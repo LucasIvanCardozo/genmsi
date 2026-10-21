@@ -1,0 +1,4 @@
+
+LOGICSWITCH               VALUE      RETRY
+  FIN                        0          0
+  HASTALAS9                  1          0

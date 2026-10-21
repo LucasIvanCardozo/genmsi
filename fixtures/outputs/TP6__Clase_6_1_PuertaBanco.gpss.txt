@@ -1,0 +1,18 @@
+                GENERATE        90,30,2700  
+A_Queue         QUEUE           qAfuera  
+GateL           GATE    LS      Puerta  
+A_Depart        DEPART          qAfuera  
+A_FacilityUse   QUEUE           qPuerta  
+                SEIZE           Puerta  
+                DEPART          qPuerta  
+                ADVANCE         2,1  
+                RELEASE         Puerta  
+A_Advance       ADVANCE         1800,900  
+A_Terminate1    TERMINATE         
+                GENERATE        ,,3600,1  
+A_Buffer        BUFFER          
+A_Logic         LOGIC   S       Puerta
+A_Buffer1       BUFFER          
+A_Terminate     TERMINATE         
+                GENERATE        3600  
+                TERMINATE       1  

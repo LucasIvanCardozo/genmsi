@@ -1,0 +1,91 @@
+                INITIAL         X$CountVac,1000  
+acreditacon     STORAGE         3  
+Horario         FUNCTION        AC1,D4   
+10800,3/18000,2/25200,10/36000,6
+Expon           FUNCTION        RN2,C24   
+0,0/0.1,0.104/0.2,0.222/0.3,0.355/0.4,0.509/0.5,0.69/0.6,0.915/0.7,1.2/0.75,1.38/0.8,1.6/0.84,1.83/0.88,2.12/0.9,2.3/0.92,2.52/0.94,2.81/0.95,2.99/0.96,3.2/0.97,3.5/0.98,3.9/0.99,4.6/0.995,5.3/0.998,6.2/0.999,7.0/0.9997,8.0
+calculo         VARIABLE        (1+((X$paradescongelar-X$descongeladas)@5))#5  
+faltantes       VARIABLE        P$vacunasdesc+X$descongeladas-X$paradescongelar  
+tiempo demora   QTABLE          qtiempototal,0,600,20  
+Tabla1          TABLE           AC1,1,1,10  
+vacunasfaltantes TABLE           V$faltantes,0,10,20  
+                GENERATE        FN$Horario,FN$Expon  
+A_Queue         QUEUE           qtiempototal  
+A_FacilityUse   QUEUE           qrecepcion  
+                SEIZE           recepcion  
+                DEPART          qrecepcion  
+                ADVANCE         25,8  
+                RELEASE         recepcion  
+Entrada1        TRANSFER        999,A_Terminate,StorageUse  
+StorageUse      QUEUE           qacreditacion,3  
+                ENTER           acreditacion,3  
+                DEPART          qacreditacion,3  
+                ADVANCE         300,120  
+                LEAVE           acreditacion,3  
+A_Counter1      SAVEVALUE       CountPaciente+,1  
+                ASSIGN          NroPaciente,X$CountPaciente  
+A_SaveValue     SAVEVALUE       paradescongelar+,1  
+A_JoinMe        JOIN            espera  
+A_Link          LINK            espera,FIFO  
+                GENERATE        1,,,4  
+A_Counter       SAVEVALUE       CountVac+,1  
+                ASSIGN          vacunadores,X$CountVac  
+A_Unlink3       UNLINK   E       vacunasdisp,A_Terminate3,1,Otro,0,A_Advance7  
+A_SaveValue2    SAVEVALUE       paradescongelar-,1  
+A_SaveValue3    SAVEVALUE       descongeladas-,1  
+A_Advance6      ADVANCE         10,5  
+A_Scan1         SCAN    MIN     espera,NroPaciente,,NroPaciente,actualatendido  
+A_RemoveTrans1  REMOVE   E       espera,1,,NroPaciente,P$actualatendido  
+A_Unlink1       UNLINK   E       espera,A_Link3,1,NroPaciente,P$actualatendido  
+A_FacilityUse1  SEIZE           *vacunadores  
+                ADVANCE         120,15  
+                RELEASE         *vacunadores  
+A_Unlink2       UNLINK   E       atencion,A_Queue1,1,NroPaciente,P$actualatendido  
+A_Assign2       ASSIGN          pausa+,1  
+A_Test1         TEST    E       P$pausa,20,A_Unlink3  
+A_Advance8      ADVANCE         900,0  
+A_Assign3       ASSIGN          pausa,0  
+                TRANSFER        ,A_Unlink3  
+A_Queue1        QUEUE           qpostvacunacion  
+A_Assign1       ASSIGN          tiempo,0  
+A_Assign4       ASSIGN          decremento,1201  
+A_Advance9      ADVANCE         1  
+A_Assign5       ASSIGN          tiempo+,1  
+A_Loop          LOOP            decremento,A_Advance9  
+A_Link2         LINK            postvacuna,FIFO  
+A_Link3         LINK            atencion,FIFO  
+A_Terminate3    TERMINATE         
+A_Advance7      ADVANCE         30,10  
+                TRANSFER        ,A_Unlink3  
+A_Terminate     TERMINATE         
+                GENERATE        ,,,1  
+A_Advance       ADVANCE         30,5  
+A_Assign        ASSIGN          vacunasdesc,V$calculo  
+A_Test          TEST    GE      P$vacunasdesc,5,A_Unlink  
+A_Advance2      ADVANCE         480  
+A_Tabulate      TABULATE        vacunasfaltantes  
+Clona1          SPLIT           P$vacunasdesc,A_Advance3  
+A_Match1        TRANSFER        ,sigue  
+sigue           MATCH           vaclistas  
+A_Unlink        UNLINK           postvacuna,A_Depart1,1,,,A_Advance5  
+A_Advance4      ADVANCE         10,3  
+                TRANSFER        ,A_Unlink  
+A_Depart1       DEPART          qpostvacunacion  
+A_Advance1      ADVANCE         20,7  
+A_Depart        DEPART          qtiempototal  
+A_Terminate1    TERMINATE         
+A_Advance5      ADVANCE         300,120  
+                TRANSFER        ,A_Advance  
+A_Advance3      ADVANCE         2,1  
+A_Assemble      ASSEMBLE        P$vacunasdesc  
+A_Match         TRANSFER        ,vaclistas  
+vaclistas       MATCH           sigue  
+Clona           SPLIT           P$vacunasdesc,A_SaveValue1  
+A_Terminate2    TERMINATE         
+A_SaveValue1    SAVEVALUE       descongeladas+,1  
+A_Link1         LINK            vacunasdisp,FIFO  
+                GENERATE        3600  
+                TERMINATE       1  
+                GENERATE        3600  
+A_Tabulate1     TABULATE        Tabla,Q$qpostvacunacion  
+A_Terminate4    TERMINATE         

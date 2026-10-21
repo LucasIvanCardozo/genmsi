@@ -1,0 +1,57 @@
+FuncMediaCocina FUNCTION        P$tipoCombo,D8   
+1,120/2,140/3,160/4,180/5,90/6,115/7,125/8,190
+FuncDistCombo   FUNCTION        RN3,D8   
+0.25,1/0.43,2/0.58,3/0.63,4/0.77,5/0.85,6/0.91,7/1,8
+Cocina          STORAGE         8  
+mediaCocina     VARIABLE        FN$FuncMediaCocina+P$paraLlevar#30  
+modificadorCocina VARIABLE        FN$Expon+15#P$paraLlevar  
+fliaMas1        VARIABLE        1+P$personasXFlia  
+cantCajas       VARIABLE        5  
+Expon           FUNCTION        RN2,C24   
+0,0/0.1,0.104/0.2,0.222/0.3,0.355/0.4,0.509/0.5,0.69/0.6,0.915/0.7,1.2/0.75,1.38/0.8,1.6/0.84,1.83/0.88,2.12/0.9,2.3/0.92,2.52/0.94,2.81/0.95,2.99/0.96,3.2/0.97,3.5/0.98,3.9/0.99,4.6/0.995,5.3/0.998,6.2/0.999,7.0/0.9997,8.0
+personasXFlia   VARIABLE        ((RN80#1000)+RN80)@(1+(5)-(1))+(1)  
+                GENERATE        90,FN$Expon  
+A_Assign        ASSIGN          personasXFlia,V$personasXFlia  
+Entrada1        TRANSFER        150,A_Advance2,A_Assign3  
+A_Assign3       ASSIGN          tieneAuto,1  
+A_Advance       ADVANCE         120,60  
+A_Advance1      ADVANCE         78,36  
+Clona           SPLIT           1,A_Advance2  
+A_Assemble2     ASSEMBLE        2  
+A_Terminate     TERMINATE         
+A_Advance2      ADVANCE         35,15  
+A_SelectF       SELECT   NU      caja,1,V$cantCajas,,,A_Select 
+Clona1          SPLIT           P$personasXFlia,A_Advance3  
+A_Queue         QUEUE           *caja  
+A_Seize         SEIZE           *caja  
+A_Depart        DEPART          *caja  
+A_Match1        TRANSFER        ,ESPERA  
+ESPERA          MATCH           PIENSA  
+A_Advance4      ADVANCE         240,60  
+A_Release       RELEASE         *caja  
+Entrada11       TRANSFER        230,Clona2,A_Assign1  
+A_Assign1       ASSIGN          paraLlevar,1  
+Clona2          SPLIT           V$personasXFlia,A_Assign2  
+A_Assemble1     ASSEMBLE        V$fliaMas1  
+A_Advance5      ADVANCE         12,5  
+A_Test          TEST    E       P$paraLlevar,1,A_Test1  
+A_Advance6      ADVANCE         2700,900  
+A_Test1         TEST    E       P$tieneAuto,1,A_Terminate  
+A_Advance7      ADVANCE         83,24  
+                TRANSFER        ,A_Assemble2  
+A_Assign2       ASSIGN          tipoCombo,FN$FuncDistCombo  
+StorageUse      QUEUE           qCocina  
+                ENTER           Cocina  
+                DEPART          qCocina  
+                ADVANCE         V$mediaCocina,V$modificadorCocina  
+                LEAVE           Cocina  
+                TRANSFER        ,A_Assemble1  
+A_Advance3      ADVANCE         180,90  
+A_Assemble3     ASSEMBLE        P$personasXFlia  
+A_Match         TRANSFER        ,PIENSA  
+PIENSA          MATCH           ESPERA  
+A_Terminate1    TERMINATE         
+A_Select        SELECT   MIN     caja,1,V$cantCajas,,Q 
+                TRANSFER        ,Clona1  
+                GENERATE        3600  
+                TERMINATE       1  

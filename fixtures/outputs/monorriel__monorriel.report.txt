@@ -1,0 +1,488 @@
+                             Reporte MicroVisualSIS
+
+ START_TIME    END_TIME     BLOCKS    FACILITIES    STORAGES
+        0         3600        32           0            0
+
+ LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE                                 
+         COUNT   COUNT   
+   10        1       0     0              1  GENERATE        ,,,1                       
+   11       24       0     0       A_Assign  ASSIGN          Parada,V$Parada            
+   12       24       0     0      A_Advance  ADVANCE         5,2                        
+   13       24       0     0    A_Tabulate2  TABULATE        TablaParada,1              
+   14      313       0     0      A_Unlink1  UNLINK   E       Monorriel,A_Tabulate1,1,Salida,P$Parada,A_Unlink
+   15      289       0     0     A_Advance2  ADVANCE         3,2                        
+   16      289       0     0              7  TRANSFER        ,A_Unlink1                 
+   17      289       0     0    A_Tabulate1  TABULATE        TablaBajada,1              
+   18      289       0     0       Entrada1  TRANSFER        600,A_Terminate,A_Advance3 
+   19      176     173     0     A_Advance3  ADVANCE         7200,5400                  
+   20        3       0     0      A_Assign3  ASSIGN          Aux,P$Entrada              
+   21        3       0     0      A_Assign5  ASSIGN          Entrada,P$Salida           
+   22        3       0     0      A_Assign4  ASSIGN          Salida,P$Aux               
+   23        3       0     0       A_Queue1  QUEUE           *Entrada                   
+   24        3       3     0        A_Link2  LINK            *Entrada,FIFO              
+   25      113       0     0    A_Terminate  TERMINATE                                  
+   26      528       0     0       A_Unlink  UNLINK   E       *Parada,A_Tabulate,1,Entrada,P$Parada,A_Advance1
+   27      504       0     0    A_Advance21  ADVANCE         3,2                        
+   28      504       0     0             19  TRANSFER        ,A_Unlink                  
+   29      504       0     0     A_Tabulate  TABULATE        TablaSubida,1              
+   30      504       0     0       A_Depart  DEPART          *Entrada                   
+   31      504     215     0        A_Link1  LINK            Monorriel,FIFO             
+   32       24       1     0     A_Advance1  ADVANCE         FN$MediaViaje,5            
+   33       23       0     0             24  TRANSFER        ,A_Assign                  
+   34        2       1     0             25  GENERATE        3600                       
+   35        1       0     0             26  TERMINATE       1                          
+   36      743       1     0             27  GENERATE        5,3                        
+   37      742       0     0      A_Assign1  ASSIGN          Entrada,FN$ProbArribo      
+   38      825       0     0      A_Assign2  ASSIGN          Salida,V$ProbSalida        
+   39      825       0     0         A_Test  TEST    NE      P$Entrada,P$Salida,A_Assign2
+   40      742       0     0        A_Queue  QUEUE           *Entrada                   
+   41      742     238     0         A_Link  LINK            *Entrada,FIFO              
+
+QUEUE            MAX  CONT. ENTRIES ENTRIES(0) AVE.CONT. AVE.TIME AVE.(-0) RETRY
+  1               26    26      66         0    10,904    594,788  594,788    0
+  2               66    30     145         0    26,024    646,117  646,117    0
+  3               35     5      61         0    10,687    630,705  630,705    0
+  4               72     2     130         0    29,864    827,008  827,008    0
+  5               61    61     107         0    22,692    763,458  763,458    0
+  6               45    45      74         0    15,470    752,581  752,581    0
+  7               22    22      36         0     7,792    779,167  779,167    0
+  8               27    20      51         0    10,441    737,020  737,020    0
+  9               22    22      50         0     9,016    649,160  649,160    0
+  10              11     8      25         0     3,137    451,720  451,720    0
+
+TABLAS
+
+TablaParada     TABLE           P$Parada,1,1,10  
+    MEDIA              : 5,000
+    DESVIACION ESTANDAR: 2,949
+    CANTIDAD EN RETRY  : 0
+
+    INTERVALO         FRECUENCIA     %     %ACUMULADO     %REMANENTE
+    0   -  1                3     12,500      12,500         87,500
+    2   -  2                3     12,500      25,000         75,000
+    3   -  3                3     12,500      37,500         62,500
+    4   -  4                3     12,500      50,000         50,000
+    5   -  5                2      8,333      58,333         41,667
+    6   -  6                2      8,333      66,667         33,333
+    7   -  7                2      8,333      75,000         25,000
+    8   -  8                2      8,333      83,333         16,667
+    9   -  9                2      8,333      91,667          8,333
+    >   a  9                2      8,333     100,000          0,000
+
+    MEDIA OVERFLOW                : 10,000
+    DESVIACION ESTANDAR OVERFLOW  : 0,000
+
+    CANTIDAD DE VALORES TABULADOS : 24
+    VALOR MAXIMO TABULADO         : 10,000
+
+
+TablaBajada     TABLE           P$Salida,1,1,10  
+    MEDIA              : 5,394
+    DESVIACION ESTANDAR: 2,945
+    CANTIDAD EN RETRY  : 0
+
+    INTERVALO         FRECUENCIA     %     %ACUMULADO     %REMANENTE
+    0   -  1               26      8,997       8,997         91,003
+    2   -  2               29     10,035      19,031         80,969
+    3   -  3               43     14,879      33,910         66,090
+    4   -  4               41     14,187      48,097         51,903
+    5   -  5               14      4,844      52,941         47,059
+    6   -  6               25      8,651      61,592         38,408
+    7   -  7               21      7,266      68,858         31,142
+    8   -  8               29     10,035      78,893         21,107
+    9   -  9               27      9,343      88,235         11,765
+    >   a  9               34     11,765     100,000          0,000
+
+    MEDIA OVERFLOW                : 10,000
+    DESVIACION ESTANDAR OVERFLOW  : 0,000
+
+    CANTIDAD DE VALORES TABULADOS : 289
+    VALOR MAXIMO TABULADO         : 10,000
+
+
+TablaSubida     TABLE           P$Entrada,1,1,10  
+    MEDIA              : 4,210
+    DESVIACION ESTANDAR: 2,422
+    CANTIDAD EN RETRY  : 0
+
+    INTERVALO         FRECUENCIA     %     %ACUMULADO     %REMANENTE
+    0   -  1               40      7,937       7,937         92,063
+    2   -  2              115     22,817      30,754         69,246
+    3   -  3               56     11,111      41,865         58,135
+    4   -  4              128     25,397      67,262         32,738
+    5   -  5               46      9,127      76,389         23,611
+    6   -  6               29      5,754      82,143         17,857
+    7   -  7               14      2,778      84,921         15,079
+    8   -  8               31      6,151      91,071          8,929
+    9   -  9               28      5,556      96,627          3,373
+    >   a  9               17      3,373     100,000          0,000
+
+    MEDIA OVERFLOW                : 10,000
+    DESVIACION ESTANDAR OVERFLOW  : 0,000
+
+    CANTIDAD DE VALORES TABULADOS : 504
+    VALOR MAXIMO TABULADO         : 10,000
+
+USER_CHAIN       CHAIN_SIZE   RETRY   AVE.CONT   ENTRIES    MAX     AVE.TIME
+  MONORRIEL            215       0     96,427       504     215      688,762
+  1                     26       0     10,904        66      26      594,788
+  2                     30       0     26,024       145      66      646,117
+  3                      5       0     10,687        61      35      630,705
+  4                      2       0     29,864       130      72      827,008
+  5                     61       0     22,692       107      61      763,458
+  6                     45       0     15,470        74      45      752,581
+  7                     22       0      7,792        36      22      779,167
+  8                     20       0     10,441        51      26      737,020
+  9                     22       0      9,016        50      22      649,160
+  10                     8       0      3,137        25      11      451,720
+
+FEC_XACT_NUMBER    PRI      BDT    CURRENT   NEXT   PARAMETER   VALUE
+             1      0       3605       23      24   PARADA          4
+           745      0       3607       27      27
+           193      0       3921       10      11   SALIDA          7
+                                                    ENTRADA         6
+           190      0       4160       10      11   SALIDA          5
+                                                    ENTRADA         2
+           222      0       4312       10      11   SALIDA          1
+                                                    ENTRADA         4
+            62      0       4400       10      11   SALIDA          6
+                                                    ENTRADA         9
+            80      0       4475       10      11   SALIDA          8
+                                                    ENTRADA         2
+            74      0       4529       10      11   SALIDA          9
+                                                    ENTRADA         2
+           261      0       4554       10      11   SALIDA          1
+                                                    ENTRADA         8
+           140      0       4585       10      11   SALIDA          6
+                                                    ENTRADA         5
+             5      0       4585       10      11   SALIDA         10
+                                                    ENTRADA         5
+           139      0       4722       10      11   SALIDA          2
+                                                    ENTRADA         5
+            26      0       4737       10      11   SALIDA          8
+                                                    ENTRADA         2
+            95      0       4761       10      11   SALIDA          7
+                                                    ENTRADA         4
+           203      0       4786       10      11   SALIDA          2
+                                                    ENTRADA         5
+           319      0       4895       10      11   SALIDA          3
+                                                    ENTRADA         6
+           185      0       4989       10      11   SALIDA          6
+                                                    ENTRADA         5
+           122      0       4990       10      11   SALIDA          7
+                                                    ENTRADA         2
+           318      0       5016       10      11   SALIDA          3
+                                                    ENTRADA         9
+           293      0       5054       10      11   SALIDA          1
+                                                    ENTRADA         5
+           238      0       5154       10      11   SALIDA          8
+                                                    ENTRADA         7
+            81      0       5325       10      11   SALIDA         10
+                                                    ENTRADA         2
+            89      0       5449       10      11   SALIDA         10
+                                                    ENTRADA         4
+            92      0       5518       10      11   SALIDA         10
+                                                    ENTRADA         9
+            98      0       5564       10      11   SALIDA          8
+                                                    ENTRADA         1
+             7      0       5698       10      11   SALIDA          6
+                                                    ENTRADA         2
+           146      0       5823       10      11   SALIDA          5
+                                                    ENTRADA         2
+            10      0       5941       10      11   SALIDA          5
+                                                    ENTRADA         4
+           154      0       5955       10      11   SALIDA          4
+                                                    ENTRADA         2
+           247      0       6002       10      11   SALIDA          9
+                                                    ENTRADA         4
+           124      0       6014       10      11   SALIDA          4
+                                                    ENTRADA         8
+           123      0       6043       10      11   SALIDA          5
+                                                    ENTRADA        10
+           249      0       6054       10      11   SALIDA         10
+                                                    ENTRADA         6
+            25      0       6054       10      11   SALIDA          7
+                                                    ENTRADA         1
+            56      0       6136       10      11   SALIDA          8
+                                                    ENTRADA         2
+           395      0       6139       10      11   SALIDA          2
+                                                    ENTRADA         9
+           235      0       6144       10      11   SALIDA          1
+                                                    ENTRADA         5
+           157      0       6180       10      11   SALIDA          8
+                                                    ENTRADA         5
+            86      0       6180       10      11   SALIDA          5
+                                                    ENTRADA         1
+            83      0       6200       10      11   SALIDA          7
+                                                    ENTRADA         4
+            33      0       6202       10      11   SALIDA          9
+                                                    ENTRADA         8
+            36      0       6283       10      11   SALIDA          3
+                                                    ENTRADA         7
+            75      0       6328       10      11   SALIDA          9
+                                                    ENTRADA         2
+            27      0       6335       10      11   SALIDA          6
+                                                    ENTRADA         2
+            78      0       6371       10      11   SALIDA          9
+                                                    ENTRADA         1
+            40      0       6585       10      11   SALIDA         10
+                                                    ENTRADA         2
+           257      0       6790       10      11   SALIDA          8
+                                                    ENTRADA         4
+           232      0       6817       10      11   SALIDA         10
+                                                    ENTRADA         7
+           213      0       6855       10      11   SALIDA          1
+                                                    ENTRADA         9
+           105      0       6884       10      11   SALIDA          3
+                                                    ENTRADA         1
+            29      0       6896       10      11   SALIDA         10
+                                                    ENTRADA         4
+           160      0       6958       10      11   SALIDA          1
+                                                    ENTRADA         3
+            85      0       6996       10      11   SALIDA          3
+                                                    ENTRADA         5
+           285      0       7010       10      11   SALIDA          3
+                                                    ENTRADA         6
+           746      0       7200       25      25
+           254      0       7231       10      11   SALIDA          1
+                                                    ENTRADA         4
+           304      0       7326       10      11   SALIDA          1
+                                                    ENTRADA         8
+           148      0       7503       10      11   SALIDA          6
+                                                    ENTRADA         5
+            97      0       7505       10      11   SALIDA          3
+                                                    ENTRADA         5
+           106      0       7538       10      11   SALIDA          7
+                                                    ENTRADA         5
+           329      0       7640       10      11   SALIDA          3
+                                                    ENTRADA         1
+           458      0       7726       10      11   SALIDA          4
+                                                    ENTRADA         2
+           287      0       7748       10      11   SALIDA          1
+                                                    ENTRADA         8
+            69      0       7882       10      11   SALIDA          7
+                                                    ENTRADA         5
+            51      0       7928       10      11   SALIDA          5
+                                                    ENTRADA         1
+            71      0       7980       10      11   SALIDA          8
+                                                    ENTRADA         5
+           339      0       7995       10      11   SALIDA          3
+                                                    ENTRADA         2
+           225      0       8009       10      11   SALIDA          1
+                                                    ENTRADA         5
+           229      0       8062       10      11   SALIDA          9
+                                                    ENTRADA         6
+           104      0       8135       10      11   SALIDA          1
+                                                    ENTRADA         2
+           137      0       8177       10      11   SALIDA          9
+                                                    ENTRADA         4
+            88      0       8218       10      11   SALIDA          9
+                                                    ENTRADA         2
+            52      0       8277       10      11   SALIDA          9
+                                                    ENTRADA         3
+           186      0       8288       10      11   SALIDA          7
+                                                    ENTRADA         3
+           121      0       8342       10      11   SALIDA          3
+                                                    ENTRADA         1
+           145      0       8361       10      11   SALIDA          7
+                                                    ENTRADA         3
+           100      0       8385       10      11   SALIDA          4
+                                                    ENTRADA         2
+           183      0       8397       10      11   SALIDA          4
+                                                    ENTRADA         6
+            87      0       8403       10      11   SALIDA          9
+                                                    ENTRADA         2
+           136      0       8441       10      11   SALIDA          1
+                                                    ENTRADA         2
+           294      0       8528       10      11   SALIDA          8
+                                                    ENTRADA         6
+           155      0       8532       10      11   SALIDA          6
+                                                    ENTRADA         1
+           246      0       8675       10      11   SALIDA          3
+                                                    ENTRADA         2
+            23      0       8706       10      11   SALIDA          6
+                                                    ENTRADA         5
+           387      0       8802       10      11   SALIDA          3
+                                                    ENTRADA         8
+           113      0       8825       10      11   SALIDA          2
+                                                    ENTRADA         4
+           272      0       8955       10      11   SALIDA          4
+                                                    ENTRADA         5
+           431      0       8963       10      11   SALIDA          3
+                                                    ENTRADA         2
+            41      0       9059       10      11   SALIDA          6
+                                                    ENTRADA         7
+           214      0       9133       10      11   SALIDA          1
+                                                    ENTRADA         4
+           182      0       9191       10      11   SALIDA          2
+                                                    ENTRADA         6
+           149      0       9211       10      11   SALIDA          9
+                                                    ENTRADA         4
+           314      0       9255       10      11   SALIDA          9
+                                                    ENTRADA         6
+             9      0       9425       10      11   SALIDA          7
+                                                    ENTRADA         5
+            34      0       9441       10      11   SALIDA          6
+                                                    ENTRADA         2
+           240      0       9479       10      11   SALIDA          6
+                                                    ENTRADA         4
+           435      0       9559       10      11   SALIDA          1
+                                                    ENTRADA        10
+           241      0       9674       10      11   SALIDA          3
+                                                    ENTRADA         9
+           275      0       9685       10      11   SALIDA          9
+                                                    ENTRADA         8
+            18      0       9765       10      11   SALIDA          2
+                                                    ENTRADA         3
+           101      0       9777       10      11   SALIDA          4
+                                                    ENTRADA         2
+           142      0       9779       10      11   SALIDA          1
+                                                    ENTRADA         4
+            19      0       9801       10      11   SALIDA          2
+                                                    ENTRADA         4
+           147      0       9808       10      11   SALIDA          2
+                                                    ENTRADA         5
+            63      0       9841       10      11   SALIDA         10
+                                                    ENTRADA         9
+           112      0      10015       10      11   SALIDA          5
+                                                    ENTRADA         4
+            72      0      10019       10      11   SALIDA          3
+                                                    ENTRADA         1
+           173      0      10215       10      11   SALIDA         10
+                                                    ENTRADA         4
+           138      0      10343       10      11   SALIDA         10
+                                                    ENTRADA         7
+            48      0      10376       10      11   SALIDA         10
+                                                    ENTRADA         3
+           170      0      10446       10      11   SALIDA          8
+                                                    ENTRADA         6
+           268      0      10537       10      11   SALIDA          4
+                                                    ENTRADA         5
+            12      0      10702       10      11   SALIDA          8
+                                                    ENTRADA         9
+            79      0      10743       10      11   SALIDA          8
+                                                    ENTRADA         4
+             4      0      10770       10      11   SALIDA          5
+                                                    ENTRADA         2
+            39      0      10904       10      11   SALIDA          9
+                                                    ENTRADA         7
+           107      0      10963       10      11   SALIDA         10
+                                                    ENTRADA         4
+            53      0      10977       10      11   SALIDA          5
+                                                    ENTRADA         2
+           406      0      11068       10      11   SALIDA          2
+                                                    ENTRADA        10
+            38      0      11107       10      11   SALIDA          8
+                                                    ENTRADA         2
+           449      0      11110       10      11   SALIDA          4
+                                                    ENTRADA        10
+           163      0      11152       10      11   SALIDA         10
+                                                    ENTRADA         5
+           194      0      11152       10      11   SALIDA          6
+                                                    ENTRADA         3
+            66      0      11172       10      11   SALIDA          6
+                                                    ENTRADA         2
+           311      0      11283       10      11   SALIDA          8
+                                                    ENTRADA         6
+           564      0      11382       10      11   SALIDA          4
+                                                    ENTRADA         2
+             6      0      11540       10      11   SALIDA          8
+                                                    ENTRADA         5
+            21      0      11779       10      11   SALIDA         10
+                                                    ENTRADA         8
+           504      0      11789       10      11   SALIDA          3
+                                                    ENTRADA         2
+           309      0      11796       10      11   SALIDA          1
+                                                    ENTRADA        10
+           167      0      11848       10      11   SALIDA          7
+                                                    ENTRADA         5
+            54      0      11888       10      11   SALIDA          3
+                                                    ENTRADA         4
+            77      0      11889       10      11   SALIDA          3
+                                                    ENTRADA        10
+            28      0      11942       10      11   SALIDA          7
+                                                    ENTRADA         5
+            67      0      11948       10      11   SALIDA          4
+                                                    ENTRADA         1
+           118      0      12075       10      11   SALIDA          4
+                                                    ENTRADA         2
+            46      0      12156       10      11   SALIDA          9
+                                                    ENTRADA         7
+           114      0      12202       10      11   SALIDA          2
+                                                    ENTRADA         1
+           150      0      12229       10      11   SALIDA          1
+                                                    ENTRADA         6
+            47      0      12259       10      11   SALIDA          1
+                                                    ENTRADA         9
+            16      0      12346       10      11   SALIDA          4
+                                                    ENTRADA         9
+           270      0      12487       10      11   SALIDA          1
+                                                    ENTRADA         6
+            90      0      12515       10      11   SALIDA          8
+                                                    ENTRADA         3
+            14      0      12538       10      11   SALIDA         10
+                                                    ENTRADA         3
+           251      0      12551       10      11   SALIDA          2
+                                                    ENTRADA         6
+           119      0      12621       10      11   SALIDA          2
+                                                    ENTRADA         9
+           248      0      12844       10      11   SALIDA          4
+                                                    ENTRADA         6
+           377      0      12945       10      11   SALIDA          2
+                                                    ENTRADA         9
+           103      0      12973       10      11   SALIDA          6
+                                                    ENTRADA         5
+           195      0      12986       10      11   SALIDA          2
+                                                    ENTRADA         6
+           162      0      13023       10      11   SALIDA          5
+                                                    ENTRADA         4
+           244      0      13027       10      11   SALIDA          3
+                                                    ENTRADA         7
+            99      0      13097       10      11   SALIDA          3
+                                                    ENTRADA         4
+           143      0      13099       10      11   SALIDA          3
+                                                    ENTRADA         5
+            13      0      13100       10      11   SALIDA         10
+                                                    ENTRADA         5
+           250      0      13151       10      11   SALIDA          8
+                                                    ENTRADA         4
+           300      0      13208       10      11   SALIDA          3
+                                                    ENTRADA         8
+            94      0      13257       10      11   SALIDA          8
+                                                    ENTRADA         4
+           278      0      13288       10      11   SALIDA         10
+                                                    ENTRADA         8
+           211      0      13300       10      11   SALIDA         10
+                                                    ENTRADA         4
+           188      0      13343       10      11   SALIDA          4
+                                                    ENTRADA         5
+           283      0      13359       10      11   SALIDA          3
+                                                    ENTRADA         9
+           383      0      13388       10      11   SALIDA         10
+                                                    ENTRADA         8
+           486      0      13430       10      11   SALIDA          3
+                                                    ENTRADA         2
+            70      0      13523       10      11   SALIDA          9
+                                                    ENTRADA        10
+           172      0      13533       10      11   SALIDA          9
+                                                    ENTRADA         3
+            84      0      13625       10      11   SALIDA          3
+                                                    ENTRADA         2
+           253      0      13873       10      11   SALIDA          2
+                                                    ENTRADA         4
+            96      0      14008       10      11   SALIDA          8
+                                                    ENTRADA         2
+           231      0      14166       10      11   SALIDA          8
+                                                    ENTRADA         5
+           126      0      14289       10      11   SALIDA         10
+                                                    ENTRADA         4
+           236      0      14534       10      11   SALIDA          4
+                                                    ENTRADA         7
+           343      0      14731       10      11   SALIDA          3
+                                                    ENTRADA         2
+           117      0      14796       10      11   SALIDA          3
+                                                    ENTRADA         4
+           259      0      15589       10      11   SALIDA          3
+                                                    ENTRADA         2
+           424      0      15768       10      11   SALIDA          4
+                                                    ENTRADA         9

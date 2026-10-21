@@ -1,0 +1,21 @@
+                GENERATE        3600  
+                TERMINATE       1  
+                GENERATE        900,300,,,10  
+A_Assign        ASSIGN          Veces,3  
+GateF           GATE    NU      Juan,A_Advance  
+A_FacilityUse   QUEUE           qJefe  
+                SEIZE           Juan  
+                DEPART          qJefe  
+                ADVANCE         180,120  
+                RELEASE         Juan  
+A_Terminate     TERMINATE         
+A_Advance       ADVANCE         60,30  
+A_Loop          LOOP            Veces,GateF  
+                TRANSFER        ,A_FacilityUse  
+                GENERATE        120,60  
+A_FacilityUse1  QUEUE           qClientes  
+                SEIZE           Juan  
+                DEPART          qClientes  
+                ADVANCE         90,60  
+                RELEASE         Juan  
+A_Terminate1    TERMINATE         

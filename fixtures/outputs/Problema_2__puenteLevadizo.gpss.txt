@@ -1,0 +1,8 @@
+Autopista       STORAGE         80  
+Func            FUNCTION        P$Param,D2   
+1,1/2,2
+                GENERATE        5,30  
+                GENERATE        0,0,,1  
+A_Advance       ADVANCE         3600,0  
+A_Logic         LOGIC   S       1
+A_Logic1        LOGIC   R       1

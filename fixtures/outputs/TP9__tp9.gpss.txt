@@ -1,0 +1,76 @@
+EnCuadra        STORAGE         1  
+                GENERATE        8,,,45  
+A_Counter       SAVEVALUE       CountSemaforo+,1  
+                ASSIGN          NroSemaforos,X$CountSemaforo  
+A_Logic         LOGIC   S       *NroSemaforos
+A_Advance       ADVANCE         50  
+A_Logic1        LOGIC   R       *NroSemaforos
+A_Advance1      ADVANCE         40  
+                TRANSFER        ,A_Logic  
+                GENERATE        ,,,1,99  
+A_JoinNumber    JOIN            GCuadras,1  
+A_JoinNumber1   JOIN            GCuadras,5  
+A_JoinNumber5   JOIN            GCuadras,9  
+A_JoinNumber4   JOIN            GCuadras,14  
+A_JoinNumber3   JOIN            GCuadras,20  
+A_JoinNumber2   JOIN            GCuadras,29  
+A_JoinNumber6   JOIN            GCuadras,33  
+A_JoinNumber8   JOIN            GCuadras,36  
+A_JoinNumber7   JOIN            GCuadras,38  
+A_JoinNumber71  JOIN            GCuadras,41  
+A_JoinNumber72  JOIN            GCuadras,43  
+A_Terminate     TERMINATE         
+                GENERATE        2400,300,,5  
+A_Counter1      SAVEVALUE       CountColectivo+,1  
+                ASSIGN          NroColectivo,X$CountColectivo  
+A_Assign        ASSIGN          Cuadra,0  
+A_Assign1       ASSIGN          Cuadra+,1  
+A_Advance2      ADVANCE         9,3  
+A_ExamineNumber EXAMINE         GCuadras,0,A_Enter  
+A_Scan          SCAN    MIN     *Cuadra,Orden,,Orden,Param  
+A_Alter         ALTER    E       ungrupo,1,param,0,otro,1 
+A_RemoveTrans   REMOVE   E       UnGrupo,1,,otro,1  
+A_Link1         LINK            *bus,FIFO  
+A_Test1         TEST    LE      CH*NroColectivo,50  
+A_Unlink        UNLINK   E       Cadena,,1,Otro,0  
+A_Enter         ENTER           EnCuadra,1  
+GateL           GATE    LS      *Cuadra  
+A_Leave         LEAVE           EnCuadra,1  
+A_Test          TEST    E       P$Cuadra,45,A_Assign1  
+A_Terminate1    TERMINATE         
+                GENERATE        60,20  
+A_Assign2       ASSIGN          Origen,1  
+A_Counter2      SAVEVALUE       Orden+,1  
+                ASSIGN          Orden,X$Orden  
+A_JoinMe        JOIN            *Origen  
+A_Link          LINK            *Origen,FIFO  
+                GENERATE        50,30  
+A_Assign21      ASSIGN          Origen,5  
+                TRANSFER        ,A_Counter2  
+                GENERATE        45,15  
+A_Assign22      ASSIGN          Origen,9  
+                TRANSFER        ,A_Counter2  
+                GENERATE        45,20  
+A_Assign23      ASSIGN          Origen,14  
+                TRANSFER        ,A_Counter2  
+                GENERATE        40,15  
+A_Assign24      ASSIGN          Origen,20  
+                TRANSFER        ,A_Counter2  
+                GENERATE        30,10  
+A_Assign25      ASSIGN          Origen,29  
+                TRANSFER        ,A_Counter2  
+                GENERATE        35,15  
+A_Assign26      ASSIGN          Origen,33  
+                TRANSFER        ,A_Counter2  
+                GENERATE        120,50  
+A_Assign261     ASSIGN          Origen,41  
+                TRANSFER        ,A_Counter2  
+                GENERATE        50,20  
+A_Assign262     ASSIGN          Origen,36  
+                TRANSFER        ,A_Counter2  
+                GENERATE        80,45  
+A_Assign263     ASSIGN          Origen,38  
+                TRANSFER        ,A_Counter2  
+                GENERATE        180,60  
+A_Assign264     ASSIGN          Origen,43  
+                TRANSFER        ,A_Counter2  

@@ -1,0 +1,30 @@
+Almacen         STORAGE         3  
+                GENERATE        60,10  
+A_FacilityUse1  QUEUE           Giratoria  
+                SEIZE           Recurso  
+                DEPART          Giratoria  
+                ADVANCE         3,2  
+                RELEASE         Recurso  
+Entrada1        TRANSFER        550,A_FacilityUse11,A_Advance  
+A_Advance       ADVANCE         5,2  
+StorageUse      QUEUE           cola  
+                ENTER           Almacen  
+                DEPART          cola  
+                ADVANCE         240,120  
+                LEAVE           Almacen  
+A_Advance1      ADVANCE         7,2  
+A_FacilityUse   QUEUE           Giratoria2  
+                SEIZE           Recurso2  
+                DEPART          Giratoria2  
+                ADVANCE         3,2  
+                RELEASE         Recurso2  
+A_Terminate     TERMINATE         
+A_FacilityUse11 QUEUE           ColaInformes  
+                SEIZE           Informes  
+                DEPART          ColaInformes  
+                ADVANCE         100,40  
+                RELEASE         Informes  
+Entrada11       TRANSFER        780,A_Terminate1,A_Advance  
+A_Terminate1    TERMINATE         
+                GENERATE        3600  
+                TERMINATE       1  

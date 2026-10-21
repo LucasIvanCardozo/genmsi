@@ -1,0 +1,143 @@
+                             Reporte MicroVisualSIS
+
+ START_TIME    END_TIME     BLOCKS    FACILITIES    STORAGES
+        0         3600        45           5            1
+
+ LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE                                 
+         COUNT   COUNT   
+   13       46       1     0              1  GENERATE        90,FN$Expon                
+   14       45       0     0       A_Assign  ASSIGN          personasXFlia,V$personasXFlia
+   15       45       0     0       Entrada1  TRANSFER        150,A_Advance2,A_Assign3   
+   16        5       0     0      A_Assign3  ASSIGN          tieneAuto,1                
+   17        5       0     0      A_Advance  ADVANCE         120,60                     
+   18        5       0     0     A_Advance1  ADVANCE         78,36                      
+   19        5       3     0          Clona  SPLIT           1,A_Advance2               
+   20        6       4     0    A_Assemble2  ASSEMBLE        2                          
+   21       19       0     0    A_Terminate  TERMINATE                                  
+   22       45       0     0     A_Advance2  ADVANCE         35,15                      
+   23       45       0     0      A_SelectF  SELECT   NU      caja,1,V$cantCajas,,,A_Select
+   24       45       0     0         Clona1  SPLIT           P$personasXFlia,A_Advance3 
+   25       45       5     0        A_Queue  QUEUE           *caja                      
+   26       40       0     0        A_Seize  SEIZE           *caja                      
+   27       40       0     0       A_Depart  DEPART          *caja                      
+   28       40       0     0       A_Match1  TRANSFER        ,ESPERA                    
+   29       40       0     0         ESPERA  MATCH           PIENSA                     
+   30       40       5     0     A_Advance4  ADVANCE         240,60                     
+   31       35       0     0      A_Release  RELEASE         *caja                      
+   32       35       0     0      Entrada11  TRANSFER        230,Clona2,A_Assign1       
+   33        9       0     0      A_Assign1  ASSIGN          paraLlevar,1               
+   34       35      17     0         Clona2  SPLIT           V$personasXFlia,A_Assign2  
+   35       98      24     0    A_Assemble1  ASSEMBLE        V$fliaMas1                 
+   36       23       0     0     A_Advance5  ADVANCE         12,5                       
+   37       23       0     0         A_Test  TEST    E       P$paraLlevar,1,A_Test1     
+   38        2       2     0     A_Advance6  ADVANCE         2700,900                   
+   39       21       0     0        A_Test1  TEST    E       P$tieneAuto,1,A_Terminate  
+   40        5       0     0     A_Advance7  ADVANCE         83,24                      
+   41        5       1     0             29  TRANSFER        ,A_Assemble2               
+   42       99       0     0      A_Assign2  ASSIGN          tipoCombo,FN$FuncDistCombo 
+   43       99       4     0     StorageUse  QUEUE           qCocina                    
+   44       95       0     0             32  ENTER           Cocina                     
+   45       95       0     0             33  DEPART          qCocina                    
+   46       95       8     0             34  ADVANCE         V$mediaCocina,V$modificadorCocina
+   47       87       0     0             35  LEAVE           Cocina                     
+   48       87       7     0             36  TRANSFER        ,A_Assemble1               
+   49      134       9     0     A_Advance3  ADVANCE         180,90                     
+   50      125       1     0    A_Assemble3  ASSEMBLE        P$personasXFlia            
+   51       43       3     0        A_Match  TRANSFER        ,PIENSA                    
+   52       40       3     0         PIENSA  MATCH           ESPERA                     
+   53       40       0     0   A_Terminate1  TERMINATE                                  
+   54       23       0     0       A_Select  SELECT   MIN     caja,1,V$cantCajas,,Q     
+   55       23       0     0             43  TRANSFER        ,Clona1                    
+   56        2       1     0             44  GENERATE        3600                       
+   57        1       0     0             45  TERMINATE       1                          
+
+FACILITY       ENTRIES  UTIL.  AVE_TIME  AVAILABLE  OWNER PEND INTER RETRY DELAY
+  1                10   0,952  342,700       1       242    0     0     0     1
+  2                10   0,838  301,700       1       245    0     0     0     1
+  3                 8   0,793  357,000       1       221    0     0     0     1
+  4                 6   0,770  462,000       1       220    0     0     0     1
+  5                 6   0,697  418,333       1       218    0     0     0     1
+
+QUEUE            MAX  CONT. ENTRIES ENTRIES(0) AVE.CONT. AVE.TIME AVE.(-0) RETRY
+  QCOCINA         11     4      99        76     0,426     15,505   66,739    0
+  1                2     1      11         3     0,403    131,818  181,250    0
+  2                2     1      11         4     0,406    132,909  208,857    0
+  3                1     1       9         5     0,200     80,000  180,000    0
+  4                1     1       7         5     0,102     52,429  183,500    0
+  5                1     1       7         5     0,089     45,857  160,500    0
+
+STORAGE           CAP. REMAIN. MIN.  MAX. ENTRIES AVL. AVE.C.  UTIL. RETRY DELAY
+  COCINA            8      0     0     8      95   1   3,593   0,449    0     4
+
+FEC_XACT_NUMBER    PRI      BDT    CURRENT   NEXT   PARAMETER   VALUE
+           263      0       3611        1       1
+           267      0       3620       37      38   CAJA            2
+                                                    PERSONASXFLIA      4
+           268      0       3622       34      35   CAJA            3
+                                                    TIPOCOMBO       5
+                                                    PERSONASXFLIA      1
+                                                    PARALLEVAR      1
+           272      0       3639       34      35   CAJA            3
+                                                    TIPOCOMBO       1
+                                                    PERSONASXFLIA      1
+                                                    PARALLEVAR      1
+           218      0       3651       18      19   CAJA            5
+                                                    PERSONASXFLIA      4
+           220      0       3657       18      19   CAJA            4
+                                                    PERSONASXFLIA      4
+           281      0       3689       37      38   CAJA            3
+                                                    TIENEAUTO       1
+                                                    PERSONASXFLIA      5
+           265      0       3691       37      38   CAJA            2
+                                                    PERSONASXFLIA      4
+           274      0       3694       34      35   CAJA            2
+                                                    TIPOCOMBO       1
+                                                    PERSONASXFLIA      2
+                                                    PARALLEVAR      1
+           264      0       3696       37      38   CAJA            2
+                                                    PERSONASXFLIA      4
+           275      0       3699       34      35   CAJA            2
+                                                    TIPOCOMBO       2
+                                                    PERSONASXFLIA      2
+                                                    PARALLEVAR      1
+           270      0       3704       34      35   CAJA            3
+                                                    TIPOCOMBO       3
+                                                    PERSONASXFLIA      1
+                                                    PARALLEVAR      1
+           277      0       3707       37      38   CAJA            3
+                                                    TIENEAUTO       1
+                                                    PERSONASXFLIA      5
+           276      0       3712       34      35   CAJA            2
+                                                    TIPOCOMBO       2
+                                                    PERSONASXFLIA      2
+                                                    PARALLEVAR      1
+           278      0       3714       37      38   CAJA            3
+                                                    TIENEAUTO       1
+                                                    PERSONASXFLIA      5
+           271      0       3722       34      35   CAJA            3
+                                                    TIPOCOMBO       8
+                                                    PERSONASXFLIA      1
+                                                    PARALLEVAR      1
+           269      0       3724       34      35   CAJA            3
+                                                    TIPOCOMBO       8
+                                                    PERSONASXFLIA      1
+                                                    PARALLEVAR      1
+           280      0       3733       37      38   CAJA            3
+                                                    TIENEAUTO       1
+                                                    PERSONASXFLIA      5
+           279      0       3746       37      38   CAJA            3
+                                                    TIENEAUTO       1
+                                                    PERSONASXFLIA      5
+           221      0       3763       18      19   CAJA            3
+                                                    PERSONASXFLIA      1
+           245      0       3789       18      19   CAJA            2
+                                                    PERSONASXFLIA      2
+           242      0       3873       18      19   CAJA            1
+                                                    PERSONASXFLIA      2
+            76      0       4236       26      27   CAJA            4
+                                                    PERSONASXFLIA      3
+                                                    PARALLEVAR      1
+            65      0       4549       26      27   CAJA            1
+                                                    PERSONASXFLIA      4
+                                                    PARALLEVAR      1
+           286      0       7200       44      44

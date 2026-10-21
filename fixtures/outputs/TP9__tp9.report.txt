@@ -1,0 +1,4 @@
+Advertencia -> No hay bloques TERMINATE con parámetro A
+
+Error en linea    35 -> El parámetro B no debe ser nulo
+

@@ -1,0 +1,36 @@
+                             Reporte MicroVisualSIS
+
+ START_TIME    END_TIME     BLOCKS    FACILITIES    STORAGES
+        0         3600        18           1            0
+
+ LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE                                 
+         COUNT   COUNT   
+    1       64       1     0              1  GENERATE        60,30                      
+    2       63       1     0      A_Advance  ADVANCE         10,5                       
+    3       62       0     0       Entrada1  TRANSFER        350,A_FacilityUse,A_FacilityUse1
+    4       18       0     0 A_FacilityUse1  QUEUE           Cola                       
+    5       18       0     0              5  SEIZE           Recurso                    
+    6       18       0     0              6  DEPART          Cola                       
+    7       18       0     0              7  ADVANCE         90,45                      
+    8       18       0     0              8  RELEASE         Recurso                    
+    9       62       0     0     A_Advance1  ADVANCE         11,7                       
+   10       62       0     0    A_Terminate  TERMINATE       0                          
+   11       44       0     0  A_FacilityUse  QUEUE           Cola                       
+   12       44       0     0             12  SEIZE           Recurso                    
+   13       44       0     0             13  DEPART          Cola                       
+   14       44       0     0             14  ADVANCE         30,10                      
+   15       44       0     0             15  RELEASE         Recurso                    
+   16       44       0     0             16  TRANSFER        ,A_Advance1                
+   17        2       1     0             17  GENERATE        3600                       
+   18        1       0     0             18  TERMINATE       1                          
+
+FACILITY       ENTRIES  UTIL.  AVE_TIME  AVAILABLE  OWNER PEND INTER RETRY DELAY
+  RECURSO          62   0,816   47,371       1         0    0     0     0     0
+
+QUEUE            MAX  CONT. ENTRIES ENTRIES(0) AVE.CONT. AVE.TIME AVE.(-0) RETRY
+  COLA             3     0      62        25     0,000      0,000    0,000    0
+
+FEC_XACT_NUMBER    PRI      BDT    CURRENT   NEXT   PARAMETER   VALUE
+            64      0       3613        2       3
+            65      0       3631        1       1
+            66      0       7200       17      17

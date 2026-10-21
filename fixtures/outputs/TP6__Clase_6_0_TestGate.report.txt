@@ -1,0 +1,5 @@
+Advertencia -> No hay bloques TERMINATE con parámetro A
+
+Error de ejecución al iniciar la simulación.
+ERROR!!
+

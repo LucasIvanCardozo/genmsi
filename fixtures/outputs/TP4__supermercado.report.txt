@@ -1,0 +1,596 @@
+                             Reporte MicroVisualSIS
+
+ START_TIME    END_TIME     BLOCKS    FACILITIES    STORAGES
+        0         3600        68           4            0
+
+ LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE                                 
+         COUNT   COUNT   
+   29        2       1     0              1  GENERATE        3600                       
+   30        1       0     0              2  TERMINATE       1                          
+   31      259       1     0              3  GENERATE        FN$MediaClientes,FN$ModificadorClientes
+   32      258       0     0       A_Assign  ASSIGN          TipoCliente,FN$ProbCliente 
+   33      258       0     0       A_Queue2  QUEUE           QPersonasSuper             
+   34      258       0     0      A_Advance  ADVANCE         8,3                        
+   35      258       0     0       Entrada1  TRANSFER        FN$PValue,A_Queue3,A_FacilityUse
+   36       23       0     0  A_FacilityUse  QUEUE           qPromotora                 
+   37       23       0     0              9  SEIZE           Promotora                  
+   38       23       0     0             10  DEPART          qPromotora                 
+   39       23       0     0             11  ADVANCE         25,5                       
+   40       23       0     0             12  RELEASE         Promotora                  
+   41       23       0     0     A_Advance4  ADVANCE         6,4                        
+   42       23       0     0      Entrada12  TRANSFER        100,A_Advance1,A_FacilityUse1
+   43        2       0     0 A_FacilityUse1  QUEUE           qPromotora                 
+   44        2       0     0             16  SEIZE           Promotora                  
+   45        2       0     0             17  DEPART          qPromotora                 
+   46        2       0     0             18  ADVANCE         25,5                       
+   47        2       0     0             19  RELEASE         Promotora                  
+   48        2       0     0    A_Advance41  ADVANCE         6,4                        
+   49       23       0     0     A_Advance1  ADVANCE         13,7                       
+   50      258       0     0       A_Queue3  QUEUE           QGondolas                  
+   51      258       0     0     A_Tabulate  TABULATE        TGondolas,1                
+   52      258       0     0    A_Assign211  ASSIGN          auxN,FN$NValue             
+   53     1100     213     0   A_Advance811  ADVANCE         420,180                    
+   54      887       0     0      A_Loop111  LOOP            auxN,A_Advance811          
+   55       45       0     0      A_Depart3  DEPART          QGondolas                  
+   56       45       0     0    A_Advance11  ADVANCE         11,5                       
+   57       45       0     0      Entrada11  TRANSFER        FN$QValue,A_Advance12,A_Tabulate1
+   58        4       0     0    A_Tabulate1  TABULATE        TPatio,1                   
+   59        4       0     0     A_Advance6  ADVANCE         FN$XValue,V$YValue         
+   60        4       2     0     A_Advance2  ADVANCE         20,15                      
+   61       43       0     0      A_SelectF  SELECT   NU      caja,1,X$ZValue,,,A_Select
+   62       43       0     0        A_Queue  QUEUE           QCajas                     
+   63       43       0     0       A_Queue1  QUEUE           *caja                      
+   64       43       0     0       A_Seize1  SEIZE           *caja                      
+   65       43       0     0      A_Depart1  DEPART          *caja                      
+   66       43       0     0       A_Depart  DEPART          QCajas                     
+   67       43       0     0     A_Assign21  ASSIGN          auxN,FN$NValue             
+   68      192       1     0    A_Advance81  ADVANCE         2,1                        
+   69      191       0     0       A_Loop11  LOOP            auxN,A_Advance81           
+   70       42       2     0     A_Advance7  ADVANCE         30,15                      
+   71       40       0     0     A_Release1  RELEASE         *caja                      
+   72       40       0     0     A_Advance3  ADVANCE         18,6                       
+   73       40       0     0      A_Depart2  DEPART          QPersonasSuper             
+   74       40       0     0    A_Terminate  TERMINATE                                  
+   75        3       0     0       A_Select  SELECT   MIN     caja,1,X$ZValue,,Q        
+   76        3       0     0             48  TRANSFER        ,A_Queue                   
+   77        2       1     0             49  GENERATE        2700,900                   
+   78        1       0     0     A_Assign31  ASSIGN          Azar,V$Azar                
+   79        1       0     0 A_FacilityInt2  QUEUE           ColaInt                    
+   80        1       0     0             52  PREEMPT         *Azar,PR,,Remanente        
+   81        1       0     0             53  DEPART          ColaInt                    
+   82        1       0     0             54  ADVANCE         17,9                       
+   83        1       0     0             55  RETURN          *Azar                      
+   84        1       0     0  A_Terminate21  TERMINATE                                  
+   85       41       0     0    A_Advance12  ADVANCE         13,7                       
+   86       41       0     0             58  TRANSFER        ,A_SelectF                 
+   87        9       1     0             59  GENERATE        420,240                    
+   88        8       0     0A_FacilityInt11  QUEUE           ColaInt                    
+   89        8       0     0             61  PREEMPT         Promotora,PR,,Remanente    
+   90        8       0     0             62  DEPART          ColaInt                    
+   91        8       0     0             63  ADVANCE         20,8                       
+   92        8       0     0             64  RETURN          Promotora                  
+   93        8       0     0  A_Terminate31  TERMINATE                                  
+   94        5       1     0             66  GENERATE        900                        
+   95        4       0     0    A_SaveValue  SAVEVALUE       ZValue,FN$cantidadCajas    
+   96        4       0     0   A_Terminate1  TERMINATE                                  
+
+FACILITY       ENTRIES  UTIL.  AVE_TIME  AVAILABLE  OWNER PEND INTER RETRY DELAY
+  PROMOTORA        33   0,221   24,121       1         0    0     0     0     0
+  1                24   0,277   41,542       1       119    0     0     0     0
+  2                14   0,137   35,214       1        53    0     0     0     0
+  3                 6   0,055   32,833       1       150    0     0     0     0
+
+QUEUE            MAX  CONT. ENTRIES ENTRIES(0) AVE.CONT. AVE.TIME AVE.(-0) RETRY
+  COLAINT          1     0       9         9     0,000      0,000    0.000    0
+  QGONDOLAS      213   213     258         0   113,514   1583,922 1583,922    0
+  QPROMOTORA       1     0      25        20     0,000      0,000    0,000    0
+  QCAJAS           1     0      43        40     0,000      0,000    0,000    0
+  QPERSONASSUPER  219   218     258         0   115,437   1610,752 1610,752    0
+  1                1     0      24        21     0,000      0,000    0,000    0
+  2                1     0      13        13     0,000      0,000    0.000    0
+  3                1     0       6         6     0,000      0,000    0.000    0
+
+TABLAS
+
+TGondolas       TABLE           AC1,300,300,84  
+    MEDIA              : 1837,434
+    DESVIACION ESTANDAR: 1054,847
+    CANTIDAD EN RETRY  : 0
+
+    INTERVALO         FRECUENCIA     %     %ACUMULADO     %REMANENTE
+    0   -  300             22      8,527       8,527         91,473
+    301 -  600             19      7,364      15,891         84,109
+    601 -  900             17      6,589      22,481         77,519
+    901 -  1200             26     10,078      32,558         67,442
+    1201 -  1500             15      5,814      38,372         61,628
+    1501 -  1800             29     11,240      49,612         50,388
+    1801 -  2100             19      7,364      56,977         43,023
+    2101 -  2400             21      8,140      65,116         34,884
+    2401 -  2700             23      8,915      74,031         25,969
+    2701 -  3000             21      8,140      82,171         17,829
+    3001 -  3300             19      7,364      89,535         10,465
+    3301 -  3600             27     10,465     100,000          0,000
+    Las frecuencias restantes (72) son todas cero.
+
+    CANTIDAD DE VALORES TABULADOS : 258
+    VALOR MAXIMO TABULADO         : 3594,000
+
+
+TPatio          TABLE           AC1,1800,1800,14  
+    MEDIA              : 2589,000
+    DESVIACION ESTANDAR: 1104,652
+    CANTIDAD EN RETRY  : 0
+
+    INTERVALO         FRECUENCIA     %     %ACUMULADO     %REMANENTE
+    0   -  1800              2     50,000      50,000         50,000
+    1801 -  3600              2     50,000     100,000          0,000
+    Las frecuencias restantes (12) son todas cero.
+
+    CANTIDAD DE VALORES TABULADOS : 4
+    VALOR MAXIMO TABULADO         : 3546,000
+
+QTABLES
+QPersonasSuper  QTABLE          QPersonasSuper,600,600,24  
+    MEDIA              : 1720,775
+    DESVIACION ESTANDAR: 486,760
+    CANTIDAD EN RETRY  : 0
+
+    INTERVALO         FRECUENCIA     %     %ACUMULADO     %REMANENTE
+    0   -  600              0      0,000       0,000        100,000
+    601 -  1200              5     12,500      12,500         87,500
+    1201 -  1800             21     52,500      65,000         35,000
+    1801 -  2400              8     20,000      85,000         15,000
+    2401 -  3000              6     15,000     100,000          0,000
+    Las frecuencias restantes (19) son todas cero.
+
+    CANTIDAD DE VALORES TABULADOS : 40
+    VALOR MAXIMO TABULADO         : 2713,000
+
+SAVEVALUE                 VALUE      RETRY
+  ZVALUE                     3          0
+
+FEC_XACT_NUMBER    PRI      BDT    CURRENT   NEXT   PARAMETER   VALUE
+            53      0       3601       40      41   CAJA            2
+                                                    AUXN            8
+                                                    TIPOCLIENTE      3
+            94      0       3602       32      33   AUXN            0
+                                                    TIPOCLIENTE      1
+           275      0       3603        3       3
+           184      0       3603       25      26   AUXN           11
+                                                    TIPOCLIENTE      2
+            67      0       3606       32      33   AUXN            0
+                                                    TIPOCLIENTE      1
+            56      0       3606       25      26   AUXN            9
+                                                    TIPOCLIENTE      2
+           191      0       3607       25      26   AUXN            9
+                                                    TIPOCLIENTE      2
+            64      0       3607       25      26   AUXN            4
+                                                    TIPOCLIENTE      3
+            93      0       3610       25      26   AUXN            5
+                                                    TIPOCLIENTE      3
+           119      0       3611       42      43   CAJA            1
+                                                    AUXN            0
+                                                    TIPOCLIENTE      1
+           133      0       3611       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+           243      0       3614       25      26   AUXN           13
+                                                    TIPOCLIENTE      3
+            37      0       3618       25      26   AUXN            2
+                                                    TIPOCLIENTE      3
+           222      0       3620       25      26   AUXN           13
+                                                    TIPOCLIENTE      2
+            60      0       3620       25      26   AUXN            5
+                                                    TIPOCLIENTE      2
+           188      0       3622       25      26   AUXN            1
+                                                    TIPOCLIENTE      1
+           217      0       3623       25      26   AUXN           14
+                                                    TIPOCLIENTE      2
+           150      0       3625       42      43   CAJA            3
+                                                    AUXN            0
+                                                    TIPOCLIENTE      1
+           108      0       3625       25      26   AUXN            6
+                                                    TIPOCLIENTE      2
+            70      0       3625       25      26   AUXN           14
+                                                    TIPOCLIENTE      3
+           113      0       3626       25      26   AUXN           20
+                                                    TIPOCLIENTE      3
+           209      0       3628       25      26   AUXN           13
+                                                    TIPOCLIENTE      2
+            78      0       3629       25      26   AUXN           10
+                                                    TIPOCLIENTE      3
+            38      0       3630       25      26   AUXN           18
+                                                    TIPOCLIENTE      3
+           127      0       3636       25      26   AUXN            1
+                                                    TIPOCLIENTE      1
+           241      0       3641       25      26   AUXN            5
+                                                    TIPOCLIENTE      1
+           179      0       3643       25      26   AUXN           11
+                                                    TIPOCLIENTE      2
+            30      0       3649       25      26   AUXN            6
+                                                    TIPOCLIENTE      2
+           224      0       3654       25      26   AUXN           14
+                                                    TIPOCLIENTE      2
+           242      0       3654       25      26   AUXN            5
+                                                    TIPOCLIENTE      1
+           196      0       3655       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+            43      0       3656       25      26   AUXN            2
+                                                    TIPOCLIENTE      2
+           170      0       3658       25      26   AUXN           10
+                                                    TIPOCLIENTE      3
+           124      0       3661       25      26   AUXN            1
+                                                    TIPOCLIENTE      3
+           165      0       3664       25      26   AUXN           13
+                                                    TIPOCLIENTE      3
+           172      0       3665       25      26   AUXN            9
+                                                    TIPOCLIENTE      2
+           235      0       3667       25      26   AUXN           11
+                                                    TIPOCLIENTE      2
+           226      0       3669       25      26   AUXN           11
+                                                    TIPOCLIENTE      2
+           252      0       3669       25      26   AUXN            5
+                                                    TIPOCLIENTE      1
+           254      0       3671       25      26   AUXN            6
+                                                    TIPOCLIENTE      1
+           200      0       3673       25      26   AUXN            5
+                                                    TIPOCLIENTE      1
+           169      0       3677       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+           173      0       3678       25      26   AUXN            7
+                                                    TIPOCLIENTE      2
+           175      0       3678       25      26   AUXN            9
+                                                    TIPOCLIENTE      2
+           215      0       3682       25      26   AUXN           14
+                                                    TIPOCLIENTE      2
+            97      0       3682       25      26   AUXN            6
+                                                    TIPOCLIENTE      3
+            59      0       3683       25      26   AUXN            7
+                                                    TIPOCLIENTE      3
+           129      0       3687       25      26   AUXN            9
+                                                    TIPOCLIENTE      3
+            71      0       3688       25      26   AUXN            9
+                                                    TIPOCLIENTE      2
+            24      0       3689       25      26   AUXN            2
+                                                    TIPOCLIENTE      2
+           138      0       3694       25      26   AUXN            2
+                                                    TIPOCLIENTE      1
+            32      0       3695       25      26   AUXN            5
+                                                    TIPOCLIENTE      2
+           205      0       3695       25      26   AUXN            6
+                                                    TIPOCLIENTE      2
+           197      0       3697       25      26   AUXN           12
+                                                    TIPOCLIENTE      3
+           238      0       3698       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+            83      0       3700       25      26   AUXN            4
+                                                    TIPOCLIENTE      2
+            91      0       3704       25      26   AUXN           18
+                                                    TIPOCLIENTE      3
+           253      0       3705       25      26   AUXN           20
+                                                    TIPOCLIENTE      3
+           199      0       3707       25      26   AUXN            7
+                                                    TIPOCLIENTE      2
+           255      0       3713       25      26   AUXN            4
+                                                    TIPOCLIENTE      1
+           139      0       3718       25      26   AUXN            2
+                                                    TIPOCLIENTE      1
+            82      0       3719       25      26   AUXN           15
+                                                    TIPOCLIENTE      3
+            41      0       3720       25      26   AUXN            2
+                                                    TIPOCLIENTE      2
+            69      0       3723       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+            23      0       3723       25      26   AUXN            1
+                                                    TIPOCLIENTE      2
+           136      0       3724       25      26   AUXN           14
+                                                    TIPOCLIENTE      3
+           146      0       3726       25      26   AUXN            7
+                                                    TIPOCLIENTE      2
+           212      0       3740       25      26   AUXN            2
+                                                    TIPOCLIENTE      1
+            74      0       3741       25      26   AUXN            3
+                                                    TIPOCLIENTE      2
+           245      0       3741       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+            15      0       3745       25      26   AUXN            1
+                                                    TIPOCLIENTE      2
+           107      0       3745       25      26   AUXN           13
+                                                    TIPOCLIENTE      3
+            86      0       3747       25      26   AUXN            3
+                                                    TIPOCLIENTE      3
+           227      0       3749       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+           210      0       3751       25      26   AUXN           12
+                                                    TIPOCLIENTE      2
+           115      0       3754       25      26   AUXN            4
+                                                    TIPOCLIENTE      2
+            26      0       3756       25      26   AUXN            6
+                                                    TIPOCLIENTE      2
+            72      0       3757       25      26   AUXN            6
+                                                    TIPOCLIENTE      2
+            57      0       3757       25      26   AUXN            6
+                                                    TIPOCLIENTE      2
+            36      0       3768       25      26   AUXN            1
+                                                    TIPOCLIENTE      2
+           248      0       3769       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+           168      0       3771       25      26   AUXN            7
+                                                    TIPOCLIENTE      2
+            95      0       3775       25      26   AUXN            6
+                                                    TIPOCLIENTE      2
+             7      0       3777       25      26   AUXN            4
+                                                    TIPOCLIENTE      2
+           204      0       3779       25      26   AUXN           13
+                                                    TIPOCLIENTE      2
+           183      0       3779       25      26   AUXN            3
+                                                    TIPOCLIENTE      1
+            62      0       3780       25      26   AUXN            3
+                                                    TIPOCLIENTE      2
+           182      0       3782       25      26   AUXN            2
+                                                    TIPOCLIENTE      1
+           251      0       3783       25      26   AUXN           23
+                                                    TIPOCLIENTE      3
+           221      0       3783       25      26   AUXN           12
+                                                    TIPOCLIENTE      2
+           161      0       3784       25      26   AUXN            2
+                                                    TIPOCLIENTE      1
+           261      0       3785       25      26   AUXN           11
+                                                    TIPOCLIENTE      2
+           111      0       3786       25      26   AUXN           13
+                                                    TIPOCLIENTE      3
+           153      0       3792       25      26   AUXN            3
+                                                    TIPOCLIENTE      1
+           249      0       3794       25      26   AUXN            5
+                                                    TIPOCLIENTE      1
+            34      0       3801       25      26   AUXN            1
+                                                    TIPOCLIENTE      3
+           247      0       3802       25      26   AUXN           14
+                                                    TIPOCLIENTE      2
+           167      0       3804       25      26   AUXN            3
+                                                    TIPOCLIENTE      1
+           246      0       3804       59      59
+            51      0       3805       25      26   AUXN            5
+                                                    TIPOCLIENTE      2
+            18      0       3806       25      26   AUXN            7
+                                                    TIPOCLIENTE      2
+           180      0       3806       25      26   AUXN            7
+                                                    TIPOCLIENTE      2
+            76      0       3808       25      26   AUXN            9
+                                                    TIPOCLIENTE      2
+           214      0       3810       25      26   AUXN           11
+                                                    TIPOCLIENTE      2
+           256      0       3812       25      26   AUXN            6
+                                                    TIPOCLIENTE      1
+           152      0       3821       25      26   AUXN           16
+                                                    TIPOCLIENTE      3
+           122      0       3824       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+           137      0       3825       25      26   AUXN            4
+                                                    TIPOCLIENTE      2
+           194      0       3825       25      26   AUXN            9
+                                                    TIPOCLIENTE      2
+           234      0       3828       25      26   AUXN           15
+                                                    TIPOCLIENTE      3
+           203      0       3828       25      26   AUXN            3
+                                                    TIPOCLIENTE      1
+           187      0       3834       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+            14      0       3837       25      26   AUXN            3
+                                                    TIPOCLIENTE      2
+           225      0       3839       25      26   AUXN           13
+                                                    TIPOCLIENTE      3
+             2      0       3841       25      26   AUXN            6
+                                                    TIPOCLIENTE      2
+           128      0       3841       25      26   AUXN            3
+                                                    TIPOCLIENTE      1
+           189      0       3842       25      26   AUXN            1
+                                                    TIPOCLIENTE      1
+           185      0       3846       25      26   AUXN            3
+                                                    TIPOCLIENTE      1
+            98      0       3848       25      26   AUXN            6
+                                                    TIPOCLIENTE      2
+            81      0       3851       25      26   AUXN           13
+                                                    TIPOCLIENTE      3
+           250      0       3852       25      26   AUXN           15
+                                                    TIPOCLIENTE      2
+           159      0       3855       25      26   AUXN            9
+                                                    TIPOCLIENTE      2
+           148      0       3857       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+           121      0       3859       25      26   AUXN           13
+                                                    TIPOCLIENTE      3
+           140      0       3864       25      26   AUXN            5
+                                                    TIPOCLIENTE      2
+           131      0       3865       25      26   AUXN            9
+                                                    TIPOCLIENTE      2
+           186      0       3865       25      26   AUXN            3
+                                                    TIPOCLIENTE      1
+           266      0       3868       25      26   AUXN            6
+                                                    TIPOCLIENTE      1
+           123      0       3868       25      26   AUXN            4
+                                                    TIPOCLIENTE      2
+             6      0       3869       25      26   AUXN            2
+                                                    TIPOCLIENTE      2
+           181      0       3872       25      26   AUXN            7
+                                                    TIPOCLIENTE      2
+           195      0       3874       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+           103      0       3875       25      26   AUXN            2
+                                                    TIPOCLIENTE      3
+           264      0       3876       25      26   AUXN           15
+                                                    TIPOCLIENTE      2
+           109      0       3876       25      26   AUXN           11
+                                                    TIPOCLIENTE      2
+           166      0       3878       25      26   AUXN            8
+                                                    TIPOCLIENTE      3
+           218      0       3883       25      26   AUXN            3
+                                                    TIPOCLIENTE      1
+           190      0       3889       25      26   AUXN            6
+                                                    TIPOCLIENTE      2
+           228      0       3890       25      26   AUXN           22
+                                                    TIPOCLIENTE      3
+            75      0       3895       25      26   AUXN           10
+                                                    TIPOCLIENTE      3
+           149      0       3900       25      26   AUXN           11
+                                                    TIPOCLIENTE      3
+           223      0       3901       25      26   AUXN            7
+                                                    TIPOCLIENTE      2
+           240      0       3903       25      26   AUXN            6
+                                                    TIPOCLIENTE      3
+           176      0       3904       25      26   AUXN           13
+                                                    TIPOCLIENTE      2
+            79      0       3907       25      26   AUXN            8
+                                                    TIPOCLIENTE      3
+            73      0       3907       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+           265      0       3912       25      26   AUXN            6
+                                                    TIPOCLIENTE      1
+           145      0       3913       25      26   AUXN            5
+                                                    TIPOCLIENTE      2
+           219      0       3913       25      26   AUXN           12
+                                                    TIPOCLIENTE      2
+           231      0       3913       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+           258      0       3913       25      26   AUXN           17
+                                                    TIPOCLIENTE      3
+            99      0       3914       25      26   AUXN            5
+                                                    TIPOCLIENTE      2
+            22      0       3915       25      26   AUXN            6
+                                                    TIPOCLIENTE      2
+           118      0       3917       25      26   AUXN            5
+                                                    TIPOCLIENTE      2
+           135      0       3919       25      26   AUXN            3
+                                                    TIPOCLIENTE      1
+           164      0       3923       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+           202      0       3924       25      26   AUXN            4
+                                                    TIPOCLIENTE      1
+           213      0       3927       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+           220      0       3928       25      26   AUXN            7
+                                                    TIPOCLIENTE      2
+           198      0       3929       25      26   AUXN            6
+                                                    TIPOCLIENTE      2
+           174      0       3930       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+           110      0       3938       25      26   AUXN           11
+                                                    TIPOCLIENTE      3
+            84      0       3941       25      26   AUXN            6
+                                                    TIPOCLIENTE      2
+           263      0       3945       25      26   AUXN            4
+                                                    TIPOCLIENTE      1
+             8      0       3950       25      26   AUXN           11
+                                                    TIPOCLIENTE      3
+            48      0       3954       25      26   AUXN            2
+                                                    TIPOCLIENTE      2
+           260      0       3954       25      26   AUXN           25
+                                                    TIPOCLIENTE      3
+           120      0       3955       25      26   AUXN           18
+                                                    TIPOCLIENTE      3
+           236      0       3958       25      26   AUXN            5
+                                                    TIPOCLIENTE      3
+           271      0       3959       25      26   AUXN           17
+                                                    TIPOCLIENTE      3
+            54      0       3961       25      26   AUXN            7
+                                                    TIPOCLIENTE      3
+            49      0       3962       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+           259      0       3966       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+           237      0       3967       25      26   AUXN            5
+                                                    TIPOCLIENTE      1
+           134      0       3975       25      26   AUXN            1
+                                                    TIPOCLIENTE      1
+           130      0       3976       25      26   AUXN           18
+                                                    TIPOCLIENTE      3
+           192      0       3979       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+           105      0       3979       25      26   AUXN            3
+                                                    TIPOCLIENTE      3
+           272      0       3980       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+           114      0       3994       25      26   AUXN            6
+                                                    TIPOCLIENTE      2
+            52      0       3997       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+           201      0       4003       25      26   AUXN            1
+                                                    TIPOCLIENTE      1
+           229      0       4007       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+           267      0       4014       25      26   AUXN            5
+                                                    TIPOCLIENTE      1
+            21      0       4016       25      26   AUXN            7
+                                                    TIPOCLIENTE      2
+           257      0       4019       25      26   AUXN           13
+                                                    TIPOCLIENTE      2
+           207      0       4021       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+           156      0       4021       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+           269      0       4022       25      26   AUXN            9
+                                                    TIPOCLIENTE      2
+           158      0       4027       25      26   AUXN           21
+                                                    TIPOCLIENTE      3
+            88      0       4033       25      26   AUXN            4
+                                                    TIPOCLIENTE      3
+            85      0       4034       25      26   AUXN            9
+                                                    TIPOCLIENTE      3
+           160      0       4035       25      26   AUXN            2
+                                                    TIPOCLIENTE      1
+           100      0       4039       25      26   AUXN            1
+                                                    TIPOCLIENTE      1
+            13      0       4043       25      26   AUXN            4
+                                                    TIPOCLIENTE      2
+            87      0       4047       25      26   AUXN           13
+                                                    TIPOCLIENTE      3
+           270      0       4048       25      26   AUXN            3
+                                                    TIPOCLIENTE      1
+            35      0       4048       25      26   AUXN            2
+                                                    TIPOCLIENTE      2
+           230      0       4053       25      26   AUXN            4
+                                                    TIPOCLIENTE      1
+            61      0       4058       25      26   AUXN            8
+                                                    TIPOCLIENTE      2
+           178      0       4058       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+           151      0       4079       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+           216      0       4084       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+           143      0       4089       25      26   AUXN            1
+                                                    TIPOCLIENTE      1
+           211      0       4091       25      26   AUXN           12
+                                                    TIPOCLIENTE      2
+           142      0       4092       25      26   AUXN            9
+                                                    TIPOCLIENTE      2
+            89      0       4100       25      26   AUXN            2
+                                                    TIPOCLIENTE      2
+           193      0       4110       25      26   AUXN           16
+                                                    TIPOCLIENTE      3
+           262      0       4116       25      26   AUXN            6
+                                                    TIPOCLIENTE      1
+           244      0       4119       25      26   AUXN            3
+                                                    TIPOCLIENTE      1
+           104      0       4125       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+           268      0       4125       25      26   AUXN           23
+                                                    TIPOCLIENTE      3
+           233      0       4134       25      26   AUXN            4
+                                                    TIPOCLIENTE      1
+           162      0       4138       25      26   AUXN            7
+                                                    TIPOCLIENTE      2
+           239      0       4140       25      26   AUXN           13
+                                                    TIPOCLIENTE      2
+           101      0       4143       25      26   AUXN            8
+                                                    TIPOCLIENTE      3
+           157      0       4147       25      26   AUXN            8
+                                                    TIPOCLIENTE      3
+           274      0       4150       25      26   AUXN            5
+                                                    TIPOCLIENTE      1
+           163      0       4156       25      26   AUXN            9
+                                                    TIPOCLIENTE      2
+           273      0       4185       25      26   AUXN           10
+                                                    TIPOCLIENTE      2
+           276      0       4500       66      66
+           232      0       5059       49      49
+           277      0       7200        1       1

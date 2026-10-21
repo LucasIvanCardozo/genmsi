@@ -1,0 +1,24 @@
+Almacen         STORAGE         10  
+                INITIAL         LS$Puerta  
+A_Test          TEST    E       1,1  
+GateF           GATE    NU      Recurso  
+GateL           GATE    LS      Puerta  
+GateS           GATE    SNE     Almacen  
+A_Logic         LOGIC   S       Puerta
+A_FacilityUse   QUEUE           Cola  
+                SEIZE           Recurso  
+                DEPART          Cola  
+                ADVANCE         10,5  
+                RELEASE         Recurso  
+A_FacilityInt   QUEUE           ColaInt  
+                PREEMPT         Recurso,PR,,Remanente  
+                DEPART          ColaInt  
+                ADVANCE         10,5  
+                RETURN          Recurso  
+StorageUse      QUEUE           QStorage  
+                ENTER           Almacen  
+                DEPART          QStorage  
+                ADVANCE         10,5  
+                LEAVE           Almacen  
+A_Test1         TEST    GE      S$AULA,10  
+A_Buffer        BUFFER          

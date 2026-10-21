@@ -1,0 +1,4 @@
+
+LOGICSWITCH               VALUE      RETRY
+  MOLINETE                   1          0
+  PUERTAMUSEO                0          0

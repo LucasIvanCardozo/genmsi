@@ -1,0 +1,7 @@
+Advertencia -> No hay bloques TERMINATE con parámetro A
+
+Tiempo de simulación: 39,  Transacción activa: 3
+Bloque actual    :   10,                  RELEASE         Recurso  
+Siguiente bloque :   11,  
+ERROR!!Se intentó obtener la linea del fuente de un bloque inexistente. (Bloque: 11).
+T. Nº 3                          

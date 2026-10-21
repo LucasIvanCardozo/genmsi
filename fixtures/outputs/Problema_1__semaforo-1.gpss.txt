@@ -1,0 +1,99 @@
+modulo2         VARIABLE        P$Cuadra@2  
+1               STORAGE         3  
+2               STORAGE         3  
+3               STORAGE         3  
+4               STORAGE         3  
+5               STORAGE         3  
+6               STORAGE         3  
+7               STORAGE         3  
+8               STORAGE         3  
+9               STORAGE         3  
+10              STORAGE         3  
+11              STORAGE         3  
+12              STORAGE         3  
+13              STORAGE         3  
+14              STORAGE         3  
+15              STORAGE         3  
+16              STORAGE         3  
+17              STORAGE         3  
+18              STORAGE         3  
+19              STORAGE         3  
+20              STORAGE         3  
+21              STORAGE         3  
+22              STORAGE         3  
+23              STORAGE         3  
+24              STORAGE         3  
+25              STORAGE         3  
+26              STORAGE         3  
+27              STORAGE         3  
+28              STORAGE         3  
+29              STORAGE         3  
+30              STORAGE         3  
+31              STORAGE         3  
+32              STORAGE         3  
+33              STORAGE         3  
+34              STORAGE         3  
+35              STORAGE         3  
+36              STORAGE         3  
+37              STORAGE         3  
+38              STORAGE         3  
+39              STORAGE         3  
+40              STORAGE         3  
+41              STORAGE         3  
+42              STORAGE         3  
+43              STORAGE         3  
+44              STORAGE         3  
+45              STORAGE         3  
+46              STORAGE         3  
+47              STORAGE         3  
+48              STORAGE         3  
+49              STORAGE         3  
+50              STORAGE         3  
+Expon           FUNCTION        RN2,C24   
+0,0/0.1,0.104/0.2,0.222/0.3,0.355/0.4,0.509/0.5,0.69/0.6,0.915/0.7,1.2/0.75,1.38/0.8,1.6/0.84,1.83/0.88,2.12/0.9,2.3/0.92,2.52/0.94,2.81/0.95,2.99/0.96,3.2/0.97,3.5/0.98,3.9/0.99,4.6/0.995,5.3/0.998,6.2/0.999,7.0/0.9997,8.0
+dondeDobla      VARIABLE        ((RN80#1000)+RN80)@(1+(50)-(P$Cuadra))+(P$Cuadra)  
+cuadraAzar      VARIABLE        ((RN80#1000)+RN80)@(1+(50)-(1))+(1)  
+                GENERATE        8,,0,50  
+A_Counter       SAVEVALUE       Count+,1  
+                ASSIGN          semaforo,X$Count  
+A_Logic         LOGIC   S       *semaforo
+A_Advance1      ADVANCE         60  
+A_Logic1        LOGIC   R       *semaforo
+A_Advance       ADVANCE         40  
+                TRANSFER        ,A_Logic  
+A_SaveValue     SAVEVALUE       Count,0  
+                GENERATE        3600  
+                TERMINATE       1  
+                GENERATE        10,FN$Expon,3600  
+A_Assign41      ASSIGN          esAuto,1  
+A_Assign        ASSIGN          Cuadra,V$cuadraAzar  
+A_Assign2       ASSIGN          dondeDobla,V$dondeDobla  
+GateL1          GATE    LR      *Cuadra  
+A_Test2         TEST    E       P$esAuto,1,A_Advance22  
+A_Advance2      ADVANCE         6,1  
+A_Enter         ENTER           *Cuadra,1  
+GateL           GATE    LS      *Cuadra  
+A_Advance21     ADVANCE         2,1  
+A_Leave         LEAVE           *Cuadra,1  
+A_Test          TEST    E       P$Cuadra,50,A_Test1  
+A_Terminate     TERMINATE         
+A_Test1         TEST    E       P$Cuadra,P$dondeDobla,A_Assign1  
+                TRANSFER        ,A_Terminate  
+A_Assign1       ASSIGN          Cuadra+,1  
+                TRANSFER        ,A_Advance2  
+A_Advance22     ADVANCE         6,1  
+A_Enter1        ENTER           *Cuadra,1  
+GateL2          GATE    LS      *Cuadra  
+A_Advance211    ADVANCE         2,1  
+A_Leave1        LEAVE           *Cuadra,1  
+A_Test11        TEST    E       P$Cuadra,P$dondeDobla,A_Assign11  
+                TRANSFER        ,A_Terminate  
+A_Assign11      ASSIGN          Cuadra+,1  
+A_Test3         TEST    E       V$modulo2,0,A_Advance22  
+A_Advance3      ADVANCE         10,5  
+                TRANSFER        ,A_Advance22  
+                GENERATE        180,60,3600  
+A_Assign4       ASSIGN          esAuto,0  
+A_Assign3       ASSIGN          Cuadra,10  
+A_Assign21      ASSIGN          dondeDobla,40  
+                TRANSFER        ,GateL1  

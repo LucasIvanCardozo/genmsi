@@ -1,0 +1,10 @@
+                GENERATE        60,30  
+                GENERATE        ,,,1  
+A_Advance       ADVANCE         60,30  
+Clona           SPLIT           1,A_FacilityUse1  
+                TRANSFER        ,A_Advance  
+A_FacilityUse1  QUEUE           Cola  
+                SEIZE           Recurso  
+                DEPART          Cola  
+                ADVANCE         10,5  
+                RELEASE         Recurso  

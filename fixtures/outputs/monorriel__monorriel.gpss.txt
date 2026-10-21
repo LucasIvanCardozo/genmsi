@@ -1,0 +1,41 @@
+Parada          VARIABLE        1+P$Parada@10  
+ProbArribo      FUNCTION        RN3,D10   
+0.1,1/0.25,2/0.35,3/0.53,4/0.68,5/0.8,6/0.85,7/0.9,8/0.96,9/1,10
+ProbSalida      VARIABLE        ((RN80#1000)+RN80)@(1+(10)-(1))+(1)  
+MediaViaje      FUNCTION        P$Param,D10   
+1,46/2,76/3,57/4,95/5,63/6,59/7,85/8,93/9,38/10,54
+TablaSubida     TABLE           P$Entrada,1,1,10  
+TablaBajada     TABLE           P$Salida,1,1,10  
+TablaParada     TABLE           P$Parada,1,1,10  
+                GENERATE        ,,,1  
+A_Assign        ASSIGN          Parada,V$Parada  
+A_Advance       ADVANCE         5,2  
+A_Tabulate2     TABULATE        TablaParada,1  
+A_Unlink1       UNLINK   E       Monorriel,A_Tabulate1,1,Salida,P$Parada,A_Unlink  
+A_Advance2      ADVANCE         3,2  
+                TRANSFER        ,A_Unlink1  
+A_Tabulate1     TABULATE        TablaBajada,1  
+Entrada1        TRANSFER        600,A_Terminate,A_Advance3  
+A_Advance3      ADVANCE         7200,5400  
+A_Assign3       ASSIGN          Aux,P$Entrada  
+A_Assign5       ASSIGN          Entrada,P$Salida  
+A_Assign4       ASSIGN          Salida,P$Aux  
+A_Queue1        QUEUE           *Entrada  
+A_Link2         LINK            *Entrada,FIFO  
+A_Terminate     TERMINATE         
+A_Unlink        UNLINK   E       *Parada,A_Tabulate,1,Entrada,P$Parada,A_Advance1  
+A_Advance21     ADVANCE         3,2  
+                TRANSFER        ,A_Unlink  
+A_Tabulate      TABULATE        TablaSubida,1  
+A_Depart        DEPART          *Entrada  
+A_Link1         LINK            Monorriel,FIFO  
+A_Advance1      ADVANCE         FN$MediaViaje,5  
+                TRANSFER        ,A_Assign  
+                GENERATE        3600  
+                TERMINATE       1  
+                GENERATE        5,3  
+A_Assign1       ASSIGN          Entrada,FN$ProbArribo  
+A_Assign2       ASSIGN          Salida,V$ProbSalida  
+A_Test          TEST    NE      P$Entrada,P$Salida,A_Assign2  
+A_Queue         QUEUE           *Entrada  
+A_Link          LINK            *Entrada,FIFO  

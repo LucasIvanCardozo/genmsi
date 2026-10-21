@@ -1,0 +1,3 @@
+
+LOGICSWITCH               VALUE      RETRY
+  PUERTA                     0         26

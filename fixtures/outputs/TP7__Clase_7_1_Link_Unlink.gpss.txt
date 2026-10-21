@@ -1,0 +1,14 @@
+                GENERATE        60,,,3  
+A_Buffer        BUFFER          
+A_Link          LINK            Cadena,FIFO  
+                GENERATE        60,,600  
+A_Buffer1       BUFFER          
+A_Unlink        UNLINK   E       Cadena,A_Buffer4,1,Otro,0,A_Buffer3  
+A_Buffer2       BUFFER          
+A_Terminate     TERMINATE         
+A_Buffer4       BUFFER          
+A_Terminate1    TERMINATE         
+A_Buffer3       BUFFER          
+                TRANSFER        ,A_Terminate  
+                GENERATE        3600  
+                TERMINATE       1  

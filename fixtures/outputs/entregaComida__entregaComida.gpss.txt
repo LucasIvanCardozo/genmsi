@@ -1,0 +1,19 @@
+Comidas         STORAGE         5  
+                GENERATE        3600  
+                TERMINATE       1  
+                GENERATE        120,60  
+A_Cajero        QUEUE           ColaCajero  
+                SEIZE           Cajero  
+                DEPART          ColaCajero  
+                ADVANCE         45,15  
+                RELEASE         Cajero  
+A_ColaComida    QUEUE           qComida  
+HornoConComidas GATE    SNE     Comidas  
+A_DepartComida  DEPART          qComida  
+A_TomarComida   LEAVE           Comidas,1  
+A_FinAlumno     TERMINATE       0  
+                GENERATE        ,,0,1  
+HornoVacio      GATE    SE      Comidas  
+A_Calentar      ADVANCE         300  
+A_CargarTanda   ENTER           Comidas,5  
+                TRANSFER        ,HornoVacio  

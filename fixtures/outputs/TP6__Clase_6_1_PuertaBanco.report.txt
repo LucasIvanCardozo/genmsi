@@ -1,0 +1,38 @@
+                             Reporte MicroVisualSIS
+
+ START_TIME    END_TIME     BLOCKS    FACILITIES    STORAGES
+        0         3600        18           0            0
+
+ LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE                                 
+         COUNT   COUNT   
+    1       14       1     0              1  GENERATE        90,30,2700                 
+    2       13      13     0        A_Queue  QUEUE           qAfuera                    
+    3        0       0     0          GateL  GATE    LS      Puerta                     
+    4        0       0     0       A_Depart  DEPART          qAfuera                    
+    5        0       0     0  A_FacilityUse  QUEUE           qPuerta                    
+    6        0       0     0              6  SEIZE           Puerta                     
+    7        0       0     0              7  DEPART          qPuerta                    
+    8        0       0     0              8  ADVANCE         2,1                        
+    9        0       0     0              9  RELEASE         Puerta                     
+   10        0       0     0      A_Advance  ADVANCE         1800,900                   
+   11        0       0     0   A_Terminate1  TERMINATE                                  
+   12        1       1     0             12  GENERATE        ,,3600,1                   
+   13        0       0     0       A_Buffer  BUFFER                                     
+   14        0       0     0        A_Logic  LOGIC   S       Puerta                     
+   15        0       0     0      A_Buffer1  BUFFER                                     
+   16        0       0     0    A_Terminate  TERMINATE                                  
+   17        2       1     0             17  GENERATE        3600                       
+   18        1       0     0             18  TERMINATE       1                          
+
+QUEUE            MAX  CONT. ENTRIES ENTRIES(0) AVE.CONT. AVE.TIME AVE.(-0) RETRY
+  QAFUERA         13    13      13         0     1,698    470,231  470,231    0
+
+LOGICSWITCH               VALUE      RETRY
+  PUERTA                     0         13
+
+CEC_XACT_NUMBER    PRI       M1    CURRENT   NEXT   PARAMETER   VALUE
+             2      0       3600       12      13
+
+FEC_XACT_NUMBER    PRI      BDT    CURRENT   NEXT   PARAMETER   VALUE
+            16      0       3666        1       1
+            17      0       7200       17      17

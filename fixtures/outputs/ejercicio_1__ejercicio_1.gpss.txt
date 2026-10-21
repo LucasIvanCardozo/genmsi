@@ -1,0 +1,11 @@
+                GENERATE        60,30  
+A_Advance       ADVANCE         10,5  
+A_FacilityUse   QUEUE           Cola  
+                SEIZE           Recurso  
+                DEPART          Cola  
+                ADVANCE         65,25  
+                RELEASE         Recurso  
+A_Advance1      ADVANCE         11,7  
+A_Terminate     TERMINATE       0  
+                GENERATE        3600  
+                TERMINATE       1  

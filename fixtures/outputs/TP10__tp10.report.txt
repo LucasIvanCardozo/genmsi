@@ -1,0 +1,1626 @@
+                             Reporte MicroVisualSIS
+
+ START_TIME    END_TIME     BLOCKS    FACILITIES    STORAGES
+        0        28800        69           0            1
+
+ LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE                                 
+         COUNT   COUNT   
+   21      100       0     0              1  GENERATE        90,30,,100                 
+   22      100       0     0       A_Assign  ASSIGN          Tipo,FN$FuncTipoPescador   
+   23      100       0     0      A_Assign1  ASSIGN          EsperaPescando,FN$FuncEsperaPescando
+   24      100       0     0      A_Assign2  ASSIGN          MediaEntreTiro,FN$FuncMediaEntre
+   25      100       0     0      A_Assign3  ASSIGN          ModificadorEntreTiro,FN$FuncModificadorEntre
+   26      100       0     0         GateL1  GATE    LS      HastaLas9                  
+   27      100       0     0        A_Queue  QUEUE           QOrganizador               
+   28      100       0     0        A_Enter  ENTER           Organizador,1              
+   29      100       0     0       A_Depart  DEPART          QOrganizador               
+   30      100       0     0     A_Counter2  SAVEVALUE       CountPescador+,1           
+   31      100       0     0             11  ASSIGN          IdPescador,X$CountPescador 
+   32      100       0     0     A_Advance3  ADVANCE         20,10                      
+   33      100       0     0        A_Leave  LEAVE           Organizador,1              
+   34     2656       0     0     A_Counter1  SAVEVALUE       CountEspera+,1             
+   35     2656       0     0             15  ASSIGN          NroEspera,X$CountEspera    
+   36     2656       0     0          Clona  SPLIT           1,A_Advance11              
+   37     2656       0     0       A_JoinMe  JOIN            GPescando                  
+   38     2656      56     0         A_Link  LINK            CPescando,FIFO             
+   39     2656      72     0    A_Advance11  ADVANCE         P$EsperaPescando,FN$Expon  
+   40     2584       0     0 A_RemoveTrans1  REMOVE   E       GPescando,1,,NroEspera,P$NroEspera
+   41     2584       0     0      A_Unlink1  UNLINK   E       CPescando,A_Advance2,1,NroEspera,P$NroEspera,A_Terminate2
+   42     2584       0     0   A_Terminate2  TERMINATE                                  
+   43     2590      34     0     A_Advance2  ADVANCE         P$MediaEntreTiro,P$ModificadorEntreTiro
+   44     2556       0     0          GateL  GATE    LR      Fin,A_Counter1             
+   45       10       0     0         A_Test  TEST    GE      P$CantPescados,1,A_Terminate7
+   46        9       9     0     A_Advance5  ADVANCE         600,300                    
+   47        0       0     0        A_Test4  TEST    E       P$IdPescador,X$IdPescCantidad,A_Test5
+   48        0       0     0     A_Advance6  ADVANCE         180,60                     
+   49        0       0     0        A_Test5  TEST    E       P$IdPescador,X$IdPescadorMayorPeso,A_Terminate7
+   50        0       0     0     A_Advance7  ADVANCE         180,60                     
+   51        1       0     0   A_Terminate7  TERMINATE       1                          
+   52        1       0     0             32  GENERATE        ,,,1                       
+   53        1       0     0        A_Logic  LOGIC   R       HastaLas9                  
+   54        1       0     0      A_Advance  ADVANCE         3600                       
+   55        1       0     0       A_Logic1  LOGIC   S       HastaLas9                  
+   56        1       0     0    A_Terminate  TERMINATE                                  
+   57      143       1     0             37  GENERATE        180,60,3600                
+   58      142       0     0         GateL2  GATE    LS      Fin,A_Terminate5           
+   59      142       0     0      A_Assign4  ASSIGN          CantPescados,V$CantPescados
+   60      503       0     0      A_Assign5  ASSIGN          NroPescador,V$Pescador     
+   61      503       0     0         A_Scan  SCAN    E       GPescando,IdPescador,P$NroPescador,IdPescador,IdPescador,A_Advance1
+   62      300       0     0  A_RemoveTrans  REMOVE   E       GPescando,1,,IdPescador,P$NroPescador
+   63      300       0     0       A_Unlink  UNLINK   E       CPescando,A_Assign6,1,IdPescador,P$NroPescador
+   64      300       0     0         A_Loop  LOOP            CantPescados,A_Assign5     
+   65      142       0     0   A_Terminate1  TERMINATE                                  
+   66      312       0     0      A_Assign6  ASSIGN          PesoPescado,V$PesoPescado  
+   67      312       0     0A_ExamineNumber  EXAMINE         GPesos,P$PesoPescado,A_Assign7
+   68       12       0     0             48  TRANSFER        ,A_Assign6                 
+   69      300       0     0      A_Assign7  ASSIGN          CantPescados,V$sumarCantPescados
+   70      300       0     0   A_JoinNumber  JOIN            GPesos,P$PesoPescado       
+   71      300       0     0        A_Test1  TEST    G       P$PesoPescado,P$PescadoMayorPeso,A_Test2
+   72      168       0     0      A_Assign8  ASSIGN          PescadoMayorPeso,P$PesoPescado
+   73      300       0     0        A_Test2  TEST    G       P$PesoPescado,X$MayorPeso,A_Test3
+   74        8       0     0    A_SaveValue  SAVEVALUE       IdPescadorMayorPeso,P$IdPescador
+   75        8       0     0   A_SaveValue2  SAVEVALUE       MayorPeso,P$PesoPescado    
+   76      300       0     0        A_Test3  TEST    E       1,1,A_Advance2             
+   77      300       0     0   A_SaveValue1  SAVEVALUE       IdPescCantidad,P$IdPescador
+   78      300       0     0   A_SaveValue3  SAVEVALUE       MayorCantidad,P$CantPescados
+   79      300       0     0             59  TRANSFER        ,A_Advance2                
+   80      203       0     0     A_Advance1  ADVANCE         1                          
+   81      203       0     0             61  TRANSFER        ,A_Assign5                 
+   82        0       0     0   A_Terminate5  TERMINATE                                  
+   83        1       0     0             63  GENERATE        ,,,1                       
+   84        1       0     0      A_Logic21  LOGIC   S       Fin                        
+   85        1       0     0     A_Advance4  ADVANCE         28800                      
+   86        1       0     0       A_Logic2  LOGIC   R       Fin                        
+   87        1       0     0 A_RemoveTrans2  REMOVE   E       GPescando,ALL,,otro,1     
+   88        1       0     0      A_Unlink2  UNLINK   E       CPescando,A_Test,ALL,Otro,0
+   89        1       0     0   A_Terminate3  TERMINATE                                  
+
+QUEUE            MAX  CONT. ENTRIES ENTRIES(0) AVE.CONT. AVE.TIME AVE.(-0) RETRY
+  QORGANIZADOR    40     0     100        50     0,000      0,000    0,000    0
+
+STORAGE           CAP. REMAIN. MIN.  MAX. ENTRIES AVL. AVE.C.  UTIL. RETRY DELAY
+  ORGANIZADOR       1      1     0     1     100   1   0,068   0,068    0     0
+
+USER_CHAIN       CHAIN_SIZE   RETRY   AVE.CONT   ENTRIES    MAX     AVE.TIME
+  CPESCANDO              0       0      0,000      2656      82        0,000
+
+XACT_GROUP           GROUP_SIZE      RETRY
+  GPESCANDO                 65          0
+
+NUMERIC_GROUP        GROUP_SIZE      RETRY
+  GPESOS                   300          0
+
+LOGICSWITCH               VALUE      RETRY
+  FIN                        0          0
+  HASTALAS9                  1          0
+
+SAVEVALUE                 VALUE      RETRY
+  COUNTESPERA             2656          0
+  MAYORCANTIDAD              2          0
+  MAYORPESO               4993          0
+  IDPESCCANTIDAD             68          0
+  IDPESCADORMAYORPESO             13          0
+  COUNTPESCADOR            101          0
+
+CEC_XACT_NUMBER    PRI       M1    CURRENT   NEXT   PARAMETER   VALUE
+            11      0        676       18      25   PESCADOMAYORPESO   3856
+                                                    PESOPESCADO   3856
+                                                    NROESPERA    2555
+                                                    IDPESCADOR      9
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+            13      0        867       18      25   PESCADOMAYORPESO   3122
+                                                    PESOPESCADO   3122
+                                                    NROESPERA    2556
+                                                    IDPESCADOR     11
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+            38      0       3000       18      25   PESCADOMAYORPESO   4619
+                                                    PESOPESCADO   4619
+                                                    NROESPERA    2557
+                                                    IDPESCADOR     36
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      1
+             6      0        199       18      25   PESCADOMAYORPESO   4299
+                                                    PESOPESCADO   4299
+                                                    NROESPERA    2567
+                                                    IDPESCADOR      4
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      2
+            31      0       2400       18      25   PESCADOMAYORPESO   2078
+                                                    PESOPESCADO   2078
+                                                    NROESPERA    2571
+                                                    IDPESCADOR     29
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+           315      0       6760       18      25   PESCADOMAYORPESO   4153
+                                                    PESOPESCADO   3598
+                                                    NROESPERA    2573
+                                                    IDPESCADOR     74
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+            32      0       2483       18      25   PESCADOMAYORPESO   4840
+                                                    PESOPESCADO   4540
+                                                    NROESPERA    2574
+                                                    IDPESCADOR     30
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+           181      0       5345       18      25   PESCADOMAYORPESO   3385
+                                                    PESOPESCADO   1208
+                                                    NROESPERA    2575
+                                                    IDPESCADOR     60
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+           347      0       7050       18      25   PESCADOMAYORPESO   4748
+                                                    PESOPESCADO   4498
+                                                    NROESPERA    2576
+                                                    IDPESCADOR     77
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      4
+           455      0       7972       18      25   PESCADOMAYORPESO   4525
+                                                    PESOPESCADO   3452
+                                                    NROESPERA    2577
+                                                    IDPESCADOR     87
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      5
+            14      0        945       18      25   PESCADOMAYORPESO   4790
+                                                    PESOPESCADO   1086
+                                                    NROESPERA    2580
+                                                    IDPESCADOR     12
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      5
+           474      0       8192       18      25   PESCADOMAYORPESO   2279
+                                                    PESOPESCADO   2279
+                                                    NROESPERA    2588
+                                                    IDPESCADOR     89
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      2
+            10      0        613       18      25   PESCADOMAYORPESO   3622
+                                                    PESOPESCADO    817
+                                                    NROESPERA    2589
+                                                    IDPESCADOR      8
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+            23      0       1695       18      25   PESCADOMAYORPESO   3647
+                                                    PESOPESCADO   2925
+                                                    NROESPERA    2593
+                                                    IDPESCADOR     21
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+           416      0       7617       18      25   PESCADOMAYORPESO   3732
+                                                    PESOPESCADO   3732
+                                                    NROESPERA    2594
+                                                    IDPESCADOR     83
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      1
+            29      0       2217       18      25   NROESPERA    2595
+                                                    IDPESCADOR     27
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+           501      0       8433       18      25   PESCADOMAYORPESO   4941
+                                                    PESOPESCADO   3311
+                                                    NROESPERA    2596
+                                                    IDPESCADOR     92
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      5
+           382      0       7331       18      25   PESCADOMAYORPESO   2653
+                                                    PESOPESCADO   1094
+                                                    NROESPERA    2597
+                                                    IDPESCADOR     80
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      4
+             9      0        529       18      25   PESCADOMAYORPESO   4487
+                                                    PESOPESCADO   2632
+                                                    NROESPERA    2599
+                                                    IDPESCADOR      7
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+             1      0         63       18      25   PESCADOMAYORPESO   4732
+                                                    PESOPESCADO   4732
+                                                    NROESPERA    2602
+                                                    IDPESCADOR      2
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+           440      0       7821       18      25   PESCADOMAYORPESO   4302
+                                                    PESOPESCADO    534
+                                                    NROESPERA    2604
+                                                    IDPESCADOR     85
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+            50      0       3796       18      25   PESCADOMAYORPESO   4267
+                                                    PESOPESCADO   3143
+                                                    NROESPERA    2605
+                                                    IDPESCADOR     44
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      7
+            63      0       3948       18      25   PESCADOMAYORPESO   4147
+                                                    PESOPESCADO   4147
+                                                    NROESPERA    2607
+                                                    IDPESCADOR     46
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+           394      0       7430       18      25   PESCADOMAYORPESO   4181
+                                                    PESOPESCADO   4181
+                                                    NROESPERA    2609
+                                                    IDPESCADOR     81
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      4
+            18      0       1291       18      25   PESCADOMAYORPESO   4795
+                                                    PESOPESCADO    882
+                                                    NROESPERA    2612
+                                                    IDPESCADOR     16
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      7
+           126      0       4680       18      25   PESCADOMAYORPESO   4830
+                                                    PESOPESCADO   2587
+                                                    NROESPERA    2613
+                                                    IDPESCADOR     53
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+           307      0       6655       18      25   PESCADOMAYORPESO   3901
+                                                    PESOPESCADO    715
+                                                    NROESPERA    2615
+                                                    IDPESCADOR     73
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+            95      0       4380       18      25   PESCADOMAYORPESO   3743
+                                                    PESOPESCADO   3743
+                                                    NROESPERA    2616
+                                                    IDPESCADOR     50
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+            17      0       1216       18      25   PESCADOMAYORPESO   3966
+                                                    PESOPESCADO   1222
+                                                    NROESPERA    2617
+                                                    IDPESCADOR     15
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      6
+           493      0       8341       18      25   PESCADOMAYORPESO   2498
+                                                    PESOPESCADO   2498
+                                                    NROESPERA    2620
+                                                    IDPESCADOR     91
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+            24      0       1771       18      25   PESCADOMAYORPESO   4190
+                                                    PESOPESCADO   3428
+                                                    NROESPERA    2621
+                                                    IDPESCADOR     22
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      2
+           554      0       8799       18      25   PESCADOMAYORPESO   3336
+                                                    PESOPESCADO   2762
+                                                    NROESPERA    2622
+                                                    IDPESCADOR     97
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      4
+           161      0       5062       18      25   PESCADOMAYORPESO   4814
+                                                    PESOPESCADO   4814
+                                                    NROESPERA    2623
+                                                    IDPESCADOR     57
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      4
+           431      0       7726       18      25   PESCADOMAYORPESO   1571
+                                                    PESOPESCADO   1571
+                                                    NROESPERA    2624
+                                                    IDPESCADOR     84
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      1
+           603      0       9186       18      25   PESCADOMAYORPESO   2445
+                                                    PESOPESCADO   2445
+                                                    NROESPERA    2625
+                                                    IDPESCADOR    101
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      2
+           217      0       5777       18      25   PESCADOMAYORPESO   2379
+                                                    PESOPESCADO   2379
+                                                    NROESPERA    2628
+                                                    IDPESCADOR     64
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      1
+            58      0       3882       18      25   PESCADOMAYORPESO   2325
+                                                    PESOPESCADO   1545
+                                                    NROESPERA    2629
+                                                    IDPESCADOR     45
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+            44      0       3566       18      25   PESCADOMAYORPESO   4368
+                                                    PESOPESCADO   4368
+                                                    NROESPERA    2630
+                                                    IDPESCADOR     42
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      1
+            86      0       4261       18      25   PESCADOMAYORPESO   4135
+                                                    PESOPESCADO   3064
+                                                    NROESPERA    2631
+                                                    IDPESCADOR     49
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+             5      0        137       18      25   PESCADOMAYORPESO   4457
+                                                    PESOPESCADO   3836
+                                                    NROESPERA    2634
+                                                    IDPESCADOR      3
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      8
+           575      0       9004       18      25   PESCADOMAYORPESO    387
+                                                    PESOPESCADO    387
+                                                    NROESPERA    2636
+                                                    IDPESCADOR     99
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      1
+            43      0       3459       18      25   PESCADOMAYORPESO   4556
+                                                    PESOPESCADO   2152
+                                                    NROESPERA    2638
+                                                    IDPESCADOR     41
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      4
+           407      0       7513       18      25   PESCADOMAYORPESO   4595
+                                                    PESOPESCADO   2276
+                                                    NROESPERA    2641
+                                                    IDPESCADOR     82
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      2
+           300      0       6557       18      25   PESCADOMAYORPESO   3355
+                                                    PESOPESCADO   2707
+                                                    NROESPERA    2642
+                                                    IDPESCADOR     72
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      5
+            41      0       3285       18      25   PESCADOMAYORPESO   4239
+                                                    PESOPESCADO   3678
+                                                    NROESPERA    2644
+                                                    IDPESCADOR     39
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      2
+            28      0       2114       18      25   PESCADOMAYORPESO   4265
+                                                    PESOPESCADO   3669
+                                                    NROESPERA    2645
+                                                    IDPESCADOR     26
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+            34      0       2654       18      25   PESCADOMAYORPESO   4931
+                                                    PESOPESCADO   1227
+                                                    NROESPERA    2646
+                                                    IDPESCADOR     32
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      4
+           517      0       8515       18      25   PESCADOMAYORPESO   2930
+                                                    PESOPESCADO   2338
+                                                    NROESPERA    2647
+                                                    IDPESCADOR     93
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      4
+            33      0       2587       18      25   PESCADOMAYORPESO   4905
+                                                    PESOPESCADO   4905
+                                                    NROESPERA    2648
+                                                    IDPESCADOR     31
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+           169      0       5182       18      25   PESCADOMAYORPESO   3188
+                                                    PESOPESCADO    911
+                                                    NROESPERA    2649
+                                                    IDPESCADOR     58
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+           206      0       5668       18      25   PESCADOMAYORPESO   4430
+                                                    PESOPESCADO   4430
+                                                    NROESPERA    2650
+                                                    IDPESCADOR     63
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      1
+            16      0       1108       18      25   PESCADOMAYORPESO   3667
+                                                    PESOPESCADO   3039
+                                                    NROESPERA    2651
+                                                    IDPESCADOR     14
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+           108      0       4490       18      25   PESCADOMAYORPESO   4984
+                                                    PESOPESCADO    689
+                                                    NROESPERA    2653
+                                                    IDPESCADOR     51
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+            15      0       1018       18      25   PESCADOMAYORPESO   4993
+                                                    PESOPESCADO   4993
+                                                    NROESPERA    2654
+                                                    IDPESCADOR     13
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+           195      0       5568       18      25   PESCADOMAYORPESO   2592
+                                                    PESOPESCADO   2592
+                                                    NROESPERA    2655
+                                                    IDPESCADOR     62
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      1
+           146      0       4873       18      25   PESCADOMAYORPESO   4758
+                                                    PESOPESCADO    327
+                                                    NROESPERA    2656
+                                                    IDPESCADOR     55
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      2
+
+FEC_XACT_NUMBER    PRI      BDT    CURRENT   NEXT   PARAMETER   VALUE
+           283      0      28805       23      24   PESCADOMAYORPESO   4982
+                                                    PESOPESCADO   2511
+                                                    NROESPERA    2591
+                                                    IDPESCADOR     71
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      5
+          2394      0      28811       19      20   PESCADOMAYORPESO   3990
+                                                    PESOPESCADO    797
+                                                    NROESPERA    2174
+                                                    IDPESCADOR     57
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+          2896      0      28812       19      20   PESCADOMAYORPESO   3667
+                                                    PESOPESCADO   3039
+                                                    NROESPERA    2651
+                                                    IDPESCADOR     14
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+          2830      0      28815       19      20   PESCADOMAYORPESO   3622
+                                                    PESOPESCADO    817
+                                                    NROESPERA    2589
+                                                    IDPESCADOR      8
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+          2670      0      28821       19      20   PESCADOMAYORPESO   4633
+                                                    PESOPESCADO    987
+                                                    NROESPERA    2437
+                                                    IDPESCADOR     96
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+          2626      0      28822       19      20   PESCADOMAYORPESO   2894
+                                                    PESOPESCADO   2414
+                                                    NROESPERA    2395
+                                                    IDPESCADOR     17
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      5
+          2713      0      28828       19      20   PESCADOMAYORPESO   1479
+                                                    PESOPESCADO   1479
+                                                    NROESPERA    2478
+                                                    IDPESCADOR     76
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+           116      0      28829       23      24   PESCADOMAYORPESO   2136
+                                                    PESOPESCADO   2136
+                                                    NROESPERA    2473
+                                                    IDPESCADOR     52
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+          2835      0      28830       19      20   PESCADOMAYORPESO   3732
+                                                    PESOPESCADO   3732
+                                                    NROESPERA    2594
+                                                    IDPESCADOR     83
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      1
+           187      0      28831       23      24   PESCADOMAYORPESO   4666
+                                                    PESOPESCADO   2025
+                                                    NROESPERA    2598
+                                                    IDPESCADOR     61
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      6
+          2837      0      28833       19      20   PESCADOMAYORPESO   4941
+                                                    PESOPESCADO   3311
+                                                    NROESPERA    2596
+                                                    IDPESCADOR     92
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      5
+          2855      0      28840       19      20   PESCADOMAYORPESO   4830
+                                                    PESOPESCADO   2587
+                                                    NROESPERA    2613
+                                                    IDPESCADOR     53
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+           536      0      28845       23      24   PESCADOMAYORPESO   2564
+                                                    PESOPESCADO   2564
+                                                    NROESPERA    2579
+                                                    IDPESCADOR     95
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      2
+          2553      0      28848       19      20   PESCADOMAYORPESO   4655
+                                                    PESOPESCADO   1734
+                                                    NROESPERA    2326
+                                                    IDPESCADOR     10
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+            45      0      28850       23      24   PESCADOMAYORPESO   4740
+                                                    PESOPESCADO   4740
+                                                    NROESPERA    2618
+                                                    IDPESCADOR     43
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      5
+           136      0      28851       23      24   NROESPERA    2614
+                                                    IDPESCADOR     54
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+          2656      0      28851       19      20   PESCADOMAYORPESO   3656
+                                                    PESOPESCADO    340
+                                                    NROESPERA    2423
+                                                    IDPESCADOR     20
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      6
+          2890      0      28854       19      20   PESCADOMAYORPESO   4931
+                                                    PESOPESCADO   1227
+                                                    NROESPERA    2646
+                                                    IDPESCADOR     32
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      4
+          2898      0      28855       19      20   PESCADOMAYORPESO   4984
+                                                    PESOPESCADO    689
+                                                    NROESPERA    2653
+                                                    IDPESCADOR     51
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+           590      0      28857       23      24   PESCADOMAYORPESO   3920
+                                                    PESOPESCADO   3920
+                                                    NROESPERA    2632
+                                                    IDPESCADOR    100
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+          2838      0      28861       19      20   PESCADOMAYORPESO   2653
+                                                    PESOPESCADO   1094
+                                                    NROESPERA    2597
+                                                    IDPESCADOR     80
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      4
+           229      0      28863       23      24   PESCADOMAYORPESO   4873
+                                                    PESOPESCADO    486
+                                                    NROESPERA    2562
+                                                    IDPESCADOR     65
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+           543      0      28863       23      24   PESCADOMAYORPESO   4633
+                                                    PESOPESCADO   1498
+                                                    NROESPERA    2437
+                                                    IDPESCADOR     96
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      4
+          2847      0      28863       19      20   PESCADOMAYORPESO   4267
+                                                    PESOPESCADO   3143
+                                                    NROESPERA    2605
+                                                    IDPESCADOR     44
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      7
+          2872      0      28866       19      20   PESCADOMAYORPESO   2325
+                                                    PESOPESCADO   1545
+                                                    NROESPERA    2629
+                                                    IDPESCADOR     45
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+          2854      0      28874       19      20   PESCADOMAYORPESO   4795
+                                                    PESOPESCADO    882
+                                                    NROESPERA    2612
+                                                    IDPESCADOR     16
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      7
+          2891      0      28882       37      37
+           238      0      28895       23      24   PESCADOMAYORPESO   3668
+                                                    PESOPESCADO   2258
+                                                    NROESPERA    2626
+                                                    IDPESCADOR     66
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+          2853      0      28897       19      20   PESCADOMAYORPESO   3361
+                                                    PESOPESCADO   3361
+                                                    NROESPERA    2611
+                                                    IDPESCADOR     31
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      2
+            36      0      28901       23      24   PESCADOMAYORPESO   2875
+                                                    PESOPESCADO   1060
+                                                    NROESPERA    2635
+                                                    IDPESCADOR     34
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      2
+           464      0      28910       23      24   PESCADOMAYORPESO   4463
+                                                    PESOPESCADO   4463
+                                                    NROESPERA    2341
+                                                    IDPESCADOR     88
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      5
+           562      0      28918       23      24   PESCADOMAYORPESO   1968
+                                                    PESOPESCADO   1968
+                                                    NROESPERA    2520
+                                                    IDPESCADOR     98
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      1
+            39      0      28919       23      24   PESCADOMAYORPESO   4698
+                                                    PESOPESCADO   4698
+                                                    NROESPERA    2265
+                                                    IDPESCADOR     37
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+          2863      0      28927       19      20   PESCADOMAYORPESO   2498
+                                                    PESOPESCADO   2498
+                                                    NROESPERA    2620
+                                                    IDPESCADOR     91
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+           359      0      28928       23      24   PESCADOMAYORPESO   1273
+                                                    PESOPESCADO   1273
+                                                    NROESPERA    2603
+                                                    IDPESCADOR     78
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      2
+           486      0      28929       23      24   PESCADOMAYORPESO   1387
+                                                    PESOPESCADO   1387
+                                                    NROESPERA    2414
+                                                    IDPESCADOR     90
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      1
+          2836      0      28929       19      20   NROESPERA    2595
+                                                    IDPESCADOR     27
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+            37      0      28932       23      24   PESCADOMAYORPESO   4838
+                                                    PESOPESCADO   4838
+                                                    NROESPERA    2465
+                                                    IDPESCADOR     35
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      5
+          2829      0      28938       19      20   PESCADOMAYORPESO   2279
+                                                    PESOPESCADO   2279
+                                                    NROESPERA    2588
+                                                    IDPESCADOR     89
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      2
+            21      0      28957       23      24   PESCADOMAYORPESO   4673
+                                                    PESOPESCADO   3683
+                                                    NROESPERA    2639
+                                                    IDPESCADOR     19
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      6
+             8      0      28961       23      24   PESCADOMAYORPESO   4259
+                                                    PESOPESCADO   2674
+                                                    NROESPERA    2592
+                                                    IDPESCADOR      6
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      5
+           374      0      28963       23      24   NROESPERA    2640
+                                                    IDPESCADOR     79
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+          2888      0      28964       19      20   PESCADOMAYORPESO   4239
+                                                    PESOPESCADO   3678
+                                                    NROESPERA    2644
+                                                    IDPESCADOR     39
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      2
+          2859      0      28971       19      20   PESCADOMAYORPESO   3966
+                                                    PESOPESCADO   1222
+                                                    NROESPERA    2617
+                                                    IDPESCADOR     15
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      6
+           247      0      28972       23      24   PESCADOMAYORPESO   2647
+                                                    PESOPESCADO    539
+                                                    NROESPERA    2587
+                                                    IDPESCADOR     67
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+            42      0      28973       23      24   NROESPERA    2637
+                                                    IDPESCADOR     40
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+             7      0      28976       23      24   PESCADOMAYORPESO   4217
+                                                    PESOPESCADO   1821
+                                                    NROESPERA    2565
+                                                    IDPESCADOR      5
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      7
+            12      0      29006       23      24   PESCADOMAYORPESO   4655
+                                                    PESOPESCADO    540
+                                                    NROESPERA    2633
+                                                    IDPESCADOR     10
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+           277      0      29009       23      24   PESCADOMAYORPESO   4568
+                                                    PESOPESCADO   4078
+                                                    NROESPERA    2627
+                                                    IDPESCADOR     70
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      4
+           257      0      29009       23      24   PESCADOMAYORPESO   4086
+                                                    PESOPESCADO   4086
+                                                    NROESPERA    2610
+                                                    IDPESCADOR     68
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      2
+          2795      0      29020       19      20   PESCADOMAYORPESO   3122
+                                                    PESOPESCADO   3122
+                                                    NROESPERA    2556
+                                                    IDPESCADOR     11
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+            22      0      29024       23      24   PESCADOMAYORPESO   3656
+                                                    PESOPESCADO   1877
+                                                    NROESPERA    2542
+                                                    IDPESCADOR     20
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      7
+          2815      0      29028       19      20   PESCADOMAYORPESO   3385
+                                                    PESOPESCADO   1208
+                                                    NROESPERA    2575
+                                                    IDPESCADOR     60
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+           176      0      29034       23      24   PESCADOMAYORPESO   3603
+                                                    PESOPESCADO   3603
+                                                    NROESPERA    2643
+                                                    IDPESCADOR     59
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      1
+          2760      0      29037       19      20   PESCADOMAYORPESO   4358
+                                                    PESOPESCADO   3881
+                                                    NROESPERA    2523
+                                                    IDPESCADOR     48
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+           154      0      29044       23      24   PESCADOMAYORPESO   4091
+                                                    PESOPESCADO   3060
+                                                    NROESPERA    2584
+                                                    IDPESCADOR     56
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      4
+            40      0      29047       23      24   PESCADOMAYORPESO   4904
+                                                    PESOPESCADO   3863
+                                                    NROESPERA    2531
+                                                    IDPESCADOR     38
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+          2857      0      29058       19      20   PESCADOMAYORPESO   3901
+                                                    PESOPESCADO    715
+                                                    NROESPERA    2615
+                                                    IDPESCADOR     73
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+          2807      0      29061       19      20   PESCADOMAYORPESO   4299
+                                                    PESOPESCADO   4299
+                                                    NROESPERA    2567
+                                                    IDPESCADOR      4
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      2
+           450      0      29070       23      24   PESCADOMAYORPESO   4557
+                                                    PESOPESCADO   2597
+                                                    NROESPERA    2546
+                                                    IDPESCADOR     86
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+            27      0      29070       23      24   PESCADOMAYORPESO   2688
+                                                    PESOPESCADO   2688
+                                                    NROESPERA    2581
+                                                    IDPESCADOR     25
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      2
+           268      0      29089       23      24   NROESPERA    2652
+                                                    IDPESCADOR     69
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+            25      0      29100       23      24   PESCADOMAYORPESO   4562
+                                                    PESOPESCADO   1690
+                                                    NROESPERA    2619
+                                                    IDPESCADOR     23
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      4
+          2892      0      29109       19      20   PESCADOMAYORPESO   2930
+                                                    PESOPESCADO   2338
+                                                    NROESPERA    2647
+                                                    IDPESCADOR     93
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      4
+          2880      0      29128       19      20   PESCADOMAYORPESO    387
+                                                    PESOPESCADO    387
+                                                    NROESPERA    2636
+                                                    IDPESCADOR     99
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      1
+          2811      0      29145       19      20   PESCADOMAYORPESO   2078
+                                                    PESOPESCADO   2078
+                                                    NROESPERA    2571
+                                                    IDPESCADOR     29
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+          2864      0      29148       19      20   PESCADOMAYORPESO   4190
+                                                    PESOPESCADO   3428
+                                                    NROESPERA    2621
+                                                    IDPESCADOR     22
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      2
+          2834      0      29156       19      20   PESCADOMAYORPESO   3647
+                                                    PESOPESCADO   2925
+                                                    NROESPERA    2593
+                                                    IDPESCADOR     21
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+          2817      0      29162       19      20   PESCADOMAYORPESO   4525
+                                                    PESOPESCADO   3452
+                                                    NROESPERA    2577
+                                                    IDPESCADOR     87
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      5
+            19      0      29189       26      27   PESCADOMAYORPESO   2894
+                                                    PESOPESCADO   2414
+                                                    NROESPERA    2395
+                                                    IDPESCADOR     17
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      5
+          2846      0      29201       19      20   PESCADOMAYORPESO   4302
+                                                    PESOPESCADO    534
+                                                    NROESPERA    2604
+                                                    IDPESCADOR     85
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+          2779      0      29245       19      20   PESCADOMAYORPESO   3111
+                                                    PESOPESCADO   3111
+                                                    NROESPERA    2541
+                                                    IDPESCADOR     47
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+          2851      0      29253       19      20   PESCADOMAYORPESO   4181
+                                                    PESOPESCADO   4181
+                                                    NROESPERA    2609
+                                                    IDPESCADOR     81
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      4
+          2899      0      29258       19      20   PESCADOMAYORPESO   4993
+                                                    PESOPESCADO   4993
+                                                    NROESPERA    2654
+                                                    IDPESCADOR     13
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+          2865      0      29266       19      20   PESCADOMAYORPESO   3336
+                                                    PESOPESCADO   2762
+                                                    NROESPERA    2622
+                                                    IDPESCADOR     97
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      4
+            20      0      29269       26      27   PESCADOMAYORPESO   4008
+                                                    PESOPESCADO   4008
+                                                    NROESPERA    2488
+                                                    IDPESCADOR     18
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      1
+            26      0      29292       26      27   PESCADOMAYORPESO   4661
+                                                    PESOPESCADO   4661
+                                                    NROESPERA    2408
+                                                    IDPESCADOR     24
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      4
+          2868      0      29308       19      20   PESCADOMAYORPESO   2445
+                                                    PESOPESCADO   2445
+                                                    NROESPERA    2625
+                                                    IDPESCADOR    101
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      2
+            35      0      29309       26      27   PESCADOMAYORPESO   4609
+                                                    PESOPESCADO   4397
+                                                    NROESPERA    2518
+                                                    IDPESCADOR     33
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      6
+            68      0      29317       26      27   PESCADOMAYORPESO   3111
+                                                    PESOPESCADO   3111
+                                                    NROESPERA    2541
+                                                    IDPESCADOR     47
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+          2901      0      29317       19      20   PESCADOMAYORPESO   4758
+                                                    PESOPESCADO    327
+                                                    NROESPERA    2656
+                                                    IDPESCADOR     55
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      2
+          2894      0      29317       19      20   PESCADOMAYORPESO   3188
+                                                    PESOPESCADO    911
+                                                    NROESPERA    2649
+                                                    IDPESCADOR     58
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+          2893      0      29322       19      20   PESCADOMAYORPESO   4905
+                                                    PESOPESCADO   4905
+                                                    NROESPERA    2648
+                                                    IDPESCADOR     31
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+           328      0      29329       26      27   PESCADOMAYORPESO   2403
+                                                    PESOPESCADO   2158
+                                                    NROESPERA    2540
+                                                    IDPESCADOR     75
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      2
+          2849      0      29347       19      20   PESCADOMAYORPESO   4147
+                                                    PESOPESCADO   4147
+                                                    NROESPERA    2607
+                                                    IDPESCADOR     46
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      3
+          2796      0      29363       19      20   PESCADOMAYORPESO   4619
+                                                    PESOPESCADO   4619
+                                                    NROESPERA    2557
+                                                    IDPESCADOR     36
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      1
+          2885      0      29372       19      20   PESCADOMAYORPESO   4595
+                                                    PESOPESCADO   2276
+                                                    NROESPERA    2641
+                                                    IDPESCADOR     82
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      2
+          2844      0      29372       19      20   PESCADOMAYORPESO   4732
+                                                    PESOPESCADO   4732
+                                                    NROESPERA    2602
+                                                    IDPESCADOR      2
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+          2774      0      29395       19      20   PESCADOMAYORPESO   3010
+                                                    PESOPESCADO    953
+                                                    NROESPERA    2536
+                                                    IDPESCADOR     28
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+          2813      0      29397       19      20   PESCADOMAYORPESO   4153
+                                                    PESOPESCADO   3598
+                                                    NROESPERA    2573
+                                                    IDPESCADOR     74
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      3
+          2840      0      29406       19      20   PESCADOMAYORPESO   4487
+                                                    PESOPESCADO   2632
+                                                    NROESPERA    2599
+                                                    IDPESCADOR      7
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+          2882      0      29451       19      20   PESCADOMAYORPESO   4556
+                                                    PESOPESCADO   2152
+                                                    NROESPERA    2638
+                                                    IDPESCADOR     41
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      4
+           334      0      29458       26      27   PESCADOMAYORPESO   1479
+                                                    PESOPESCADO   1479
+                                                    NROESPERA    2478
+                                                    IDPESCADOR     76
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+          2852      0      29468       19      20   PESCADOMAYORPESO   1747
+                                                    PESOPESCADO   1747
+                                                    NROESPERA    2610
+                                                    IDPESCADOR     68
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      1
+          2900      0      29517       19      20   PESCADOMAYORPESO   2592
+                                                    PESOPESCADO   2592
+                                                    NROESPERA    2655
+                                                    IDPESCADOR     62
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      1
+          2871      0      29565       19      20   PESCADOMAYORPESO   2379
+                                                    PESOPESCADO   2379
+                                                    NROESPERA    2628
+                                                    IDPESCADOR     64
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      1
+          2816      0      29588       19      20   PESCADOMAYORPESO   4748
+                                                    PESOPESCADO   4498
+                                                    NROESPERA    2576
+                                                    IDPESCADOR     77
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      4
+            30      0      29597       26      27   PESCADOMAYORPESO   3010
+                                                    PESOPESCADO    953
+                                                    NROESPERA    2536
+                                                    IDPESCADOR     28
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+            77      0      29599       26      27   PESCADOMAYORPESO   4358
+                                                    PESOPESCADO   3881
+                                                    NROESPERA    2523
+                                                    IDPESCADOR     48
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+          2867      0      29617       19      20   PESCADOMAYORPESO   1571
+                                                    PESOPESCADO   1571
+                                                    NROESPERA    2624
+                                                    IDPESCADOR     84
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      1
+          2895      0      29675       19      20   PESCADOMAYORPESO   4430
+                                                    PESOPESCADO   4430
+                                                    NROESPERA    2650
+                                                    IDPESCADOR     63
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      1
+          2755      0      29682       19      20   PESCADOMAYORPESO   4609
+                                                    PESOPESCADO   4397
+                                                    NROESPERA    2518
+                                                    IDPESCADOR     33
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      6
+          2889      0      29694       19      20   PESCADOMAYORPESO   4265
+                                                    PESOPESCADO   3669
+                                                    NROESPERA    2645
+                                                    IDPESCADOR     26
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+          2886      0      29697       19      20   PESCADOMAYORPESO   3355
+                                                    PESOPESCADO   2707
+                                                    NROESPERA    2642
+                                                    IDPESCADOR     72
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      5
+          2858      0      29800       19      20   PESCADOMAYORPESO   3743
+                                                    PESOPESCADO   3743
+                                                    NROESPERA    2616
+                                                    IDPESCADOR     50
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+          2814      0      29873       19      20   PESCADOMAYORPESO   4840
+                                                    PESOPESCADO   4540
+                                                    NROESPERA    2574
+                                                    IDPESCADOR     30
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2
+          2789      0      29922       19      20   NROESPERA    2550
+                                                    IDPESCADOR     94
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+          2820      0      29927       19      20   PESCADOMAYORPESO   4790
+                                                    PESOPESCADO   1086
+                                                    NROESPERA    2580
+                                                    IDPESCADOR     12
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      5
+          2778      0      30075       19      20   PESCADOMAYORPESO   2403
+                                                    PESOPESCADO   2158
+                                                    NROESPERA    2540
+                                                    IDPESCADOR     75
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      2
+          2866      0      30279       19      20   PESCADOMAYORPESO   4814
+                                                    PESOPESCADO   4814
+                                                    NROESPERA    2623
+                                                    IDPESCADOR     57
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    900
+                                                    TIPO            1
+                                                    CANTPESCADOS      4
+          2877      0      30348       19      20   PESCADOMAYORPESO   4457
+                                                    PESOPESCADO   3836
+                                                    NROESPERA    2634
+                                                    IDPESCADOR      3
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      8
+          2640      0      30534       19      20   PESCADOMAYORPESO   4661
+                                                    PESOPESCADO   4661
+                                                    NROESPERA    2408
+                                                    IDPESCADOR     24
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      4
+          2873      0      31516       19      20   PESCADOMAYORPESO   4368
+                                                    PESOPESCADO   4368
+                                                    NROESPERA    2630
+                                                    IDPESCADOR     42
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      1
+          2724      0      31823       19      20   PESCADOMAYORPESO   4008
+                                                    PESOPESCADO   4008
+                                                    NROESPERA    2488
+                                                    IDPESCADOR     18
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      1
+          2874      0      31984       19      20   PESCADOMAYORPESO   4135
+                                                    PESOPESCADO   3064
+                                                    NROESPERA    2631
+                                                    IDPESCADOR     49
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    600
+                                                    TIPO            2
+                                                    CANTPESCADOS      3
+          2794      0      32139       19      20   PESCADOMAYORPESO   3856
+                                                    PESOPESCADO   3856
+                                                    NROESPERA    2555
+                                                    IDPESCADOR      9
+                                                    MODIFICADORENTRETIRO      1
+                                                    MEDIAENTRETIRO    300
+                                                    ESPERAPESCANDO    720
+                                                    TIPO            3
+                                                    CANTPESCADOS      2

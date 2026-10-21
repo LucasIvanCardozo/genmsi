@@ -912,7 +912,13 @@ impl<'p> Simulation<'p> {
                         xact,
                         depth: 0,
                     };
-                    let count = spec.count.eval(&mut ctx).round().max(1.0) as usize;
+                    // `Modo = Todos` (`ALL` in the generated GPSS) releases every
+                    // matching member, whatever `Cantidad` says.
+                    let count = if spec.all {
+                        usize::MAX
+                    } else {
+                        spec.count.eval(&mut ctx).round().max(1.0) as usize
+                    };
                     let wanted = spec.compare_value.as_ref().map(|expr| expr.eval(&mut ctx));
                     (count, wanted)
                 };

@@ -37,7 +37,7 @@ expression: stdout(&output)
       "node": 8,
       "class": "Logic",
       "label": "A_Logic",
-      "operands": "Puerta,Set",
+      "operands": "S,Puerta",
       "entries": 0,
       "current": 0,
       "retries": 0
@@ -57,7 +57,7 @@ expression: stdout(&output)
       "node": 10,
       "class": "GateL",
       "label": "GateL",
-      "operands": "Logic { switch: EntityName { source: Literal(\"Puerta\") }, state: true }",
+      "operands": "LS,Puerta",
       "entries": 9,
       "current": 9,
       "retries": 9

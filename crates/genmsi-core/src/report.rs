@@ -12,7 +12,9 @@ use serde::Serialize;
 use serde_json::json;
 
 use crate::error::EngineError;
-use crate::program::{BlockKind, ExecBlock, Program};
+use crate::program::{
+    BlockKind, ExecBlock, GateCondition, LogicOp, Program, RelOp, SelectMode,
+};
 use crate::sim::{BlockStats, RunResult};
 
 /// Format a number the way the original report does.
@@ -69,8 +71,8 @@ pub fn render(result: &RunResult, program: &Program) -> String {
             stats.current,
             stats.retries,
             loc,
-            block.class.to_uppercase(),
-            operands(block)
+            block_type(block),
+            operands(block, program)
         );
     }
 
@@ -259,8 +261,99 @@ pub fn render(result: &RunResult, program: &Program) -> String {
     out
 }
 
+/// GPSS block type shown in the report's `BLOCK_TYPE` column.
+///
+/// Most GenMSI classes keep their own uppercased name, but a few expand into
+/// differently named GPSS statements. The mapping below is proven by these
+/// baseline rows in `fixtures/outputs/*.report.txt`:
+///
+/// - `GateL  GATE  LS  Puerta` (`TP6__Clase 6_1_PuertaBanco`) and
+///   `GateF  GATE  NU  Juan,A_Advance` (`TP6__Clase 6_3_JefeEducado`): the
+///   three gate classes all print `GATE`.
+/// - `Multifurcacion  TRANSFER  ,FN$MultifurcacionGO` (`TP10__tp10`).
+/// - `A_SelectF  SELECT  NU  Caja,1,10,,,A_Select` and
+///   `A_Select  SELECT  MIN  Caja,1,10,,Q` (`Parcial 6-11-23__Veron - Parcial`,
+///   `TP4__supermercado`, `TP5__burgerShop`).
+/// - `A_JoinNumber  JOIN  GPesos,P$PesoPescado` and
+///   `A_JoinMe  JOIN  EsperaServiciosVarios` (`TP10__tp10`, `TP8__mecanicos`).
+/// - `A_ExamineNumber  EXAMINE  GPesos,P$PesoPescado,A_Assign7` (`TP10__tp10`).
+/// - `A_RemoveTrans  REMOVE  E  EsperaServiciosVarios,1,,IDAutomovil,P$IDAutomovil`
+///   (`TP10__tp10`).
+/// - `A_Counter  SAVEVALUE  CAutomovil+,1` (`TP8__mecanicos`, `TP10__tp10`):
+///   the original has no `COUNTER` statement, a `Counter` module expands to
+///   `SAVEVALUE`.
+pub fn block_type(block: &ExecBlock) -> std::borrow::Cow<'_, str> {
+    match block.class.as_str() {
+        "GateL" | "GateS" | "GateF" => std::borrow::Cow::Borrowed("GATE"),
+        "Multifurcacion" => std::borrow::Cow::Borrowed("TRANSFER"),
+        "SelectF" => std::borrow::Cow::Borrowed("SELECT"),
+        "JoinNumber" | "JoinMe" => std::borrow::Cow::Borrowed("JOIN"),
+        "ExamineNumber" => std::borrow::Cow::Borrowed("EXAMINE"),
+        "RemoveTrans" => std::borrow::Cow::Borrowed("REMOVE"),
+        "Counter" => std::borrow::Cow::Borrowed("SAVEVALUE"),
+        other => std::borrow::Cow::Owned(other.to_uppercase()),
+    }
+}
+
+/// The GPSS comparison letters used by `TEST`:
+/// `TEST E P$SectorVisitado,3,A_Test1`, `TEST NE P$ImpacienciaMedia,0,A_JoinMe`,
+/// `TEST L P$Tipo,6,Entrada11`, `TEST G P$Donde,3,A_Unlink1`,
+/// `TEST GE P$CantPescados,1,A_Terminate7` (baseline rows in
+/// `fixtures/outputs/*.report.txt`).
+fn rel_op_letter(op: RelOp) -> &'static str {
+    match op {
+        RelOp::Lt => "L",
+        RelOp::Le => "LE",
+        RelOp::Eq => "E",
+        RelOp::Ne => "NE",
+        RelOp::Ge => "GE",
+        RelOp::Gt => "G",
+    }
+}
+
+/// GPSS `LOC` of the block at `index`: its label, or the running number
+/// `render` assigns to unlabeled blocks.
+fn loc_label(program: &Program, index: usize) -> String {
+    let mut numeric = 0;
+    program
+        .blocks
+        .iter()
+        .take(index + 1)
+        .map(|block| match &block.label {
+            Some(label) => label.clone(),
+            None => {
+                numeric += 1;
+                numeric.to_string()
+            }
+        })
+        .last()
+        .unwrap_or_default()
+}
+
+/// LOC of the target of the module's failure output (`Salida2`), when that
+/// output is linked. Gate, Test, SelectF and ExamineNumber modules route their
+/// "else" branch through it; the original prints that target as the last
+/// operand (`GateF  GATE  NU  Juan,A_Advance`).
+fn failure_target_label(program: &Program, block: &ExecBlock) -> Option<String> {
+    let position = block
+        .port_names
+        .iter()
+        .position(|port| port == "Salida2")
+        .or_else(|| (block.next.len() > 1).then_some(1))?;
+    block
+        .next
+        .get(position)
+        .copied()
+        .flatten()
+        .map(|target| loc_label(program, target))
+}
+
 /// Render the operands of a block the way GPSS shows them.
-pub fn operands(block: &ExecBlock) -> String {
+///
+/// Blocks whose first operand is a mode (gate condition, `TEST` comparison,
+/// `LOGIC` switch operation, `SELECT` selection) print the GPSS mode letter
+/// first; conditional blocks append the LOC of their linked failure output.
+pub fn operands(block: &ExecBlock, program: &Program) -> String {
     let refs: Vec<String> = match &block.kind {
         BlockKind::Generate(spec) => vec![
             spec.mean.to_string(),
@@ -282,7 +375,14 @@ pub fn operands(block: &ExecBlock) -> String {
         ],
         BlockKind::Assign(spec) => vec![spec.parameter.clone(), spec.value.to_string()],
         BlockKind::SaveValue(spec) => vec![spec.savevalue.clone(), spec.value.to_string()],
-        BlockKind::Counter(spec) => vec![spec.savevalue.clone(), spec.increment.to_string()],
+        BlockKind::Counter(spec) => {
+            // The original expands `Counter` to `SAVEVALUE name+,increment`
+            // (`A_Counter  SAVEVALUE  CAutomovil+,1`, TP8/TP10 baselines).
+            vec![
+                format!("{}+", spec.savevalue),
+                spec.increment.to_string(),
+            ]
+        }
         BlockKind::Queue(spec) | BlockKind::Depart(spec) => vec![spec.queue.to_string()],
         BlockKind::Seize(spec) | BlockKind::Release(spec) | BlockKind::Return(spec) => {
             vec![spec.facility.to_string()]
@@ -291,34 +391,129 @@ pub fn operands(block: &ExecBlock) -> String {
         BlockKind::Enter(spec) | BlockKind::Leave(spec) => {
             vec![spec.storage.to_string(), spec.units.to_string()]
         }
-        BlockKind::Test(spec) => vec![
-            spec.left.to_string(),
-            format!("{:?}", spec.op),
-            spec.right.to_string(),
-        ],
+        BlockKind::Test(spec) => {
+            // `TEST    E       P$SectorVisitado,3,A_Test1`.
+            let mut refs = vec![
+                rel_op_letter(spec.op).to_string(),
+                spec.left.to_string(),
+                spec.right.to_string(),
+            ];
+            if let Some(label) = failure_target_label(program, block) {
+                refs.push(label);
+            }
+            refs
+        }
         BlockKind::Transfer(spec) => vec![spec.probability.to_string()],
         BlockKind::MultiTransfer(spec) => {
             spec.weights.iter().map(ToString::to_string).collect()
         }
-        BlockKind::Gate(spec) => vec![format!("{:?}", spec.condition)],
-        BlockKind::Logic(spec) => vec![spec.switch.to_string(), format!("{:?}", spec.op)],
+        BlockKind::Gate(spec) => {
+            // `GateL  GATE  LS  Puerta`, `GateL  GATE  LR  Fin,A_Counter1`,
+            // `HornoConComidas  GATE  SNE  Comidas`,
+            // `GateF  GATE  NU  Juan,A_Advance`.
+            let mut refs = match &spec.condition {
+                GateCondition::Logic { switch, state } => vec![
+                    if *state { "LS" } else { "LR" }.to_string(),
+                    switch.to_string(),
+                ],
+                GateCondition::Storage { storage, empty } => vec![
+                    if *empty { "SE" } else { "SNE" }.to_string(),
+                    storage.to_string(),
+                ],
+                GateCondition::Facility { facility, available } => vec![
+                    if *available { "NU" } else { "U" }.to_string(),
+                    facility.to_string(),
+                ],
+            };
+            if let Some(label) = failure_target_label(program, block) {
+                refs.push(label);
+            }
+            refs
+        }
+        BlockKind::Logic(spec) => {
+            // `LOGIC   R       Molinete` / `LOGIC   S       Molinete`.
+            vec![
+                match spec.op {
+                    LogicOp::Set => "S",
+                    LogicOp::Reset => "R",
+                }
+                .to_string(),
+                spec.switch.to_string(),
+            ]
+        }
         BlockKind::Link(spec) => vec![spec.chain.to_string()],
         BlockKind::Unlink(spec) => vec![spec.chain.to_string(), spec.count.to_string()],
         BlockKind::Split(spec) => vec![spec.total.to_string()],
         BlockKind::Assemble(spec) => vec![spec.count.to_string()],
         BlockKind::Match(spec) => vec![spec.conjugate.clone()],
         BlockKind::Loop(spec) => vec![spec.parameter.clone()],
-        BlockKind::Select(spec) => vec![
-            spec.parameter.clone(),
-            spec.low.to_string(),
-            spec.high.to_string(),
-            format!("{:?}", spec.mode),
-        ],
+        BlockKind::Select(spec) => {
+            // `A_SelectF  SELECT  NU  Caja,1,10,,,A_Select` (first free) and
+            // `A_Select  SELECT  MIN  Caja,1,10,,Q` (smallest queue content):
+            // mode, parameter, range, an unused condition operand, then the
+            // scanned entity class for MIN/MAX or the alternate destination
+            // for first-free.
+            let mode = match spec.mode {
+                SelectMode::FirstFree => "NU",
+                SelectMode::Min => "MIN",
+                SelectMode::Max => "MAX",
+            };
+            let mut refs = vec![
+                mode.to_string(),
+                spec.parameter.clone(),
+                spec.low.to_string(),
+                spec.high.to_string(),
+            ];
+            if spec.mode == SelectMode::FirstFree {
+                refs.push(String::new());
+                refs.push(String::new());
+                if let Some(label) = failure_target_label(program, block) {
+                    refs.push(label);
+                }
+            } else {
+                refs.push(String::new());
+                refs.push(spec.kind.to_string());
+            }
+            refs
+        }
         BlockKind::Tabulate(spec) => vec![spec.table.clone()],
         BlockKind::Priority(expr) => vec![expr.to_string()],
-        BlockKind::Join(spec) => vec![spec.group.clone()],
-        BlockKind::Examine(spec) => vec![spec.group.clone(), spec.number.to_string()],
-        BlockKind::Remove(spec) => vec![spec.group.clone()],
+        BlockKind::Join(spec) => {
+            // `A_JoinNumber  JOIN  GPesos,P$PesoPescado` (numbered) and
+            // `A_JoinMe  JOIN  EsperaServiciosVarios` (the transaction itself).
+            let mut refs = vec![spec.group.clone()];
+            if let Some(number) = &spec.number {
+                refs.push(number.to_string());
+            }
+            refs
+        }
+        BlockKind::Examine(spec) => {
+            // `A_ExamineNumber  EXAMINE  GPesos,P$PesoPescado,A_Assign7`.
+            let mut refs = vec![spec.group.clone(), spec.number.to_string()];
+            if let Some(label) = failure_target_label(program, block) {
+                refs.push(label);
+            }
+            refs
+        }
+        BlockKind::Remove(spec) => {
+            // `A_RemoveTrans  REMOVE  E  EsperaServiciosVarios,1,,otro,1`: the
+            // equality mode of the comparison, group, count (`ALL` when every
+            // member is removed), an unused operand, then the compared
+            // parameter and value.
+            let count = if spec.all {
+                "ALL".to_string()
+            } else {
+                spec.count.to_string()
+            };
+            let mut refs = vec!["E".to_string(), spec.group.clone(), count, String::new()];
+            if let Some(parameter) = &spec.parameter {
+                refs.push(parameter.clone());
+            }
+            if let Some(value) = &spec.value {
+                refs.push(value.to_string());
+            }
+            refs
+        }
         BlockKind::Scan(spec) => vec![spec.group.clone()],
         BlockKind::Alter(spec) => vec![spec.group.clone()],
         BlockKind::InitialLogic(spec) => vec![spec.switch.to_string()],
@@ -398,7 +593,7 @@ pub fn json_report<'a>(result: &'a RunResult, program: &'a Program) -> JsonRepor
                 node: block.module_id,
                 class: &block.class,
                 label,
-                operands: operands(block),
+                operands: operands(block, program),
                 entries: stats.entries,
                 current: stats.current,
                 retries: stats.retries,
@@ -526,7 +721,7 @@ pub fn program_json(program: &Program) -> serde_json::Value {
             "node": block.module_id,
             "class": block.class,
             "label": block.label,
-            "operands": operands(block),
+            "operands": operands(block, program),
             "ports": block.port_names,
         })).collect::<Vec<_>>(),
         "storages": program.definitions.storages,

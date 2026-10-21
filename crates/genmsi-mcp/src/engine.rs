@@ -57,13 +57,16 @@ pub fn load(source: &ModelSource) -> Result<Loaded, ToolError> {
             if !path.is_file() {
                 return Err(ToolError::not_found(path.display().to_string()));
             }
-            genmsi_format::load(path)
-                .map_err(|error| ToolError::from_format(&error, Some(&name)))?
+            genmsi_format::parse_file(path)
+                .map_err(|error| ToolError::from_format(&error, Some(&name), None))?
         }
-        ModelSource::Inline(text) => {
-            genmsi_format::load_str(text).map_err(|error| ToolError::from_format(&error, Some(&name)))?
-        }
+        ModelSource::Inline(text) => genmsi_format::parse_str(text)
+            .map_err(|error| ToolError::from_format(&error, Some(&name), None))?,
     };
+    // The structural rules are checked here, with the model in hand, so a
+    // failure can point at the block that breaks them.
+    genmsi_format::validate(&model)
+        .map_err(|error| ToolError::from_format(&error, Some(&name), Some(&model)))?;
     let program = genmsi_core::compile_model(&model)
         .map_err(|error| ToolError::from_engine(&error, &model, &name))?;
     Ok(Loaded {

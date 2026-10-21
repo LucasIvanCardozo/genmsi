@@ -62,13 +62,20 @@ impl ToolError {
     }
 
     /// The model file could not be read or parsed.
-    pub fn from_format(error: &FormatError, path: Option<&str>) -> Self {
+    ///
+    /// `model` is the parsed model when the failure is a rule the model
+    /// breaks: the block the rule names then carries its position.
+    pub fn from_format(
+        error: &FormatError,
+        path: Option<&str>,
+        model: Option<&GmdlModel>,
+    ) -> Self {
         let (class, message) = match error {
             FormatError::Xml { message, .. } => ("invalid_xml", format!("invalid XML: {message}")),
             FormatError::Structural { message, .. } => ("invalid_model", message.clone()),
         };
         let location = error.location();
-        Self {
+        let failure = Self {
             error: class,
             message,
             path: path.map(str::to_string),
@@ -76,6 +83,10 @@ impl ToolError {
             column: None,
             node: location.node,
             class: None,
+        };
+        match model {
+            Some(model) => failure.locate(model),
+            None => failure,
         }
     }
 
@@ -109,7 +120,7 @@ impl ToolError {
                 node: None,
                 class: None,
             },
-            EngineError::Format(format) => Self::from_format(format, Some(path)),
+            EngineError::Format(format) => Self::from_format(format, Some(path), Some(model)),
             EngineError::Graph { message } => Self {
                 error: "invalid_graph",
                 message: message.clone(),

@@ -1,11 +1,15 @@
-//! MCP server for the GenMSI engine (`genmsi mcp` over stdio).
+//! The `genmsi-mcp` binary: the GenMSI MCP server over stdio.
 //!
-//! Planned tool surface (Phase 3): `simulate`, `lint`, `get_trace`,
-//! `explain_model`. The engine logic lives in `genmsi-core`; this binary only
-//! adapts it to the MCP protocol. `rmcp` is added when this phase starts.
+//! The server speaks MCP on standard input and output; standard error is
+//! free for the failure that stopped it.
 
-fn main() {
-    eprintln!("genmsi-mcp is not implemented yet (planned for Phase 3)");
-    eprintln!("see docs/ROADMAP.md for the phase plan");
-    std::process::exit(2);
+#[tokio::main]
+async fn main() -> std::process::ExitCode {
+    match genmsi_mcp::serve_stdio().await {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("error: {error}");
+            std::process::ExitCode::FAILURE
+        }
+    }
 }

@@ -55,7 +55,19 @@ fn json(output: &Output) -> serde_json::Value {
     serde_json::from_str(&stdout(output)).expect("stdout is one JSON document")
 }
 
+fn models() -> Vec<PathBuf> {
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(repo_root().join("fixtures/models"))
+        .expect("fixtures/models")
+        .map(|entry| entry.expect("entry").path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "gmdl"))
+        .collect();
+    paths.sort();
+    paths
+}
 
+fn stem(path: &Path) -> String {
+    path.file_stem().expect("stem").to_string_lossy().to_string()
+}
 
 #[test]
 fn lint_reports_a_clean_model() {
@@ -141,6 +153,13 @@ fn simulate_honours_the_seed_and_the_horizon() {
     assert!(end_time < 700.0, "{end_time}");
 }
 
+#[test]
+fn the_same_seed_reproduces_the_same_bytes() {
+    let first = genmsi(&["simulate", "fixtures/models/TP3__aeropuerto.gmdl"]);
+    let second = genmsi(&["simulate", "fixtures/models/TP3__aeropuerto.gmdl"]);
+    assert_eq!(first.status, second.status);
+    assert_eq!(str::from_utf8(&first.stdout), str::from_utf8(&second.stdout));
+}
 
 #[test]
 fn trace_prints_events_and_reports_the_limit() {
@@ -206,5 +225,67 @@ fn run_all_on_a_file_is_a_usage_error() {
     assert!(stderr(&output).contains("not a directory"), "{}", stderr(&output));
 }
 
+#[test]
+fn a_missing_model_file_exits_with_one() {
+    let output = genmsi(&["simulate", "fixtures/models/does-not-exist.gmdl"]);
+    assert_eq!(code(&output), 1);
+    let message = stderr(&output);
+    assert!(
+        message.starts_with("error: fixtures/models/does-not-exist.gmdl: "),
+        "{message}"
+    );
+}
 
+#[test]
+fn a_usage_error_exits_with_two() {
+    let missing_argument = genmsi(&["simulate"]);
+    assert_eq!(code(&missing_argument), 2);
+    assert!(
+        stderr(&missing_argument).contains("Usage"),
+        "{}",
+        stderr(&missing_argument)
+    );
 
+    let unknown_option = genmsi(&["simulate", SMALL, "--nope"]);
+    assert_eq!(code(&unknown_option), 2);
+    assert!(
+        stderr(&unknown_option).contains("--nope"),
+        "{}",
+        stderr(&unknown_option)
+    );
+}
+
+#[test]
+fn every_reference_model_is_runnable_through_the_cli() {
+    let paths = models();
+    assert_eq!(paths.len(), 25, "the fixture set holds 25 models");
+    let mut ran = 0;
+    let mut refused = 0;
+    for path in &paths {
+        let name = stem(path);
+        let shown = path
+            .strip_prefix(repo_root())
+            .expect("inside the repository")
+            .display()
+            .to_string();
+        let output = genmsi(&["simulate", &shown]);
+        match REFUSED.iter().find(|(model, _)| *model == name) {
+            Some((_, class)) => {
+                refused += 1;
+                assert_eq!(code(&output), 1, "{name}: must be refused");
+                let message = stderr(&output);
+                assert!(message.contains(class), "{name}: expected {class:?}, got {message}");
+                assert!(stdout(&output).is_empty(), "{name}: a failure prints no report");
+            }
+            None => {
+                ran += 1;
+                assert_eq!(code(&output), 0, "{name}: {}", stderr(&output));
+                assert!(
+                    stdout(&output).contains("Reporte MicroVisualSIS"),
+                    "{name}: no report"
+                );
+            }
+        }
+    }
+    assert_eq!((ran, refused), (20, 5));
+}

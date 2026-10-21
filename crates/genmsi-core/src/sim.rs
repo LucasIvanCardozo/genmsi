@@ -1216,24 +1216,15 @@ impl<'p> Simulation<'p> {
                     spec.parameter.as_deref(),
                     wanted,
                 );
-                if removed.is_empty() {
-                    let target = if block.has_failure_port() {
-                        block.next_named("Salida2")
-                    } else {
-                        block.next_named("Salida1")
-                    };
+                // The removed transactions are *detached* from the group, not
+                // resumed: they keep waiting where they are (normally inside a
+                // LINK block) until an UNLINK releases them. Resuming them here
+                // would run them through this block's own output.
+                if removed.is_empty() && block.has_failure_port() {
+                    let target = block.next_named("Salida2");
                     self.leave(xact, block_index, target);
                 } else {
                     let target = block.next_named("Salida1");
-                    for id in removed {
-                        if let Some(transaction) = self.xacts.get_mut(&id) {
-                            transaction.transition(XactState::Ready);
-                        }
-                        match target {
-                            Some(target) => self.enter_block(id, target),
-                            None => self.remove_transaction(id),
-                        }
-                    }
                     self.leave(xact, block_index, target);
                 }
             }

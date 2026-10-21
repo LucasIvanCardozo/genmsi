@@ -88,7 +88,7 @@ fn an_unpaired_transaction_stays_waiting() {
     let result = run(&program, 100.0, 7);
     let waiting: u64 = of_class(&program, "Match")
         .iter()
-        .map(|index| result.blocks[*index].current as u64)
+        .map(|index| result.blocks[*index].current)
         .sum();
     assert!(waiting >= 1, "a lone transaction waits for its conjugate");
 }

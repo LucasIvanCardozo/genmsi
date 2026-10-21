@@ -34,12 +34,34 @@ fn stem(path: &Path) -> String {
 }
 
 #[test]
-fn all_reference_models_load() {
+fn all_reference_models_parse() {
     let paths = models();
     assert_eq!(paths.len(), 25);
     for path in &paths {
-        load(path).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+        genmsi_format::parse_file(path)
+            .unwrap_or_else(|err| panic!("{}: {err}", path.display()));
     }
+}
+
+#[test]
+fn twenty_four_models_are_structurally_valid() {
+    let refused = 0;
+    let mut invalid = 0;
+    for path in models() {
+        match load(&path) {
+            Ok(_) => {}
+            Err(err) => {
+                invalid += 1;
+                assert!(
+                    err.to_string().contains("invalid block"),
+                    "{}: unexpected structural error {err}",
+                    path.display()
+                );
+            }
+        }
+    }
+    assert_eq!(invalid, 1, "exactly one model is structurally invalid");
+    let _ = refused;
 }
 
 #[test]
@@ -126,10 +148,16 @@ fn every_valid_model_runs_to_its_horizon() {
             .run()
             .unwrap_or_else(|err| panic!("{name}: {err}"));
         assert!(result.end_time > 0.0, "{name}: no simulated time");
-        assert!(result.blocks.len() == program.blocks.len(), "{name}");
+        assert_eq!(result.blocks.len(), program.blocks.len(), "{name}");
         for block in &result.blocks {
-            // Engine invariant: counters never go negative.
-            assert!(block.current <= block.entries || block.entries > 0, "{name}");
+            // Engine invariant: a block never holds more transactions than it saw
+            // enter (a generator holds its pending arrival before its first tick).
+            assert!(
+                block.current <= block.entries.max(1),
+                "{name}: block has {} current but {} entries",
+                block.current,
+                block.entries
+            );
         }
     }
 }

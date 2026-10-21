@@ -2215,11 +2215,11 @@ fn block_expressions(kind: &BlockKind) -> Vec<&ProgramExpr> {
 /// Walk an expression tree collecting statically named references.
 fn collect_references(expr: &Expr, visit: &mut impl FnMut(RefKind, &str)) {
     match expr {
-        Expr::Ref { kind, name } => {
-            if let NameSource::Literal(name) = name {
-                visit(*kind, name);
-            }
-        }
+        Expr::Ref {
+            kind,
+            name: NameSource::Literal(name),
+        } => visit(*kind, name),
+        Expr::Ref { .. } => {}
         Expr::Neg(inner) => collect_references(inner, visit),
         Expr::Bin(_, left, right) => {
             collect_references(left, visit);

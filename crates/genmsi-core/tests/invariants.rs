@@ -145,14 +145,19 @@ fn transaction_states_only_follow_legal_transitions() {
             let mut xact = Transaction::new(1, 0, 0.0);
             xact.state = from;
             let legal = xact.transition(to);
-            let expected = !matches!(
-                (from, to),
-                (XactState::Terminated, XactState::Ready)
-                    | (XactState::Terminated, XactState::Scheduled)
-                    | (XactState::Terminated, XactState::Waiting)
-                    | (XactState::Scheduled, XactState::Scheduled)
-            ) && !(from != to && xact.state == from);
-            assert_eq!(legal, expected || from == to, "{from:?} -> {to:?}");
+            let expected = if from == to {
+                true
+            } else {
+                match from {
+                    XactState::Terminated => false,
+                    XactState::Ready => true,
+                    XactState::Scheduled => true,
+                    XactState::Waiting => {
+                        matches!(to, XactState::Ready | XactState::Terminated)
+                    }
+                }
+            };
+            assert_eq!(legal, expected, "{from:?} -> {to:?}");
             if legal {
                 assert_eq!(xact.state, to);
             }

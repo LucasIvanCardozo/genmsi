@@ -36,25 +36,6 @@ pub fn validate(model: &GmdlModel) -> Result<(), FormatError> {
 /// refusal to start; every runnable baseline has either a `Clock` block or a
 /// `TERMINATE` with a positive `A` operand.
 pub fn validate_runnable(model: &GmdlModel) -> Result<(), FormatError> {
-    let has_clock = model
-        .activity_blocks()
-        .any(|b| b.class == "Clock" && b.prop_int("Frecuencia").is_some_and(|f| f > 0));
-    let has_terminate_a = model.activity_blocks().any(|b| {
-        b.class == "Terminate" && b.prop_int("Unidades").is_some_and(|units| units > 0)
-    });
-    if !has_clock && !has_terminate_a {
-        let node = model
-            .activity_blocks()
-            .find(|b| b.class == "Terminate")
-            .map(|b| b.id)
-            .unwrap_or(root_id(model));
-        return Err(FormatError::structural(
-            node,
-            "no TERMINATE block with operand A and no CLOCK block: the simulation \
-             would never finish",
-        ));
-    }
-
     // Oracle: `TP9__tp9.report.txt` fails with
     // `Error en linea 35 -> El parámetro B no debe ser nulo` on an UNLINK whose
     // "unlinked transactions" output carries no label. The other two outputs
@@ -75,6 +56,25 @@ pub fn validate_runnable(model: &GmdlModel) -> Result<(), FormatError> {
                 ),
             ));
         }
+    }
+
+    let has_clock = model
+        .activity_blocks()
+        .any(|b| b.class == "Clock" && b.prop_int("Frecuencia").is_some_and(|f| f > 0));
+    let has_terminate_a = model.activity_blocks().any(|b| {
+        b.class == "Terminate" && b.prop_int("Unidades").is_some_and(|units| units > 0)
+    });
+    if !has_clock && !has_terminate_a {
+        let node = model
+            .activity_blocks()
+            .find(|b| b.class == "Terminate")
+            .map(|b| b.id)
+            .unwrap_or(root_id(model));
+        return Err(FormatError::structural(
+            node,
+            "no TERMINATE block with operand A and no CLOCK block: the simulation \
+             would never finish",
+        ));
     }
 
     Ok(())

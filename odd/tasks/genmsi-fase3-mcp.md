@@ -189,3 +189,36 @@ FASE 3 — GenMSI-rs: genmsi-mcp. Sos la sesión de la Fase 3 del proyecto genms
   in what changes) both apply; the mitigations are the byte-identical roundtrip test
   over the 25 reference models, the differential check of L6 and the snapshot tests of
   the CLI, which did not move.
+
+### Coordinator review (independent verification, then three follow-up units)
+
+- L12 (verification, independent): the contract checks held — `.gmdl` roundtrip
+  byte-identical for all 25 fixtures even with `Block::source` forced to false values, MCP
+  and CLI byte-identical on 15 of 15 document comparisons, `line`/`column` exact on the
+  load/compile path, schema ids equal, no CLI regression. Two real defects came out:
+  `genmsi-core/src/documents.rs` was a *second* implementation of the lint/trace documents
+  (the CLI was never pointed at it, so parity rested on the two copies happening to match),
+  and parse-time failures returned only `line` where `docs/mcp.md` promises `line`,
+  `column`, `node` and `class`.
+- L13 (fix, `refactor(cli)` commit): the CLI now builds the lint and trace documents with
+  `genmsi_core::documents`, the schema ids and the envelope come from that one place, and
+  `crates/genmsi-cli/tests/documents_parity.rs` compares the real binary's stdout bytes
+  against the engine document, so a drift fails a test instead of a hand-run comparison.
+  No CLI snapshot was regenerated: the published bytes did not move.
+- L14 (fix, `fix(format)`/`fix(mcp)` commit): parse failures carry line, column and the
+  owning `moduleid`; the location now prints the node, so the messages no longer repeat
+  `node N:` in their text; `invalid_xml` carries line and column; a non-UTF-8 file loads
+  through `parse_file` and classifies as the CLI classifies it; `ToolError::CLASSES` pins
+  the ten class names so a rename fails a test.
+- L15 (decision, D15): `genmsi mcp` hosts the same server as the standalone `genmsi-mcp`
+  binary, through `serve_stdio_blocking()` (the MCP crate owns the runtime). D14's closing
+  paragraph is resolved by D15.
+- L16 (fix, `fix(cli)` commit): the user-facing error printed the model path and the node
+  twice (`error: model.gmdl: model.gmdl:2 (node 1): node 1: …`); the CLI now strips the
+  file the reader already rendered and keeps exactly one path and one node. A test asserts
+  each appears once.
+- L17 (open, not fixed): validation failures that are about the model as a whole
+  (`no TERMINATE` or `no CLOCK`, a dangling link) still point at the root container
+  `main`, which the agent cannot edit, and `explain_model`'s glossary is built from the raw
+  model, so a class with no glossary entry disappears without a signal. Both are recorded
+  as known low-severity gaps rather than silently accepted.

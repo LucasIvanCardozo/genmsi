@@ -127,3 +127,16 @@ over stdio. D7's wording (`genmsi mcp` runs the server) needs the CLI path,
 which the Phase 3 assignment does not allow, and D2 forbids the CLI from
 depending on a second client crate; wiring the subcommand is a coordinator
 decision.
+Resolved by D15: the CLI hosts the same server behind `genmsi mcp`.
+
+## D15 — One entry point for the MCP server: `genmsi mcp`, `genmsi-mcp` kept
+
+D7 says `genmsi mcp` runs the server, and D1's single-binary rationale rests on that
+sentence. Phase 3 delivered the server as its own `genmsi-mcp` binary and flagged the
+conflict with D2's layer rule instead of deciding it. Resolution: `genmsi-mcp` exposes
+`serve_stdio()` and a blocking `serve_stdio_blocking()` (it owns the runtime, the CLI
+stays synchronous), and `genmsi-cli` hosts the same server behind `genmsi mcp`. It is
+the workspace's only client-to-client dependency, and it is allowed because that crate
+carries no simulation logic (D2): it adapts the engine's documents into tools, and the
+CLI adds one dispatch arm and nothing else. The standalone `genmsi-mcp` binary stays for
+hosts that pin a command path.

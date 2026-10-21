@@ -37,6 +37,8 @@ pub enum Command {
     Trace(TraceArgs),
     /// Simulate every model of a directory and summarise the outcome.
     RunAll(RunAllArgs),
+    /// Serve the MCP protocol over stdio (the same server as `genmsi-mcp`).
+    Mcp,
 }
 
 /// Options shared by the subcommands that read one model.

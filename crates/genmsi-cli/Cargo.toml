@@ -13,6 +13,10 @@ path = "src/main.rs"
 [dependencies]
 genmsi-core = { path = "../genmsi-core" }
 genmsi-format = { path = "../genmsi-format" }
+# The only client-to-client dependency in the workspace: genmsi-mcp carries no
+# simulation logic (decision D2), it only adapts the engine's documents into
+# MCP tools, so the CLI can host the server without a second binary.
+genmsi-mcp = { path = "../genmsi-mcp" }
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true

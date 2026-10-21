@@ -26,3 +26,17 @@ pub async fn serve_stdio() -> Result<(), Box<dyn std::error::Error + Send + Sync
     service.waiting().await?;
     Ok(())
 }
+
+/// Serve the MCP protocol over stdio from synchronous code, blocking until the
+/// client disconnects.
+///
+/// The CLI is synchronous and must not acquire a runtime dependency of its
+/// own, so this builds the runtime it needs (a current-thread one: the server
+/// only waits on stdio and has no CPU parallelism) and blocks on
+/// [`serve_stdio`] inside it.
+pub fn serve_stdio_blocking() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?
+        .block_on(serve_stdio())
+}

@@ -16,6 +16,7 @@ genmsi lint     <model.gmdl> [--json]
 genmsi simulate <model.gmdl> [--seed <n>] [--until <time>] [--json]
 genmsi trace    <model.gmdl> [--seed <n>] [--until <time>] [--limit <n>] [--json]
 genmsi run-all  <directory>  [--seed <n>] [--until <time>] [--json]
+genmsi mcp
 ```
 
 ## Common options
@@ -122,6 +123,17 @@ $ echo $?
 
 A failure does not stop the sweep. On `fixtures/models` the expected result is
 `20 ok, 5 failed` and exit `1`; on a directory of valid models it exits `0`.
+
+### `mcp`
+
+Serves the MCP (Model Context Protocol) server over stdio, the same server as
+the standalone `genmsi-mcp` binary (see `docs/mcp.md`), until the client
+disconnects. It takes no options.
+
+This subcommand is the one exception to the one-document rule: **standard
+output belongs to the protocol** and carries nothing but JSON-RPC messages. A
+failure goes to stderr and exits `1`. An MCP client config for the CLI is the
+same as for the binary, with `genmsi mcp` as the command.
 
 ## `--json` documents
 

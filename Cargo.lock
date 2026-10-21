@@ -432,6 +432,7 @@ dependencies = [
  "clap",
  "genmsi-core",
  "genmsi-format",
+ "genmsi-mcp",
  "insta",
  "serde",
  "serde_json",

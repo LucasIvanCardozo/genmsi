@@ -5,6 +5,7 @@
 //! exit code that document implies.
 
 pub mod lint;
+pub mod simulate;
 
 use crate::cli::Command;
 use crate::error::{CliError, ExitCode};
@@ -13,5 +14,6 @@ use crate::error::{CliError, ExitCode};
 pub fn run(command: Command) -> Result<ExitCode, CliError> {
     match command {
         Command::Lint(args) => lint::run(args),
+        Command::Simulate(args) => simulate::run(args),
     }
 }

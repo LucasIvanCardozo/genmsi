@@ -1,0 +1,220 @@
+---
+source: crates/genmsi-cli/tests/cli.rs
+expression: stdout(&output)
+---
+{
+  "schema": "genmsi.report/1",
+  "title": "Puerta Banco",
+  "seed": 1,
+  "start_time": 0.0,
+  "end_time": 3600.0,
+  "end_reason": "terminated",
+  "transactions": 11,
+  "events": 31,
+  "blocks": [
+    {
+      "line": 1,
+      "node": 6,
+      "class": "Generate",
+      "label": null,
+      "operands": "90,30,2700",
+      "entries": 9,
+      "current": 1,
+      "retries": 0
+    },
+    {
+      "line": 2,
+      "node": 7,
+      "class": "Generate",
+      "label": null,
+      "operands": "0,,3600,1",
+      "entries": 1,
+      "current": 0,
+      "retries": 0
+    },
+    {
+      "line": 3,
+      "node": 8,
+      "class": "Logic",
+      "label": "A_Logic",
+      "operands": "Puerta,Set",
+      "entries": 0,
+      "current": 0,
+      "retries": 0
+    },
+    {
+      "line": 4,
+      "node": 9,
+      "class": "Terminate",
+      "label": "A_Terminate",
+      "operands": "",
+      "entries": 0,
+      "current": 0,
+      "retries": 0
+    },
+    {
+      "line": 5,
+      "node": 10,
+      "class": "GateL",
+      "label": "GateL",
+      "operands": "Logic { switch: EntityName { source: Literal(\"Puerta\") }, state: true }",
+      "entries": 9,
+      "current": 9,
+      "retries": 9
+    },
+    {
+      "line": 6,
+      "node": 11,
+      "class": "Queue",
+      "label": "A_FacilityUse",
+      "operands": "qPuerta",
+      "entries": 0,
+      "current": 0,
+      "retries": 0
+    },
+    {
+      "line": 7,
+      "node": 11,
+      "class": "Seize",
+      "label": null,
+      "operands": "Puerta",
+      "entries": 0,
+      "current": 0,
+      "retries": 0
+    },
+    {
+      "line": 8,
+      "node": 11,
+      "class": "Depart",
+      "label": null,
+      "operands": "qPuerta",
+      "entries": 0,
+      "current": 0,
+      "retries": 0
+    },
+    {
+      "line": 9,
+      "node": 11,
+      "class": "Advance",
+      "label": null,
+      "operands": "2,1",
+      "entries": 0,
+      "current": 0,
+      "retries": 0
+    },
+    {
+      "line": 10,
+      "node": 11,
+      "class": "Release",
+      "label": null,
+      "operands": "Puerta",
+      "entries": 0,
+      "current": 0,
+      "retries": 0
+    },
+    {
+      "line": 11,
+      "node": 23,
+      "class": "Advance",
+      "label": "A_Advance",
+      "operands": "1800,900",
+      "entries": 0,
+      "current": 0,
+      "retries": 0
+    },
+    {
+      "line": 12,
+      "node": 14,
+      "class": "Generate",
+      "label": null,
+      "operands": "3600",
+      "entries": 1,
+      "current": 1,
+      "retries": 0
+    },
+    {
+      "line": 13,
+      "node": 14,
+      "class": "Terminate",
+      "label": null,
+      "operands": "1",
+      "entries": 1,
+      "current": 0,
+      "retries": 0
+    },
+    {
+      "line": 14,
+      "node": 16,
+      "class": "Queue",
+      "label": "A_Queue",
+      "operands": "qAfuera",
+      "entries": 9,
+      "current": 0,
+      "retries": 0
+    },
+    {
+      "line": 15,
+      "node": 17,
+      "class": "Depart",
+      "label": "A_Depart",
+      "operands": "qAfuera",
+      "entries": 0,
+      "current": 0,
+      "retries": 0
+    },
+    {
+      "line": 16,
+      "node": 18,
+      "class": "Buffer",
+      "label": "A_Buffer",
+      "operands": "",
+      "entries": 1,
+      "current": 0,
+      "retries": 0
+    },
+    {
+      "line": 17,
+      "node": 20,
+      "class": "Buffer",
+      "label": "A_Buffer1",
+      "operands": "",
+      "entries": 0,
+      "current": 0,
+      "retries": 0
+    },
+    {
+      "line": 18,
+      "node": 37,
+      "class": "Terminate",
+      "label": "A_Terminate1",
+      "operands": "",
+      "entries": 0,
+      "current": 0,
+      "retries": 0
+    }
+  ],
+  "entities": {
+    "facilities": {},
+    "storages": {},
+    "queues": {
+      "qAfuera": {
+        "name": "qAfuera",
+        "content": 9,
+        "max": 9,
+        "entries": 9,
+        "zero_entries": 0,
+        "total_time": 0.0,
+        "area": 4501.111948286849,
+        "retry": 0
+      }
+    },
+    "chains": {},
+    "logic": {
+      "Puerta": false
+    },
+    "savevalues": {},
+    "tables": {},
+    "qtables": {}
+  },
+  "diagnostics": []
+}

@@ -81,8 +81,53 @@ fn lint_refuses_a_model_the_original_refuses() {
     assert!(message.starts_with("error: fixtures/models/TP9__tp9.gmdl: "), "{message}");
 }
 
+#[test]
+fn simulate_prints_the_gpss_report() {
+    let output = genmsi(&["simulate", SMALL]);
+    assert_eq!(code(&output), 0, "{}", stderr(&output));
+    insta::assert_snapshot!("simulate_report", stdout(&output));
+}
 
+#[test]
+fn simulate_json_carries_the_engine_document() {
+    let output = genmsi(&["simulate", SMALL, "--json"]);
+    assert_eq!(code(&output), 0, "{}", stderr(&output));
+    let document = json(&output);
+    assert_eq!(document["schema"], "genmsi.report/1");
+    assert_eq!(document["end_time"], 3600.0);
+    assert_eq!(document["end_reason"], "terminated");
+    assert_eq!(document["seed"], 1);
+    assert_eq!(document["blocks"].as_array().expect("blocks").len(), 18);
+    insta::assert_snapshot!("simulate_json", stdout(&output));
+}
 
+#[test]
+fn simulate_honours_the_seed_and_the_horizon() {
+    let default = json(&genmsi(&["simulate", "fixtures/models/TP4__supermercado.gmdl", "--json"]));
+    let other = json(&genmsi(&[
+        "simulate",
+        "fixtures/models/TP4__supermercado.gmdl",
+        "--json",
+        "--seed",
+        "99",
+    ]));
+    assert_eq!(default["seed"], 1);
+    assert_eq!(other["seed"], 99);
+    assert_ne!(default["blocks"], other["blocks"], "a new seed must change the run");
+
+    let bounded = json(&genmsi(&[
+        "simulate",
+        "fixtures/models/TP4__supermercado.gmdl",
+        "--json",
+        "--until",
+        "600",
+    ]));
+    assert_eq!(bounded["end_reason"], "time_limit");
+    // The engine stops at the first event after the horizon, so it may overshoot.
+    let end_time = bounded["end_time"].as_f64().expect("end_time");
+    assert!(end_time >= 600.0, "{end_time}");
+    assert!(end_time < 700.0, "{end_time}");
+}
 
 
 

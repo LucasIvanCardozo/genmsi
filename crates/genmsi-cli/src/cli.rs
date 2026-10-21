@@ -31,6 +31,8 @@ pub struct Cli {
 pub enum Command {
     /// Validate a model and report structural, modelling or compiler problems.
     Lint(LintArgs),
+    /// Simulate a model and print the GPSS report.
+    Simulate(SimulateArgs),
 }
 
 /// Options shared by the subcommands that read one model.
@@ -40,7 +42,17 @@ pub struct ModelArgs {
     pub path: PathBuf,
 }
 
-
+/// Options shared by the subcommands that run a simulation.
+#[derive(Debug, Args)]
+pub struct RunArgs {
+    /// Seed of every random stream; the same seed reproduces the same run.
+    #[arg(long, value_name = "SEED", default_value_t = 1)]
+    pub seed: u64,
+    /// Stop once the simulated clock passes this time, instead of running to
+    /// the model's own termination.
+    #[arg(long, value_name = "TIME")]
+    pub until: Option<f64>,
+}
 
 /// Output form of every subcommand.
 #[derive(Debug, Args)]
@@ -61,7 +73,19 @@ pub struct LintArgs {
     pub output: OutputArgs,
 }
 
-
+/// `genmsi simulate <model>`.
+#[derive(Debug, Args)]
+pub struct SimulateArgs {
+    /// Options of the model to simulate.
+    #[command(flatten)]
+    pub model: ModelArgs,
+    /// Simulation knobs.
+    #[command(flatten)]
+    pub run: RunArgs,
+    /// Output form.
+    #[command(flatten)]
+    pub output: OutputArgs,
+}
 
 
 

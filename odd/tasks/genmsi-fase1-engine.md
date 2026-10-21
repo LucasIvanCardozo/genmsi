@@ -55,6 +55,14 @@ Phase 1 session for genmsi-rs. Coordinator: "GenMSI-rs: sesión principal coordi
 - T10 (S6) Oracle comparison harness for the 20 valid models + `docs/oracle-comparison.md`. Route: inline. Commit: `feat(core): oracle comparison harness and documented results`.
 - T11 (S6, S8) insta snapshots, proptest invariants, final `cargo test` verification. Route: inline. Commit: `test(core): model and invariant suites` + `docs: design notes`.
 
+Commit slice boundary: the Phase 1 slice is 9 commits on `feat/phase1-engine`
+(~11.6k authored lines, lock files excluded). The size comes from building a
+whole format and engine from a scaffold; the split follows compile units and
+module boundaries (format, expressions/RNG/statistics, compiler, scheduler,
+report/replication, oracle, tests, docs) rather than the ~400-line guideline.
+Every commit compiles; the native review applies to the work-unit commits, not to
+the accumulated branch.
+
 Commit-size note: the format crate and the engine were built as two compile
 units; the engine files are interdependent (a `Program` needs the compiler, the
 scheduler needs the program), so work units follow module boundaries

@@ -11,6 +11,7 @@
 
 pub mod engine;
 pub mod errors;
+pub mod glossary;
 pub mod server;
 
 use rmcp::ServiceExt;

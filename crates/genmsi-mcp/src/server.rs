@@ -12,10 +12,11 @@ use rmcp::model::{CallToolResult, ContentBlock, ServerCapabilities, ServerConfig
 use rmcp::schemars;
 use rmcp::schemars::JsonSchema;
 use rmcp::{tool, tool_handler, tool_router, ServerHandler};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::engine::{self, ModelSource};
 use crate::errors::ToolError;
+use crate::glossary;
 
 /// The GenMSI MCP server: the engine served over stdio.
 #[derive(Debug, Clone)]
@@ -181,6 +182,43 @@ impl GenmsiServer {
             Err(error) => error_result(&error),
         }
     }
+
+    /// Describe a model: its blocks, its operands and what each statement does.
+    ///
+    /// Returns the `genmsi.explain/1` document: the engine's own program
+    /// description plus the glossary of the classes the model uses.
+    #[tool(
+        name = "explain_model",
+        description = "Describe a GenMSI model: its blocks, operands and ports, plus what each GPSS statement of the model does. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text) and returns the genmsi.explain/1 document."
+    )]
+    pub fn explain_model(&self, Parameters(input): Parameters<ModelInput>) -> CallToolResult {
+        match explain_document(&input) {
+            Ok(document) => document_result(document),
+            Err(error) => error_result(&error),
+        }
+    }
+}
+
+/// Body of the `genmsi.explain/1` document.
+#[derive(Debug, Serialize)]
+struct ExplainBody {
+    /// The engine's description of the compiled program.
+    program: serde_json::Value,
+    /// What each statement of the model does.
+    glossary: std::collections::BTreeMap<String, String>,
+}
+
+/// The explain document of a model.
+fn explain_document(input: &ModelInput) -> Result<String, ToolError> {
+    let loaded = engine::load(&input.source()?)?;
+    let body = ExplainBody {
+        program: genmsi_core::program_json(&loaded.program),
+        glossary: glossary::for_model(&loaded.model),
+    };
+    Ok(genmsi_core::to_pretty_json(
+        genmsi_core::EXPLAIN_SCHEMA,
+        &body,
+    ))
 }
 
 /// The lint document of a model.
@@ -320,6 +358,17 @@ mod tests {
         assert_eq!(result.is_error, Some(true));
         let text = text_of(&result);
         assert!(text.contains("\"error\": \"invalid_arguments\""), "{text}");
+    }
+
+    #[test]
+    fn explain_model_describes_the_model_and_its_statements() {
+        let result = GenmsiServer::new().explain_model(Parameters(model_input()));
+        assert_eq!(result.is_error, Some(false));
+        let text = text_of(&result);
+        assert!(text.contains("\"schema\": \"genmsi.explain/1\""), "{text}");
+        assert!(text.contains("\"program\""), "{text}");
+        assert!(text.contains("\"Generate\""), "{text}");
+        assert!(text.contains("\"glossary\""), "{text}");
     }
 
     #[test]

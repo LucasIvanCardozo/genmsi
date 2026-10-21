@@ -7,7 +7,7 @@ Scope of this document: repository bootstrap only (structure, docs, placeholders
 
 - S1 (verbatim): "quiero ademas una buena filosofia de escalabilidad, buena estructura de carpetas ordenadas y reuzabilidad!"
 - S2 (verbatim): "lo que si quiero es que minimo en la nueva se pueda hacer lo que se hace en la version actual (pero mejor en terminos de optimizacion y codigo)"
-- S3: Repository lives at `~/Documentos/Workspace/genmsi` (user decision, 2026 session).
+- S3: Repository lives at `~/Documentos/Workspace/Genmsi` (user decision, 2026 session); the original `Genmsi_20230711/` folder stays inside, git-ignored.
 - S4: Layers: `genmsi-format` (parse/validate/write .gmdl + gClasses.xml), `genmsi-core` (DES engine, RNG, expressions, traces, reports), `genmsi-cli` (clap binary), `genmsi-mcp` (rmcp stdio server, Fase 3), `genmsi-app` (Tauri 2 + React, Fase 4, placeholder only).
 - S5: Only `genmsi-format` and `genmsi-core` may be dependencies of more than one crate; cli/mcp/app are thin layers with no simulation logic.
 - S6: Git remote: none for now (user decision); conventional commits on `main`.

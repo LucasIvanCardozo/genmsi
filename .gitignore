@@ -1,3 +1,7 @@
+# Original GenMSI application (kept as local reference, never tracked)
+/Genmsi_20230711/
+/.atl/
+
 # Rust
 /target/
 **/*.rs.bk

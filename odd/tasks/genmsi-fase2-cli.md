@@ -226,3 +226,22 @@ and no simulation number moves.
   notation (`P:` against `P$`) stays a documented difference. The fix is rendering in
   `crates/genmsi-core/src/report.rs` plus the two CLI snapshots; it is not the same
   unit as the type mapping and was not folded into it.
+
+- L16 (coordinator, L15 closed by `2c1b4cb`): the parity unit landed on
+  `fix/report-operand-parity`. Measured again by LOC over the same 20 baselines: 490
+  labelled rows identical, against 334 before the type mapping and the operands were
+  touched. What remains is three documented differences, none of them a number:
+  1. our SNA notation (`P:`, `V:`, `FN:`, `X:`) against the original's `P$`, `V$`,
+     `FN$`, `X$` — the models are written in our form and the report reads back what
+     the model says;
+  2. `Multifurcacion`, which the original renders as a helper function it generates
+     (`TRANSFER ,FN$MultifurcacionGO`); we print the branch weights the model stores
+     instead of inventing a function we do not generate;
+  3. `TERMINATE 0` in four rows: `TerminateSpec` collapses "no operand" and an
+     explicit zero into the same `units = 0.0`, and empty is the more common form
+     (~35 rows), so the report keeps printing nothing rather than a wrong `0`
+     everywhere. Distinguishing them needs a field in `program.rs`, which is engine
+     surface, not rendering.
+  The unit is two commits (code + this record) and exceeds the ~400-line guideline only
+  because two snapshot files are regenerated wholesale; the authored code is under 200
+  lines. Item 3 (it changes published output), so it is the one to review alone.

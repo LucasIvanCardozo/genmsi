@@ -43,6 +43,8 @@ genmsi `v1.2020.07.28 BETA1!`.
 
 ## Manual method (validated end to end for `TP2__problema1.gmdl`)
 
+The same steps, useful for debugging the harness:
+
 ```sh
 export WINEPREFIX=$PWD/scripts/wine-oracle/wineprefix
 cp -a Genmsi_20230711 Genmsi_20230711.backup   # only once; then diff -r
@@ -84,11 +86,11 @@ movement overrides injected moves. The script therefore:
   the `org.kde.KWin` DBus Scripting API) before every input action, and
 - aborts instead of typing if KWin does not confirm the activation.
 
-**Preferred headless mode (no interference with the desktop at all):**
-install `xorg-server-xvfb`, and the same harness runs Wine on a private
-display where the GenMSI window always has focus. See
-`run_oracle.sh --headless` once available; the discovery above is
-identical, only the display differs.
+**Headless mode (default, no interference with the desktop at all):**
+`run_oracle.sh` runs Wine on a private Xvfb display (`:99`, started
+automatically if absent). The GenMSI window is the only client there, always
+focused; coordinates are computed relative to the window so window placement
+does not matter. Set `XDISPLAY` to reuse a different private display.
 
 ## Gotchas discovered
 

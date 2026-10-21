@@ -189,3 +189,20 @@ FASE 2 — GenMSI-rs: genmsi-cli. Sos la sesión de la Fase 2 del proyecto genms
   operands for gate/logic/test/counter/select/join/examine/remove blocks). It is
   Phase 1 debt, but it is this phase's snapshot that froze the wrong text, so the fix
   belongs here rather than behind the merge.
+
+### Phase 2 commit slice
+
+Ten commits on `feat/phase2-cli` over `ca71ed1`, ~2.4k authored lines (snapshots
+included): the seven phase slices recorded above, the coordinator's record
+correction (`c8ca73d`, L12) and the GPSS report fix (L14). The size comes from a
+new crate surface plus eight snapshot files, not from one oversized change; each
+slice is an independently reviewable subcommand or document. Native review applies
+to a committed candidate — the branch tip or a PR slice — never to the accumulated
+branch.
+
+One slice carries high-risk item 3 and is the one to review alone: the GPSS report
+fix changes text shared by every model (the block-type column and the `operands`
+field of the `genmsi.report/1` document). It was verified row by row against the
+baselines of the seven GATE models: 334 labelled rows are unchanged, the rows it
+touches are exactly the gate/logic/test/select/join/examine/remove/counter classes,
+and no simulation number moves.

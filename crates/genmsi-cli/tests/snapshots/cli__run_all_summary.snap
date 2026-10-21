@@ -1,0 +1,30 @@
+---
+source: crates/genmsi-cli/tests/cli.rs
+expression: stdout(&output)
+---
+OK    Parcial 6-11-23__Veron - Parcial              36000.0  terminated
+FAIL  Parcial 8-11-21__ParcialMikelModelos       (node 109): QTable: invalid block: definition name "tiempo demora" contains whitespace or ':'
+OK    Problema 1__semaforo-1                         3600.0  terminated
+FAIL  Problema 2__puenteLevadizo                 (node 0): no TERMINATE block with operand A and no CLOCK block: the simulation would never finish
+OK    TP10__tp10                                    28800.0  terminated
+OK    TP2__problema1                                 3600.0  terminated
+OK    TP3__aeropuerto                                3600.0  terminated
+OK    TP4__supermercado                              3600.0  terminated
+OK    TP5__burgerShop                                3600.0  terminated
+FAIL  TP6__Clase 6_0_TestGate                    (node 0): no TERMINATE block with operand A and no CLOCK block: the simulation would never finish
+OK    TP6__Clase 6_1_PuertaBanco                     3600.0  terminated
+OK    TP6__Clase 6_2_UltimoCliente                   6097.1  terminated
+OK    TP6__Clase 6_3_JefeEducado                     3600.0  terminated
+OK    TP7__Clase 7_1_Link_Unlink                     3600.0  terminated
+OK    TP7__Clase 7_2_ProductorConsumidor             3600.0  terminated
+OK    TP7__Clase 7_3_Cadete                          3600.0  terminated
+OK    TP8__mecanicos                                 3600.0  terminated
+FAIL  TP9__hack                                  (node 0): no TERMINATE block with operand A and no CLOCK block: the simulation would never finish
+FAIL  TP9__tp9                                   (node 68): Unlink: the operand B must not be null; UNLINK needs a label for the unlinked transactions
+OK    ejercicio_1__ejercicio_1                       3600.0  terminated
+OK    ejercicio_2__ejercicio_2                       3600.0  terminated
+OK    ejercicio_3__ejercicio_3                       1800.0  terminated
+OK    ejercicio_4__ejercicio_4                       3600.0  terminated
+OK    entregaComida__entregaComida                   3600.0  terminated
+OK    monorriel__monorriel                           3600.0  terminated
+25 models: 20 ok, 5 failed

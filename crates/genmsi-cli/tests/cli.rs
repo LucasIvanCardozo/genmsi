@@ -8,6 +8,18 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+/// The five models whose oracle baseline is an error instead of a report, and
+/// the engine message class each must produce.
+const REFUSED: [(&str, &str); 5] = [
+    (
+        "Parcial 8-11-21__ParcialMikelModelos",
+        "invalid block",
+    ),
+    ("Problema 2__puenteLevadizo", "no TERMINATE block"),
+    ("TP6__Clase 6_0_TestGate", "no TERMINATE block"),
+    ("TP9__hack", "no TERMINATE block"),
+    ("TP9__tp9", "the operand B must not be null"),
+];
 
 /// A model small enough to snapshot whole and rich enough to exercise queues,
 /// facilities, gates and two generators.
@@ -149,8 +161,50 @@ fn trace_json_is_versioned() {
     insta::assert_snapshot!("trace_json", stdout(&output));
 }
 
+#[test]
+fn run_all_sweeps_the_whole_fixture_set() {
+    let output = genmsi(&["run-all", "fixtures/models"]);
+    assert_eq!(code(&output), 1, "five models are refused: {}", stdout(&output));
+    assert!(
+        stdout(&output).ends_with("25 models: 20 ok, 5 failed\n"),
+        "{}",
+        stdout(&output)
+    );
+    insta::assert_snapshot!("run_all_summary", stdout(&output));
+}
 
+#[test]
+fn run_all_json_marks_every_refused_model() {
+    let output = genmsi(&["run-all", "fixtures/models", "--json"]);
+    assert_eq!(code(&output), 1);
+    let document = json(&output);
+    assert_eq!(document["schema"], "genmsi.run-all/1");
+    assert_eq!(document["models_total"], 25);
+    assert_eq!(document["models_ok"], 20);
+    assert_eq!(document["models_failed"], 5);
+    let models = document["models"].as_array().expect("models");
+    let failed: Vec<&serde_json::Value> = models
+        .iter()
+        .filter(|model| model["status"] == "failed")
+        .collect();
+    assert_eq!(failed.len(), 5);
+    for (name, class) in REFUSED {
+        let model = failed
+            .iter()
+            .find(|model| model["name"] == name)
+            .unwrap_or_else(|| panic!("{name} is missing from the sweep"));
+        let error = model["error"].as_str().expect("error text");
+        assert!(error.contains(class), "{name}: {error}");
+        assert!(model["end_time"].is_null(), "{name}: a failed model has no end_time");
+    }
+}
 
+#[test]
+fn run_all_on_a_file_is_a_usage_error() {
+    let output = genmsi(&["run-all", SMALL]);
+    assert_eq!(code(&output), 2);
+    assert!(stderr(&output).contains("not a directory"), "{}", stderr(&output));
+}
 
 
 

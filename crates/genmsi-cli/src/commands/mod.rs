@@ -5,6 +5,7 @@
 //! exit code that document implies.
 
 pub mod lint;
+pub mod run_all;
 pub mod simulate;
 pub mod trace;
 
@@ -17,5 +18,6 @@ pub fn run(command: Command) -> Result<ExitCode, CliError> {
         Command::Lint(args) => lint::run(args),
         Command::Simulate(args) => simulate::run(args),
         Command::Trace(args) => trace::run(args),
+        Command::RunAll(args) => run_all::run(args),
     }
 }

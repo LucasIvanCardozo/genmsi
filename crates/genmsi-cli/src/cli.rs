@@ -35,6 +35,8 @@ pub enum Command {
     Simulate(SimulateArgs),
     /// Simulate a model and print its event trace.
     Trace(TraceArgs),
+    /// Simulate every model of a directory and summarise the outcome.
+    RunAll(RunAllArgs),
 }
 
 /// Options shared by the subcommands that read one model.
@@ -106,4 +108,15 @@ pub struct TraceArgs {
     pub limit: usize,
 }
 
-
+/// `genmsi run-all <directory>`.
+#[derive(Debug, Args)]
+pub struct RunAllArgs {
+    /// Directory holding the `.gmdl` models (one level, not recursive).
+    pub dir: PathBuf,
+    /// Simulation knobs applied to every model.
+    #[command(flatten)]
+    pub run: RunArgs,
+    /// Output form.
+    #[command(flatten)]
+    pub output: OutputArgs,
+}

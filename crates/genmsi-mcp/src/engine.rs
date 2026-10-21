@@ -98,11 +98,6 @@ pub fn run(loaded: &Loaded, config: SimConfig) -> Result<RunResult, ToolError> {
         .map_err(|error| ToolError::from_engine(&error, &loaded.model, &loaded.name))
 }
 
-/// The path of a model the agent named on disk.
-pub fn file_path(path: &str) -> PathBuf {
-    PathBuf::from(path)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,7 +118,7 @@ mod tests {
 
     #[test]
     fn a_missing_file_is_reported_as_such() {
-        let error = load(&ModelSource::File(file_path("does-not-exist.gmdl"))).expect_err("must fail");
+        let error = load(&ModelSource::File(PathBuf::from("does-not-exist.gmdl"))).expect_err("must fail");
         assert_eq!(error.error, "model_not_found");
         assert_eq!(error.path.as_deref(), Some("does-not-exist.gmdl"));
     }

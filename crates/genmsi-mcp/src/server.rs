@@ -6,6 +6,9 @@
 //! (`genmsi.lint/1`, `genmsi.report/1`, `genmsi.trace/1`), so an agent and a
 //! script read the same thing (decision D13).
 
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, ContentBlock, ServerCapabilities, ServerConfig};
@@ -115,7 +118,7 @@ impl TraceInput {
 /// The model the agent asked for: a file on disk or the document itself.
 fn source_of(path: &Option<String>, model: &Option<String>) -> Result<ModelSource, ToolError> {
     match (path, model) {
-        (Some(path), None) => Ok(ModelSource::File(engine::file_path(path))),
+        (Some(path), None) => Ok(ModelSource::File(PathBuf::from(path))),
         (None, Some(text)) => Ok(ModelSource::Inline(text.clone())),
         (Some(_), Some(_)) => Err(ToolError::arguments(
             "give `path` or `model`, not both: one names the file, the other carries the document",
@@ -147,10 +150,7 @@ impl GenmsiServer {
         description = "Validate a GenMSI model: it loads, validates and compiles. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text) and returns the genmsi.lint/1 document."
     )]
     pub fn lint(&self, Parameters(input): Parameters<ModelInput>) -> CallToolResult {
-        match lint_document(&input) {
-            Ok(document) => document_result(document),
-            Err(error) => error_result(&error),
-        }
+        finish(lint_document(&input))
     }
 
     /// Run a model and return its report.
@@ -162,10 +162,7 @@ impl GenmsiServer {
         description = "Simulate a GenMSI model and return its report. Takes `path` or `model`, plus the optional `seed` and `until`, and returns the genmsi.report/1 document."
     )]
     pub fn simulate(&self, Parameters(input): Parameters<RunInput>) -> CallToolResult {
-        match report_document(&input) {
-            Ok(document) => document_result(document),
-            Err(error) => error_result(&error),
-        }
+        finish(report_document(&input))
     }
 
     /// Run a model and return its event trace.
@@ -177,10 +174,7 @@ impl GenmsiServer {
         description = "Simulate a GenMSI model and return its event trace. Takes `path` or `model`, plus the optional `seed`, `until` and `limit`, and returns the genmsi.trace/1 document."
     )]
     pub fn get_trace(&self, Parameters(input): Parameters<TraceInput>) -> CallToolResult {
-        match trace_document(&input) {
-            Ok(document) => document_result(document),
-            Err(error) => error_result(&error),
-        }
+        finish(trace_document(&input))
     }
 
     /// Describe a model: its blocks, its operands and what each statement does.
@@ -192,10 +186,7 @@ impl GenmsiServer {
         description = "Describe a GenMSI model: its blocks, operands and ports, plus what each GPSS statement of the model does. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text) and returns the genmsi.explain/1 document."
     )]
     pub fn explain_model(&self, Parameters(input): Parameters<ModelInput>) -> CallToolResult {
-        match explain_document(&input) {
-            Ok(document) => document_result(document),
-            Err(error) => error_result(&error),
-        }
+        finish(explain_document(&input))
     }
 }
 
@@ -205,7 +196,7 @@ struct ExplainBody {
     /// The engine's description of the compiled program.
     program: serde_json::Value,
     /// What each statement of the model does.
-    glossary: std::collections::BTreeMap<String, String>,
+    glossary: BTreeMap<String, String>,
 }
 
 /// The explain document of a model.
@@ -255,14 +246,12 @@ fn trace_document(input: &TraceInput) -> Result<String, ToolError> {
     ))
 }
 
-/// A document as the content of a successful tool result.
-fn document_result(document: String) -> CallToolResult {
-    CallToolResult::success(vec![ContentBlock::text(document)])
-}
-
-/// A failure as the content of a failed tool result.
-fn error_result(error: &ToolError) -> CallToolResult {
-    CallToolResult::error(vec![ContentBlock::text(error.to_json())])
+/// The outcome of a tool: the document it produced, or the failure it found.
+fn finish(outcome: Result<String, ToolError>) -> CallToolResult {
+    match outcome {
+        Ok(document) => CallToolResult::success(vec![ContentBlock::text(document)]),
+        Err(error) => CallToolResult::error(vec![ContentBlock::text(error.to_json())]),
+    }
 }
 
 #[tool_handler(router = self.tool_router)]

@@ -159,6 +159,10 @@ Same branch `feat/phase1-engine`, same allowed paths as S9. Closing the gap betw
   TP3 69% -> 85%, ejercicio_3 -> 86%), T15b `MATCH` waiter bookkeeping (`5edf093`, TP5 63% -> 84%).
 - T16 (S12, S14) Final oracle run, `docs/oracle-comparison.md`, `cargo test` + clippy. Done:
   20 of 20 models match, 98 tests green, clippy clean.
+- T17 (S12, S14) Review of the closed result: narrow the two overstatements L22 carried and pin
+  the `TRANSFER` branch rule that the last diverging metric depends on. Route: inline. Done:
+  `crates/genmsi-core/tests/transfer_branch.rs` (three tests, all three fail under an inverted
+  rule), the "Single-sample noise on small blocks" note in `docs/oracle-comparison.md`, L23.
 
 ## Log (Fase 1b)
 
@@ -237,8 +241,27 @@ Same branch `feat/phase1-engine`, same allowed paths as S9. Closing the gap betw
 - L22 (final result, S10/S14): `cargo run --release -p genmsi-core --example oracle -- --runs 5
   --write` reports **20 of 20 models match, 0 partial, 0 gap** (was 13/6/1). The tolerances and
   the baselines are untouched. `cargo test` green (98 tests), `cargo clippy --all-targets`
-  clean. Remaining mismatched metrics per model are the documented baseline artifacts of L11 and
-  L16, not engine semantics.
+  clean. Most of the remaining mismatched metrics are the baseline artifacts of L11 and L16. One
+  is not: `ejercicio_4__ejercicio_4`'s `Entrada1` branch draw is single-sample noise at n = 59,
+  not a different rule (L23).
+
+- L23 (evidence, review of the closed phase): the metric totals moved 627/894 -> 823/956, but
+  two models lost metrics (TP6_3 14 -> 12, ejercicio_4 25 -> 23), so "no regressions" held for
+  model status, not for every metric.
+  - TP6_3's loss is `QJEFE`'s two averages: baseline `0`, the zeroed-average artifact of L16,
+    which used to pass only because our confidence interval happened to straddle zero.
+  - ejercicio_4's loss is not an artifact. `COLAINFORMES` entries are 32 in the baseline against
+    25 here, and `AVE.CONT.` 0.981 against 0.251, both driven by one `TRANSFER` draw: the
+    baseline sends 27 of `Entrada1`'s 59 transactions to `Salida1` where its own 55/45 split
+    expects 32.45 (-1.4 sigma, two-sided p ~ 0.20). The inverted rule is impossible — it would
+    need 21.8 of `Entrada11`'s 28 in `A_Terminate1` where 7 were observed (6.8 sigma) — and every
+    other baseline row that isolates one branch agrees with `Prob` -> `Salida1`: 18 of 18 rows
+    across 8 models (binomial log-likelihood -46.6 against -2271.5 for the inversion). The
+    editor's hint says "probabilidad de continuar por la Salida1", and the GPSS export writes
+    `TRANSFER P,<Salida2>,<Salida1>`, which is standard GPSS (the fraction goes to the second
+    named operand). The engine rule (`sim.rs`, `BlockKind::Transfer`) is correct, so nothing was
+    changed for that metric. Pinned by `crates/genmsi-core/tests/transfer_branch.rs` and
+    documented in `docs/oracle-comparison.md` ("Single-sample noise on small blocks").
 
 ### Fase 1b commit slice
 

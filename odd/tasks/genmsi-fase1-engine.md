@@ -278,4 +278,11 @@ commit, never to the accumulated branch.
 Two 1b commits carry high-risk item 3 (they change behaviour shared by every
 model) and are the ones to review alone: `dee4aa5` (block routing through
 `next_default`) and `98b2d68` (the global priority order). Each was measured
-against all 20 baselines before and after, and no model regressed.
+against all 20 baselines before and after, and no model regressed — at model
+status; the two metric-level losses those measurements left are L23.
+
+The review tail after the closure is three more reviewable units: `2c554e0`
+(`TRANSFER` branch rule pinned by three tests), `e327fae` (the single-sample
+noise note in the generated oracle document) and `6ade03a` (L23 and the T17
+record). None of them changes engine behaviour, so the review of the 1b slice
+above is unchanged: 30 commits, five of the mdocs, none of them delivery.

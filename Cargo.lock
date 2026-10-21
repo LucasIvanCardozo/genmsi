@@ -265,8 +265,10 @@ dependencies = [
  "clap",
  "genmsi-core",
  "genmsi-format",
+ "insta",
  "serde",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]

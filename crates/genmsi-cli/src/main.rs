@@ -1,46 +1,36 @@
-use std::path::PathBuf;
+//! GenMSI command-line interface.
+//!
+//! A thin layer over `genmsi-core` (decision D2: the CLI carries no simulation
+//! logic). Layout:
+//!
+//! - [`cli`]: the argument surface, one struct per subcommand.
+//! - [`commands`]: one module per subcommand; each renders one document.
+//! - [`model`]: the only place that calls the engine crates.
+//! - [`output`]: the versioned JSON envelope and stdout helpers.
+//! - [`error`]: exit codes and the failure type reported on stderr.
+//!
+//! Every subcommand prints a deterministic document, which is what makes the
+//! output snapshot-testable (ROADMAP Phase 2) and usable from CI.
 
-use clap::{Parser, Subcommand};
+mod cli;
+mod commands;
+mod error;
+mod model;
+mod output;
 
-/// GenMSI: discrete-event simulation toolkit (GPSS-like), headless engine with
-/// CLI, MCP and GUI clients.
-///
-/// The simulator is under active development; subcommands report
-/// "not implemented yet" until their phase lands (see docs/ROADMAP.md).
-#[derive(Parser)]
-#[command(name = "genmsi", version, about)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
+use std::io::{self, Write as _};
 
-#[derive(Subcommand)]
-enum Commands {
-    /// Validate a .gmdl model file and report structural problems.
-    Lint {
-        /// Path to the model file.
-        path: PathBuf,
-    },
-    /// Run a simulation and print the report (add --json for machine output).
-    Simulate {
-        /// Path to the model file.
-        path: PathBuf,
-        /// Emit the report as typed JSON instead of human-readable text.
-        #[arg(long)]
-        json: bool,
-    },
-}
+use clap::Parser as _;
 
-fn main() {
+use crate::cli::Cli;
+
+fn main() -> std::process::ExitCode {
     let cli = Cli::parse();
-    match cli.command {
-        Commands::Lint { .. } => unimplemented_stub("lint", "Phase 1"),
-        Commands::Simulate { .. } => unimplemented_stub("simulate", "Phase 2"),
+    match commands::run(cli.command) {
+        Ok(code) => code.into(),
+        Err(error) => {
+            let _ = writeln!(io::stderr(), "error: {error}");
+            error.exit_code().into()
+        }
     }
-}
-
-fn unimplemented_stub(command: &str, phase: &str) {
-    eprintln!("error: `{command}` is not implemented yet (planned for {phase})");
-    eprintln!("see docs/ROADMAP.md for the phase plan");
-    std::process::exit(2);
 }

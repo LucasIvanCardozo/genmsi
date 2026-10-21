@@ -1,0 +1,20 @@
+---
+source: crates/genmsi-cli/tests/cli.rs
+expression: stdout(&output)
+---
+{
+  "schema": "genmsi.lint/1",
+  "path": "fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl",
+  "status": "ok",
+  "title": "Puerta Banco",
+  "blocks": 18,
+  "definitions": {
+    "functions": 0,
+    "variables": 0,
+    "random_variables": 0,
+    "storages": 0,
+    "tables": 0,
+    "qtables": 0
+  },
+  "diagnostics": []
+}

@@ -16,3 +16,7 @@ genmsi-format = { path = "../genmsi-format" }
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+insta = "1"

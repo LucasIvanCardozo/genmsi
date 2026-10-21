@@ -1,0 +1,5 @@
+---
+source: crates/genmsi-cli/tests/cli.rs
+expression: stderr(&output)
+---
+error: fixtures/models/Parcial 8-11-21__ParcialMikelModelos.gmdl: (node 109): QTable: invalid block: definition name "tiempo demora" contains whitespace or ':'

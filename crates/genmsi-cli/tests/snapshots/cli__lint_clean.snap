@@ -1,0 +1,10 @@
+---
+source: crates/genmsi-cli/tests/cli.rs
+expression: stdout(&output)
+---
+model: fixtures/models/TP2__problema1.gmdl
+title: Modelo1
+status: ok
+blocks: 52
+definitions: functions 0, variables 0, random_variables 0, storages 4, tables 0, qtables 1
+diagnostics: none

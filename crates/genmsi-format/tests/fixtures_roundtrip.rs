@@ -107,6 +107,20 @@ fn encoded_property_values_are_decoded_for_semantics() {
 }
 
 #[test]
+fn blocks_record_the_position_of_their_opening_tag() {
+    let path = models_dir().join("TP9__tp9.gmdl");
+    let text = std::fs::read_to_string(&path).expect("model is UTF-8");
+    let model = parse_str(&text).expect("model parses");
+    let block = model.block(68).expect("node 68 exists");
+    let offset = text
+        .find("<module moduleid=\"68\"")
+        .expect("the opening tag is in the file");
+    let source = block.source.expect("the block records its position");
+    assert_eq!(source.line, 1, "the reference models are one long line");
+    assert_eq!(source.column, text[..offset].chars().count() + 1);
+}
+
+#[test]
 fn custom_class_macro_code_is_preserved() {
     let path = models_dir().join("Parcial 6-11-23__Veron - Parcial.gmdl");
     let text = std::fs::read_to_string(&path).expect("model is UTF-8");

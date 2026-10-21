@@ -33,7 +33,7 @@ mod writer;
 pub use error::{FormatError, Location};
 pub use model::{
     Block, ContainerHeader, CustomClass, GmdlModel, Layout, Link, Port, PortLayout, Property,
-    SectionKind, percent_decode, percent_encode,
+    SectionKind, SourcePos, percent_decode, percent_encode,
 };
 pub use parser::{parse_file, parse_str};
 pub use validate::{validate, validate_runnable};

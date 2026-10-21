@@ -152,6 +152,27 @@ pub struct ContainerHeader {
     pub nonexefoot: String,
 }
 
+/// Where a block sits in the source file.
+///
+/// The position is read from the file and never written back: the writer does
+/// not look at it, so a model that is only read and rewritten stays
+/// byte-identical. It exists so a client (the MCP server, an editor) can point
+/// at the exact place of a block that fails to compile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourcePos {
+    /// 1-based line of the block's opening tag.
+    pub line: usize,
+    /// 1-based column of the block's opening tag.
+    pub column: usize,
+}
+
+impl SourcePos {
+    /// A position on the given line and column.
+    pub fn new(line: usize, column: usize) -> Self {
+        Self { line, column }
+    }
+}
+
 /// One block (activity) or container of the model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
@@ -181,6 +202,8 @@ pub struct Block {
     pub props: Vec<Property>,
     /// Section order recorded from the source.
     pub sections: Vec<SectionKind>,
+    /// Position of the block in the source file, when it was read from one.
+    pub source: Option<SourcePos>,
 }
 
 impl Block {

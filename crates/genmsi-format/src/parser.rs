@@ -12,7 +12,7 @@ use roxmltree::{Document, Node, ParsingOptions};
 use crate::error::{FormatError, Location};
 use crate::model::{
     Block, ContainerHeader, CustomClass, GmdlModel, Layout, Link, Port, PortLayout, Property,
-    SectionKind,
+    SectionKind, SourcePos,
 };
 
 /// Parse a model from text.
@@ -181,6 +181,7 @@ fn parse_block(text: &str, node: Node<'_, '_>) -> Result<Block, FormatError> {
         links: Vec::new(),
         props: Vec::new(),
         sections: Vec::new(),
+        source: Some(position_of(text, node.range().start)),
     };
 
     for section in node.children().filter(Node::is_element) {
@@ -449,12 +450,23 @@ fn structural(text: &str, node: Node<'_, '_>, message: impl Into<String>) -> For
 
 /// 1-based line of a byte offset.
 pub(crate) fn line_of(text: &str, offset: usize) -> usize {
+    position_of(text, offset).line
+}
+
+/// 1-based line and column of a byte offset.
+///
+/// The column counts characters, not bytes, so a model written with accented
+/// characters still points at the right place.
+fn position_of(text: &str, offset: usize) -> SourcePos {
     let end = offset.min(text.len());
-    text.as_bytes()[..end]
-        .iter()
-        .filter(|byte| **byte == b'\n')
-        .count()
-        + 1
+    let before = text.get(..end).unwrap_or("");
+    let line = before.bytes().filter(|byte| *byte == b'\n').count() + 1;
+    let column = before
+        .rsplit('\n')
+        .next()
+        .map(|last| last.chars().count() + 1)
+        .unwrap_or(1);
+    SourcePos::new(line, column)
 }
 
 /// Exact text that followed the root element.
@@ -537,5 +549,28 @@ mod tests {
         let with_crlf = format!("{MINIMAL}\r\n");
         assert_eq!(parse_str(&with_crlf).unwrap().trailing, "\r\n");
         assert_eq!(parse_str(MINIMAL).unwrap().trailing, "");
+    }
+
+    #[test]
+    fn every_block_records_its_source_position() {
+        let model = parse_str(MINIMAL).expect("model parses");
+        let generate = model.block(1).expect("generate block");
+        let offset = MINIMAL.find("<module moduleid=\"1\"").expect("tag in text");
+        let expected_column = MINIMAL[..offset].chars().count() + 1;
+        assert_eq!(
+            generate.source,
+            Some(SourcePos::new(1, expected_column)),
+            "the position points at the opening tag"
+        );
+        // Every block of the model carries a position.
+        assert!(model.blocks.iter().all(|block| block.source.is_some()));
+    }
+
+    #[test]
+    fn the_position_follows_the_line_of_the_block() {
+        let text = "<gmodel versioncode=\"1\">\n  <gclasses/>\n  <modules>\n    <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"m\" name=\"m\" kind=\"C\"><links/><inputs/><outputs/></module>\n  </modules>\n</gmodel>";
+        let model = parse_str(text).expect("model parses");
+        let root = model.block(0).expect("root block");
+        assert_eq!(root.source, Some(SourcePos::new(4, 5)));
     }
 }

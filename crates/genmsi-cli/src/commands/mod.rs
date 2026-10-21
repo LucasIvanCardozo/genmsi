@@ -6,6 +6,7 @@
 
 pub mod lint;
 pub mod simulate;
+pub mod trace;
 
 use crate::cli::Command;
 use crate::error::{CliError, ExitCode};
@@ -15,5 +16,6 @@ pub fn run(command: Command) -> Result<ExitCode, CliError> {
     match command {
         Command::Lint(args) => lint::run(args),
         Command::Simulate(args) => simulate::run(args),
+        Command::Trace(args) => trace::run(args),
     }
 }

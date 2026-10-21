@@ -130,7 +130,24 @@ fn simulate_honours_the_seed_and_the_horizon() {
 }
 
 
+#[test]
+fn trace_prints_events_and_reports_the_limit() {
+    let output = genmsi(&["trace", SMALL, "--limit", "8"]);
+    assert_eq!(code(&output), 0, "{}", stderr(&output));
+    insta::assert_snapshot!("trace_events", stdout(&output));
+}
 
+#[test]
+fn trace_json_is_versioned() {
+    let output = genmsi(&["trace", SMALL, "--limit", "3", "--json"]);
+    assert_eq!(code(&output), 0, "{}", stderr(&output));
+    let document = json(&output);
+    assert_eq!(document["schema"], "genmsi.trace/1");
+    assert_eq!(document["limit"], 3);
+    assert_eq!(document["records"], 3);
+    assert_eq!(document["truncated"], true);
+    insta::assert_snapshot!("trace_json", stdout(&output));
+}
 
 
 

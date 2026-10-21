@@ -35,6 +35,21 @@ pub enum EndReason {
     TimeLimit,
 }
 
+impl EndReason {
+    /// Stable identifier of the reason.
+    ///
+    /// Reported by the JSON documents (`terminated`, `no_events`,
+    /// `time_limit`) and by the CLI trace summary, so consumers can rely on the
+    /// spelling.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Terminated => "terminated",
+            Self::NoEvents => "no_events",
+            Self::TimeLimit => "time_limit",
+        }
+    }
+}
+
 /// Configuration of one run.
 #[derive(Debug, Clone, Copy)]
 pub struct SimConfig {

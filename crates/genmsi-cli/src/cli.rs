@@ -33,6 +33,8 @@ pub enum Command {
     Lint(LintArgs),
     /// Simulate a model and print the GPSS report.
     Simulate(SimulateArgs),
+    /// Simulate a model and print its event trace.
+    Trace(TraceArgs),
 }
 
 /// Options shared by the subcommands that read one model.
@@ -87,6 +89,21 @@ pub struct SimulateArgs {
     pub output: OutputArgs,
 }
 
-
+/// `genmsi trace <model>`.
+#[derive(Debug, Args)]
+pub struct TraceArgs {
+    /// Options of the model to trace.
+    #[command(flatten)]
+    pub model: ModelArgs,
+    /// Simulation knobs.
+    #[command(flatten)]
+    pub run: RunArgs,
+    /// Output form.
+    #[command(flatten)]
+    pub output: OutputArgs,
+    /// Maximum number of trace records to keep.
+    #[arg(long, value_name = "N", default_value_t = 100)]
+    pub limit: usize,
+}
 
 

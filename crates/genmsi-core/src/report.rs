@@ -410,11 +410,7 @@ pub fn json_report<'a>(result: &'a RunResult, program: &'a Program) -> JsonRepor
         seed: result.seed,
         start_time: result.start_time,
         end_time: result.end_time,
-        end_reason: match result.end_reason {
-            crate::sim::EndReason::Terminated => "terminated",
-            crate::sim::EndReason::NoEvents => "no_events",
-            crate::sim::EndReason::TimeLimit => "time_limit",
-        },
+        end_reason: result.end_reason.as_str(),
         transactions: result.transactions,
         events: result.events,
         blocks,

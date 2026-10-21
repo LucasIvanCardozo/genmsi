@@ -1,0 +1,44 @@
+---
+source: crates/genmsi-cli/tests/cli.rs
+expression: stdout(&output)
+---
+{
+  "schema": "genmsi.trace/1",
+  "title": "Puerta Banco",
+  "seed": 1,
+  "start_time": 0.0,
+  "end_time": 3600.0,
+  "end_reason": "terminated",
+  "limit": 3,
+  "records": 3,
+  "truncated": true,
+  "events": [
+    {
+      "time": 2700.0,
+      "xact": 1,
+      "block": 0,
+      "class": "Generate",
+      "label": null,
+      "event": "generate",
+      "detail": ""
+    },
+    {
+      "time": 2700.0,
+      "xact": 1,
+      "block": 13,
+      "class": "Queue",
+      "label": "A_Queue",
+      "event": "enter",
+      "detail": ""
+    },
+    {
+      "time": 2700.0,
+      "xact": 1,
+      "block": 13,
+      "class": "Queue",
+      "label": "A_Queue",
+      "event": "leave",
+      "detail": "-> 4"
+    }
+  ]
+}

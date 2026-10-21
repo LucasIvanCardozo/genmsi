@@ -64,9 +64,23 @@ pub enum CliError {
 impl CliError {
     /// A model failure, with the path the user asked for.
     pub fn model(path: &Path, error: impl fmt::Display) -> Self {
+        // The reader attaches the file to its own location, so an engine message
+        // can already start with the path (`model.gmdl:9 (node 3): ...`). Strip
+        // that prefix instead of printing the path twice; the display adds the
+        // path the user typed, which is the one a log line should show.
+        let path_text = path.display().to_string();
+        let message = error.to_string();
+        // The reader renders its location as `<path>:<line> (node <id>)`, so an
+        // engine message can already start with the path; stripping it keeps the
+        // path from appearing twice, and the display below adds back the path
+        // the user typed.
+        let message = message
+            .strip_prefix(&format!("{path_text}:"))
+            .map(|rest| rest.trim_start().to_string())
+            .unwrap_or(message);
         Self::Model {
-            path: path.display().to_string(),
-            message: error.to_string(),
+            path: path_text,
+            message,
         }
     }
 

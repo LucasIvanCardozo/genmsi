@@ -61,8 +61,12 @@ mod tests {
         let text = error.to_string();
         assert!(text.contains("invalid block"), "{text}");
         assert!(text.contains("(node "), "{text}");
-        // The CLI prefixes the path so a log line says which model failed.
-        assert!(text.starts_with(&path.display().to_string()), "{text}");
+        // The CLI names the path exactly once, even though the engine's own
+        // location already carries the file.
+        let path_text = path.display().to_string();
+        assert!(text.starts_with(&path_text), "{text}");
+        assert_eq!(text.matches(&path_text).count(), 1, "path printed twice: {text}");
+        assert_eq!(text.matches("(node ").count(), 1, "node printed twice: {text}");
     }
 
     #[test]

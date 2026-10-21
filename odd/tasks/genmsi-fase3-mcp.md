@@ -222,3 +222,20 @@ FASE 3 — GenMSI-rs: genmsi-mcp. Sos la sesión de la Fase 3 del proyecto genms
   `main`, which the agent cannot edit, and `explain_model`'s glossary is built from the raw
   model, so a class with no glossary entry disappears without a signal. Both are recorded
   as known low-severity gaps rather than silently accepted.
+
+### Phase 3 commit slice
+
+Seventeen commits on `feat/phase3-mcp` over `df95f3e`, ~3.3k authored lines including the
+lock file. Ten are the phase's, split by concern: `10eb859` (source position in the model),
+`e8a7665` (engine documents), `07f64e5` (server + adapter), `b370d76` (three tools),
+`8516025` (explain + glossary), `092a327` (tests), `84912a7` (docs), `18967d7` and
+`1d10f51` (two review fixes of its own), `082e133` (feature doc). Five are the coordinator
+review's: `d1f104b` (tool error positions), `9c544b4` (CLI delegates the documents),
+`1d53501` (`genmsi mcp`), `d5cf29a` (single path and node in the CLI error), `a07b7b7`
+(records). Review per work unit, not per branch; the native review candidate is a PR slice.
+
+Three commits carry high-risk item 3 and are the ones to review alone: `d1f104b` changes the
+tool error body and the CLI's stderr text, `9c544b4` changes how the CLI builds its
+published documents, and `1d53501` adds the workspace's only client-to-client dependency.
+Each was verified against its own invariant (class names unchanged and now pinned; eight CLI
+snapshots passing unregenerated; the subcommand's handshake tested with a bounded wait).

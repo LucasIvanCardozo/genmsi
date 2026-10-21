@@ -126,6 +126,16 @@ fn main() {
     markdown.push_str("code. The block table of the corresponding `.report.txt` is the authoritative\n");
     markdown.push_str("expansion for every model: it lists each generated block with its operands and\n");
     markdown.push_str("its entry count.\n");
+    markdown.push_str("\n### Single-sample noise on small blocks\n\n");
+    markdown.push_str("A baseline is one sample, and the count tolerance of 20% is about two\n");
+    markdown.push_str("standard deviations at `n = 50`: a block visited a few dozen times can land\n");
+    markdown.push_str("outside it by chance. `ejercicio_4__ejercicio_4` is the remaining case. Its\n");
+    markdown.push_str("`Entrada1` `TRANSFER` splits 55/45 and the baseline sent 27 of 59 transactions\n");
+    markdown.push_str("to `Salida1` where 32.45 is expected (-1.4 sigma, two-sided p ~ 0.20); that\n");
+    markdown.push_str("one draw puts the `ColaInformes` entries and `AVE.CONT.` of the model out of\n");
+    markdown.push_str("tolerance while the model still matches. It is not a different rule: 18 of the\n");
+    markdown.push_str("18 other baseline rows that isolate one `TRANSFER` branch send the `Prob`\n");
+    markdown.push_str("share to `Salida1` (`crates/genmsi-core/tests/transfer_branch.rs`).\n");
     markdown.push_str("\n## Models the original refuses\n\n");
     markdown.push_str("These five baselines are error outputs, not reports. The engine must reject\n");
     markdown.push_str("each model with an equivalent error class.\n\n");

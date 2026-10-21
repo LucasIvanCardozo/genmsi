@@ -12,24 +12,24 @@ rule is deliberately generous; see `docs/DECISIONS.md` D6.
 
 | Model | Horizon | Runs | Matched | Ratio | Status |
 |---|---:|---:|---:|---:|---|
-| Parcial 6-11-23__Veron - Parcial | 36000 | 5 | 21/101 | 21% | gap |
+| Parcial 6-11-23__Veron - Parcial | 36000 | 5 | 117/150 | 78% | match |
 | Problema 1__semaforo-1 | 3600 | 5 | 126/132 | 95% | match |
 | TP10__tp10 | 28800 | 5 | 31/64 | 48% | partial |
-| TP2__problema1 | 3600 | 5 | 51/57 | 89% | match |
-| TP3__aeropuerto | 3600 | 5 | 59/91 | 65% | partial |
-| TP4__supermercado | 3600 | 5 | 27/62 | 44% | partial |
-| TP5__burgerShop | 3600 | 5 | 43/63 | 68% | partial |
+| TP2__problema1 | 3600 | 5 | 52/57 | 91% | match |
+| TP3__aeropuerto | 3600 | 5 | 63/91 | 69% | partial |
+| TP4__supermercado | 3600 | 5 | 48/65 | 74% | match |
+| TP5__burgerShop | 3600 | 5 | 40/63 | 63% | partial |
 | TP6__Clase 6_1_PuertaBanco | 3600 | 5 | 10/13 | 77% | match |
-| TP6__Clase 6_2_UltimoCliente | 6184 | 5 | 9/19 | 47% | partial |
+| TP6__Clase 6_2_UltimoCliente | 6184 | 5 | 16/19 | 84% | match |
 | TP6__Clase 6_3_JefeEducado | 3600 | 5 | 14/16 | 88% | match |
 | TP7__Clase 7_1_Link_Unlink | 3600 | 5 | 9/9 | 100% | match |
 | TP7__Clase 7_2_ProductorConsumidor | 3600 | 5 | 13/13 | 100% | match |
 | TP7__Clase 7_3_Cadete | 3600 | 5 | 9/13 | 69% | partial |
-| TP8__mecanicos | 3600 | 5 | 93/106 | 88% | match |
+| TP8__mecanicos | 3600 | 5 | 98/116 | 84% | match |
 | ejercicio_1__ejercicio_1 | 3600 | 5 | 8/9 | 89% | match |
-| ejercicio_2__ejercicio_2 | 3600 | 5 | 8/11 | 73% | match |
-| ejercicio_3__ejercicio_3 | 1800 | 5 | 15/21 | 71% | match |
-| ejercicio_4__ejercicio_4 | 3600 | 5 | 25/29 | 86% | match |
+| ejercicio_2__ejercicio_2 | 3600 | 5 | 9/11 | 82% | match |
+| ejercicio_3__ejercicio_3 | 1800 | 5 | 16/21 | 76% | match |
+| ejercicio_4__ejercicio_4 | 3600 | 5 | 23/29 | 79% | match |
 | entregaComida__entregaComida | 3600 | 5 | 10/10 | 100% | match |
 | monorriel__monorriel | 3600 | 5 | 46/55 | 84% | match |
 
@@ -39,101 +39,150 @@ Horizon 36000 (baseline end time), 5 replications, seed base 7.
 
 | Section | Entity | Metric | Baseline | Ours (mean) | 95% CI | Rel. error | Match |
 |---|---|---|---:|---:|---|---:|---|
-| facility | MOLINETE | utilization | 0,200 | 0,009 | [0,007, 0,011] | 96% | no |
-| facility | MOLINETE | average_time | 19,203 | 316,620 | [248,746, 384,494] | 1549% | no |
-| facility | RECURSO | utilization | 0,091 | 0,004 | [0,004, 0,004] | 95% | no |
-| facility | RECURSO | average_time | 4,463 | 3,912 | [3,679, 4,145] | 12% | yes |
-| facility | 1 | utilization | 0,167 | 0,099 | [0,080, 0,117] | 41% | no |
-| facility | 1 | average_time | 120,080 | 121,260 | [108,792, 133,728] | 1% | yes |
-| facility | 2 | utilization | 0,140 | 0,009 | [0,004, 0,013] | 94% | no |
-| facility | 2 | average_time | 109,304 | 106,789 | [62,614, 150,965] | 2% | yes |
-| queue | QMOLINETE | entries | 375 | 1 | [1, 1] | 100% | no |
-| queue | QMOLINETE | average_content | 0 | 0 | [0, 0] | 0% | yes |
-| queue | QMOLINETE | average_time | 0 | 0 | [0, 0] | 0% | yes |
-| queue | SISTEMA | entries | 367 | 398,600 | [384,000, 413,200] | 9% | yes |
-| queue | SISTEMA | average_content | 0 | 304,398 | [238,620, 370,176] | n/a | no |
-| queue | SISTEMA | average_time | 0 | 0 | [0, 0] | 0% | yes |
-| queue | 1 | entries | 784 | 29,200 | [25,755, 32,645] | 96% | no |
-| queue | 1 | average_content | 0 | 0,025 | [0,014, 0,036] | n/a | no |
-| queue | 1 | average_time | 0 | 30,593 | [16,921, 44,265] | n/a | no |
-| queue | 2 | entries | 46 | 3 | [1,163, 4,837] | 93% | no |
-| queue | 2 | average_content | 0 | 0,001 | [-0,002, 0,004] | n/a | yes |
-| queue | 2 | average_time | 0 | 9,609 | [-20,967, 40,186] | n/a | yes |
-| storage | SALIDA | average_content | 0,039 | 0 | [0, 0] | 100% | no |
-| storage | SALIDA | utilization | 0,005 | 0 | [0, 0] | 100% | no |
-| storage | PUERTA | average_content | 0,051 | 0 | [0, 0] | 100% | no |
-| storage | PUERTA | utilization | 0,009 | 0 | [0, 0] | 100% | no |
-| storage | STAND | average_content | 4,527 | 0 | [0, 0] | 100% | no |
-| storage | STAND | utilization | 0,226 | 0 | [0, 0] | 100% | no |
+| facility | MOLINETE | utilization | 0,200 | 0,210 | [0,200, 0,220] | 5% | yes |
+| facility | MOLINETE | average_time | 19,203 | 18,088 | [15,082, 21,093] | 6% | yes |
+| facility | RECURSO | utilization | 0,091 | 0,107 | [0,092, 0,121] | 17% | yes |
+| facility | RECURSO | average_time | 4,463 | 4,547 | [4,495, 4,599] | 2% | yes |
+| facility | 1 | utilization | 0,167 | 0,186 | [0,165, 0,208] | 12% | yes |
+| facility | 1 | average_time | 120,080 | 125,000 | [121,515, 128,484] | 4% | yes |
+| facility | 2 | utilization | 0,140 | 0,174 | [0,154, 0,193] | 24% | yes |
+| facility | 2 | average_time | 109,304 | 120,435 | [112,229, 128,640] | 10% | yes |
+| facility | 3 | utilization | 0,128 | 0,160 | [0,149, 0,171] | 25% | yes |
+| facility | 3 | average_time | 115,075 | 123,465 | [116,040, 130,890] | 7% | yes |
+| facility | 4 | utilization | 0,111 | 0,136 | [0,119, 0,153] | 23% | yes |
+| facility | 4 | average_time | 121,606 | 121,922 | [120,455, 123,389] | 0% | yes |
+| facility | 5 | utilization | 0,108 | 0,118 | [0,102, 0,135] | 10% | yes |
+| facility | 5 | average_time | 122 | 118,914 | [112,850, 124,978] | 3% | yes |
+| facility | 6 | utilization | 0,099 | 0,104 | [0,085, 0,123] | 5% | yes |
+| facility | 6 | average_time | 119,367 | 122,342 | [116,842, 127,842] | 2% | yes |
+| facility | 7 | utilization | 0,080 | 0,090 | [0,071, 0,109] | 12% | yes |
+| facility | 7 | average_time | 120,125 | 121,469 | [110,695, 132,243] | 1% | yes |
+| facility | 8 | utilization | 0,065 | 0,075 | [0,048, 0,101] | 15% | yes |
+| facility | 8 | average_time | 111,714 | 120,752 | [114,581, 126,924] | 8% | yes |
+| facility | 9 | utilization | 0,056 | 0,062 | [0,028, 0,096] | 11% | yes |
+| facility | 9 | average_time | 125,563 | 129,113 | [118,684, 139,541] | 3% | yes |
+| facility | 10 | utilization | 0,040 | 0,041 | [0,018, 0,065] | 3% | yes |
+| facility | 10 | average_time | 110,615 | 111,721 | [97,509, 125,932] | 1% | yes |
+| queue | QMOLINETE | entries | 375 | 422,200 | [367,460, 476,940] | 13% | yes |
+| queue | QMOLINETE | average_content | 0 | 0,086 | [0,020, 0,153] | n/a | no |
+| queue | QMOLINETE | average_time | 0 | 7,471 | [1,384, 13,558] | n/a | no |
+| queue | QSALIDA | entries | 367 | 423 | [366,075, 479,925] | 15% | yes |
+| queue | QSALIDA | average_content | 0 | 0 | [0, 0] | 0% | yes |
+| queue | QSALIDA | average_time | 0 | 0 | [0, 0] | 0% | yes |
+| queue | QSTAND | entries | 337 | 392,400 | [338,739, 446,061] | 16% | yes |
+| queue | QSTAND | average_content | 0 | 0,475 | [-0,112, 1,062] | n/a | yes |
+| queue | QSTAND | average_time | 0 | 43,421 | [-14,062, 100,903] | n/a | yes |
+| queue | QPUERTA | entries | 367 | 423 | [366,075, 479,925] | 15% | yes |
+| queue | QPUERTA | average_content | 0 | 0,082 | [0,058, 0,105] | n/a | no |
+| queue | QPUERTA | average_time | 0 | 6,890 | [5,835, 7,944] | n/a | no |
+| queue | SISTEMA | entries | 367 | 423 | [366,075, 479,925] | 15% | yes |
+| queue | SISTEMA | average_content | 0 | 41,568 | [35,531, 47,605] | n/a | no |
+| queue | SISTEMA | average_time | 0 | 3535,550 | [3441,950, 3629,151] | n/a | no |
+| queue | 1 | entries | 784 | 899,800 | [785,086, 1014,514] | 15% | yes |
+| queue | 1 | average_content | 0 | 0,909 | [0,457, 1,360] | n/a | no |
+| queue | 1 | average_time | 0 | 35,611 | [22,504, 48,717] | n/a | no |
+| queue | 2 | entries | 46 | 52 | [45,315, 58,685] | 13% | yes |
+| queue | 2 | average_content | 0 | 0,158 | [0,119, 0,198] | n/a | no |
+| queue | 2 | average_time | 0 | 110,665 | [80,678, 140,652] | n/a | no |
+| queue | 3 | entries | 40 | 46,800 | [41,504, 52,096] | 17% | yes |
+| queue | 3 | average_content | 0 | 0,143 | [0,092, 0,194] | n/a | no |
+| queue | 3 | average_time | 0 | 110,285 | [69,812, 150,759] | n/a | no |
+| queue | 4 | entries | 33 | 40,200 | [34,760, 45,640] | 22% | no |
+| queue | 4 | average_content | 0 | 0,120 | [0,069, 0,171] | n/a | no |
+| queue | 4 | average_time | 0 | 106,250 | [71,551, 140,948] | n/a | no |
+| queue | 5 | entries | 32 | 35,800 | [31,205, 40,395] | 12% | yes |
+| queue | 5 | average_content | 0 | 0,103 | [0,058, 0,147] | n/a | no |
+| queue | 5 | average_time | 0 | 101,887 | [67,849, 135,924] | n/a | no |
+| queue | 6 | entries | 30 | 30,800 | [24,091, 37,509] | 3% | yes |
+| queue | 6 | average_content | 0 | 0,092 | [0,044, 0,141] | n/a | no |
+| queue | 6 | average_time | 0 | 105,052 | [67,610, 142,494] | n/a | no |
+| queue | 7 | entries | 24 | 26,600 | [21,905, 31,295] | 11% | yes |
+| queue | 7 | average_content | 0 | 0,076 | [0,038, 0,113] | n/a | no |
+| queue | 7 | average_time | 0 | 99,944 | [66,751, 133,137] | n/a | no |
+| queue | 8 | entries | 21 | 22,400 | [13,336, 31,464] | 7% | yes |
+| queue | 8 | average_content | 0 | 0,066 | [0,027, 0,105] | n/a | no |
+| queue | 8 | average_time | 0 | 101,696 | [79,585, 123,808] | n/a | no |
+| queue | 9 | entries | 16 | 17,600 | [7,415, 27,785] | 10% | yes |
+| queue | 9 | average_content | 0 | 0,058 | [0,013, 0,103] | n/a | no |
+| queue | 9 | average_time | 0 | 110,822 | [80,243, 141,402] | n/a | no |
+| queue | 10 | entries | 13 | 13,600 | [5,478, 21,722] | 5% | yes |
+| queue | 10 | average_content | 0 | 0,043 | [0,009, 0,078] | n/a | no |
+| queue | 10 | average_time | 0 | 104,049 | [58,227, 149,871] | n/a | no |
+| storage | SALIDA | average_content | 0,039 | 0,047 | [0,041, 0,053] | 22% | yes |
+| storage | SALIDA | utilization | 0,005 | 0,006 | [0,005, 0,007] | 19% | yes |
+| storage | PUERTA | average_content | 0,051 | 0,059 | [0,052, 0,066] | 15% | yes |
+| storage | PUERTA | utilization | 0,009 | 0,010 | [0,009, 0,011] | 9% | yes |
+| storage | STAND | average_content | 4,527 | 5,253 | [4,511, 5,996] | 16% | yes |
+| storage | STAND | utilization | 0,226 | 0,263 | [0,226, 0,300] | 16% | yes |
 | block | A_Assign1 | entries | 20 | 20 | [20, 20] | 0% | yes |
 | block | A_Assign | entries | 20 | 20 | [20, 20] | 0% | yes |
 | block | Clona | entries | 20 | 20 | [20, 20] | 0% | yes |
 | block | A_Advance | entries | 20 | 20 | [20, 20] | 0% | yes |
-| block | A_Assemble | entries | 387 | 20 | [20, 20] | 95% | no |
-| block | A_Terminate | entries | 20 | 0 | [0, 0] | 100% | no |
-| block | A_FacilityUse3 | entries | 367 | 0 | [0, 0] | 100% | no |
-| block | A_Queue1 | entries | 367 | 398,600 | [384,000, 413,200] | 9% | yes |
-| block | A_FacilityUse2 | entries | 367 | 398,600 | [384,000, 413,200] | 9% | yes |
-| block | Entrada1 | entries | 367 | 39,600 | [38,490, 40,710] | 89% | no |
-| block | A_Advance2 | entries | 305 | 31,600 | [29,717, 33,483] | 90% | no |
-| block | A_Advance3 | entries | 305 | 31,600 | [29,717, 33,483] | 90% | no |
-| block | A_SelectF | entries | 305 | 31,600 | [29,717, 33,483] | 90% | no |
-| block | A_Queue | entries | 305 | 31,600 | [29,717, 33,483] | 90% | no |
-| block | A_Seize | entries | 305 | 31,600 | [29,717, 33,483] | 90% | no |
-| block | A_Depart | entries | 305 | 31,600 | [29,717, 33,483] | 90% | no |
-| block | A_Advance1 | entries | 305 | 31,600 | [29,717, 33,483] | 90% | no |
-| block | A_Release | entries | 305 | 31,600 | [29,717, 33,483] | 90% | no |
-| block | A_Advance4 | entries | 305 | 31,600 | [29,717, 33,483] | 90% | no |
-| block | A_Gather | entries | 367 | 39,600 | [38,490, 40,710] | 89% | no |
-| block | GateL1 | entries | 367 | 0 | [0, 0] | 100% | no |
-| block | StorageUse | entries | 367 | 0 | [0, 0] | 100% | no |
-| block | Multifurcacion | entries | 367 | 0 | [0, 0] | 100% | no |
-| block | A_Tabulate | entries | 337 | 0 | [0, 0] | 100% | no |
-| block | StorageUse2 | entries | 337 | 0 | [0, 0] | 100% | no |
-| block | A_Assign6 | entries | 337 | 0 | [0, 0] | 100% | no |
-| block | A_Assign7 | entries | 337 | 0 | [0, 0] | 100% | no |
-| block | A_Assign10 | entries | 337 | 0 | [0, 0] | 100% | no |
-| block | A_Tabulate1 | entries | 337 | 0 | [0, 0] | 100% | no |
-| block | A_Test | entries | 337 | 0 | [0, 0] | 100% | no |
-| block | StorageUse1 | entries | 367 | 0 | [0, 0] | 100% | no |
-| block | A_Depart1 | entries | 367 | 0 | [0, 0] | 100% | no |
-| block | A_Test1 | entries | 218 | 0 | [0, 0] | 100% | no |
-| block | Entrada11 | entries | 125 | 0 | [0, 0] | 100% | no |
-| block | A_Test2 | entries | 95 | 0 | [0, 0] | 100% | no |
-| block | A_Advance9 | entries | 327 | 0 | [0, 0] | 100% | no |
-| block | A_Assign4 | entries | 327 | 0 | [0, 0] | 100% | no |
-| block | A_Assign9 | entries | 327 | 0 | [0, 0] | 100% | no |
-| block | A_Assign11 | entries | 327 | 0 | [0, 0] | 100% | no |
-| block | A_Tabulate3 | entries | 327 | 0 | [0, 0] | 100% | no |
-| block | A_Test4 | entries | 327 | 0 | [0, 0] | 100% | no |
-| block | A_Test12 | entries | 214 | 0 | [0, 0] | 100% | no |
-| block | Entrada15 | entries | 167 | 0 | [0, 0] | 100% | no |
-| block | A_Test22 | entries | 145 | 0 | [0, 0] | 100% | no |
-| block | GateL | entries | 361 | 0 | [0, 0] | 100% | no |
-| block | A_SaveValue | entries | 361 | 0 | [0, 0] | 100% | no |
-| block | A_FacilityUse1 | entries | 361 | 0 | [0, 0] | 100% | no |
-| block | A_Assign2 | entries | 361 | 0 | [0, 0] | 100% | no |
-| block | A_Advance7 | entries | 2323 | 0 | [0, 0] | 100% | no |
-| block | A_Loop1 | entries | 2323 | 0 | [0, 0] | 100% | no |
-| block | A_Assign5 | entries | 361 | 0 | [0, 0] | 100% | no |
-| block | A_Assign8 | entries | 361 | 0 | [0, 0] | 100% | no |
-| block | A_Assign101 | entries | 361 | 0 | [0, 0] | 100% | no |
-| block | A_Tabulate2 | entries | 361 | 0 | [0, 0] | 100% | no |
-| block | A_Test3 | entries | 361 | 0 | [0, 0] | 100% | no |
-| block | A_Test11 | entries | 302 | 0 | [0, 0] | 100% | no |
-| block | Entrada12 | entries | 75 | 0 | [0, 0] | 100% | no |
-| block | A_Test21 | entries | 51 | 0 | [0, 0] | 100% | no |
-| block | Entrada14 | entries | 227 | 0 | [0, 0] | 100% | no |
-| block | A_Advance8 | entries | 15 | 1 | [1, 1] | 93% | no |
-| block | A_Logic | entries | 14 | 1 | [1, 1] | 93% | no |
-| block | A_Assign3 | entries | 14 | 1 | [1, 1] | 93% | no |
-| block | A_FacilityInt | entries | 14 | 1 | [1, 1] | 93% | no |
-| block | A_SaveValue1 | entries | 14 | 0 | [0, 0] | 100% | no |
-| block | A_Logic1 | entries | 14 | 0 | [0, 0] | 100% | no |
-| block | Entrada16 | entries | 47 | 0 | [0, 0] | 100% | no |
-| block | Entrada13 | entries | 93 | 0 | [0, 0] | 100% | no |
-| block | A_Select | entries | 40 | 0 | [0, 0] | 100% | no |
-| block | A_Advance5 | entries | 62 | 8 | [5,677, 10,323] | 87% | no |
+| block | A_Assemble | entries | 387 | 443 | [386,075, 499,925] | 14% | yes |
+| block | A_Terminate | entries | 20 | 20 | [20, 20] | 0% | yes |
+| block | A_FacilityUse3 | entries | 367 | 423 | [366,075, 479,925] | 15% | yes |
+| block | A_Queue1 | entries | 367 | 423 | [366,075, 479,925] | 15% | yes |
+| block | A_FacilityUse2 | entries | 367 | 423 | [366,075, 479,925] | 15% | yes |
+| block | Entrada1 | entries | 367 | 423 | [366,075, 479,925] | 15% | yes |
+| block | A_Advance2 | entries | 305 | 339,600 | [289,620, 389,580] | 11% | yes |
+| block | A_Advance3 | entries | 305 | 339,600 | [289,620, 389,580] | 11% | yes |
+| block | A_SelectF | entries | 305 | 339,600 | [289,620, 389,580] | 11% | yes |
+| block | A_Queue | entries | 305 | 339,600 | [289,620, 389,580] | 11% | yes |
+| block | A_Seize | entries | 305 | 339,600 | [289,620, 389,580] | 11% | yes |
+| block | A_Depart | entries | 305 | 339,600 | [289,620, 389,580] | 11% | yes |
+| block | A_Advance1 | entries | 305 | 339,600 | [289,620, 389,580] | 11% | yes |
+| block | A_Release | entries | 305 | 339,600 | [289,620, 389,580] | 11% | yes |
+| block | A_Advance4 | entries | 305 | 339,600 | [289,620, 389,580] | 11% | yes |
+| block | A_Gather | entries | 367 | 423 | [366,075, 479,925] | 15% | yes |
+| block | GateL1 | entries | 367 | 423 | [366,075, 479,925] | 15% | yes |
+| block | StorageUse | entries | 367 | 423 | [366,075, 479,925] | 15% | yes |
+| block | Multifurcacion | entries | 367 | 423 | [366,075, 479,925] | 15% | yes |
+| block | A_Tabulate | entries | 337 | 392,400 | [338,739, 446,061] | 16% | yes |
+| block | StorageUse2 | entries | 337 | 392,400 | [338,739, 446,061] | 16% | yes |
+| block | A_Assign6 | entries | 337 | 392,400 | [338,739, 446,061] | 16% | yes |
+| block | A_Assign7 | entries | 337 | 392,400 | [338,739, 446,061] | 16% | yes |
+| block | A_Assign10 | entries | 337 | 392,400 | [338,739, 446,061] | 16% | yes |
+| block | A_Tabulate1 | entries | 337 | 392,400 | [338,739, 446,061] | 16% | yes |
+| block | A_Test | entries | 337 | 392,400 | [338,739, 446,061] | 16% | yes |
+| block | StorageUse1 | entries | 367 | 423 | [366,075, 479,925] | 15% | yes |
+| block | A_Depart1 | entries | 367 | 423 | [366,075, 479,925] | 15% | yes |
+| block | A_Test1 | entries | 218 | 272,800 | [233,528, 312,072] | 25% | no |
+| block | Entrada11 | entries | 125 | 169,800 | [138,487, 201,113] | 36% | no |
+| block | A_Test2 | entries | 95 | 139,200 | [113,691, 164,709] | 47% | no |
+| block | A_Advance9 | entries | 327 | 390,200 | [338,300, 442,100] | 19% | yes |
+| block | A_Assign4 | entries | 327 | 390,200 | [338,300, 442,100] | 19% | yes |
+| block | A_Assign9 | entries | 327 | 390,200 | [338,300, 442,100] | 19% | yes |
+| block | A_Assign11 | entries | 327 | 390,200 | [338,300, 442,100] | 19% | yes |
+| block | A_Tabulate3 | entries | 327 | 390,200 | [338,300, 442,100] | 19% | yes |
+| block | A_Test4 | entries | 327 | 390,200 | [338,300, 442,100] | 19% | yes |
+| block | A_Test12 | entries | 214 | 237,200 | [206,823, 267,577] | 11% | yes |
+| block | Entrada15 | entries | 167 | 172,400 | [143,410, 201,390] | 3% | yes |
+| block | A_Test22 | entries | 145 | 138 | [114,658, 161,342] | 5% | yes |
+| block | GateL | entries | 361 | 406,200 | [351,686, 460,714] | 13% | yes |
+| block | A_SaveValue | entries | 361 | 406,200 | [351,686, 460,714] | 13% | yes |
+| block | A_FacilityUse1 | entries | 361 | 406,200 | [351,686, 460,714] | 13% | yes |
+| block | A_Assign2 | entries | 361 | 406,200 | [351,686, 460,714] | 13% | yes |
+| block | A_Advance7 | entries | 2323 | 2631,400 | [2308,513, 2954,287] | 13% | yes |
+| block | A_Loop1 | entries | 2323 | 2631,400 | [2308,513, 2954,287] | 13% | yes |
+| block | A_Assign5 | entries | 361 | 406,200 | [351,686, 460,714] | 13% | yes |
+| block | A_Assign8 | entries | 361 | 406,200 | [351,686, 460,714] | 13% | yes |
+| block | A_Assign101 | entries | 361 | 406,200 | [351,686, 460,714] | 13% | yes |
+| block | A_Tabulate2 | entries | 361 | 406,200 | [351,686, 460,714] | 13% | yes |
+| block | A_Test3 | entries | 361 | 406,200 | [351,686, 460,714] | 13% | yes |
+| block | A_Test11 | entries | 302 | 336 | [287,766, 384,234] | 11% | yes |
+| block | Entrada12 | entries | 75 | 80,800 | [71,535, 90,065] | 8% | yes |
+| block | A_Test21 | entries | 51 | 65,600 | [58,120, 73,080] | 29% | no |
+| block | Entrada14 | entries | 227 | 255,200 | [208,953, 301,447] | 12% | yes |
+| block | A_Advance8 | entries | 15 | 16,800 | [15,440, 18,160] | 12% | yes |
+| block | A_Logic | entries | 14 | 16 | [15,122, 16,878] | 14% | yes |
+| block | A_Assign3 | entries | 14 | 16 | [15,122, 16,878] | 14% | yes |
+| block | A_FacilityInt | entries | 14 | 16 | [15,122, 16,878] | 14% | yes |
+| block | A_SaveValue1 | entries | 14 | 15,800 | [14,440, 17,160] | 13% | yes |
+| block | A_Logic1 | entries | 14 | 15,800 | [14,440, 17,160] | 13% | yes |
+| block | Entrada16 | entries | 47 | 64,800 | [61,587, 68,013] | 38% | no |
+| block | Entrada13 | entries | 93 | 103 | [92,876, 113,124] | 11% | yes |
+| block | A_Select | entries | 40 | 72,400 | [14,465, 130,335] | 81% | yes |
+| block | A_Advance5 | entries | 62 | 83,400 | [70,421, 96,379] | 35% | no |
 | block | A_Logic3 | entries | 1 | 1 | [1, 1] | 0% | yes |
 | block | A_Advance6 | entries | 1 | 1 | [1, 1] | 0% | yes |
 | block | A_Logic2 | entries | 1 | 1 | [1, 1] | 0% | yes |
@@ -357,17 +406,17 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 
 | Section | Entity | Metric | Baseline | Ours (mean) | 95% CI | Rel. error | Match |
 |---|---|---|---:|---:|---|---:|---|
-| facility | E_CARNET | utilization | 0,298 | 0,422 | [0,202, 0,641] | 42% | yes |
-| facility | E_CARNET | average_time | 153,286 | 156,131 | [91,505, 220,757] | 2% | yes |
+| facility | E_CARNET | utilization | 0,298 | 0,429 | [0,196, 0,662] | 44% | yes |
+| facility | E_CARNET | average_time | 153,286 | 155,389 | [91,379, 219,399] | 1% | yes |
 | facility | RECEPCION | utilization | 0,392 | 0,416 | [0,377, 0,455] | 6% | yes |
 | facility | RECEPCION | average_time | 23,932 | 24,954 | [24,417, 25,491] | 4% | yes |
 | queue | COLAINT | entries | 1 | 1,200 | [0,645, 1,755] | 20% | yes |
 | queue | COLAINT | average_content | 0 | 0 | [0, 0] | 0% | yes |
 | queue | COLAINT | average_time | 0 | 0 | [0, 0] | 0% | yes |
 | queue | COLA_E_CARNET | entries | 6 | 8,800 | [5,969, 11,631] | 47% | yes |
-| queue | COLA_E_CARNET | average_content | 0 | 0,127 | [-0,086, 0,341] | n/a | yes |
-| queue | COLA_E_CARNET | average_time | 0 | 23,749 | [6,544, 40,955] | n/a | no |
-| queue | COLA_EXIT | entries | 29 | 30 | [27,677, 32,323] | 3% | yes |
+| queue | COLA_E_CARNET | average_content | 0 | 0,084 | [-0,014, 0,183] | n/a | yes |
+| queue | COLA_E_CARNET | average_time | 0 | 30,596 | [1,956, 59,235] | n/a | no |
+| queue | COLA_EXIT | entries | 29 | 30,400 | [28,517, 32,283] | 5% | yes |
 | queue | COLA_EXIT | average_content | 0 | 0 | [0, 0] | 0% | yes |
 | queue | COLA_EXIT | average_time | 0 | 0 | [0, 0] | 0% | yes |
 | queue | COLA_VACUNACION | entries | 49 | 43 | [38,790, 47,210] | 12% | yes |
@@ -380,16 +429,16 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 | queue | COLA_RECEPCION | average_content | 0 | 0,001 | [-0,000, 0,002] | n/a | yes |
 | queue | COLA_RECEPCION | average_time | 0 | 0,061 | [-0,017, 0,138] | n/a | yes |
 | queue | CENTRO | entries | 59 | 60 | [55,112, 64,888] | 2% | yes |
-| queue | CENTRO | average_content | 22,285 | 20,344 | [18,441, 22,248] | 9% | yes |
-| queue | CENTRO | average_time | 1359,763 | 702,765 | [665,929, 739,602] | 48% | no |
+| queue | CENTRO | average_content | 22,285 | 20,310 | [18,358, 22,262] | 9% | yes |
+| queue | CENTRO | average_time | 1359,763 | 705,973 | [667,891, 744,055] | 48% | no |
 | storage | ACREDITACION | average_content | 4,092 | 3,971 | [3,436, 4,507] | 3% | yes |
 | storage | ACREDITACION | utilization | 0,818 | 0,794 | [0,687, 0,901] | 3% | yes |
 | storage | VACUNACION | average_content | 3,389 | 3,148 | [2,983, 3,314] | 7% | yes |
 | storage | VACUNACION | utilization | 0,847 | 0,787 | [0,746, 0,828] | 7% | yes |
 | storage | SALAESPERA | average_content | 16,644 | 14,509 | [13,192, 15,826] | 13% | yes |
 | storage | SALAESPERA | utilization | 0,378 | 0,330 | [0,300, 0,360] | 13% | yes |
-| storage | EXIT | average_content | 0,023 | 0,025 | [0,022, 0,028] | 10% | yes |
-| storage | EXIT | utilization | 0,008 | 0,008 | [0,007, 0,009] | 5% | yes |
+| storage | EXIT | average_content | 0,023 | 0,026 | [0,023, 0,028] | 12% | yes |
+| storage | EXIT | utilization | 0,008 | 0,009 | [0,008, 0,009] | 7% | yes |
 | block | A_Queue | entries | 59 | 60 | [55,112, 64,888] | 2% | yes |
 | block | A_Advance | entries | 59 | 60 | [55,112, 64,888] | 2% | yes |
 | block | A_FacilityUse | entries | 59 | 60 | [55,112, 64,888] | 2% | yes |
@@ -404,16 +453,16 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 | block | A_Advance2 | entries | 40 | 36,800 | [35,181, 38,419] | 8% | yes |
 | block | A_Leave | entries | 23 | 19,400 | [17,517, 21,283] | 16% | yes |
 | block | A_Priority1 | entries | 23 | 19,400 | [17,517, 21,283] | 16% | yes |
-| block | StorageUse | entries | 29 | 30 | [27,677, 32,323] | 3% | yes |
-| block | A_Depart | entries | 29 | 30 | [27,677, 32,323] | 3% | yes |
-| block | A_Terminate | entries | 29 | 30 | [27,677, 32,323] | 3% | yes |
+| block | StorageUse | entries | 29 | 30,400 | [28,517, 32,283] | 5% | yes |
+| block | A_Depart | entries | 29 | 30,400 | [28,517, 32,283] | 5% | yes |
+| block | A_Terminate | entries | 29 | 30,400 | [28,517, 32,283] | 5% | yes |
 | block | A_Priority | entries | 1 | 1,400 | [-0,015, 2,815] | 40% | yes |
 | block | A_Advance111 | entries | 0 | 2,800 | [0,412, 5,188] | n/a | no |
 | block | A_Advance1 | entries | 6 | 8,800 | [5,969, 11,631] | 47% | yes |
 | block | A_FacilityUse1 | entries | 6 | 8,800 | [5,969, 11,631] | 47% | yes |
-| block | A_Advance11 | entries | 6 | 8 | [5,366, 10,634] | 33% | yes |
+| block | A_Advance11 | entries | 6 | 8,200 | [5,109, 11,291] | 37% | yes |
 | block | A_FacilityInt1 | entries | 1 | 1,200 | [0,645, 1,755] | 20% | yes |
-| block | A_Terminate11 | entries | 1 | 0 | [0, 0] | 100% | no |
+| block | A_Terminate11 | entries | 1 | 1 | [1, 1] | 0% | yes |
 
 ## TP3__aeropuerto
 
@@ -421,19 +470,19 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 
 | Section | Entity | Metric | Baseline | Ours (mean) | 95% CI | Rel. error | Match |
 |---|---|---|---:|---:|---|---:|---|
-| facility | CAJERO1FREESHOP | utilization | 0,231 | 0,170 | [0,137, 0,202] | 27% | yes |
-| facility | CAJERO1FREESHOP | average_time | 75,636 | 69,224 | [65,676, 72,771] | 8% | yes |
-| facility | CAJERO2FREESHOP | utilization | 0,309 | 0,149 | [0,106, 0,192] | 52% | no |
-| facility | CAJERO2FREESHOP | average_time | 69,563 | 67,149 | [59,407, 74,892] | 3% | yes |
-| queue | QSALIDA | entries | 39 | 32 | [27,112, 36,888] | 18% | yes |
+| facility | CAJERO1FREESHOP | utilization | 0,231 | 0,169 | [0,136, 0,202] | 27% | yes |
+| facility | CAJERO1FREESHOP | average_time | 75,636 | 67,584 | [60,415, 74,754] | 11% | yes |
+| facility | CAJERO2FREESHOP | utilization | 0,309 | 0,171 | [0,125, 0,218] | 45% | no |
+| facility | CAJERO2FREESHOP | average_time | 69,563 | 67,056 | [60,003, 74,109] | 4% | yes |
+| queue | QSALIDA | entries | 39 | 32,400 | [27,705, 37,095] | 17% | yes |
 | queue | QSALIDA | average_content | 0 | 0 | [0, 0] | 0% | yes |
 | queue | QSALIDA | average_time | 0 | 0 | [0, 0] | 0% | yes |
 | queue | QCAJA1FREESHOP | entries | 11 | 9 | [7,759, 10,241] | 18% | yes |
-| queue | QCAJA1FREESHOP | average_content | 0 | 0,128 | [-0,163, 0,419] | n/a | yes |
-| queue | QCAJA1FREESHOP | average_time | 0 | 8,158 | [4,654, 11,661] | n/a | no |
-| queue | QCAJA2FREESHOP | entries | 16 | 8,200 | [5,812, 10,588] | 49% | no |
-| queue | QCAJA2FREESHOP | average_content | 0 | 0,110 | [-0,165, 0,385] | n/a | yes |
-| queue | QCAJA2FREESHOP | average_time | 0 | 4,540 | [0,988, 8,092] | n/a | no |
+| queue | QCAJA1FREESHOP | average_content | 0 | 0,028 | [0,015, 0,040] | n/a | no |
+| queue | QCAJA1FREESHOP | average_time | 0 | 11,010 | [6,256, 15,764] | n/a | no |
+| queue | QCAJA2FREESHOP | entries | 16 | 9,200 | [6,812, 11,588] | 43% | no |
+| queue | QCAJA2FREESHOP | average_content | 0 | 0,021 | [-0,007, 0,049] | n/a | yes |
+| queue | QCAJA2FREESHOP | average_time | 0 | 7,565 | [-2,606, 17,736] | n/a | yes |
 | queue | QENTREGAEQUIPAJE | entries | 270 | 270 | [270, 270] | 0% | yes |
 | queue | QENTREGAEQUIPAJE | average_content | 118,216 | 118,492 | [116,004, 120,981] | 0% | yes |
 | queue | QENTREGAEQUIPAJE | average_time | 1576,207 | 300,857 | [277,358, 324,357] | 81% | no |
@@ -447,8 +496,8 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 | storage | MIGRACION | utilization | 0,382 | 0,382 | [0,378, 0,385] | 0% | yes |
 | storage | ENTREGAEQUIPAJE | average_content | 9,089 | 9,085 | [9,018, 9,153] | 0% | yes |
 | storage | ENTREGAEQUIPAJE | utilization | 0,757 | 0,757 | [0,751, 0,763] | 0% | yes |
-| storage | SALIDA | average_content | 0,025 | 0,017 | [0,016, 0,019] | 31% | yes |
-| storage | SALIDA | utilization | 0,003 | 0,002 | [0,002, 0,002] | 28% | yes |
+| storage | SALIDA | average_content | 0,025 | 0,018 | [0,016, 0,019] | 30% | yes |
+| storage | SALIDA | utilization | 0,003 | 0,002 | [0,002, 0,002] | 27% | yes |
 | block | A_Assign | entries | 30 | 30 | [30, 30] | 0% | yes |
 | block | A_Assign2 | entries | 30 | 30 | [30, 30] | 0% | yes |
 | block | A_Assign3 | entries | 30 | 30 | [30, 30] | 0% | yes |
@@ -476,26 +525,26 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 | block | Entrada14 | entries | 25 | 16,200 | [14,581, 17,819] | 35% | no |
 | block | A_Queue1 | entries | 15 | 8,200 | [5,812, 10,588] | 45% | no |
 | block | A_Seize11 | entries | 15 | 8,200 | [5,812, 10,588] | 45% | no |
-| block | A_Depart1 | entries | 15 | 8 | [5,677, 10,323] | 47% | no |
-| block | A_Advance61 | entries | 61 | 26,800 | [15,579, 38,021] | 56% | no |
-| block | A_Loop11 | entries | 60 | 26,800 | [15,579, 38,021] | 55% | no |
-| block | A_Advance71 | entries | 14 | 8 | [5,677, 10,323] | 43% | no |
-| block | Entrada16 | entries | 14 | 7,600 | [5,717, 9,483] | 46% | no |
-| block | A_Release11 | entries | 14 | 7,600 | [5,717, 9,483] | 46% | no |
-| block | StorageUse3 | entries | 39 | 32 | [27,112, 36,888] | 18% | yes |
-| block | A_Terminate | entries | 39 | 32 | [27,112, 36,888] | 18% | yes |
+| block | A_Depart1 | entries | 15 | 8,200 | [5,812, 10,588] | 45% | no |
+| block | A_Advance61 | entries | 61 | 27,600 | [16,971, 38,229] | 55% | no |
+| block | A_Loop11 | entries | 60 | 27,600 | [16,971, 38,229] | 54% | no |
+| block | A_Advance71 | entries | 14 | 8,200 | [5,812, 10,588] | 41% | no |
+| block | Entrada16 | entries | 14 | 7,800 | [5,760, 9,840] | 44% | no |
+| block | A_Release11 | entries | 14 | 7,800 | [5,760, 9,840] | 44% | no |
+| block | StorageUse3 | entries | 39 | 32,400 | [27,705, 37,095] | 17% | yes |
+| block | A_Terminate | entries | 39 | 32,400 | [27,705, 37,095] | 17% | yes |
 | block | A_Queue | entries | 10 | 8 | [6,759, 9,241] | 20% | yes |
 | block | A_Seize1 | entries | 10 | 8 | [6,759, 9,241] | 20% | yes |
-| block | A_Depart | entries | 10 | 7,800 | [6,440, 9,160] | 22% | no |
-| block | A_Advance6 | entries | 39 | 24,400 | [20,416, 28,384] | 37% | no |
-| block | A_Loop1 | entries | 39 | 24,400 | [20,416, 28,384] | 37% | no |
-| block | A_Advance7 | entries | 10 | 7,800 | [6,440, 9,160] | 22% | no |
-| block | Entrada15 | entries | 9 | 7,800 | [6,440, 9,160] | 13% | yes |
+| block | A_Depart | entries | 10 | 8 | [6,759, 9,241] | 20% | yes |
+| block | A_Advance6 | entries | 39 | 25 | [20,790, 29,210] | 36% | no |
+| block | A_Loop1 | entries | 39 | 25 | [20,790, 29,210] | 36% | no |
+| block | A_Advance7 | entries | 10 | 8 | [6,759, 9,241] | 20% | yes |
+| block | Entrada15 | entries | 9 | 8 | [6,759, 9,241] | 11% | yes |
 | block | A_FacilityInt2 | entries | 0 | 0 | [0, 0] | 0% | yes |
-| block | A_Release1 | entries | 9 | 7,800 | [6,440, 9,160] | 13% | yes |
+| block | A_Release1 | entries | 9 | 8 | [6,759, 9,241] | 11% | yes |
 | block | A_FacilityInt | entries | 1 | 1 | [1, 1] | 0% | yes |
-| block | A_FacilityInt1 | entries | 1 | 0 | [0, 0] | 100% | no |
-| block | A_Terminate2 | entries | 1 | 0 | [0, 0] | 100% | no |
+| block | A_FacilityInt1 | entries | 1 | 1 | [1, 1] | 0% | yes |
+| block | A_Terminate2 | entries | 1 | 1 | [1, 1] | 0% | yes |
 | block | A_Advance5 | entries | 23 | 36,800 | [33,355, 40,245] | 60% | no |
 | block | A_Advance3 | entries | 10 | 9 | [4,977, 13,023] | 10% | yes |
 | block | A_Assign1 | entries | 60 | 60 | [60, 60] | 0% | yes |
@@ -519,66 +568,69 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 
 | Section | Entity | Metric | Baseline | Ours (mean) | 95% CI | Rel. error | Match |
 |---|---|---|---:|---:|---|---:|---|
-| facility | PROMOTORA | utilization | 0,221 | 0,182 | [0,129, 0,236] | 18% | yes |
-| facility | PROMOTORA | average_time | 24,121 | 22,087 | [20,113, 24,062] | 8% | yes |
-| facility | 1 | utilization | 0,277 | 0,005 | [0,000, 0,009] | 98% | no |
-| facility | 1 | average_time | 41,542 | 16,664 | [0,036, 33,292] | 60% | no |
+| facility | PROMOTORA | utilization | 0,221 | 0,185 | [0,133, 0,237] | 16% | yes |
+| facility | PROMOTORA | average_time | 24,121 | 21,834 | [19,789, 23,879] | 9% | yes |
+| facility | 1 | utilization | 0,277 | 0,052 | [0,023, 0,081] | 81% | no |
+| facility | 1 | average_time | 41,542 | 32,638 | [23,500, 41,775] | 21% | yes |
 | queue | COLAINT | entries | 9 | 9,400 | [7,985, 10,815] | 4% | yes |
 | queue | COLAINT | average_content | 0 | 0 | [0, 0] | 0% | yes |
 | queue | COLAINT | average_time | 0 | 0 | [0, 0] | 0% | yes |
-| queue | QGONDOLAS | entries | 258 | 228,400 | [208,818, 247,982] | 11% | yes |
-| queue | QGONDOLAS | average_content | 113,514 | 115,157 | [98,628, 131,686] | 1% | yes |
-| queue | QGONDOLAS | average_time | 1583,922 | 0 | [0, 0] | 100% | no |
-| queue | QPROMOTORA | entries | 25 | 21,800 | [12,745, 30,855] | 13% | yes |
-| queue | QPROMOTORA | average_content | 0 | 0,171 | [-0,114, 0,455] | n/a | yes |
-| queue | QPROMOTORA | average_time | 0 | 2,463 | [0,865, 4,061] | n/a | no |
-| queue | QCAJAS | entries | 43 | 0 | [0, 0] | 100% | no |
-| queue | QCAJAS | average_content | 0 | 0 | [0, 0] | 0% | yes |
-| queue | QCAJAS | average_time | 0 | 0 | [0, 0] | 0% | yes |
+| queue | QGONDOLAS | entries | 258 | 228,800 | [209,045, 248,555] | 11% | yes |
+| queue | QGONDOLAS | average_content | 113,514 | 106,126 | [91,738, 120,514] | 7% | yes |
+| queue | QGONDOLAS | average_time | 1583,922 | 278,403 | [205,087, 351,720] | 82% | no |
+| queue | QPROMOTORA | entries | 25 | 22,200 | [13,230, 31,170] | 11% | yes |
+| queue | QPROMOTORA | average_content | 0 | 0,019 | [0,004, 0,034] | n/a | no |
+| queue | QPROMOTORA | average_time | 0 | 3,184 | [0,783, 5,585] | n/a | no |
+| queue | QCAJAS | entries | 43 | 34,400 | [24,720, 44,080] | 20% | yes |
+| queue | QCAJAS | average_content | 0 | 0,082 | [0,038, 0,127] | n/a | no |
+| queue | QCAJAS | average_time | 0 | 8,208 | [5,296, 11,120] | n/a | no |
 | queue | QPERSONASSUPER | entries | 258 | 229 | [209,214, 248,786] | 11% | yes |
-| queue | QPERSONASSUPER | average_content | 115,437 | 116,089 | [99,486, 132,692] | 1% | yes |
-| queue | QPERSONASSUPER | average_time | 1610,752 | 0 | [0, 0] | 100% | no |
+| queue | QPERSONASSUPER | average_content | 115,437 | 107,775 | [93,134, 122,417] | 7% | yes |
+| queue | QPERSONASSUPER | average_time | 1610,752 | 264,212 | [197,820, 330,604] | 84% | no |
+| queue | 1 | entries | 24 | 5,200 | [1,538, 8,862] | 78% | no |
+| queue | 1 | average_content | 0 | 0,009 | [-0,002, 0,020] | n/a | yes |
+| queue | 1 | average_time | 0 | 4,783 | [-2,041, 11,608] | n/a | yes |
 | block | A_Assign | entries | 258 | 229 | [209,214, 248,786] | 11% | yes |
 | block | A_Queue2 | entries | 258 | 229 | [209,214, 248,786] | 11% | yes |
 | block | A_Advance | entries | 258 | 229 | [209,214, 248,786] | 11% | yes |
 | block | Entrada1 | entries | 258 | 228,800 | [209,045, 248,555] | 11% | yes |
 | block | A_FacilityUse | entries | 23 | 20,200 | [12,231, 28,169] | 12% | yes |
-| block | A_Advance4 | entries | 23 | 19,800 | [11,688, 27,912] | 14% | yes |
-| block | Entrada12 | entries | 23 | 19,800 | [11,688, 27,912] | 14% | yes |
-| block | A_FacilityUse1 | entries | 2 | 1,600 | [-0,283, 3,483] | 20% | yes |
-| block | A_Advance41 | entries | 2 | 1,600 | [-0,283, 3,483] | 20% | yes |
-| block | A_Advance1 | entries | 23 | 19,800 | [11,688, 27,912] | 14% | yes |
-| block | A_Queue3 | entries | 258 | 228,400 | [208,818, 247,982] | 11% | yes |
-| block | A_Tabulate | entries | 258 | 228,400 | [208,818, 247,982] | 11% | yes |
-| block | A_Assign211 | entries | 258 | 0 | [0, 0] | 100% | no |
-| block | A_Advance811 | entries | 1100 | 0 | [0, 0] | 100% | no |
-| block | A_Loop111 | entries | 887 | 0 | [0, 0] | 100% | no |
-| block | A_Depart3 | entries | 45 | 0 | [0, 0] | 100% | no |
-| block | A_Advance11 | entries | 45 | 0 | [0, 0] | 100% | no |
-| block | Entrada11 | entries | 45 | 0 | [0, 0] | 100% | no |
-| block | A_Tabulate1 | entries | 4 | 0 | [0, 0] | 100% | no |
-| block | A_Advance6 | entries | 4 | 0 | [0, 0] | 100% | no |
-| block | A_Advance2 | entries | 4 | 0 | [0, 0] | 100% | no |
-| block | A_SelectF | entries | 43 | 0 | [0, 0] | 100% | no |
-| block | A_Queue | entries | 43 | 0 | [0, 0] | 100% | no |
-| block | A_Queue1 | entries | 43 | 0 | [0, 0] | 100% | no |
-| block | A_Seize1 | entries | 43 | 0 | [0, 0] | 100% | no |
-| block | A_Depart1 | entries | 43 | 0 | [0, 0] | 100% | no |
-| block | A_Depart | entries | 43 | 0 | [0, 0] | 100% | no |
-| block | A_Assign21 | entries | 43 | 0 | [0, 0] | 100% | no |
-| block | A_Advance81 | entries | 192 | 0 | [0, 0] | 100% | no |
-| block | A_Loop11 | entries | 191 | 0 | [0, 0] | 100% | no |
-| block | A_Advance7 | entries | 42 | 0 | [0, 0] | 100% | no |
-| block | A_Release1 | entries | 40 | 0 | [0, 0] | 100% | no |
-| block | A_Advance3 | entries | 40 | 0 | [0, 0] | 100% | no |
-| block | A_Depart2 | entries | 40 | 0 | [0, 0] | 100% | no |
-| block | A_Terminate | entries | 40 | 0 | [0, 0] | 100% | no |
-| block | A_Select | entries | 3 | 0 | [0, 0] | 100% | no |
+| block | A_Advance4 | entries | 23 | 20,200 | [12,231, 28,169] | 12% | yes |
+| block | Entrada12 | entries | 23 | 20,200 | [12,231, 28,169] | 12% | yes |
+| block | A_FacilityUse1 | entries | 2 | 2 | [0,037, 3,963] | 0% | yes |
+| block | A_Advance41 | entries | 2 | 2 | [0,037, 3,963] | 0% | yes |
+| block | A_Advance1 | entries | 23 | 20,200 | [12,231, 28,169] | 12% | yes |
+| block | A_Queue3 | entries | 258 | 228,800 | [209,045, 248,555] | 11% | yes |
+| block | A_Tabulate | entries | 258 | 228,800 | [209,045, 248,555] | 11% | yes |
+| block | A_Assign211 | entries | 258 | 228,800 | [209,045, 248,555] | 11% | yes |
+| block | A_Advance811 | entries | 1100 | 1013,600 | [878,938, 1148,262] | 8% | yes |
+| block | A_Loop111 | entries | 887 | 819,800 | [695,479, 944,121] | 8% | yes |
+| block | A_Depart3 | entries | 45 | 35 | [25,107, 44,893] | 22% | no |
+| block | A_Advance11 | entries | 45 | 35 | [25,107, 44,893] | 22% | no |
+| block | Entrada11 | entries | 45 | 34,800 | [25,208, 44,392] | 23% | no |
+| block | A_Tabulate1 | entries | 4 | 1,800 | [1,245, 2,355] | 55% | no |
+| block | A_Advance6 | entries | 4 | 1,800 | [1,245, 2,355] | 55% | no |
+| block | A_Advance2 | entries | 4 | 1,800 | [1,245, 2,355] | 55% | no |
+| block | A_SelectF | entries | 43 | 34,400 | [24,720, 44,080] | 20% | yes |
+| block | A_Queue | entries | 43 | 34,400 | [24,720, 44,080] | 20% | yes |
+| block | A_Queue1 | entries | 43 | 34,400 | [24,720, 44,080] | 20% | yes |
+| block | A_Seize1 | entries | 43 | 34,400 | [24,720, 44,080] | 20% | yes |
+| block | A_Depart1 | entries | 43 | 34 | [24,877, 43,123] | 21% | yes |
+| block | A_Depart | entries | 43 | 34 | [24,877, 43,123] | 21% | yes |
+| block | A_Assign21 | entries | 43 | 34 | [24,877, 43,123] | 21% | yes |
+| block | A_Advance81 | entries | 192 | 175,200 | [119,359, 231,041] | 9% | yes |
+| block | A_Loop11 | entries | 191 | 174,400 | [118,523, 230,277] | 9% | yes |
+| block | A_Advance7 | entries | 42 | 33,200 | [24,018, 42,382] | 21% | yes |
+| block | A_Release1 | entries | 40 | 32,800 | [23,411, 42,189] | 18% | yes |
+| block | A_Advance3 | entries | 40 | 32,800 | [23,411, 42,189] | 18% | yes |
+| block | A_Depart2 | entries | 40 | 32,400 | [23,508, 41,292] | 19% | yes |
+| block | A_Terminate | entries | 40 | 32,400 | [23,508, 41,292] | 19% | yes |
+| block | A_Select | entries | 3 | 0,600 | [-1,066, 2,266] | 80% | no |
 | block | A_Assign31 | entries | 1 | 1 | [1, 1] | 0% | yes |
 | block | A_FacilityInt2 | entries | 1 | 1 | [1, 1] | 0% | yes |
-| block | A_Terminate21 | entries | 1 | 0 | [0, 0] | 100% | no |
-| block | A_Advance12 | entries | 41 | 0 | [0, 0] | 100% | no |
-| block | A_Terminate31 | entries | 8 | 0 | [0, 0] | 100% | no |
+| block | A_Terminate21 | entries | 1 | 1 | [1, 1] | 0% | yes |
+| block | A_Advance12 | entries | 41 | 33 | [23,877, 42,123] | 20% | yes |
+| block | A_Terminate31 | entries | 8 | 8,400 | [6,985, 9,815] | 5% | yes |
 | block | A_SaveValue | entries | 4 | 3 | [3, 3] | 25% | no |
 | block | A_Terminate1 | entries | 4 | 3 | [3, 3] | 25% | no |
 
@@ -588,69 +640,69 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 
 | Section | Entity | Metric | Baseline | Ours (mean) | 95% CI | Rel. error | Match |
 |---|---|---|---:|---:|---|---:|---|
-| facility | 1 | utilization | 0,952 | 0,927 | [0,846, 1,008] | 3% | yes |
-| facility | 1 | average_time | 342,700 | 2287,851 | [257,467, 4318,235] | 568% | yes |
+| facility | 1 | utilization | 0,952 | 0,936 | [0,852, 1,020] | 2% | yes |
+| facility | 1 | average_time | 342,700 | 2282,366 | [241,483, 4323,249] | 566% | yes |
 | facility | 2 | utilization | 0,838 | 0,851 | [0,637, 1,065] | 2% | yes |
 | facility | 2 | average_time | 301,700 | 2099,306 | [25,963, 4172,649] | 596% | yes |
-| facility | 3 | utilization | 0,793 | 0,710 | [0,347, 1,073] | 10% | yes |
-| facility | 3 | average_time | 357 | 889,607 | [-711,225, 2490,439] | 149% | yes |
-| facility | 4 | utilization | 0,770 | 0,669 | [0,356, 0,982] | 13% | yes |
-| facility | 4 | average_time | 462 | 947,052 | [-578,199, 2472,303] | 105% | yes |
-| facility | 5 | utilization | 0,697 | 0,727 | [0,598, 0,855] | 4% | yes |
-| facility | 5 | average_time | 418,333 | 1275,852 | [-363,137, 2914,841] | 205% | yes |
-| queue | QCOCINA | entries | 99 | 60 | [35,124, 84,876] | 39% | no |
-| queue | QCOCINA | average_content | 0,426 | 0,037 | [-0,031, 0,105] | 91% | no |
-| queue | QCOCINA | average_time | 15,505 | 1,833 | [-0,950, 4,615] | 88% | no |
-| queue | 1 | entries | 11 | 6,800 | [1,017, 12,583] | 38% | yes |
-| queue | 1 | average_content | 0,403 | 1,484 | [0,593, 2,374] | 268% | no |
-| queue | 1 | average_time | 131,818 | 39,629 | [-32,866, 112,125] | 70% | no |
-| queue | 2 | entries | 11 | 7,400 | [1,738, 13,062] | 33% | yes |
-| queue | 2 | average_content | 0,406 | 1,316 | [0,304, 2,328] | 224% | yes |
-| queue | 2 | average_time | 132,909 | 45,434 | [-32,863, 123,730] | 66% | no |
-| queue | 3 | entries | 9 | 9,200 | [1,231, 17,169] | 2% | yes |
-| queue | 3 | average_content | 0,200 | 1,103 | [0,127, 2,080] | 452% | yes |
-| queue | 3 | average_time | 80 | 93,200 | [24,034, 162,366] | 16% | yes |
-| queue | 4 | entries | 7 | 9,400 | [0,595, 18,205] | 34% | yes |
-| queue | 4 | average_content | 0,102 | 0,877 | [0,136, 1,617] | 759% | no |
-| queue | 4 | average_time | 52,429 | 52,308 | [-8,089, 112,704] | 0% | yes |
-| queue | 5 | entries | 7 | 5,750 | [3,033, 8,467] | 18% | yes |
-| queue | 5 | average_content | 0,089 | 1,021 | [-0,014, 2,057] | 1048% | yes |
-| queue | 5 | average_time | 45,857 | 24,708 | [-26,632, 76,047] | 46% | yes |
-| storage | COCINA | average_content | 3,593 | 2,198 | [1,295, 3,101] | 39% | no |
-| storage | COCINA | utilization | 0,449 | 0,275 | [0,162, 0,388] | 39% | no |
-| block | A_Assign | entries | 45 | 38,600 | [21,610, 55,590] | 14% | yes |
-| block | Entrada1 | entries | 45 | 38,600 | [21,610, 55,590] | 14% | yes |
+| facility | 3 | utilization | 0,793 | 0,720 | [0,349, 1,091] | 9% | yes |
+| facility | 3 | average_time | 357 | 919,268 | [-660,784, 2499,319] | 157% | yes |
+| facility | 4 | utilization | 0,770 | 0,697 | [0,384, 1,011] | 9% | yes |
+| facility | 4 | average_time | 462 | 1086,328 | [-337,348, 2510,004] | 135% | yes |
+| facility | 5 | utilization | 0,697 | 0,725 | [0,600, 0,851] | 4% | yes |
+| facility | 5 | average_time | 418,333 | 1120,729 | [-741,326, 2982,784] | 168% | yes |
+| queue | QCOCINA | entries | 99 | 57,600 | [32,209, 82,991] | 42% | no |
+| queue | QCOCINA | average_content | 0,426 | 0,034 | [-0,038, 0,107] | 92% | no |
+| queue | QCOCINA | average_time | 15,505 | 1,683 | [-1,344, 4,710] | 89% | no |
+| queue | 1 | entries | 11 | 7 | [-0,077, 14,077] | 36% | yes |
+| queue | 1 | average_content | 0,403 | 1,477 | [0,590, 2,363] | 266% | no |
+| queue | 1 | average_time | 131,818 | 63,689 | [-70,681, 198,059] | 52% | yes |
+| queue | 2 | entries | 11 | 7,200 | [1,285, 13,115] | 35% | yes |
+| queue | 2 | average_content | 0,406 | 1,310 | [0,301, 2,320] | 223% | yes |
+| queue | 2 | average_time | 132,909 | 47,208 | [-34,771, 129,188] | 64% | no |
+| queue | 3 | entries | 9 | 8,200 | [1,210, 15,190] | 9% | yes |
+| queue | 3 | average_content | 0,200 | 1,082 | [0,106, 2,058] | 441% | yes |
+| queue | 3 | average_time | 80 | 132,774 | [-5,123, 270,670] | 66% | yes |
+| queue | 4 | entries | 7 | 7 | [-0,185, 14,185] | 0% | yes |
+| queue | 4 | average_content | 0,102 | 0,898 | [0,127, 1,670] | 781% | no |
+| queue | 4 | average_time | 52,429 | 75,774 | [-53,370, 204,918] | 45% | yes |
+| queue | 5 | entries | 7 | 8,250 | [1,209, 15,291] | 18% | yes |
+| queue | 5 | average_content | 0,089 | 0,906 | [-0,177, 1,989] | 918% | yes |
+| queue | 5 | average_time | 45,857 | 85,306 | [-72,936, 243,547] | 86% | yes |
+| storage | COCINA | average_content | 3,593 | 2,085 | [1,173, 2,997] | 42% | no |
+| storage | COCINA | utilization | 0,449 | 0,261 | [0,147, 0,375] | 42% | no |
+| block | A_Assign | entries | 45 | 36,800 | [20,391, 53,209] | 18% | yes |
+| block | Entrada1 | entries | 45 | 36,800 | [20,391, 53,209] | 18% | yes |
 | block | A_Assign3 | entries | 5 | 4 | [0,174, 7,826] | 20% | yes |
 | block | A_Advance | entries | 5 | 4 | [0,174, 7,826] | 20% | yes |
 | block | A_Advance1 | entries | 5 | 3,800 | [-0,261, 7,861] | 24% | yes |
 | block | Clona | entries | 5 | 3,400 | [-0,773, 7,573] | 32% | yes |
-| block | A_Assemble2 | entries | 6 | 5,200 | [-1,451, 11,851] | 13% | yes |
-| block | A_Terminate | entries | 19 | 12,400 | [4,374, 20,426] | 35% | yes |
-| block | A_Advance2 | entries | 45 | 38 | [21,483, 54,517] | 16% | yes |
-| block | A_SelectF | entries | 45 | 37,400 | [21,294, 53,506] | 17% | yes |
-| block | Clona1 | entries | 45 | 37,400 | [21,294, 53,506] | 17% | yes |
-| block | A_Queue | entries | 45 | 37,400 | [21,294, 53,506] | 17% | yes |
-| block | A_Seize | entries | 40 | 37,400 | [21,294, 53,506] | 7% | yes |
-| block | A_Depart | entries | 40 | 24,800 | [16,880, 32,720] | 38% | no |
-| block | ESPERA | entries | 40 | 24,800 | [16,880, 32,720] | 38% | no |
-| block | A_Advance4 | entries | 40 | 21,800 | [14,177, 29,423] | 45% | no |
-| block | A_Release | entries | 35 | 20,200 | [13,210, 27,190] | 42% | no |
-| block | Entrada11 | entries | 35 | 20,200 | [13,210, 27,190] | 42% | no |
+| block | A_Assemble2 | entries | 6 | 4,600 | [-0,564, 9,764] | 23% | yes |
+| block | A_Terminate | entries | 19 | 11,400 | [4,024, 18,776] | 40% | no |
+| block | A_Advance2 | entries | 45 | 36,200 | [20,413, 51,987] | 20% | yes |
+| block | A_SelectF | entries | 45 | 36 | [20,199, 51,801] | 20% | yes |
+| block | Clona1 | entries | 45 | 36 | [20,199, 51,801] | 20% | yes |
+| block | A_Queue | entries | 45 | 36 | [20,199, 51,801] | 20% | yes |
+| block | A_Seize | entries | 40 | 36 | [20,199, 51,801] | 10% | yes |
+| block | A_Depart | entries | 40 | 24,400 | [16,717, 32,083] | 39% | no |
+| block | ESPERA | entries | 40 | 24,400 | [16,717, 32,083] | 39% | no |
+| block | A_Advance4 | entries | 40 | 21,200 | [13,887, 28,513] | 47% | no |
+| block | A_Release | entries | 35 | 19,800 | [13,034, 26,566] | 43% | no |
+| block | Entrada11 | entries | 35 | 19,800 | [13,034, 26,566] | 43% | no |
 | block | A_Assign1 | entries | 9 | 3,800 | [0,836, 6,764] | 58% | no |
-| block | Clona2 | entries | 35 | 20,200 | [13,210, 27,190] | 42% | no |
-| block | A_Assemble1 | entries | 98 | 79,400 | [49,084, 109,716] | 19% | yes |
-| block | A_Advance5 | entries | 23 | 15,400 | [7,231, 23,569] | 33% | yes |
-| block | A_Test | entries | 23 | 15,400 | [7,231, 23,569] | 33% | yes |
-| block | A_Advance6 | entries | 2 | 3,400 | [0,163, 6,637] | 70% | yes |
-| block | A_Test1 | entries | 21 | 12,800 | [4,593, 21,007] | 39% | yes |
-| block | A_Advance7 | entries | 5 | 1,800 | [-0,744, 4,344] | 64% | no |
-| block | A_Assign2 | entries | 99 | 60 | [35,124, 84,876] | 39% | no |
-| block | StorageUse | entries | 99 | 60 | [35,124, 84,876] | 39% | no |
-| block | A_Advance3 | entries | 134 | 116,400 | [66,273, 166,527] | 13% | yes |
-| block | A_Assemble3 | entries | 125 | 112 | [63,472, 160,528] | 10% | yes |
-| block | PIENSA | entries | 40 | 35,400 | [19,830, 50,970] | 12% | yes |
-| block | A_Terminate1 | entries | 40 | 21,800 | [14,177, 29,423] | 45% | no |
-| block | A_Select | entries | 23 | 17,600 | [1,186, 34,014] | 23% | yes |
+| block | Clona2 | entries | 35 | 19,800 | [13,034, 26,566] | 43% | no |
+| block | A_Assemble1 | entries | 98 | 76 | [45,426, 106,574] | 22% | yes |
+| block | A_Advance5 | entries | 23 | 14,200 | [6,378, 22,022] | 38% | no |
+| block | A_Test | entries | 23 | 14,200 | [6,378, 22,022] | 38% | no |
+| block | A_Advance6 | entries | 2 | 3,400 | [0,826, 5,974] | 70% | yes |
+| block | A_Test1 | entries | 21 | 11,600 | [4,018, 19,182] | 45% | no |
+| block | A_Advance7 | entries | 5 | 1,200 | [-0,160, 2,560] | 76% | no |
+| block | A_Assign2 | entries | 99 | 57,600 | [32,209, 82,991] | 42% | no |
+| block | StorageUse | entries | 99 | 57,600 | [32,209, 82,991] | 42% | no |
+| block | A_Advance3 | entries | 134 | 113,800 | [64,014, 163,586] | 15% | yes |
+| block | A_Assemble3 | entries | 125 | 111,200 | [62,684, 159,716] | 11% | yes |
+| block | PIENSA | entries | 40 | 35 | [19,420, 50,580] | 12% | yes |
+| block | A_Terminate1 | entries | 40 | 21,200 | [13,887, 28,513] | 47% | no |
+| block | A_Select | entries | 23 | 15 | [-0,947, 30,947] | 35% | yes |
 
 ## TP6__Clase 6_1_PuertaBanco
 
@@ -678,25 +730,25 @@ Horizon 6184 (baseline end time), 5 replications, seed base 7.
 
 | Section | Entity | Metric | Baseline | Ours (mean) | 95% CI | Rel. error | Match |
 |---|---|---|---:|---:|---|---:|---|
-| facility | PUERTA | utilization | 0,004 | 0,002 | [0,001, 0,002] | 58% | no |
-| facility | PUERTA | average_time | 1,846 | 2,000 | [1,716, 2,285] | 8% | yes |
+| facility | PUERTA | utilization | 0,004 | 0,004 | [0,004, 0,005] | 6% | yes |
+| facility | PUERTA | average_time | 1,846 | 1,926 | [1,795, 2,058] | 4% | yes |
 | queue | QPUERTA | entries | 13 | 13,200 | [12,161, 14,239] | 2% | yes |
-| queue | QPUERTA | average_content | 0 | 3,199 | [2,752, 3,646] | n/a | no |
-| queue | QPUERTA | average_time | 0 | 0,152 | [0,123, 0,181] | n/a | no |
-| storage | SALON | average_content | 3,584 | 1,435 | [1,016, 1,853] | 60% | no |
-| storage | SALON | utilization | 0,004 | 0,001 | [0,001, 0,002] | 64% | no |
-| block | A_Buffer | entries | 39 | 35,800 | [31,933, 39,667] | 8% | yes |
-| block | GateL1 | entries | 13 | 35,800 | [31,933, 39,667] | 175% | no |
+| queue | QPUERTA | average_content | 0 | 0,016 | [0,011, 0,021] | n/a | no |
+| queue | QPUERTA | average_time | 0 | 7,124 | [5,146, 9,102] | n/a | no |
+| storage | SALON | average_content | 3,584 | 3,603 | [3,059, 4,147] | 1% | yes |
+| storage | SALON | utilization | 0,004 | 0,004 | [0,003, 0,004] | 10% | yes |
+| block | A_Buffer | entries | 39 | 36,400 | [33,046, 39,754] | 7% | yes |
+| block | GateL1 | entries | 13 | 36,400 | [33,046, 39,754] | 180% | no |
 | block | A_FacilityUse1 | entries | 13 | 13,200 | [12,161, 14,239] | 2% | yes |
-| block | A_Enter | entries | 13 | 5 | [4,122, 5,878] | 62% | no |
-| block | A_Advance2 | entries | 13 | 5 | [4,122, 5,878] | 62% | no |
-| block | A_Leave | entries | 13 | 4,600 | [3,490, 5,710] | 65% | no |
-| block | A_Terminate3 | entries | 13 | 4,600 | [3,490, 5,710] | 65% | no |
+| block | A_Enter | entries | 13 | 13,200 | [12,161, 14,239] | 2% | yes |
+| block | A_Advance2 | entries | 13 | 13,200 | [12,161, 14,239] | 2% | yes |
+| block | A_Leave | entries | 13 | 12,400 | [10,734, 14,066] | 5% | yes |
+| block | A_Terminate3 | entries | 13 | 12,400 | [10,734, 14,066] | 5% | yes |
 | block | A_Logic1 | entries | 1 | 1 | [1, 1] | 0% | yes |
 | block | A_Advance1 | entries | 1 | 1 | [1, 1] | 0% | yes |
 | block | A_Logic11 | entries | 1 | 1 | [1, 1] | 0% | yes |
 | block | GateS | entries | 1 | 1 | [1, 1] | 0% | yes |
-| block | A_Terminate2 | entries | 1 | 0,600 | [-0,080, 1,280] | 40% | yes |
+| block | A_Terminate2 | entries | 1 | 0,400 | [-0,280, 1,080] | 60% | yes |
 
 ## TP6__Clase 6_3_JefeEducado
 
@@ -704,22 +756,22 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 
 | Section | Entity | Metric | Baseline | Ours (mean) | 95% CI | Rel. error | Match |
 |---|---|---|---:|---:|---|---:|---|
-| facility | JUAN | utilization | 0,738 | 0,790 | [0,724, 0,856] | 7% | yes |
-| facility | JUAN | average_time | 85,710 | 96,166 | [87,095, 105,237] | 12% | yes |
+| facility | JUAN | utilization | 0,738 | 0,845 | [0,776, 0,913] | 14% | yes |
+| facility | JUAN | average_time | 85,710 | 95,650 | [87,294, 104,006] | 12% | yes |
 | queue | QCLIENTES | entries | 28 | 28,800 | [27,761, 29,839] | 3% | yes |
-| queue | QCLIENTES | average_content | 0 | 0,936 | [0,211, 1,660] | n/a | no |
-| queue | QCLIENTES | average_time | 0 | 25,895 | [19,060, 32,730] | n/a | no |
+| queue | QCLIENTES | average_content | 0 | 0,439 | [0,144, 0,734] | n/a | no |
+| queue | QCLIENTES | average_time | 0 | 54,178 | [19,940, 88,415] | n/a | no |
 | queue | QJEFE | entries | 3 | 3,600 | [2,920, 4,280] | 20% | yes |
-| queue | QJEFE | average_content | 0 | 0,240 | [-0,055, 0,536] | n/a | yes |
-| queue | QJEFE | average_time | 0 | 11,756 | [-2,438, 25,949] | n/a | yes |
+| queue | QJEFE | average_content | 0 | 0,092 | [-0,010, 0,195] | n/a | yes |
+| queue | QJEFE | average_time | 0 | 51,529 | [-21,352, 124,410] | n/a | yes |
 | block | A_Assign | entries | 3 | 3,600 | [2,920, 4,280] | 20% | yes |
-| block | GateF | entries | 8 | 7,600 | [5,345, 9,855] | 5% | yes |
+| block | GateF | entries | 8 | 8,600 | [5,023, 12,177] | 7% | yes |
 | block | A_FacilityUse | entries | 3 | 3,600 | [2,920, 4,280] | 20% | yes |
-| block | A_Terminate | entries | 3 | 2,800 | [1,761, 3,839] | 7% | yes |
-| block | A_Advance | entries | 6 | 5,600 | [3,345, 7,855] | 7% | yes |
-| block | A_Loop | entries | 6 | 5,600 | [3,345, 7,855] | 7% | yes |
+| block | A_Terminate | entries | 3 | 3,200 | [2,161, 4,239] | 7% | yes |
+| block | A_Advance | entries | 6 | 7 | [3,174, 10,826] | 17% | yes |
+| block | A_Loop | entries | 6 | 7 | [3,174, 10,826] | 17% | yes |
 | block | A_FacilityUse1 | entries | 28 | 28,800 | [27,761, 29,839] | 3% | yes |
-| block | A_Terminate1 | entries | 27 | 26 | [24,037, 27,963] | 4% | yes |
+| block | A_Terminate1 | entries | 27 | 27,800 | [26,761, 28,839] | 3% | yes |
 
 ## TP7__Clase 7_1_Link_Unlink
 
@@ -783,8 +835,8 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 
 | Section | Entity | Metric | Baseline | Ours (mean) | 95% CI | Rel. error | Match |
 |---|---|---|---:|---:|---|---:|---|
-| facility | LAVADO | utilization | 0,842 | 0,665 | [0,624, 0,706] | 21% | yes |
-| facility | LAVADO | average_time | 126,292 | 117,352 | [113,907, 120,797] | 7% | yes |
+| facility | LAVADO | utilization | 0,842 | 0,810 | [0,765, 0,855] | 4% | yes |
+| facility | LAVADO | average_time | 126,292 | 115,790 | [111,219, 120,360] | 8% | yes |
 | facility | 1 | utilization | 0,487 | 0,457 | [0,363, 0,551] | 6% | yes |
 | facility | 1 | average_time | 194,778 | 184,234 | [128,688, 239,779] | 5% | yes |
 | facility | 2 | utilization | 0,261 | 0,417 | [0,306, 0,528] | 60% | no |
@@ -805,17 +857,21 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 | facility | 9 | average_time | 220,909 | 163,995 | [142,638, 185,352] | 26% | yes |
 | facility | 10 | utilization | 0,637 | 0,286 | [0,169, 0,403] | 55% | no |
 | facility | 10 | average_time | 208,545 | 168,680 | [144,631, 192,729] | 19% | yes |
-| facility | 100 | utilization | 0,419 | 0,558 | [0,468, 0,648] | 33% | yes |
-| facility | 100 | average_time | 107,857 | 114,054 | [105,522, 122,587] | 6% | yes |
+| facility | 100 | utilization | 0,419 | 0,556 | [0,506, 0,606] | 33% | yes |
+| facility | 100 | average_time | 107,857 | 114,001 | [108,049, 119,953] | 6% | yes |
+| facility | 101 | utilization | 0,221 | 0,181 | [0,113, 0,249] | 18% | yes |
+| facility | 101 | average_time | 79,400 | 118,739 | [99,899, 137,579] | 50% | no |
+| facility | 102 | utilization | 0,074 | 0,041 | [0,038, 0,045] | 44% | no |
+| facility | 102 | average_time | 88,667 | 123,748 | [16,419, 231,076] | 40% | yes |
 | queue | QFOSAS | entries | 8 | 6,600 | [3,133, 10,067] | 18% | yes |
 | queue | QFOSAS | average_content | 0 | 0,117 | [-0,071, 0,306] | n/a | yes |
 | queue | QFOSAS | average_time | 0 | 46,261 | [-68,245, 160,767] | n/a | yes |
-| queue | QSECADO | entries | 23 | 20 | [18,244, 21,756] | 13% | yes |
-| queue | QSECADO | average_content | 0 | 0,006 | [-0,002, 0,015] | n/a | yes |
-| queue | QSECADO | average_time | 0 | 1,138 | [-0,372, 2,649] | n/a | yes |
+| queue | QSECADO | entries | 23 | 24,200 | [22,359, 26,041] | 5% | yes |
+| queue | QSECADO | average_content | 0 | 0,028 | [-0,000, 0,057] | n/a | yes |
+| queue | QSECADO | average_time | 0 | 4,099 | [0,209, 7,990] | n/a | no |
 | queue | QLAVADO | entries | 33 | 29 | [25,835, 32,165] | 12% | yes |
-| queue | QLAVADO | average_content | 3,708 | 4,388 | [2,897, 5,880] | 18% | yes |
-| queue | QLAVADO | average_time | 404,545 | 35,563 | [30,729, 40,397] | 91% | no |
+| queue | QLAVADO | average_content | 3,708 | 2,701 | [1,051, 4,351] | 27% | yes |
+| queue | QLAVADO | average_time | 404,545 | 281,623 | [121,414, 441,832] | 30% | yes |
 | queue | QLIMPIEZAINTERIOR | entries | 33 | 30,200 | [26,139, 34,261] | 8% | yes |
 | queue | QLIMPIEZAINTERIOR | average_content | 0 | 0,079 | [-0,014, 0,172] | n/a | yes |
 | queue | QLIMPIEZAINTERIOR | average_time | 0 | 9,197 | [-1,380, 19,775] | n/a | yes |
@@ -823,15 +879,21 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 | queue | QESPERASERVICIOSVARIOS | average_content | 0,884 | 0,633 | [0,564, 0,702] | 28% | yes |
 | queue | QESPERASERVICIOSVARIOS | average_time | 32,141 | 23,258 | [21,226, 25,289] | 28% | yes |
 | queue | QTPERMANENCIAVEHICULOS | entries | 102 | 100,800 | [97,709, 103,891] | 1% | yes |
-| queue | QTPERMANENCIAVEHICULOS | average_content | 17,456 | 17,688 | [14,849, 20,527] | 1% | yes |
-| queue | QTPERMANENCIAVEHICULOS | average_time | 616,088 | 278,723 | [233,280, 324,167] | 55% | no |
-| queue | 100 | entries | 14 | 0 | [0, 0] | 100% | no |
-| queue | 100 | average_content | 0 | 0 | [0, 0] | 0% | yes |
-| queue | 100 | average_time | 0 | 0 | [0, 0] | 0% | yes |
+| queue | QTPERMANENCIAVEHICULOS | average_content | 17,456 | 15,289 | [13,393, 17,184] | 12% | yes |
+| queue | QTPERMANENCIAVEHICULOS | average_time | 616,088 | 351,140 | [301,213, 401,067] | 43% | no |
+| queue | 100 | entries | 14 | 18 | [15,366, 20,634] | 29% | no |
+| queue | 100 | average_content | 0 | 0,190 | [0,134, 0,247] | n/a | no |
+| queue | 100 | average_time | 0 | 37,359 | [29,730, 44,988] | n/a | no |
+| queue | 101 | entries | 10 | 5,400 | [3,985, 6,815] | 46% | no |
+| queue | 101 | average_content | 0 | 0,035 | [-0,009, 0,079] | n/a | yes |
+| queue | 101 | average_time | 0 | 21,226 | [-0,488, 42,940] | n/a | yes |
+| queue | 102 | entries | 3 | 1,333 | [-0,101, 2,768] | 56% | no |
+| queue | 102 | average_content | 0 | 0,008 | [-0,026, 0,042] | n/a | yes |
+| queue | 102 | average_time | 0 | 14,307 | [-47,257, 75,872] | n/a | yes |
 | storage | FOSAS | average_content | 1,001 | 0,826 | [0,335, 1,317] | 17% | yes |
 | storage | FOSAS | utilization | 0,500 | 0,413 | [0,168, 0,658] | 17% | yes |
-| storage | SECADO | average_content | 1,156 | 0,983 | [0,870, 1,097] | 15% | yes |
-| storage | SECADO | utilization | 0,578 | 0,492 | [0,435, 0,548] | 15% | yes |
+| storage | SECADO | average_content | 1,156 | 1,171 | [1,056, 1,286] | 1% | yes |
+| storage | SECADO | utilization | 0,578 | 0,586 | [0,528, 0,643] | 1% | yes |
 | storage | LIMPIEZAINTERIOR | average_content | 0,818 | 0,764 | [0,649, 0,878] | 7% | yes |
 | storage | LIMPIEZAINTERIOR | utilization | 0,409 | 0,382 | [0,325, 0,439] | 7% | yes |
 | block | A_Assign | entries | 90 | 89,400 | [86,826, 91,974] | 1% | yes |
@@ -870,11 +932,11 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 | block | Clona1 | entries | 33 | 30,200 | [26,139, 34,261] | 8% | yes |
 | block | StorageUse1 | entries | 33 | 30,200 | [26,139, 34,261] | 8% | yes |
 | block | A_FacilityUse1 | entries | 33 | 29 | [25,835, 32,165] | 12% | yes |
-| block | StorageUse11 | entries | 23 | 20 | [18,244, 21,756] | 13% | yes |
-| block | A_Assemble1 | entries | 42 | 35,400 | [32,284, 38,516] | 16% | yes |
-| block | A_Advance6 | entries | 21 | 11,800 | [10,761, 12,839] | 44% | no |
-| block | A_Depart2 | entries | 66 | 59,600 | [57,717, 61,483] | 10% | yes |
-| block | A_Terminate | entries | 66 | 59,600 | [57,717, 61,483] | 10% | yes |
+| block | StorageUse11 | entries | 23 | 24,200 | [22,359, 26,041] | 5% | yes |
+| block | A_Assemble1 | entries | 42 | 45 | [40,611, 49,389] | 7% | yes |
+| block | A_Advance6 | entries | 21 | 20 | [17,366, 22,634] | 5% | yes |
+| block | A_Depart2 | entries | 66 | 67,800 | [64,138, 71,462] | 3% | yes |
+| block | A_Terminate | entries | 66 | 67,800 | [64,138, 71,462] | 3% | yes |
 | block | A_Advance4 | entries | 33 | 30,200 | [26,139, 34,261] | 8% | yes |
 | block | Entrada13 | entries | 32 | 28,800 | [25,469, 32,131] | 10% | yes |
 | block | A_Advance5 | entries | 21 | 20,200 | [17,979, 22,421] | 4% | yes |
@@ -896,15 +958,15 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 
 | Section | Entity | Metric | Baseline | Ours (mean) | 95% CI | Rel. error | Match |
 |---|---|---|---:|---:|---|---:|---|
-| facility | RECURSO | utilization | 0,978 | 0,933 | [0,927, 0,940] | 5% | yes |
-| facility | RECURSO | average_time | 65,204 | 63,688 | [61,387, 65,988] | 2% | yes |
+| facility | RECURSO | utilization | 0,978 | 0,965 | [0,950, 0,981] | 1% | yes |
+| facility | RECURSO | average_time | 65,204 | 63,901 | [62,262, 65,539] | 2% | yes |
 | queue | COLA | entries | 59 | 60,400 | [57,542, 63,258] | 2% | yes |
-| queue | COLA | average_content | 3,596 | 3,102 | [1,355, 4,849] | 14% | yes |
-| queue | COLA | average_time | 219,407 | 22,525 | [18,860, 26,190] | 90% | no |
+| queue | COLA | average_content | 3,596 | 2,364 | [1,101, 3,627] | 34% | yes |
+| queue | COLA | average_time | 219,407 | 123,697 | [57,490, 189,904] | 44% | no |
 | block | A_Advance | entries | 59 | 60,400 | [57,542, 63,258] | 2% | yes |
 | block | A_FacilityUse | entries | 59 | 60,400 | [57,542, 63,258] | 2% | yes |
-| block | A_Advance1 | entries | 53 | 51,800 | [49,959, 53,641] | 2% | yes |
-| block | A_Terminate | entries | 53 | 51,800 | [49,959, 53,641] | 2% | yes |
+| block | A_Advance1 | entries | 53 | 53,400 | [52,290, 54,510] | 1% | yes |
+| block | A_Terminate | entries | 53 | 53,400 | [52,290, 54,510] | 1% | yes |
 
 ## ejercicio_2__ejercicio_2
 
@@ -912,16 +974,16 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 
 | Section | Entity | Metric | Baseline | Ours (mean) | 95% CI | Rel. error | Match |
 |---|---|---|---:|---:|---|---:|---|
-| facility | RECURSO | utilization | 0,816 | 0,782 | [0,726, 0,839] | 4% | yes |
-| facility | RECURSO | average_time | 47,371 | 53,978 | [50,068, 57,887] | 14% | yes |
+| facility | RECURSO | utilization | 0,816 | 0,877 | [0,808, 0,945] | 7% | yes |
+| facility | RECURSO | average_time | 47,371 | 53,318 | [49,927, 56,710] | 13% | yes |
 | queue | COLA | entries | 62 | 61,600 | [59,026, 64,174] | 1% | yes |
-| queue | COLA | average_content | 0 | 4,521 | [2,680, 6,361] | n/a | no |
-| queue | COLA | average_time | 0 | 15,389 | [11,367, 19,412] | n/a | no |
+| queue | COLA | average_content | 0 | 1,578 | [-0,007, 3,164] | n/a | yes |
+| queue | COLA | average_time | 0 | 86,642 | [3,349, 169,935] | n/a | no |
 | block | A_Advance | entries | 63 | 61,600 | [59,026, 64,174] | 2% | yes |
 | block | Entrada1 | entries | 62 | 61,600 | [59,026, 64,174] | 1% | yes |
 | block | A_FacilityUse1 | entries | 18 | 24 | [18,379, 29,621] | 33% | no |
-| block | A_Advance1 | entries | 62 | 51,400 | [49,323, 53,477] | 17% | yes |
-| block | A_Terminate | entries | 62 | 51 | [49,480, 52,520] | 18% | yes |
+| block | A_Advance1 | entries | 62 | 58,400 | [55,826, 60,974] | 6% | yes |
+| block | A_Terminate | entries | 62 | 58 | [56,037, 59,963] | 6% | yes |
 | block | A_FacilityUse | entries | 44 | 37,600 | [32,588, 42,612] | 15% | yes |
 
 ## ejercicio_3__ejercicio_3
@@ -930,25 +992,25 @@ Horizon 1800 (baseline end time), 5 replications, seed base 7.
 
 | Section | Entity | Metric | Baseline | Ours (mean) | 95% CI | Rel. error | Match |
 |---|---|---|---:|---:|---|---:|---|
-| facility | RECURSO | utilization | 0,647 | 0,619 | [0,591, 0,646] | 4% | yes |
-| facility | RECURSO | average_time | 35,273 | 37,887 | [37,001, 38,772] | 7% | yes |
+| facility | RECURSO | utilization | 0,647 | 0,666 | [0,641, 0,690] | 3% | yes |
+| facility | RECURSO | average_time | 35,273 | 37,445 | [36,294, 38,596] | 6% | yes |
 | queue | MOSTRADOR | entries | 19 | 18,400 | [17,290, 19,510] | 3% | yes |
-| queue | MOSTRADOR | average_content | 0 | 1,137 | [0,588, 1,686] | n/a | no |
-| queue | MOSTRADOR | average_time | 0 | 6,507 | [4,695, 8,320] | n/a | no |
+| queue | MOSTRADOR | average_content | 0 | 0,206 | [0,155, 0,258] | n/a | no |
+| queue | MOSTRADOR | average_time | 0 | 19,500 | [13,969, 25,030] | n/a | no |
 | queue | VENTANILLA | entries | 16 | 13,800 | [11,412, 16,188] | 14% | yes |
-| queue | VENTANILLA | average_content | 0,164 | 0,081 | [0,047, 0,114] | 51% | no |
-| queue | VENTANILLA | average_time | 18,438 | 10,403 | [7,343, 13,463] | 44% | no |
-| storage | ALMACEN | average_content | 0,482 | 1,449 | [0,936, 1,962] | 201% | no |
-| storage | ALMACEN | utilization | 0 | 0,001 | [0,001, 0,002] | n/a | no |
+| queue | VENTANILLA | average_content | 0,164 | 0,088 | [0,052, 0,125] | 46% | no |
+| queue | VENTANILLA | average_time | 18,438 | 11,383 | [8,266, 14,499] | 38% | no |
+| storage | ALMACEN | average_content | 0,482 | 0,567 | [0,485, 0,649] | 18% | yes |
+| storage | ALMACEN | utilization | 0 | 0,001 | [0,000, 0,001] | n/a | no |
 | block | A_FacilityUse1 | entries | 16 | 13,800 | [11,412, 16,188] | 14% | yes |
 | block | A_Advance11 | entries | 14 | 13,600 | [11,717, 15,483] | 3% | yes |
 | block | A_Terminate1 | entries | 14 | 13,600 | [11,717, 15,483] | 3% | yes |
 | block | A_Advance | entries | 20 | 19,400 | [18,290, 20,510] | 3% | yes |
 | block | A_Enter | entries | 19 | 18,400 | [17,290, 19,510] | 3% | yes |
 | block | A_FacilityUse | entries | 19 | 18,400 | [17,290, 19,510] | 3% | yes |
-| block | A_Leave | entries | 18 | 15,400 | [13,517, 17,283] | 14% | yes |
-| block | A_Advance1 | entries | 18 | 15,400 | [13,517, 17,283] | 14% | yes |
-| block | A_Terminate | entries | 17 | 15,400 | [13,517, 17,283] | 9% | yes |
+| block | A_Leave | entries | 18 | 17,800 | [16,440, 19,160] | 1% | yes |
+| block | A_Advance1 | entries | 18 | 17,800 | [16,440, 19,160] | 1% | yes |
+| block | A_Terminate | entries | 17 | 17,600 | [16,185, 19,015] | 4% | yes |
 | block | Entrada1 | entries | 0 | 0 | [0, 0] | 0% | yes |
 | block | A_Advance2 | entries | 0 | 0 | [0, 0] | 0% | yes |
 
@@ -958,21 +1020,21 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 
 | Section | Entity | Metric | Baseline | Ours (mean) | 95% CI | Rel. error | Match |
 |---|---|---|---:|---:|---|---:|---|
-| facility | INFORMES | utilization | 0,821 | 0,625 | [0,546, 0,704] | 24% | yes |
-| facility | INFORMES | average_time | 101,862 | 97,783 | [91,276, 104,290] | 4% | yes |
+| facility | INFORMES | utilization | 0,821 | 0,661 | [0,569, 0,753] | 20% | yes |
+| facility | INFORMES | average_time | 101,862 | 97,410 | [92,520, 102,299] | 4% | yes |
 | facility | RECURSO2 | utilization | 0,030 | 0,034 | [0,032, 0,036] | 12% | yes |
 | facility | RECURSO2 | average_time | 2,634 | 2,961 | [2,745, 3,177] | 12% | yes |
 | facility | RECURSO | utilization | 0,043 | 0,050 | [0,048, 0,052] | 17% | yes |
 | facility | RECURSO | average_time | 2,610 | 3,045 | [2,871, 3,220] | 17% | yes |
 | queue | COLAINFORMES | entries | 32 | 25 | [21,715, 28,285] | 22% | no |
-| queue | COLAINFORMES | average_content | 0,981 | 0,752 | [0,265, 1,239] | 23% | yes |
-| queue | COLAINFORMES | average_time | 110,344 | 19,938 | [13,059, 26,817] | 82% | no |
+| queue | COLAINFORMES | average_content | 0,981 | 0,251 | [0,085, 0,416] | 74% | no |
+| queue | COLAINFORMES | average_time | 110,344 | 33,897 | [15,224, 52,569] | 69% | no |
 | queue | GIRATORIA2 | entries | 41 | 41 | [38,677, 43,323] | 0% | yes |
 | queue | GIRATORIA2 | average_content | 0 | 0,000 | [-0,000, 0,000] | n/a | yes |
 | queue | GIRATORIA2 | average_time | 0 | 0,005 | [-0,004, 0,013] | n/a | yes |
-| queue | COLA | entries | 48 | 52,600 | [48,520, 56,680] | 10% | yes |
-| queue | COLA | average_content | 2,237 | 3,951 | [3,711, 4,190] | 77% | no |
-| queue | COLA | average_time | 167,792 | 221,561 | [187,912, 255,210] | 32% | yes |
+| queue | COLA | entries | 48 | 53,400 | [49,320, 57,480] | 11% | yes |
+| queue | COLA | average_content | 2,237 | 4,358 | [4,078, 4,638] | 95% | no |
+| queue | COLA | average_time | 167,792 | 231,425 | [196,268, 266,582] | 38% | no |
 | queue | GIRATORIA | entries | 59 | 59,400 | [57,734, 61,066] | 1% | yes |
 | queue | GIRATORIA | average_content | 0 | 0 | [0, 0] | 0% | yes |
 | queue | GIRATORIA | average_time | 0 | 0 | [0, 0] | 0% | yes |
@@ -980,13 +1042,13 @@ Horizon 3600 (baseline end time), 5 replications, seed base 7.
 | storage | ALMACEN | utilization | 0,926 | 0,946 | [0,927, 0,964] | 2% | yes |
 | block | A_FacilityUse1 | entries | 59 | 59,400 | [57,734, 61,066] | 1% | yes |
 | block | Entrada1 | entries | 59 | 59,400 | [57,734, 61,066] | 1% | yes |
-| block | A_Advance | entries | 48 | 52,600 | [48,520, 56,680] | 10% | yes |
-| block | StorageUse | entries | 48 | 52,600 | [48,520, 56,680] | 10% | yes |
+| block | A_Advance | entries | 48 | 53,600 | [49,917, 57,283] | 12% | yes |
+| block | StorageUse | entries | 48 | 53,400 | [49,320, 57,480] | 11% | yes |
 | block | A_Advance1 | entries | 42 | 41 | [38,677, 43,323] | 2% | yes |
 | block | A_FacilityUse | entries | 41 | 41 | [38,677, 43,323] | 0% | yes |
 | block | A_Terminate | entries | 41 | 40,800 | [38,412, 43,188] | 0% | yes |
-| block | Entrada11 | entries | 28 | 22,600 | [20,026, 25,174] | 19% | yes |
-| block | A_Terminate1 | entries | 7 | 4,400 | [1,980, 6,820] | 37% | no |
+| block | Entrada11 | entries | 28 | 23,800 | [20,587, 27,013] | 15% | yes |
+| block | A_Terminate1 | entries | 7 | 4,600 | [2,345, 6,855] | 34% | no |
 
 ## entregaComida__entregaComida
 
@@ -1078,7 +1140,7 @@ each model with an equivalent error class.
 | Problema 2__puenteLevadizo | (node 0): no TERMINATE block with operand A and no CLOCK block: the simulation would never finish |
 | TP6__Clase 6_0_TestGate | (node 0): no TERMINATE block with operand A and no CLOCK block: the simulation would never finish |
 | TP9__hack | (node 0): no TERMINATE block with operand A and no CLOCK block: the simulation would never finish |
-| TP9__tp9 | (node 10): no TERMINATE block with operand A and no CLOCK block: the simulation would never finish |
+| TP9__tp9 | (node 68): Unlink: the operand B must not be null; UNLINK needs a label for the unlinked transactions |
 
 ### TP9__hack
 

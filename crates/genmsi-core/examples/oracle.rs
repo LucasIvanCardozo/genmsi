@@ -106,6 +106,26 @@ fn main() {
          rule is deliberately generous; see `docs/DECISIONS.md` D6.\n"
     );
     let mut markdown = genmsi_core::oracle::render_markdown(&comparisons, &note);
+    markdown.push_str("\n## Baseline artifacts\n\nTwo properties of the oracle outputs are defects of\n");
+    markdown.push_str("the original, not gaps in the engine. They are documented instead of forced to\n");
+    markdown.push_str("match, and the comparison rule is not relaxed for them.\n");
+    markdown.push_str("\n### Queue averages of queues that end empty\n\n");
+    markdown.push_str("The original prints `AVE.CONT.`, `AVE.TIME` and `AVE.(-0)` as exactly `0,000`\n");
+    markdown.push_str("for every queue whose `CONT.` is zero at the end of the run, however much\n");
+    markdown.push_str("traffic the queue carried: `Parcial 6-11-23` reports `SISTEMA` with `MAX` 117\n");
+    markdown.push_str("and 367 entries and still averages 0. All 76 queue rows of the 20 baselines\n");
+    markdown.push_str("follow the rule `CONT. = 0 => averages = 0` without exception, so the three\n");
+    markdown.push_str("average metrics of such queues cannot match a working statistician; they are\n");
+    markdown.push_str("counted as mismatches here and the affected models (`Parcial 6-11-23`,\n");
+    markdown.push_str("`TP10__tp10`, `TP6__Clase 6_2_UltimoCliente`) carry that cost in their ratio.\n");
+    markdown.push_str("\n### Truncated `Código GPSS` extractions\n\n");
+    markdown.push_str("`fixtures/outputs/<model>.gpss.txt` is meant to hold the original's generated\n");
+    markdown.push_str("GPSS source. For `Parcial 6-11-23`, `TP10`, `TP3`, `TP4`, `TP5`, `TP6_2` and\n");
+    markdown.push_str("`TP8` the extraction captured a fragment of the report instead (a three- or\n");
+    markdown.push_str("four-line tail, e.g. the `LOGICSWITCH` table), so those files are not usable as\n");
+    markdown.push_str("code. The block table of the corresponding `.report.txt` is the authoritative\n");
+    markdown.push_str("expansion for every model: it lists each generated block with its operands and\n");
+    markdown.push_str("its entry count.\n");
     markdown.push_str("\n## Models the original refuses\n\n");
     markdown.push_str("These five baselines are error outputs, not reports. The engine must reject\n");
     markdown.push_str("each model with an equivalent error class.\n\n");

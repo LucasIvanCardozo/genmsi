@@ -165,3 +165,51 @@ Same branch `feat/phase1-engine`, same allowed paths as S9. Closing the gap betw
   edits to `fixtures/outputs/`, no edits to `crates/genmsi-cli/` or `crates/genmsi-mcp/`), and the
   deliverable (updated comparison table, green tests + clean clippy, one commit per correction;
   an original model that is simply badly written is documented, not forced to match).
+
+### Fase 1b evidence
+
+- L11 (evidence, oracle source): `fixtures/outputs/<model>.gpss.txt` is not usable
+  as the original's generated GPSS for `Parcial 6-11-23`, `TP10`, `TP3`, `TP4`,
+  `TP5`, `TP6_2` and `TP8`: those extractions captured a three- or four-line tail of
+  the *report* (for the Parcial model the `LOGICSWITCH` table) instead of the code
+  tab. The block table of `fixtures/outputs/<model>.report.txt` lists every
+  generated block with its operands and entry count, so it is the authoritative
+  expansion used for every diagnosis in this phase. Recorded in
+  `docs/oracle-comparison.md` ("Baseline artifacts").
+- L12 (fix, commit `af3cf2f`): `RELEASE` resumed one waitress from the facility's
+  pending chain and dropped the rest, stranding them in `SEIZE` forever.
+  `Parcial 6-11-23` lost 331 of 369 transactions at `Recurso`. Now the head of the
+  sorted chain is retried and the remainder stays queued. Test:
+  `tests/facility_waiters.rs`.
+- L13 (fix, commit `7b5e0e5`): `FacilityUse`/`FacilityInt`/`StorageUse` read their
+  `Queue` operand as a literal, so `*Bondi` became one queue named `*BONDI`
+  instead of the bus queues `1`..`10` the baseline reports. `entity()` is now split
+  into `entity_name()` + `optional_entity()`. Test: `tests/operand_names.rs`.
+- L14 (fix, commit `dee4aa5`): `ExecBlock::next_default()` returned the first
+  output port, but the editor declares `FacilityInt`'s unlinked failure port
+  (`SalidaAlt`) before `Salida1`; `RETURN` therefore ended the transaction, the
+  preempting manager never closed its loop, and the gate it left reset stayed shut.
+  `next_default()` now prefers the port named `Salida1`. Test:
+  `tests/preemption.rs`. Oracle effect on `Parcial 6-11-23`: 46% -> 78%.
+- L15 (fix, commit `b05a8e3`): `InitialLS` stores its state in `Valor`
+  (`subType="op_Swich"`), not `Op`, so no `INITIAL LS` was ever applied. `Op`
+  remains a fallback. Test: `tests/logic_switches.rs`. Logic switches keep the
+  published reset default: the Parcial model only needs its `Molinete` switch set,
+  which the preempting manager does (L14), not an initially-set switch.
+- L16 (baseline artifact, documented not forced): the original prints the three
+  queue averages of a queue as `0,000` whenever that queue is empty at the end of
+  the run, whatever traffic it carried (`SISTEMA` in `Parcial 6-11-23`: `MAX` 117,
+  367 entries, averages 0). All 76 queue rows of the 20 baselines follow
+  `CONT. = 0 => averages = 0`. The comparison rule is not relaxed for this: the
+  affected metrics stay mismatches and are documented in
+  `docs/oracle-comparison.md`.
+
+### Fase 1b commit slice
+
+The Phase 1 construction slice (9 commits) is recorded above. Fase 1b commits are
+per-correction (fix + its regression test + evidence): `af3cf2f`, `7b5e0e5`,
+`dee4aa5`, `b05a8e3`. The cumulative branch size therefore grows past the
+~400-authorized-line guideline, but each 1b commit is an independently reviewable
+correction; native review applies per work-unit commit, never to the accumulated
+branch. `dee4aa5` carries the only high-risk item of the phase (item 3: it changes
+shared block routing for every model) and is the one to review alone.

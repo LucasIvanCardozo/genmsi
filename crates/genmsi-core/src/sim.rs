@@ -5,7 +5,7 @@
 //! a transaction is only ever in one place, tracked by [`XactState`].
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet};
+use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
 
 use serde::Serialize;
 
@@ -202,7 +202,7 @@ pub struct Simulation<'p> {
     transaction_groups: BTreeMap<String, Vec<XactId>>,
     numeric_groups: BTreeMap<String, Vec<f64>>,
     assemble_waiters: HashMap<usize, Vec<(u64, XactId)>>,
-    match_waiters: HashMap<usize, Option<XactId>>,
+    match_waiters: HashMap<usize, VecDeque<XactId>>,
     gate_waiters: HashMap<usize, Vec<XactId>>,
     cancelled_resumes: HashSet<(XactId, usize)>,
     diagnostics: Vec<String>,
@@ -1049,25 +1049,31 @@ impl<'p> Simulation<'p> {
                     self.leave(xact, block_index, block.next_default());
                     return Ok(());
                 };
-                let waiting = self
+                // Pair with the oldest transaction waiting at the conjugate
+                // block. Every waiter is kept: a block can hold any number of
+                // them, and pairing them first-in first-out is what keeps the
+                // two flows in step.
+                let partner = self
                     .match_waiters
                     .get_mut(&conjugate)
-                    .and_then(Option::take);
-                match waiting {
+                    .and_then(VecDeque::pop_front)
+                    .filter(|partner| self.xacts.contains_key(partner));
+                match partner {
                     Some(partner) => {
-                        self.match_waiters.insert(block_index, None);
                         if let Some(transaction) = self.xacts.get_mut(&partner) {
                             transaction.transition(XactState::Ready);
                         }
+                        // `leave` decrements the conjugate block's CURRENT count:
+                        // the partner is leaving that block, not this one.
                         let partner_target = self.program.blocks[conjugate].next_default();
-                        match partner_target {
-                            Some(target) => self.enter_block(partner, target),
-                            None => self.remove_transaction(partner),
-                        }
+                        self.leave(partner, conjugate, partner_target);
                         self.leave(xact, block_index, block.next_default());
                     }
                     None => {
-                        self.match_waiters.insert(block_index, Some(xact));
+                        self.match_waiters
+                            .entry(block_index)
+                            .or_default()
+                            .push_back(xact);
                         if let Some(transaction) = self.xacts.get_mut(&xact) {
                             transaction.transition(XactState::Waiting);
                         }

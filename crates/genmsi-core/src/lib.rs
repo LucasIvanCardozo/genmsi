@@ -24,6 +24,7 @@
 //! println!("{}", genmsi_core::render(&result, &program));
 //! ```
 
+pub mod documents;
 pub mod error;
 pub mod expr;
 pub mod oracle;
@@ -35,6 +36,10 @@ pub mod sim;
 pub mod stat;
 pub mod xact;
 
+pub use documents::{
+    DefinitionCounts, EXPLAIN_SCHEMA, Envelope, LINT_SCHEMA, LintDocument, REPORT_SCHEMA,
+    TRACE_SCHEMA, TraceDocument, lint_document, to_pretty_json, trace_document,
+};
 pub use error::EngineError;
 pub use program::{Program, compile};
 pub use report::{json_report, program_json, render, to_csv, to_json};

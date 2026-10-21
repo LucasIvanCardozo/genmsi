@@ -68,6 +68,39 @@ impl EngineError {
             message: message.into(),
         }
     }
+
+    /// The model node the failure belongs to, when it is node-scoped.
+    ///
+    /// A client uses it to look the block up in the model and report the place
+    /// the agent has to fix.
+    pub fn node(&self) -> Option<u32> {
+        match self {
+            Self::Unsupported { node, .. } | Self::InvalidBlock { node, .. } => Some(*node),
+            Self::Format(error) => error.location().node,
+            Self::Expression { .. } | Self::Graph { .. } | Self::Runtime(_) => None,
+        }
+    }
+
+    /// The block class the failure belongs to, when the failure names one.
+    pub fn class(&self) -> Option<&str> {
+        match self {
+            Self::Unsupported { class, .. } | Self::InvalidBlock { class, .. } => Some(class),
+            Self::Format(_) | Self::Expression { .. } | Self::Graph { .. } | Self::Runtime(_) => {
+                None
+            }
+        }
+    }
+
+    /// The source location of the failure, when it has one.
+    ///
+    /// Only format failures carry a location: an XML problem knows its line,
+    /// a structural problem knows its node.
+    pub fn location(&self) -> Option<&genmsi_format::Location> {
+        match self {
+            Self::Format(error) => Some(error.location()),
+            _ => None,
+        }
+    }
 }
 
 /// Format a numeric entity name the way GPSS numbers entities.
@@ -105,6 +138,27 @@ mod tests {
             err.to_string(),
             "node 42 (Advance): Media is empty"
         );
+        assert_eq!(err.node(), Some(42));
+        assert_eq!(err.class(), Some("Advance"));
+    }
+
+    #[test]
+    fn a_format_failure_keeps_its_location() {
+        let error = genmsi_format::FormatError::structural(7, "no TERMINATE block")
+            .with_file("model.gmdl");
+        let err = EngineError::from(error);
+        assert_eq!(err.node(), Some(7));
+        assert_eq!(err.class(), None);
+        let location = err.location().expect("a format failure has a location");
+        assert_eq!(location.file.as_deref(), Some("model.gmdl"));
+    }
+
+    #[test]
+    fn a_runtime_failure_names_no_block() {
+        let err = EngineError::Runtime("zero-time loop".to_string());
+        assert_eq!(err.node(), None);
+        assert_eq!(err.class(), None);
+        assert!(err.location().is_none());
     }
 
     #[test]

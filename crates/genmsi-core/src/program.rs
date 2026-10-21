@@ -561,9 +561,18 @@ impl ExecBlock {
             .or_else(|| self.next.first().copied().flatten())
     }
 
-    /// Target of the first output port.
+    /// Target of the block's main output: the port named `Salida1`, otherwise
+    /// the first port.
+    ///
+    /// The editor does not always declare `Salida1` first: `FacilityInt` writes
+    /// its failure output (`SalidaAlt`) before it, and leaves that port
+    /// unlinked, so "first port" is not the main output.
     pub fn next_default(&self) -> Option<usize> {
-        self.next.first().copied().flatten()
+        self.port_names
+            .iter()
+            .position(|port| port == "Salida1")
+            .and_then(|index| self.next.get(index).copied().flatten())
+            .or_else(|| self.next.first().copied().flatten())
     }
 
     /// Target of the output port at `index`.
@@ -1676,8 +1685,11 @@ impl Compiler<'_> {
                 }
                 "InitialLS" => {
                     let switch = self.require_name(module, "LogicSwich")?;
+                    // The editor stores the initial value in `Valor`; older files
+                    // and hand-written fixtures use `Op`.
                     let state = module
-                        .prop_value("Op")
+                        .prop_value("Valor")
+                        .or_else(|| module.prop_value("Op"))
                         .is_some_and(|op| op.eq_ignore_ascii_case("Set"));
                     definitions.initial_logic.push((switch, state));
                 }

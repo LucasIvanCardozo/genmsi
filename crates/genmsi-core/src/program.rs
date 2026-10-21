@@ -980,14 +980,12 @@ impl Compiler<'_> {
                     EngineError::invalid_block(node, class, "Media is required")
                 })?;
                 let modifier = self.sna(module, "Modificador")?;
-                let queue = self.name(module, "Queue");
+                let queue = self.optional_entity(module, "Queue")?;
                 let first;
                 if let Some(queue) = &queue {
                     first = Some(push!(
                         BlockKind::Queue(QueueSpec {
-                            queue: EntityName {
-                                source: NameSource::Literal(queue.clone()),
-                            },
+                            queue: queue.clone(),
                             units: 1.0,
                         }),
                         label.clone(),
@@ -1011,9 +1009,7 @@ impl Compiler<'_> {
                         name: module.name.clone(),
                         label: None,
                         kind: BlockKind::Depart(QueueSpec {
-                            queue: EntityName {
-                                source: NameSource::Literal(queue.clone()),
-                            },
+                            queue: queue.clone(),
                             units: 1.0,
                         }),
                         next: Vec::new(),
@@ -1073,7 +1069,7 @@ impl Compiler<'_> {
                     EngineError::invalid_block(node, class, "Media is required")
                 })?;
                 let modifier = self.sna(module, "Modificador")?;
-                let queue = self.name(module, "Queue");
+                let queue = self.optional_entity(module, "Queue")?;
                 let remaining = self.name(module, "Remanente");
                 let route_owner = module
                     .outputs
@@ -1083,9 +1079,7 @@ impl Compiler<'_> {
                 if let Some(queue) = &queue {
                     first = Some(push!(
                         BlockKind::Queue(QueueSpec {
-                            queue: EntityName {
-                                source: NameSource::Literal(queue.clone()),
-                            },
+                            queue: queue.clone(),
                             units: 1.0,
                         }),
                         label.clone(),
@@ -1111,9 +1105,7 @@ impl Compiler<'_> {
                         name: module.name.clone(),
                         label: None,
                         kind: BlockKind::Depart(QueueSpec {
-                            queue: EntityName {
-                                source: NameSource::Literal(queue.clone()),
-                            },
+                            queue: queue.clone(),
                             units: 1.0,
                         }),
                         next: Vec::new(),
@@ -1159,7 +1151,7 @@ impl Compiler<'_> {
                     EngineError::invalid_block(node, class, "Media is required")
                 })?;
                 let modifier = self.sna(module, "Modificador")?;
-                let queue = self.name(module, "Queue");
+                let queue = self.optional_entity(module, "Queue")?;
                 let units = self
                     .sna(module, "Cantidad")?
                     .unwrap_or_else(|| self.number_expr(1.0));
@@ -1167,9 +1159,7 @@ impl Compiler<'_> {
                 if let Some(queue) = &queue {
                     first = Some(push!(
                         BlockKind::Queue(QueueSpec {
-                            queue: EntityName {
-                                source: NameSource::Literal(queue.clone()),
-                            },
+                            queue: queue.clone(),
                             units: 1.0,
                         }),
                         label.clone(),
@@ -1194,9 +1184,7 @@ impl Compiler<'_> {
                         name: module.name.clone(),
                         label: None,
                         kind: BlockKind::Depart(QueueSpec {
-                            queue: EntityName {
-                                source: NameSource::Literal(queue.clone()),
-                            },
+                            queue: queue.clone(),
                             units: 1.0,
                         }),
                         next: Vec::new(),
@@ -2054,17 +2042,35 @@ impl Compiler<'_> {
         let text = module.prop_value(prop).ok_or_else(|| {
             EngineError::invalid_block(module.id, &module.class, format!("{prop} is required"))
         })?;
-        let resolved = self.resolve_placeholders(module, &text, Fallback::Literal)?;
+        self.entity_name(module, &text)
+    }
+
+    /// Like [`Self::entity`], but an empty or missing property means "no entity".
+    fn optional_entity(
+        &self,
+        module: &Block,
+        prop: &str,
+    ) -> Result<Option<EntityName>, EngineError> {
+        let Some(text) = module.prop_value(prop) else {
+            return Ok(None);
+        };
+        let entity = self.entity_name(module, &text)?;
+        let empty = match &entity.source {
+            NameSource::Literal(name) => name.is_empty(),
+            NameSource::Indirect(_) => false,
+        };
+        Ok((!empty).then_some(entity))
+    }
+
+    /// Build an entity operand, honouring the GPSS `*parameter` indirect form.
+    fn entity_name(&self, module: &Block, text: &str) -> Result<EntityName, EngineError> {
+        let resolved = self.resolve_placeholders(module, text, Fallback::Literal)?;
         let trimmed = resolved.trim();
-        if let Some(indirect) = trimmed.strip_prefix('*') {
-            Ok(EntityName {
-                source: NameSource::Indirect(indirect.trim().to_string()),
-            })
-        } else {
-            Ok(EntityName {
-                source: NameSource::Literal(trimmed.to_string()),
-            })
-        }
+        let source = match trimmed.strip_prefix('*') {
+            Some(indirect) => NameSource::Indirect(indirect.trim().to_string()),
+            None => NameSource::Literal(trimmed.to_string()),
+        };
+        Ok(EntityName { source })
     }
 
     fn sna(&self, module: &Block, prop: &str) -> Result<Option<ProgramExpr>, EngineError> {

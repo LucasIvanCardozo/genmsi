@@ -119,11 +119,24 @@ empty report and no prose message an agent has to parse.
 | `node` | number | `moduleid` of the offending block. |
 | `class` | string | GPSS class of the offending block. |
 
-The fields that do not apply are absent. **The line and the column point at the
-opening tag of the `<module>` element of the `.gmdl` file**, which is where an
-agent has to look; the reference models are one very long line, so the column is
-the one that tells two blocks apart. The line and the column are not the line
-of the GPSS program the original tool generated.
+The fields that do not apply are absent — never `null`, never `0`. **The line
+and the column point at the opening tag of the offending element of the
+`.gmdl` file**, which is where an agent has to look; the reference models are
+one very long line, so the column is the one that tells two blocks apart. The
+line and the column are not the line of the GPSS program the original tool
+generated.
+
+A failure the parser finds while reading the document points at the element it
+was reading: the opening tag of the `<module>` when the failure is inside one
+(a duplicate port id, a malformed property), and the root element when it is
+not (`node` is absent then). A file the server opens but cannot decode, for
+example one that is not UTF-8, is an `invalid_model` with the same
+`cannot read model: …` message the CLI prints; it carries no position.
+
+`class` names the GPSS class of a compiled block, so it is filled only for
+`invalid_block` and `unsupported_block`. The engine reports
+`invalid_expression`, `invalid_graph` and `runtime_error` without a block, so
+those carry no position at all.
 
 The classes:
 
@@ -131,14 +144,14 @@ The classes:
 |---|---|
 | `invalid_arguments` | The call itself is wrong: no model, or both `path` and `model`. |
 | `model_not_found` | The file named by `path` does not exist. |
-| `model_unreadable` | The file exists but cannot be read. |
-| `invalid_xml` | The document is not well-formed XML. The line is known, the block is not. |
-| `invalid_model` | The document breaks a structural or runnable rule (a name with whitespace, no `TERMINATE` and no `CLOCK`, an `UNLINK` without a label). |
+| `model_unreadable` | Reserved for a file the tool cannot read outside the model load path; a model the server loads goes through the same `parse_file` call the CLI uses, so its read failures are `invalid_model` (a missing file is still `model_not_found`). |
+| `invalid_xml` | The document is not well-formed XML. The line and the column are known, the block is not. |
+| `invalid_model` | The document breaks a structural or runnable rule (a name with whitespace, no `TERMINATE` and no `CLOCK`, an `UNLINK` without a label), or cannot be decoded at all (see above). Parse failures carry the position of the offending element; rule failures carry the position of the block that breaks the rule. |
 | `invalid_block` | A block does not compile (a missing operand, an empty entity name). |
 | `unsupported_block` | The engine does not implement that block class. |
-| `invalid_expression` | An expression does not parse or does not evaluate. |
-| `invalid_graph` | The links do not form a valid graph. |
-| `runtime_error` | The run failed (for example a zero-time loop). |
+| `invalid_expression` | An expression does not parse or does not evaluate. The engine reports it without a block, so it carries no position. |
+| `invalid_graph` | The links do not form a valid graph. The engine reports it without a block, so it carries no position. |
+| `runtime_error` | The run failed (for example a zero-time loop). The engine reports it without a block, so it carries no position. |
 
 ## Parity with the CLI
 

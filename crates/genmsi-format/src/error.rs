@@ -1,21 +1,24 @@
 //! Error types for reading, validating and writing `.gmdl` models.
 //!
-//! Every failure carries a [`Location`] with the file, the 1-based source line
-//! and the model node (`moduleid`) involved, so an agent or a human can go
-//! straight to the offending block.
+//! Every failure carries a [`Location`] with the file, the 1-based source
+//! line and column, and the model node (`moduleid`) involved, so an agent or
+//! a human can go straight to the offending block.
 
 use std::fmt;
 
 /// Where a format problem happened.
 ///
-/// Fields are optional because not every error has all three: an XML syntax
-/// error has a line but no node, a model loaded from a string has no file.
+/// Fields are optional because not every error has all of them: a file that
+/// cannot be read has a name but no position, an error found while scanning
+/// the text has a line and a column but often no node.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Location {
     /// Source file name (or `<memory>` when parsing a string).
     pub file: Option<String>,
     /// 1-based line in the source file.
     pub line: Option<usize>,
+    /// 1-based column in the source file, when the exact offset is known.
+    pub column: Option<usize>,
     /// `moduleid` of the node involved, when the error is node-scoped.
     pub node: Option<u32>,
 }
@@ -26,6 +29,7 @@ impl Location {
         Self {
             file: Some(file.into()),
             line: None,
+            column: None,
             node: None,
         }
     }
@@ -35,6 +39,7 @@ impl Location {
         Self {
             file: None,
             line: None,
+            column: None,
             node: Some(node),
         }
     }
@@ -48,6 +53,12 @@ impl Location {
     /// Set the source line.
     pub fn with_line(mut self, line: usize) -> Self {
         self.line = Some(line);
+        self
+    }
+
+    /// Set the source column.
+    pub fn with_column(mut self, column: usize) -> Self {
+        self.column = Some(column);
         self
     }
 
@@ -100,14 +111,27 @@ pub enum FormatError {
         /// Parser message.
         message: String,
     },
-    /// The XML is well-formed but violates the `.gmdl` schema or a documented
-    /// structural rule.
+    /// The document is well-formed XML but violates the `.gmdl` schema or a
+    /// documented structural rule.
     #[error("{location}: {message}")]
     Structural {
         /// Where the problem is.
         location: Location,
         /// Human-readable description of the violated rule.
         message: String,
+    },
+    /// The model file could not be read: it is missing, the operating system
+    /// refuses it or it is not UTF-8. The parser reads the file itself, so a
+    /// client that loads through it gets the same `cannot read model` text
+    /// the CLI prints.
+    #[error("{location}: cannot read model: {message}")]
+    Read {
+        /// The file that could not be read.
+        location: Location,
+        /// The reader's message.
+        message: String,
+        /// The kind of I/O failure, to tell a missing file from the rest.
+        kind: std::io::ErrorKind,
     },
 }
 
@@ -131,15 +155,30 @@ impl FormatError {
     /// Where the failure happened.
     pub fn location(&self) -> &Location {
         match self {
-            Self::Xml { location, .. } | Self::Structural { location, .. } => location,
+            Self::Xml { location, .. }
+            | Self::Structural { location, .. }
+            | Self::Read { location, .. } => location,
         }
+    }
+
+    /// Whether the failure is the model file itself not existing.
+    pub fn is_missing_file(&self) -> bool {
+        matches!(
+            self,
+            Self::Read {
+                kind: std::io::ErrorKind::NotFound,
+                ..
+            }
+        )
     }
 
     /// Add a file name if the error does not carry one yet.
     pub fn with_file(mut self, file: impl Into<String>) -> Self {
         let file = file.into();
         match &mut self {
-            Self::Xml { location, .. } | Self::Structural { location, .. } => {
+            Self::Xml { location, .. }
+            | Self::Structural { location, .. }
+            | Self::Read { location, .. } => {
                 if location.file.is_none() {
                     location.file = Some(file);
                 }

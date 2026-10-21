@@ -54,12 +54,17 @@ pub fn load(source: &ModelSource) -> Result<Loaded, ToolError> {
     let name = source.name();
     let model = match source {
         ModelSource::File(path) => {
-            let text = std::fs::read_to_string(path).map_err(|error| match error.kind() {
-                std::io::ErrorKind::NotFound => ToolError::not_found(path.display().to_string()),
-                _ => ToolError::unreadable(path.display().to_string(), error),
-            })?;
-            genmsi_format::parse_str(&text)
-                .map_err(|error| ToolError::from_format(&error, Some(&name), None))?
+            // The CLI loads through `parse_file` too, so both clients
+            // classify a file the same way: a missing file is its own class,
+            // and every other failure to read or parse it is the model
+            // failure the CLI prints.
+            genmsi_format::parse_file(path).map_err(|error| {
+                if error.is_missing_file() {
+                    ToolError::not_found(name.clone())
+                } else {
+                    ToolError::from_format(&error, Some(&name), None)
+                }
+            })?
         }
         ModelSource::Inline(text) => genmsi_format::parse_str(text)
             .map_err(|error| ToolError::from_format(&error, Some(&name), None))?,

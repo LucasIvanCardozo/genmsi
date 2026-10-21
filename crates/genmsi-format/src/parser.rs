@@ -24,7 +24,9 @@ pub fn parse_str(text: &str) -> Result<GmdlModel, FormatError> {
     let doc = Document::parse_with_options(text, options).map_err(|err| {
         let pos = err.pos();
         FormatError::Xml {
-            location: Location::default().with_line(pos.row as usize),
+            location: Location::default()
+                .with_line(pos.row as usize)
+                .with_column(pos.col as usize),
             message: err.to_string(),
         }
     })?;
@@ -131,9 +133,10 @@ pub fn parse_str(text: &str) -> Result<GmdlModel, FormatError> {
 /// Read and parse a model file.
 pub fn parse_file(path: impl AsRef<Path>) -> Result<GmdlModel, FormatError> {
     let path = path.as_ref();
-    let text = std::fs::read_to_string(path).map_err(|err| FormatError::Structural {
+    let text = std::fs::read_to_string(path).map_err(|err| FormatError::Read {
         location: Location::file(path.display().to_string()),
-        message: format!("cannot read model: {err}"),
+        message: err.to_string(),
+        kind: err.kind(),
     })?;
     let file = path.display().to_string();
     parse_str(&text).map_err(|err| err.with_file(file))
@@ -149,12 +152,12 @@ fn parse_block(text: &str, node: Node<'_, '_>) -> Result<Block, FormatError> {
             return Err(structural(
                 text,
                 node,
-                format!("node {id}: attribute kind must be A or C, found {kind_text:?}"),
+                format!("attribute kind must be A or C, found {kind_text:?}"),
             ));
         }
     };
 
-    let layout = optional_layout(text, node, id)?;
+    let layout = optional_layout(text, node)?;
     let header = if kind == 'C' {
         Some(ContainerHeader {
             genprefer: attr_or_default(node, "genprefer"),
@@ -188,31 +191,31 @@ fn parse_block(text: &str, node: Node<'_, '_>) -> Result<Block, FormatError> {
         match section.tag_name().name() {
             "inputs" => {
                 push_section(text, section, &mut block.sections, SectionKind::Inputs)?;
-                block.inputs = parse_ports(text, section, id, true)?;
+                block.inputs = parse_ports(text, section, true)?;
             }
             "outputs" => {
                 push_section(text, section, &mut block.sections, SectionKind::Outputs)?;
-                block.outputs = parse_ports(text, section, id, false)?;
+                block.outputs = parse_ports(text, section, false)?;
             }
             "links" => {
                 push_section(text, section, &mut block.sections, SectionKind::Links)?;
-                block.links = parse_links(text, section, id)?;
+                block.links = parse_links(text, section)?;
             }
             "props" => {
                 push_section(text, section, &mut block.sections, SectionKind::Props)?;
-                block.props = parse_props(text, section, id)?;
+                block.props = parse_props(text, section)?;
             }
             other => {
                 return Err(structural(
                     text,
                     section,
-                    format!("node {id}: unknown element <{other}> inside <module>"),
+                    format!("unknown element <{other}> inside <module>"),
                 ));
             }
         }
     }
 
-    validate_ports(text, node, id, &block)?;
+    validate_ports(text, node, &block)?;
     Ok(block)
 }
 
@@ -245,7 +248,6 @@ fn section_name(kind: SectionKind) -> &'static str {
 fn parse_ports(
     text: &str,
     section: Node<'_, '_>,
-    block_id: u32,
     is_input: bool,
 ) -> Result<Vec<Port>, FormatError> {
     let expected = if is_input { "input" } else { "output" };
@@ -256,7 +258,7 @@ fn parse_ports(
                 text,
                 node,
                 format!(
-                    "node {block_id}: unexpected element <{}> inside <{}>",
+                    "unexpected element <{}> inside <{}>",
                     node.tag_name().name(),
                     section.tag_name().name()
                 ),
@@ -267,7 +269,7 @@ fn parse_ports(
             name: attr_or_default(node, "name"),
             caption: attr_or_default(node, "caption"),
             mylabel: attr_or_default(node, "mylabel"),
-            layout: optional_port_layout(text, node, block_id)?,
+            layout: optional_port_layout(text, node)?,
         });
     }
     Ok(ports)
@@ -276,7 +278,6 @@ fn parse_ports(
 fn parse_links(
     text: &str,
     section: Node<'_, '_>,
-    block_id: u32,
 ) -> Result<Vec<Link>, FormatError> {
     let mut links = Vec::new();
     for node in section.children().filter(Node::is_element) {
@@ -285,7 +286,7 @@ fn parse_links(
                 text,
                 node,
                 format!(
-                    "node {block_id}: unexpected element <{}> inside <links>",
+                    "unexpected element <{}> inside <links>",
                     node.tag_name().name()
                 ),
             ));
@@ -301,11 +302,7 @@ fn parse_links(
     Ok(links)
 }
 
-fn parse_props(
-    text: &str,
-    section: Node<'_, '_>,
-    block_id: u32,
-) -> Result<Vec<Property>, FormatError> {
+fn parse_props(text: &str, section: Node<'_, '_>) -> Result<Vec<Property>, FormatError> {
     let mut props = Vec::new();
     for node in section.children().filter(Node::is_element) {
         if node.tag_name().name() != "property" {
@@ -313,7 +310,7 @@ fn parse_props(
                 text,
                 node,
                 format!(
-                    "node {block_id}: unexpected element <{}> inside <props>",
+                    "unexpected element <{}> inside <props>",
                     node.tag_name().name()
                 ),
             ));
@@ -331,14 +328,14 @@ fn parse_props(
     Ok(props)
 }
 
-fn validate_ports(text: &str, node: Node<'_, '_>, id: u32, block: &Block) -> Result<(), FormatError> {
+fn validate_ports(text: &str, node: Node<'_, '_>, block: &Block) -> Result<(), FormatError> {
     let mut seen = std::collections::HashSet::new();
     for port in block.inputs.iter().chain(&block.outputs) {
         if !seen.insert(port.ioid) {
             return Err(structural(
                 text,
                 node,
-                format!("node {id}: duplicate port id {}", port.ioid),
+                format!("duplicate port id {}", port.ioid),
             ));
         }
     }
@@ -348,17 +345,13 @@ fn validate_ports(text: &str, node: Node<'_, '_>, id: u32, block: &Block) -> Res
         return Err(structural(
             text,
             node,
-            format!("node {id}: activity block must not own <links>"),
+            "activity block must not own <links>".to_string(),
         ));
     }
     Ok(())
 }
 
-fn optional_layout(
-    text: &str,
-    node: Node<'_, '_>,
-    id: u32,
-) -> Result<Option<Layout>, FormatError> {
+fn optional_layout(text: &str, node: Node<'_, '_>) -> Result<Option<Layout>, FormatError> {
     let width = node.attribute("width");
     let height = node.attribute("height");
     let x = node.attribute("x");
@@ -366,24 +359,20 @@ fn optional_layout(
     match (width, height, x, y) {
         (None, None, None, None) => Ok(None),
         (Some(w), Some(h), Some(x), Some(y)) => Ok(Some(Layout {
-            width: parse_i32(text, node, id, "width", w)?,
-            height: parse_i32(text, node, id, "height", h)?,
-            x: parse_i32(text, node, id, "x", x)?,
-            y: parse_i32(text, node, id, "y", y)?,
+            width: parse_i32(text, node, "width", w)?,
+            height: parse_i32(text, node, "height", h)?,
+            x: parse_i32(text, node, "x", x)?,
+            y: parse_i32(text, node, "y", y)?,
         })),
         _ => Err(structural(
             text,
             node,
-            format!("node {id}: layout needs width, height, x and y together"),
+            "layout needs width, height, x and y together".to_string(),
         )),
     }
 }
 
-fn optional_port_layout(
-    text: &str,
-    node: Node<'_, '_>,
-    block_id: u32,
-) -> Result<Option<PortLayout>, FormatError> {
+fn optional_port_layout(text: &str, node: Node<'_, '_>) -> Result<Option<PortLayout>, FormatError> {
     let width = node.attribute("width");
     let height = node.attribute("height");
     let x = node.attribute("x");
@@ -391,15 +380,15 @@ fn optional_port_layout(
     match (width, height, x, y) {
         (None, None, None, None) => Ok(None),
         (Some(w), Some(h), Some(x), Some(y)) => Ok(Some(PortLayout {
-            width: parse_i32(text, node, block_id, "width", w)?,
-            height: parse_i32(text, node, block_id, "height", h)?,
-            x: parse_i32(text, node, block_id, "x", x)?,
-            y: parse_i32(text, node, block_id, "y", y)?,
+            width: parse_i32(text, node, "width", w)?,
+            height: parse_i32(text, node, "height", h)?,
+            x: parse_i32(text, node, "x", x)?,
+            y: parse_i32(text, node, "y", y)?,
         })),
         _ => Err(structural(
             text,
             node,
-            format!("node {block_id}: port layout needs width, height, x and y together"),
+            "port layout needs width, height, x and y together".to_string(),
         )),
     }
 }
@@ -407,7 +396,6 @@ fn optional_port_layout(
 fn parse_i32(
     text: &str,
     node: Node<'_, '_>,
-    id: u32,
     name: &str,
     raw: &str,
 ) -> Result<i32, FormatError> {
@@ -415,7 +403,7 @@ fn parse_i32(
         structural(
             text,
             node,
-            format!("node {id}: attribute {name} must be an integer, found {raw:?}"),
+            format!("attribute {name} must be an integer, found {raw:?}"),
         )
     })
 }
@@ -441,16 +429,49 @@ fn required_u32(text: &str, node: Node<'_, '_>, name: &str) -> Result<u32, Forma
     })
 }
 
+/// A structural failure at the element the parser is reading.
+///
+/// The position points at the opening tag of that element: the 1-based line
+/// and column, plus the `moduleid` of the `<module>` it belongs to when the
+/// failure is inside one under `<modules>`. A failure at or above `<gmodel>`
+/// (the root element itself, the children of `<gclasses>`) belongs to no
+/// node, and `node` stays absent then.
 fn structural(text: &str, node: Node<'_, '_>, message: impl Into<String>) -> FormatError {
+    let position = position_of(text, node.range().start);
+    let mut location = Location::default()
+        .with_line(position.line)
+        .with_column(position.column);
+    if let Some(id) = module_id_of(node) {
+        location = location.with_node(id);
+    }
     FormatError::Structural {
-        location: Location::default().with_line(line_of(text, node.range().start)),
+        location,
         message: message.into(),
     }
 }
 
-/// 1-based line of a byte offset.
-pub(crate) fn line_of(text: &str, offset: usize) -> usize {
-    position_of(text, offset).line
+/// The `moduleid` of the `<module>` element the failure happened in, climbing
+/// from the offending element up to `<gmodel>`.
+fn module_id_of(mut node: Node<'_, '_>) -> Option<u32> {
+    loop {
+        let parent = node.parent()?;
+        match parent.tag_name().name() {
+            "gmodel" => return None,
+            "modules" => {
+                // The element directly under `<modules>` is the `<module>`
+                // the failure belongs to (or an unexpected element that is
+                // no module at all).
+                if node.tag_name().name() == "module" {
+                    return node
+                        .attribute("moduleid")
+                        .and_then(|raw| raw.trim().parse().ok());
+                }
+                return None;
+            }
+            _ => {}
+        }
+        node = parent;
+    }
 }
 
 /// 1-based line and column of a byte offset.

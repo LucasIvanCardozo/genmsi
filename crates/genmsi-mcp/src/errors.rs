@@ -36,6 +36,21 @@ pub struct ToolError {
 }
 
 impl ToolError {
+    /// Every class the tools can emit, sorted; an agent switching on `error`
+    /// depends on these exact strings, and the tests pin the set.
+    pub const CLASSES: &'static [&'static str] = &[
+        "invalid_arguments",
+        "invalid_block",
+        "invalid_expression",
+        "invalid_graph",
+        "invalid_model",
+        "invalid_xml",
+        "model_not_found",
+        "model_unreadable",
+        "runtime_error",
+        "unsupported_block",
+    ];
+
     /// The arguments of the call do not make sense.
     pub fn arguments(message: impl Into<String>) -> Self {
         Self {
@@ -64,6 +79,12 @@ impl ToolError {
     }
 
     /// The model file exists but cannot be read.
+    ///
+    /// The model load path goes through [`genmsi_format::parse_file`], the
+    /// same call the CLI makes, so a file that exists but cannot be decoded
+    /// there is an `invalid_model` with the same `cannot read model` message
+    /// the CLI prints; this constructor stays for callers that read a file
+    /// themselves.
     pub fn unreadable(path: impl Into<String>, reason: impl fmt::Display) -> Self {
         let path = path.into();
         Self {
@@ -88,6 +109,12 @@ impl ToolError {
     ) -> Self {
         let (class, message) = match error {
             FormatError::Xml { message, .. } => ("invalid_xml", format!("invalid XML: {message}")),
+            FormatError::Read { message, .. } => {
+                // The load path reads exactly like the CLI, so a file it
+                // opens but cannot decode is the model failure the CLI
+                // prints as "cannot read model: ...".
+                ("invalid_model", format!("cannot read model: {message}"))
+            }
             FormatError::Structural { message, .. } => ("invalid_model", message.clone()),
         };
         let location = error.location();
@@ -96,7 +123,7 @@ impl ToolError {
             message,
             path: path.map(str::to_string),
             line: location.line.map(|line| line as u32),
-            column: None,
+            column: location.column.map(|column| column as u32),
             node: location.node,
             class: None,
         };

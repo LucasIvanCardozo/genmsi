@@ -17,8 +17,10 @@ pub mod error;
 pub mod expr;
 pub mod program;
 pub mod rng;
+pub mod sim;
 pub mod stat;
 pub mod xact;
 
 pub use error::EngineError;
 pub use program::{Program, compile};
+pub use sim::{BlockStats, EndReason, RunResult, SimConfig, Simulation, TraceEvent};

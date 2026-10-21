@@ -97,3 +97,33 @@ model. `trace` has no filters beyond `--limit`, and `run-all <dir>` exists as th
 CI convenience that sweeps one directory. Rationale: the smallest surface that
 covers the original's workflow (D11) while giving scripts a contract they can
 depend on; the schema field lets each document grow without breaking consumers.
+
+## D14 — MCP tool surface: the CLI's documents, a model by path or by document
+
+The four tools of D7 are thin adapters over the same API the CLI uses, and they
+return the CLI's documents verbatim: `lint` returns `genmsi.lint/1`,
+`simulate` returns `genmsi.report/1` and `get_trace` returns `genmsi.trace/1`.
+`explain_model` has no CLI counterpart, so it publishes `genmsi.explain/1`: the
+engine's `program_json` plus the GPSS glossary of the classes the model uses.
+Rationale: one schema per document and one contract to maintain (D13), so an
+agent and a script read the same thing; the tool result and the CLI output are
+the same bytes.
+
+Every tool takes the model either as `path` (a `.gmdl` file) or as `model` (the
+document as text), because an agent that builds a model from scratch has no
+file yet. The inline document is compiled exactly like a file and never touches
+the disk.
+
+A model that does not work is a tool error with a JSON body: `error` (a stable
+class), `message`, `path`, `line`, `column`, `node` and `class`. To make the
+line and the column possible, the semantic model records the source position of
+every block (`genmsi-format`: `Block::source`); the field is additive, the
+writer never reads it, and the engine keeps producing byte-identical `.gmdl`
+files. The position points at the opening tag of the `<module>` element in the
+`.gmdl` source, not at the line of the GPSS program the original generated.
+
+This phase delivers the server as its own binary, `genmsi-mcp`, speaking MCP
+over stdio. D7's wording (`genmsi mcp` runs the server) needs the CLI path,
+which the Phase 3 assignment does not allow, and D2 forbids the CLI from
+depending on a second client crate; wiring the subcommand is a coordinator
+decision.

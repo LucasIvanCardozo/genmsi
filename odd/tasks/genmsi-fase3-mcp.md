@@ -80,6 +80,19 @@ skeleton, tools, glossary, tests, docs), each one a reviewable behaviour of abou
 authored lines or less with its tests. The branch is `feat/phase3-mcp`; push, PR and
 merge stay with the user.
 
+## Commits
+
+| Task | Commit |
+|---|---|
+| Feature document | `e116d54` `docs(odd): phase 3 feature document for the MCP session` |
+| T1 | `10eb859` `feat(format): record the source position of every block` |
+| T2 | `e8a7665` `feat(core): publish the lint and trace documents for every client` |
+| T3, T4, T6 | `07f64e5` `feat(mcp): rmcp stdio server with the model adapter` |
+| T5 | `b370d76` `feat(mcp): lint, simulate and get_trace tools` |
+| T7 | `8516025` `feat(mcp): explain_model with the GPSS glossary` |
+| T8 | `092a327` `test(mcp): cover the reference models through the tools` |
+| T9, T10, T11 | `docs(mcp): document the tools, the schemas and the transcript` |
+
 ## Decisions (answered by the coordinator, D12)
 
 The four assignment questions were answered; these answers are the contract this phase
@@ -139,3 +152,27 @@ FASE 3 — GenMSI-rs: genmsi-mcp. Sos la sesión de la Fase 3 del proyecto genms
   paths; the CLI keeps its own copies of the same two structs until it is allowed to
   delegate to the core. Both copies are pinned by snapshot tests, and the phase closes
   with a differential check that the MCP result and the CLI result are the same bytes.
+- L6 (evidence, differential check): the tool result and the CLI output are the same
+  bytes. `genmsi lint/simulate/trace --json` and the matching tool call over
+  `fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl` (the trace with `--limit 3`)
+  produce byte-identical documents; the three `diff` runs are empty. The documents live
+  in `genmsi-core` (T2), so this is one code path, not two that happen to agree.
+- L7 (evidence, reference models through the tools): `crates/genmsi-mcp/tests/tools.rs`
+  drives the server with an MCP client over a duplex transport: it lists the four tools
+  and runs the 25 reference models through them. Twenty run and report; the five the
+  original refuses fail as tool errors with the same message class as the CLI table of
+  `docs/cli.md`, and each of them carries the `line`, the `column`, the `node` and the
+  `class` of the block to fix.
+- L8 (delivery, slices): the first two slices (the server with the adapter, and the
+  three tools) are larger than the ~400-line guideline, because the crate, its
+  dependency on `rmcp` and the engine boundary arrive together; the slices after them
+  (glossary, tests, docs) are inside the guideline. The boundary is recorded here
+  rather than hidden.
+- L9 (evidence, transcript): `docs/mcp-transcript.md` is a real session: the server was
+  started as `./target/debug/genmsi-mcp` and driven over stdio, one request at a time,
+  with the model written inline. The transcript shows the handshake, `tools/list`, the
+  four calls and the error an agent gets when it forgets the name of the queue.
+- L10 (decision, tools): the tools return the CLI's documents as the text of the tool
+  result and the failures as a tool error (`isError: true`) with the JSON body, not as
+  a protocol error: the request was well-formed, the model was not, and the agent has
+  to read the message to fix it.

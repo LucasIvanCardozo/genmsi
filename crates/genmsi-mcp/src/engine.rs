@@ -5,7 +5,7 @@
 //! engine already produces. The CLI does exactly the same through the same
 //! API, so both clients show the same numbers.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use genmsi_core::{Program, RunResult, SimConfig, Simulation};
 use genmsi_format::GmdlModel;
@@ -54,10 +54,11 @@ pub fn load(source: &ModelSource) -> Result<Loaded, ToolError> {
     let name = source.name();
     let model = match source {
         ModelSource::File(path) => {
-            if !path.is_file() {
-                return Err(ToolError::not_found(path.display().to_string()));
-            }
-            genmsi_format::parse_file(path)
+            let text = std::fs::read_to_string(path).map_err(|error| match error.kind() {
+                std::io::ErrorKind::NotFound => ToolError::not_found(path.display().to_string()),
+                _ => ToolError::unreadable(path.display().to_string(), error),
+            })?;
+            genmsi_format::parse_str(&text)
                 .map_err(|error| ToolError::from_format(&error, Some(&name), None))?
         }
         ModelSource::Inline(text) => genmsi_format::parse_str(text)
@@ -99,7 +100,7 @@ pub fn run(loaded: &Loaded, config: SimConfig) -> Result<RunResult, ToolError> {
 
 /// The path of a model the agent named on disk.
 pub fn file_path(path: &str) -> PathBuf {
-    Path::new(path).to_path_buf()
+    PathBuf::from(path)
 }
 
 #[cfg(test)]

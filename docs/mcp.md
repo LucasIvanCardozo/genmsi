@@ -131,6 +131,7 @@ The classes:
 |---|---|
 | `invalid_arguments` | The call itself is wrong: no model, or both `path` and `model`. |
 | `model_not_found` | The file named by `path` does not exist. |
+| `model_unreadable` | The file exists but cannot be read. |
 | `invalid_xml` | The document is not well-formed XML. The line is known, the block is not. |
 | `invalid_model` | The document breaks a structural or runnable rule (a name with whitespace, no `TERMINATE` and no `CLOCK`, an `UNLINK` without a label). |
 | `invalid_block` | A block does not compile (a missing operand, an empty entity name). |

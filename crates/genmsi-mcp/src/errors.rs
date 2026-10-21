@@ -5,6 +5,8 @@
 //! and the column point at the opening tag of the `<module>` element of the
 //! `.gmdl` file, which is where an agent has to look.
 
+use std::fmt;
+
 use genmsi_core::EngineError;
 use genmsi_format::{FormatError, GmdlModel};
 use serde::Serialize;
@@ -53,6 +55,20 @@ impl ToolError {
         Self {
             error: "model_not_found",
             message: format!("cannot read model: {path}"),
+            path: Some(path),
+            line: None,
+            column: None,
+            node: None,
+            class: None,
+        }
+    }
+
+    /// The model file exists but cannot be read.
+    pub fn unreadable(path: impl Into<String>, reason: impl fmt::Display) -> Self {
+        let path = path.into();
+        Self {
+            error: "model_unreadable",
+            message: format!("cannot read model: {reason}"),
             path: Some(path),
             line: None,
             column: None,
@@ -206,5 +222,12 @@ mod tests {
         let failure = ToolError::not_found("missing.gmdl");
         assert_eq!(failure.error, "model_not_found");
         assert_eq!(failure.path.as_deref(), Some("missing.gmdl"));
+    }
+
+    #[test]
+    fn a_file_that_cannot_be_read_is_its_own_class() {
+        let failure = ToolError::unreadable("model.gmdl", "permission denied");
+        assert_eq!(failure.error, "model_unreadable");
+        assert_eq!(failure.message, "cannot read model: permission denied");
     }
 }

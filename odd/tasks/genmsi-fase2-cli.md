@@ -206,3 +206,23 @@ field of the `genmsi.report/1` document). It was verified row by row against the
 baselines of the seven GATE models: 334 labelled rows are unchanged, the rows it
 touches are exactly the gate/logic/test/select/join/examine/remove/counter classes,
 and no simulation number moves.
+
+- L15 (coordinator, measured after the merge): the report fix closed the type column and
+  the gate/logic/test/select/join/examine/remove/counter rows, but the operand column
+  still differs from the original beyond that. Compared by LOC over the 20 baselines
+  with a valid report: 497 labelled rows, 334 identical, 163 differing. The
+  differences are one of two kinds.
+  - Formatting (62 rows): we join the mode letter with a comma where the original uses
+    a column (`GATE LS,Puerta` against `GATE LS  Puerta`).
+  - Missing operands (~106 rows): `TRANSFER` prints `0.8` instead of the original's
+    `800,<Salida2>,<Salida1>` (31 rows), `UNLINK` omits the mode, the alternate
+    destination and the compared parameter/value (12), `ASSIGN` omits the `+`/`-`
+    suffix (12), `LINK` omits `FIFO`/`LIFO` (10), `SPLIT` and `LOOP` omit their target
+    LOC (8 + 8), `TABULATE` omits the weight (7), `TERMINATE` prints nothing where the
+    original prints `0` (4), `SCAN` prints only the group (3), `SAVEVALUE` omits `+`
+    (1).
+  None of this changes a number: entries, occupancy and the entity tables are already
+  right, and the oracle comparison parses those, not this column. The expression
+  notation (`P:` against `P$`) stays a documented difference. The fix is rendering in
+  `crates/genmsi-core/src/report.rs` plus the two CLI snapshots; it is not the same
+  unit as the type mapping and was not folded into it.

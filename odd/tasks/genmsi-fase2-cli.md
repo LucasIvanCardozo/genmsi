@@ -89,12 +89,19 @@ by subcommand rather than by file.
 
 | Task | Commit subject | Hash |
 |---|---|---|
-| T1, T2, T3 | `feat(cli): lint subcommand on a layered skeleton` | _after the slice_ |
-| T4, T5 | `feat(cli): simulate subcommand with the versioned report` | _after the slice_ |
-| T6 | `feat(cli): trace subcommand with a record limit` | _after the slice_ |
-| T7 | `feat(cli): run-all subcommand for directory sweeps` | _after the slice_ |
-| T8, T9 | `test(cli): every reference model, snapshots and determinism` | _after the slice_ |
-| T10, T11 | `docs(cli): commands, exit codes and the json schema` | _after the slice_ |
+| T1, T2, T3 | `feat(cli): lint subcommand on a layered skeleton` | `4d76d55` |
+| T4, T5 | `feat(cli): simulate subcommand with the versioned report` | `a3321bc` |
+| T6 | `feat(cli): trace subcommand with a record limit` | `eccac1b` |
+| T7 | `feat(cli): run-all subcommand for directory sweeps` | `2689f80` |
+| T8, T9 | `test(cli): every reference model, snapshots and determinism` | `0948087` |
+| T10, T11 | `docs(cli): commands, exit codes and the json schema` | `c376097` |
+
+Commit slice boundary: the Phase 2 slice is 7 commits on `feat/phase2-cli` (~2.2k
+authored lines, lock files excluded). The phase turns a placeholder binary into a
+CLI, so the work is one compile unit; the slices follow subcommands and the docs
+rather than the ~400-line guideline, and every slice compiles and passes its own
+tests. Native review applies to the work-unit commits, not to the accumulated
+branch.
 
 ## Log
 
@@ -165,3 +172,7 @@ FASE 2 — GenMSI-rs: genmsi-cli. Sos la sesión de la Fase 2 del proyecto genms
   reports, 5 refusals with exit 1), one snapshot per subcommand, `docs/cli.md` with
   the four schema ids, and `DECISIONS.md` D13 appended. Push, PR and merge stay
   with the user.
+- L11 (evidence, commit map): the six slices are `4d76d55` (skeleton + lint),
+  `a3321bc` (simulate), `eccac1b` (trace), `2689f80` (run-all), `0948087` (tests),
+  `c376097` (docs). Every slice was built and tested before committing; the branch
+  is `feat/phase2-cli`, based on `ca71ed1`.

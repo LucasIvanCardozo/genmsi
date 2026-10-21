@@ -1,0 +1,235 @@
+#!/usr/bin/env python3
+"""Inventory the GPSS block classes used by the .gmdl models in fixtures/models/.
+
+Phase 0 tool (decision D9): the resulting docs/BLOCK-INVENTORY.md defines the
+block subset that genmsi-core must implement first.
+
+For every module class found in the models it reports:
+  - how many times the class is used (total and per model),
+  - which properties carry a non-empty value, with type/subType and sample
+    values.
+
+Modules without a `moduleclass` (kind="C": main model node, notes, decorative
+containers) are reported separately as non-block nodes; they are not blocks.
+
+Stdlib only, deterministic output. Usage:
+
+    python3 scripts/inventory_blocks.py [--models DIR] [--out FILE]
+"""
+
+import argparse
+import collections
+import sys
+import urllib.parse
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+DEFAULT_MODELS = Path(__file__).resolve().parent.parent / "fixtures" / "models"
+DEFAULT_OUT = Path(__file__).resolve().parent.parent / "docs" / "BLOCK-INVENTORY.md"
+
+VALUE_SAMPLE_LIMIT = 3       # distinct sample values shown per property
+VALUE_MAX_LEN = 40           # sample values are truncated to this length
+
+
+def pct_decode(text: str) -> str:
+    """Decode GenMSI's '%XX' percent-escaping used in hints/values/descriptions."""
+    try:
+        return urllib.parse.unquote(text) if "%" in text else text
+    except (UnicodeDecodeError, ValueError):
+        return text
+
+
+def trunc(s: str, n: int = VALUE_MAX_LEN) -> str:
+    s = s.replace("|", "\\|").replace("\n", " ").strip()
+    return s if len(s) <= n else s[: n - 1] + "…"
+
+
+class ClassStats:
+    def __init__(self, name: str):
+        self.name = name
+        self.uses = 0
+        self.models = set()
+        # property name -> {"uses": int, "nonempty": int, "types": Counter,
+        #                   "subtypes": Counter, "samples": dict(value->first model)}
+        self.props = collections.OrderedDict()
+
+    def add_module(self, module: ET.Element, model: str) -> None:
+        self.uses += 1
+        self.models.add(model)
+        props = module.find("props")
+        if props is None:
+            return
+        for prop in props.findall("property"):
+            name = prop.get("name") or "?"
+            value = prop.get("value") or ""
+            st = self.props.setdefault(
+                name,
+                {"uses": 0, "nonempty": 0, "types": collections.Counter(),
+                 "subtypes": collections.Counter(), "samples": {}},
+            )
+            st["uses"] += 1
+            if value.strip():
+                st["nonempty"] += 1
+                st["types"][prop.get("type") or "?"] += 1
+                st["subtypes"][prop.get("subType") or "?"] += 1
+                if value not in st["samples"]:
+                    st["samples"][value] = model
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--models", type=Path, default=DEFAULT_MODELS)
+    ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    args = ap.parse_args()
+
+    model_files = sorted(args.models.glob("*.gmdl"))
+    if not model_files:
+        print(f"error: no .gmdl models found under {args.models}", file=sys.stderr)
+        return 1
+
+    classes: dict[str, ClassStats] = collections.OrderedDict()
+    nonblock_names: collections.Counter = collections.Counter()
+    nonblock_models = set()
+    custom_classes: list[tuple[str, str, str]] = []  # (className, description, model)
+    parsed = 0
+
+    for path in model_files:
+        model = path.name
+        try:
+            root = ET.parse(path).getroot()
+        except ET.ParseError as exc:
+            print(f"error: {model}: XML parse failed: {exc}", file=sys.stderr)
+            return 1
+        parsed += 1
+
+        if root.tag != "gmodel":
+            print(f"error: {model}: root element is <{root.tag}>, expected <gmodel>",
+                  file=sys.stderr)
+            return 1
+
+        for gclass in root.iter("gclasses"):
+            for mc in gclass.findall("moduleclass"):
+                custom_classes.append(
+                    (mc.get("className") or "?", pct_decode(mc.get("ClassDescrip") or ""), model)
+                )
+
+        modules = root.find("modules")
+        if modules is None:
+            print(f"error: {model}: no <modules> element", file=sys.stderr)
+            return 1
+        for module in modules.findall("module"):
+            cls_name = module.get("moduleclass") or ""
+            if not cls_name:
+                nonblock_names[f'{module.get("name") or "?"} (kind={module.get("kind") or "?"})'] += 1
+                nonblock_models.add(model)
+                continue
+            stats = classes.setdefault(cls_name, ClassStats(cls_name))
+            stats.add_module(module, model)
+
+    # ---- render markdown --------------------------------------------------
+    lines: list[str] = []
+    lines.append("# Block inventory (Phase 0, decision D9)")
+    lines.append("")
+    lines.append(
+        f"Generated by `scripts/inventory_blocks.py` over the {parsed} models in "
+        "`fixtures/models/`. This is the block subset genmsi-core implements "
+        "first (D9); classes are listed by frequency of use."
+    )
+    lines.append("")
+    lines.append(
+        "A property counts as *used* when its `value` attribute is non-empty. "
+        "Empty values are shown too, because they are part of the block schema "
+        "the writer must emit."
+    )
+    lines.append("")
+    lines.append("## Summary")
+    lines.append("")
+    lines.append(f"- Models inventoried: **{parsed}**")
+    lines.append(f"- Distinct block classes used: **{len(classes)}**")
+    total_block_uses = sum(c.uses for c in classes.values())
+    lines.append(f"- Total block instances: **{total_block_uses}**")
+    lines.append(
+        f"- Non-block nodes (no `moduleclass`, kind `C`: main model node, "
+        f"notes, decorative containers): **{sum(nonblock_names.values())}** "
+        f"across {len(nonblock_models)} models"
+    )
+    lines.append("")
+    lines.append("| Class | Uses | Models |")
+    lines.append("|---|---:|---:|")
+    for c in sorted(classes.values(), key=lambda c: (-c.uses, c.name)):
+        lines.append(f"| `{c.name}` | {c.uses} | {len(c.models)} |")
+    lines.append("")
+
+    lines.append("## Per-class property usage")
+    lines.append("")
+    lines.append(
+        "For each class: properties in schema order, how many of the block's "
+        "uses set them non-empty (`non-empty/uses`), declared `type`/`subType`, "
+        "and up to "
+        f"{VALUE_SAMPLE_LIMIT} distinct example values."
+    )
+    lines.append("")
+    for c in sorted(classes.values(), key=lambda c: (-c.uses, c.name)):
+        lines.append(f"### `{c.name}` — {c.uses} use(s) in {len(c.models)} model(s)")
+        lines.append("")
+        lines.append("Models: " + ", ".join(f"`{m}`" for m in sorted(c.models)))
+        lines.append("")
+        if not c.props:
+            lines.append("_No properties._")
+            lines.append("")
+            continue
+        lines.append("| Property | Non-empty | Type | SubType | Example values |")
+        lines.append("|---|---|---|---|---|")
+        for pname, st in c.props.items():
+            types = "/".join(sorted(st["types"])) or "—"
+            subtypes = "/".join(sorted(st["subtypes"])) or "—"
+            samples: list[str] = []
+            for value in sorted(st["samples"], key=lambda s: (-len(s), s)):
+                if value not in samples:
+                    samples.append(value)
+                if len(samples) >= VALUE_SAMPLE_LIMIT:
+                    break
+            ex = "; ".join(f"`{trunc(pct_decode(v))}`" for v in samples) or "—"
+            lines.append(
+                f"| `{pname}` | {st['nonempty']}/{st['uses']} | {types} | {subtypes} | {ex} |"
+            )
+        lines.append("")
+
+    if nonblock_names:
+        lines.append("## Non-block nodes")
+        lines.append("")
+        lines.append(
+            "Modules with an empty `moduleclass` attribute are not simulation "
+            "blocks: they are the main model node, text notes (Enunciado, Tapa) "
+            "or decorative containers saved by the editor."
+        )
+        lines.append("")
+        lines.append("| Name (kind) | Occurrences |")
+        lines.append("|---|---:|")
+        for name, count in sorted(nonblock_names.items(), key=lambda kv: (-kv[1], kv[0])):
+            lines.append(f"| `{name}` | {count} |")
+        lines.append("")
+
+    if custom_classes:
+        lines.append("## Custom classes declared in `gclasses`")
+        lines.append("")
+        lines.append(
+            "Some models declare editor-aliases for block classes. "
+            "`Multifurcacion` / `Que area voy` alias a *Multi Transfer* block."
+        )
+        lines.append("")
+        lines.append("| className | ClassDescrip | Declared in |")
+        lines.append("|---|---|---|")
+        for name, desc, model in custom_classes:
+            lines.append(f"| `{name}` | {trunc(desc, 60)} | `{model}` |")
+        lines.append("")
+
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"wrote {args.out} ({parsed} models, {len(classes)} classes, "
+          f"{total_block_uses} block uses)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

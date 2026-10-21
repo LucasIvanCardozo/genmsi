@@ -5,36 +5,13 @@
 //! says so when the bound was reached, so a truncated trace is never mistaken
 //! for a complete one.
 
+use genmsi_core::documents::{TRACE_SCHEMA, trace_document};
 use genmsi_core::{Simulation, TraceEvent};
-use serde::Serialize;
 
 use crate::cli::TraceArgs;
 use crate::error::{CliError, ExitCode};
 use crate::model;
-use crate::output::{self, TRACE_SCHEMA};
-
-/// Body of the `genmsi.trace/1` document.
-#[derive(Debug, Serialize)]
-pub struct TraceReport<'a> {
-    /// Program title.
-    pub title: &'a str,
-    /// Seed used.
-    pub seed: u64,
-    /// Start time.
-    pub start_time: f64,
-    /// End time.
-    pub end_time: f64,
-    /// Why the run ended (`terminated`, `no_events`, `time_limit`).
-    pub end_reason: &'a str,
-    /// Record limit this run used.
-    pub limit: usize,
-    /// Records actually kept.
-    pub records: usize,
-    /// Whether the limit may have cut the trace.
-    pub truncated: bool,
-    /// Trace records, in simulation order.
-    pub events: &'a [TraceEvent],
-}
+use crate::output;
 
 /// Human-readable form of a trace.
 pub fn render(events: &[TraceEvent], limit: usize, truncated: bool) -> String {
@@ -72,17 +49,7 @@ pub fn run(args: TraceArgs) -> Result<ExitCode, CliError> {
     let records = result.trace.len();
     let truncated = records >= args.limit;
     if args.output.json {
-        let document = TraceReport {
-            title: &result.title,
-            seed: result.seed,
-            start_time: result.start_time,
-            end_time: result.end_time,
-            end_reason: result.end_reason.as_str(),
-            limit: args.limit,
-            records,
-            truncated,
-            events: &result.trace,
-        };
+        let document = trace_document(&result, args.limit);
         output::print_json(TRACE_SCHEMA, &document)?;
     } else {
         output::print(&render(&result.trace, args.limit, truncated))?;

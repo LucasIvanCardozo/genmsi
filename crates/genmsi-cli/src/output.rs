@@ -11,24 +11,12 @@ use serde::Serialize;
 
 use crate::error::CliError;
 
-/// Schema id of the `lint` document.
-pub const LINT_SCHEMA: &str = "genmsi.lint/1";
-/// Schema id of the `simulate` document.
-pub const REPORT_SCHEMA: &str = "genmsi.report/1";
-/// Schema id of the `trace` document.
-pub const TRACE_SCHEMA: &str = "genmsi.trace/1";
+// The schema ids and the envelope are the engine's documents, published from
+// one place (`genmsi_core::documents`) so every client agrees on them. The
+// CLI adds `run-all`, which only it produces.
+pub use genmsi_core::documents::{LINT_SCHEMA, REPORT_SCHEMA};
 /// Schema id of the `run-all` document.
 pub const RUN_ALL_SCHEMA: &str = "genmsi.run-all/1";
-
-/// A versioned document: the schema id followed by the body fields.
-#[derive(Debug, Serialize)]
-pub struct Envelope<'a, T: Serialize> {
-    /// Schema id of this document, `<name>/<major>`.
-    pub schema: &'a str,
-    /// Document fields, serialized at the top level.
-    #[serde(flatten)]
-    pub body: T,
-}
 
 /// Write text to stdout.
 ///
@@ -46,7 +34,7 @@ pub fn print(text: &str) -> Result<(), CliError> {
 
 /// Write one pretty-printed JSON document.
 pub fn print_json<T: Serialize + ?Sized>(schema: &str, body: &T) -> Result<(), CliError> {
-    let document = Envelope { schema, body };
+    let document = genmsi_core::documents::Envelope { schema, body };
     let text = serde_json::to_string_pretty(&document)
         .map_err(|error| CliError::Serialize(error.to_string()))?;
     print(&format!("{text}\n"))
@@ -55,6 +43,7 @@ pub fn print_json<T: Serialize + ?Sized>(schema: &str, body: &T) -> Result<(), C
 #[cfg(test)]
 mod tests {
     use super::*;
+    use genmsi_core::documents::TRACE_SCHEMA;
 
     #[derive(Serialize)]
     struct Body {
@@ -63,7 +52,7 @@ mod tests {
 
     #[test]
     fn the_envelope_starts_with_the_schema() {
-        let document = Envelope {
+        let document = genmsi_core::documents::Envelope {
             schema: LINT_SCHEMA,
             body: Body { answer: 42 },
         };

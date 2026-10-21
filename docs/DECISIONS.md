@@ -82,3 +82,18 @@ This is the coordinator session. Each phase runs in a dedicated session that
 receives its assignment (objective, allowed edit paths, S# specs, deliverable)
 from the coordinator and consults it instead of making product decisions.
 Product questions go to the user through the coordinator.
+
+## D13 — CLI output contract: one deterministic document per subcommand
+
+Every `genmsi` subcommand writes exactly one deterministic document to stdout and
+nothing to stderr unless it fails, which is what makes the output snapshot-testable
+and usable from CI (ROADMAP Phase 2). `--json` wraps the body in a versioned
+envelope, `{"schema": "genmsi.<document>/<major>", ...}`; within one major version a
+change is additive only (new fields may appear; existing names, types and meanings
+stay), and a breaking change bumps the number. Exit codes: `0` success, `1` the
+model does not load, validate or run (including the five models the original
+refuses), `2` usage error, `3` `lint` found compiler diagnostics on a runnable
+model. `trace` has no filters beyond `--limit`, and `run-all <dir>` exists as the
+CI convenience that sweeps one directory. Rationale: the smallest surface that
+covers the original's workflow (D11) while giving scripts a contract they can
+depend on; the schema field lets each document grow without breaking consumers.

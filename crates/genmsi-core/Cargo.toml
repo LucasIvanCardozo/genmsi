@@ -1,0 +1,14 @@
+[package]
+name = "genmsi-core"
+description = "Headless discrete-event simulation engine: scheduler, seeded RNG, expression evaluation, traces and reports"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+rand = "0.9"
+rand_chacha = "0.9"

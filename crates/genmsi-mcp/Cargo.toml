@@ -1,0 +1,18 @@
+[package]
+name = "genmsi-mcp"
+description = "MCP server exposing the GenMSI engine to AI agents over stdio (tools: simulate, lint, get_trace, explain_model)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "genmsi-mcp"
+path = "src/main.rs"
+
+[dependencies]
+genmsi-core = { path = "../genmsi-core" }
+genmsi-format = { path = "../genmsi-format" }
+serde.workspace = true
+serde_json.workspace = true
+# rmcp joins in Phase 3; kept out until the tool surface is defined.

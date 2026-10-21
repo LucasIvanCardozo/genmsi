@@ -1,0 +1,18 @@
+[package]
+name = "genmsi-cli"
+description = "Command-line client for the GenMSI engine: simulate, lint, trace (human and --json output)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "genmsi"
+path = "src/main.rs"
+
+[dependencies]
+genmsi-core = { path = "../genmsi-core" }
+genmsi-format = { path = "../genmsi-format" }
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true

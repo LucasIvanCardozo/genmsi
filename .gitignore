@@ -16,3 +16,8 @@ dist/
 .vscode/
 *.swp
 .DS_Store
+
+# Phase 0 Wine oracle: backup of the original + isolated wineprefix (never tracked)
+/Genmsi_20230711.backup/
+/scripts/wine-oracle/wineprefix/
+/scripts/wine-oracle/out/

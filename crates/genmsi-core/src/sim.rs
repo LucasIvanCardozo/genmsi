@@ -168,7 +168,7 @@ impl Ord for Event {
     fn cmp(&self, other: &Self) -> Ordering {
         self.time
             .total_cmp(&other.time)
-            .then_with(|| self.priority.cmp(&other.priority))
+            .then_with(|| other.priority.cmp(&self.priority))
             .then_with(|| self.seq.cmp(&other.seq))
     }
 }
@@ -698,7 +698,7 @@ impl<'p> Simulation<'p> {
                         let facility = self.entities.facility(&name, self.now);
                         std::mem::take(&mut facility.waiters)
                     };
-                    waiters.sort_by_key(|waiter| (self.priority_of(*waiter), *waiter));
+                    waiters.sort_by_key(|waiter| (std::cmp::Reverse(self.priority_of(*waiter)), *waiter));
                     self.entities.facility(&name, self.now).waiters = waiters;
                     if let Some(transaction) = self.xacts.get_mut(&xact) {
                         transaction.transition(XactState::Waiting);
@@ -774,7 +774,7 @@ impl<'p> Simulation<'p> {
                         storage.waiters.push(xact);
                         std::mem::take(&mut storage.waiters)
                     };
-                    waiters.sort_by_key(|waiter| (self.priority_of(*waiter), *waiter));
+                    waiters.sort_by_key(|waiter| (std::cmp::Reverse(self.priority_of(*waiter)), *waiter));
                     self.entities
                         .storage(&name, UNDECLARED_STORAGE_CAPACITY, self.now)
                         .waiters = waiters;
@@ -1397,7 +1397,7 @@ impl<'p> Simulation<'p> {
             .into_iter()
             .filter(|candidate| self.xacts.contains_key(candidate))
             .collect();
-        sorted.sort_by_key(|xact| (self.priority_of(*xact), *xact));
+        sorted.sort_by_key(|xact| (std::cmp::Reverse(self.priority_of(*xact)), *xact));
         // Retry only the head of the pending chain; the rest stay queued for the
         // next release. Resuming one waiter and dropping the others would strand
         // every transaction behind it in the SEIZE block forever.

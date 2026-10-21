@@ -9,13 +9,27 @@
 //!   reproducible, which is the basis for replications, confidence intervals
 //!   and regression testing.
 //! - No opaque global state; the engine owns all mutable state behind an
-//!   explicit `Simulation` handle.
+//!   explicit [`Simulation`] handle.
 //! - Blocks are described by data in `genmsi-format` and compiled into a
-//!   `Program`; adding a block type does not require touching the scheduler.
+//!   [`Program`]; adding a block type does not require touching the scheduler.
+//!
+//! # Example
+//!
+//! ```no_run
+//! use genmsi_core::{simulate, SimConfig};
+//! use genmsi_format::load;
+//!
+//! let model = load("fixtures/models/TP2__problema1.gmdl").unwrap();
+//! let (program, result) = simulate(&model, SimConfig::default()).unwrap();
+//! println!("{}", genmsi_core::render(&result, &program));
+//! ```
 
 pub mod error;
 pub mod expr;
+pub mod oracle;
 pub mod program;
+pub mod report;
+pub mod replication;
 pub mod rng;
 pub mod sim;
 pub mod stat;
@@ -23,4 +37,33 @@ pub mod xact;
 
 pub use error::EngineError;
 pub use program::{Program, compile};
+pub use report::{json_report, program_json, render, to_csv, to_json};
+pub use replication::{
+    MetricSummary, ReplicationConfig, ReplicationResult, render_summary, replicate,
+};
 pub use sim::{BlockStats, EndReason, RunResult, SimConfig, Simulation, TraceEvent};
+
+use genmsi_format::GmdlModel;
+
+/// Compile and run a model once.
+pub fn simulate(
+    model: &GmdlModel,
+    config: SimConfig,
+) -> Result<(Program, RunResult), EngineError> {
+    let title = model
+        .root()
+        .map(|root| root.name.clone())
+        .unwrap_or_else(|| "model".to_string());
+    let program = compile(model, title)?;
+    let result = Simulation::new(&program, config).run()?;
+    Ok((program, result))
+}
+
+/// Compile a model without running it.
+pub fn compile_model(model: &GmdlModel) -> Result<Program, EngineError> {
+    let title = model
+        .root()
+        .map(|root| root.name.clone())
+        .unwrap_or_else(|| "model".to_string());
+    compile(model, title)
+}

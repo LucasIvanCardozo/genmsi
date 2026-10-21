@@ -91,7 +91,8 @@ merge stay with the user.
 | T5 | `b370d76` `feat(mcp): lint, simulate and get_trace tools` |
 | T7 | `8516025` `feat(mcp): explain_model with the GPSS glossary` |
 | T8 | `092a327` `test(mcp): cover the reference models through the tools` |
-| T9, T10, T11 | `docs(mcp): document the tools, the schemas and the transcript` |
+| T9, T10, T11 | `84912a7` `docs(mcp): document the tools, the schemas and the transcript` |
+| T12 | `18967d7` `fix(mcp): tell a missing model from a model that cannot be read`, `1d10f51` `refactor(mcp): one place that turns a tool outcome into a result` |
 
 ## Decisions (answered by the coordinator, D12)
 
@@ -176,3 +177,15 @@ FASE 3 — GenMSI-rs: genmsi-mcp. Sos la sesión de la Fase 3 del proyecto genms
   result and the failures as a tool error (`isError: true`) with the JSON body, not as
   a protocol error: the request was well-formed, the model was not, and the agent has
   to read the message to fix it.
+- L11 (verification, close): `cargo test --workspace` green (151 tests before this
+  phase, 24 more with it: 19 unit and 5 integration of the MCP crate) and
+  `cargo clippy --workspace --all-targets -- -D warnings` clean. The oracle keeps its
+  20 of 20 and the CLI snapshots are untouched: `crates/genmsi-cli/` was not modified in
+  this phase.
+- L12 (risk): the change touches the shared semantic model (`genmsi-format`) and the
+  shared engine API (`genmsi-core`), so the native review candidate is the accumulated
+  branch, not a single commit. Risk item 3 (a contract others consume: the `.gmdl`
+  format and the `genmsi.*/1` documents) and item 6 (no test would catch a regression
+  in what changes) both apply; the mitigations are the byte-identical roundtrip test
+  over the 25 reference models, the differential check of L6 and the snapshot tests of
+  the CLI, which did not move.

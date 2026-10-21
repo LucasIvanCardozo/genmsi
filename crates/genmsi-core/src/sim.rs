@@ -1396,11 +1396,25 @@ impl<'p> Simulation<'p> {
         if waiters.is_empty() {
             return;
         }
-        let mut sorted = waiters;
-        sorted.sort_by_key(|xact| (self.priority_of(*xact), *xact));
-        if let Some(xact) = sorted
+        let mut sorted: Vec<XactId> = waiters
             .into_iter()
-            .find(|candidate| self.xacts.contains_key(candidate))
+            .filter(|candidate| self.xacts.contains_key(candidate))
+            .collect();
+        sorted.sort_by_key(|xact| (self.priority_of(*xact), *xact));
+        // Retry only the head of the pending chain; the rest stay queued for the
+        // next release. Resuming one waiter and dropping the others would strand
+        // every transaction behind it in the SEIZE block forever.
+        let resumed = if sorted.is_empty() {
+            None
+        } else {
+            Some(sorted.remove(0))
+        };
+        if !sorted.is_empty() {
+            let facility = self.entities.facility(name, self.now);
+            sorted.append(&mut facility.waiters);
+            facility.waiters = sorted;
+        }
+        if let Some(xact) = resumed
             && let Some(block) = self
                 .xacts
                 .get(&xact)

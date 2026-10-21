@@ -116,3 +116,52 @@ scheduler needs the program), so work units follow module boundaries
   `docs/oracle-comparison.md`. Result: 13 models within tolerance, 6 partial
   (TP3 65%, TP4 75%, TP5 68%, TP6_2 47%, TP7_3 69%, TP10 48%) and 1 gap
   (Parcial 6-11-23 at 21%); the remaining work per model is recorded there.
+
+## Fase 1b: oracle fidelity (continuation of Phase 1)
+
+Same branch `feat/phase1-engine`, same allowed paths as S9. Closing the gap between
+13 match / 6 partial / 1 gap and 19-20 match / <=1 partial / 0 gap.
+
+- S10 (verbatim): "Objetivo: pasar de 13 match / 6 partial / 1 gap a 19-20 match / <=1 partial /
+  0 gap, sin relajar el criterio de comparación (20%/35% o dentro del IC 95%) ni tocar los
+  baselines."
+- S11 (verbatim): "Prioridad: 1. Parcial 6-11-23 (gap, 21%): la divergencia es estructural -
+  QMOLINETE 375 entradas vs 1, y average_time de MOLINETE 19 vs 316. Diagnóstico primero: usá la
+  pestaña 'Código GPSS' del original para ver cómo expande grupos/PREEMPT/Multifurcación,
+  comparala con tu compilación, y corregí. 2. TP10 (48%) y TP6_2 (47%): mismos pasos - diff de
+  Código GPSS vs tu expansión, identificar el bloque o la semántica que difiere, corregir,
+  re-medir. 3. TP3, TP4, TP5, TP7_3 (65-75%): probablemente métricas de occupancy/tiempos;
+  revisá si es un problema de conteo en depart/enter o de la expansión de
+  FacilityUse/StorageUse."
+- S12 (verbatim): "Método obligatorio: por cada modelo, primero identificar la métrica divergente
+  más estructural (no la que más falla), plantear la hipótesis semántica, verificarla contra la
+  fuente (Código GPSS del original, docs de cátedra en docs/reference/, semántica publicada de
+  GPSS), corregir, y agregar un test de regresión que fije el comportamiento corregido.
+  Documentá cada corrección en docs/oracle-comparison.md y en el Log del feature doc."
+- S13 (verbatim): "Prohibiciones: no relajes tolerancias, no modifiques fixtures/outputs/, no
+  toques crates/genmsi-cli/ ni crates/genmsi-mcp/."
+- S14 (verbatim): "Entregable: docs/oracle-comparison.md actualizado con la tabla completa, tests
+  en verde + clippy limpio, commits por corrección. Si un modelo resulta estar mal escrito en el
+  original (modelado defectuoso, no semántica del motor), documentalo como tal con evidencia y no
+  lo fuerces a matchear - es un resultado válido."
+
+## Tasks (Fase 1b)
+
+- T12 (S12) Structural diagnosis of Parcial 6-11-23: compare our expanded block table against the
+  baseline report/generated GPSS. Route: inline. Commit: e.g. `fix(core): ...`.
+- T13 (S11) Fix every engine defect the diagnosis exposes, one regression test per fix.
+- T14 (S11) TP10 + TP6_2 diagnosis and fix. Route: inline unless a trigger fires.
+- T15 (S11) TP3, TP4, TP5, TP7_3 diagnosis and fix.
+- T16 (S12, S14) Re-run the oracle, update `docs/oracle-comparison.md`, `cargo test` + clippy.
+
+## Log (Fase 1b)
+
+- L10 (verbatim, first message of 1b): "FASE 1b — fidelidad contra el oráculo (continuación de tu
+  Fase 1) [...] Objetivo: pasar de 13 match / 6 partial / 1 gap a 19-20 match / <=1 partial / 0
+  gap, sin relajar el criterio de comparación (20%/35% o dentro del IC 95%) ni tocar los
+  baselines." + the priority list (Parcial 6-11-23, TP10/TP6_2, TP3/TP4/TP5/TP7_3), the mandatory
+  method (most structural metric first, hypothesis, source check, fix, regression test, document
+  in `docs/oracle-comparison.md` and this Log), the prohibitions (no tolerance relaxation, no
+  edits to `fixtures/outputs/`, no edits to `crates/genmsi-cli/` or `crates/genmsi-mcp/`), and the
+  deliverable (updated comparison table, green tests + clean clippy, one commit per correction;
+  an original model that is simply badly written is documented, not forced to match).

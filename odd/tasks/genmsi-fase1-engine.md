@@ -113,6 +113,6 @@ scheduler needs the program), so work units follow module boundaries
   termination path instead.
 - L9 (evidence, oracle run): `cargo run --release -p genmsi-core --example oracle
   -- --runs 5 --write` compares all 20 valid models; results per model are in
-  `docs/oracle-comparison.md`. 14 models are within tolerance, 6 are partial or
-  gaps (TP10, TP3, TP4, TP5, TP6_2, TP7_3, Parcial) and the remaining work is
-  recorded there.
+  `docs/oracle-comparison.md`. Result: 13 models within tolerance, 6 partial
+  (TP3 65%, TP4 75%, TP5 68%, TP6_2 47%, TP7_3 69%, TP10 48%) and 1 gap
+  (Parcial 6-11-23 at 21%); the remaining work per model is recorded there.

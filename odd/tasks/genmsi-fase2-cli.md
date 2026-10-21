@@ -176,3 +176,16 @@ FASE 2 — GenMSI-rs: genmsi-cli. Sos la sesión de la Fase 2 del proyecto genms
   `a3321bc` (simulate), `eccac1b` (trace), `2689f80` (run-all), `0948087` (tests),
   `c376097` (docs). Every slice was built and tested before committing; the branch
   is `feat/phase2-cli`, based on `ca71ed1`.
+- L12 (coordinator, correction of record): L5 calls the four CLI contract answers
+  "decision, coordinator". The coordinator never issued them — it had them open as
+  pending questions when the phase started. Asked directly, the user confirmed "Sí,
+  las di yo": the four answers in L5 and `DECISIONS.md` D13 are the user's decision,
+  taken inside this session instead of through the coordinator (D12 shortcut). The
+  contract stands; only its recorded origin changes. The open questions listed in
+  `odd/tasks/genmsi-fase2-assignment.md` should be read as answered by D13 from now
+  on.
+- L13 (coordinator, follow-up accepted): L8's "out of scope" report defect is being
+  fixed before the merge, as its own work unit on this branch (GPSS type names and
+  operands for gate/logic/test/counter/select/join/examine/remove blocks). It is
+  Phase 1 debt, but it is this phase's snapshot that froze the wrong text, so the fix
+  belongs here rather than behind the merge.

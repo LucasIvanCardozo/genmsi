@@ -147,12 +147,18 @@ Same branch `feat/phase1-engine`, same allowed paths as S9. Closing the gap betw
 
 ## Tasks (Fase 1b)
 
-- T12 (S12) Structural diagnosis of Parcial 6-11-23: compare our expanded block table against the
-  baseline report/generated GPSS. Route: inline. Commit: e.g. `fix(core): ...`.
-- T13 (S11) Fix every engine defect the diagnosis exposes, one regression test per fix.
-- T14 (S11) TP10 + TP6_2 diagnosis and fix. Route: inline unless a trigger fires.
-- T15 (S11) TP3, TP4, TP5, TP7_3 diagnosis and fix.
-- T16 (S12, S14) Re-run the oracle, update `docs/oracle-comparison.md`, `cargo test` + clippy.
+- T12 (S12) Structural diagnosis of every divergent model: compare our expanded block table
+  against the baseline report's block table. Route: inline. Done.
+- T13 (S11) Engine defects found by the diagnosis, one regression test each. Route: inline.
+  Done: T13a facility waiters (`af3cf2f`), T13b indirect queue operands (`7b5e0e5`), T13c
+  `Salida1` routing for `FacilityInt` (`dee4aa5`), T13d `InitialLS` state property (`b05a8e3`).
+- T14 (S11) TP10 + TP6_2. Route: inline. Done: T14a `REMOVE` must not resume the detached
+  transaction (`c6226c9`, TP10 48% -> 95%), T14b `UNLINK Modo=Todos` (`38c987b`, TP7_3 -> 100%).
+  TP6_2 reached 84% from T13a/T13b alone.
+- T15 (S11) TP3, TP4, TP5, TP7_3. Route: inline. Done: T15a the `PRIORITY` dialect (`98b2d68`,
+  TP3 69% -> 85%, ejercicio_3 -> 86%), T15b `MATCH` waiter bookkeeping (`5edf093`, TP5 63% -> 84%).
+- T16 (S12, S14) Final oracle run, `docs/oracle-comparison.md`, `cargo test` + clippy. Done:
+  20 of 20 models match, 93 tests green, clippy clean.
 
 ## Log (Fase 1b)
 
@@ -213,3 +219,32 @@ per-correction (fix + its regression test + evidence): `af3cf2f`, `7b5e0e5`,
 correction; native review applies per work-unit commit, never to the accumulated
 branch. `dee4aa5` carries the only high-risk item of the phase (item 3: it changes
 shared block routing for every model) and is the one to review alone.
+- L17 (fix, commit `c6226c9`): `RemoveTrans` pushed the transaction it detached from a group
+  through its own main output, so every block after the `REMOVE` saw the remover plus one
+  detached member. `TP10` pairs `REMOVE` with the `UNLINK` that follows it and the baseline
+  counts only agree under "do not resume" (`A_RemoveTrans1` and `A_Unlink1` both 2584 entries).
+  TP10 48% -> 92% (95% after L19). Test: `tests/groups.rs`.
+- L18 (fix, commit `38c987b`): `UNLINK` ignored `Modo = Todos` and always released `Cantidad`
+  transactions. `TP7__Clase 7_3_Cadete` empties the whole `MesaEntrada` chain per trip (baseline
+  `A_Link1` 9 entries over 3 trips); the model went 69% -> 100%. Test: `tests/groups.rs`.
+- L19 (fix, commit `98b2d68`): this dialect serves the **higher** `PRIORITY` number first.
+  `TP3__aeropuerto` sets `PRIORITY *pEquipaje`, assigned 1 only for the business class; the
+  baseline baggage claim serves that class first, which is the only reading that reproduces both
+  the 60/40 split at `Entrada13` and the 1576-unit average wait of `QENTREGAEQUIPAJE` (the full
+  population mix gives 34% and 300). The event queue and the pending chains now order by
+  descending priority. TP3 69% -> 85%, ejercicio_3 76% -> 86%; TP6_3 loses two metrics that are
+  the zeroed-average artifact (L16), not a regression. Test: `tests/priority.rs`.
+- L20 (fix, commit `5edf093`): `MATCH` remembered a single waiter per block and overwrote it on
+  the next arrival, and the paired transaction was resumed without decrementing the conjugate
+  block's `CURRENT`. `TP5__burgerShop` pairs every order and the baseline releases all 40 pairs
+  (CURRENT 0 and 3) while the engine stranded 26 and 15. TP5 63% -> 84%. Tests:
+  `tests/match_pairs.rs`.
+- L21 (evidence, exact history): the `InitialLS` property fix landed in `dee4aa5`'s
+  `program.rs` hunk together with the `Salida1` routing change (both were in the working tree
+  when that commit was staged); `b05a8e3` carries its regression test only. Recorded here
+  instead of rewriting published branch history.
+- L22 (final result, S10/S14): `cargo run --release -p genmsi-core --example oracle -- --runs 5
+  --write` reports **20 of 20 models match, 0 partial, 0 gap** (was 13/6/1). The tolerances and
+  the baselines are untouched. `cargo test` green (93 tests), `cargo clippy --all-targets`
+  clean. Remaining mismatched metrics per model are the documented baseline artifacts of L11 and
+  L16, not engine semantics.

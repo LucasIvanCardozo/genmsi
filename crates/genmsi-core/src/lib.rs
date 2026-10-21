@@ -10,29 +10,13 @@
 //!   and regression testing.
 //! - No opaque global state; the engine owns all mutable state behind an
 //!   explicit `Simulation` handle.
-//! - Blocks are defined by data (block definitions live in `genmsi-format`),
-//!   so adding a block type must not require recompiling the engine.
+//! - Blocks are described by data in `genmsi-format` and compiled into a
+//!   `Program`; adding a block type does not require touching the scheduler.
 
-/// Error type for engine failures (bad expressions, invalid model, runtime).
-#[derive(Debug, thiserror::Error)]
-#[allow(dead_code)] // scaffold: variants gain use in Phase 1
-pub enum EngineError {
-    /// An expression in the model could not be evaluated.
-    #[error("expression error: {0}")]
-    Expression(String),
-    /// The model is valid XML but not runnable as-is.
-    #[error("invalid simulation setup: {0}")]
-    InvalidSetup(String),
-}
+pub mod error;
+pub mod expr;
+pub mod rng;
+pub mod stat;
+pub mod xact;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn engine_error_display_is_actionable() {
-        let err = EngineError::Expression("unknown function FN:MediaClientes".to_string());
-        let text = err.to_string();
-        assert!(text.contains("FN:MediaClientes"));
-    }
-}
+pub use error::EngineError;

@@ -1,0 +1,42 @@
+//! Grammar of the GenMSI expression language (SNA subset).
+//!
+//! The syntax follows the values the editor stores in properties: `P:Media`,
+//! `FN:Horario`, `X:Count`, `V:calculo`, `Q:cola`, `S:storage`, `CH:Cadena`,
+//! `CH:*NroColectivo` (indirect name), `AC1`, `RN2`, `[containerParam]`, with
+//! the GPSS operators `+ - * /` plus `#` (integer division) and `@` (modulo).
+//! `$` is accepted as an alternative separator so generated GPSS text
+//! (`P$Media`) parses too.
+
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+
+expr       = _{ SOI ~ sum ~ EOI }
+
+sum        = { product ~ (add_op ~ product)* }
+product    = { unary ~ (mul_op ~ unary)* }
+unary      = { neg | primary }
+neg        = { "-" ~ unary }
+primary    = _{ percent | number | placeholder | typed | indirect | system | bare | "(" ~ sum ~ ")" }
+
+add_op     = { "+" | "-" }
+mul_op     = { "*" | "/" | "#" | "@" }
+
+number     = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? | "." ~ ASCII_DIGIT+ }
+
+// A percentage literal is the editor's per-mille value: `70%` means 700.
+percent    = @{ number ~ "%" }
+
+placeholder = { "[" ~ placeholder_name ~ "]" }
+placeholder_name = @{ (!"]" ~ ANY)+ }
+
+typed      = { kind ~ (":" | "$") ~ name_source }
+indirect   = { "*" ~ name_source }
+name_source = _{ indirect_name | name }
+indirect_name = { "*" ~ name }
+name       = @{ (ASCII_ALPHANUMERIC | "_" | ".")+ }
+
+kind       = @{ "FN" | "BV" | "MX" | "CH" | "P" | "X" | "V" | "F" | "Q" | "S" | "R" | "N" | "W" }
+
+system     = @{ "AC1" | "C1" | "TC1" | "RN" ~ ASCII_DIGIT+ }
+
+// A bare name in an expression is a parameter read (the editor emits `*name`).
+bare       = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_" | ".")* }

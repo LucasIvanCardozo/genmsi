@@ -158,7 +158,7 @@ Same branch `feat/phase1-engine`, same allowed paths as S9. Closing the gap betw
 - T15 (S11) TP3, TP4, TP5, TP7_3. Route: inline. Done: T15a the `PRIORITY` dialect (`98b2d68`,
   TP3 69% -> 85%, ejercicio_3 -> 86%), T15b `MATCH` waiter bookkeeping (`5edf093`, TP5 63% -> 84%).
 - T16 (S12, S14) Final oracle run, `docs/oracle-comparison.md`, `cargo test` + clippy. Done:
-  20 of 20 models match, 93 tests green, clippy clean.
+  20 of 20 models match, 98 tests green, clippy clean.
 
 ## Log (Fase 1b)
 
@@ -210,15 +210,6 @@ Same branch `feat/phase1-engine`, same allowed paths as S9. Closing the gap betw
   affected metrics stay mismatches and are documented in
   `docs/oracle-comparison.md`.
 
-### Fase 1b commit slice
-
-The Phase 1 construction slice (9 commits) is recorded above. Fase 1b commits are
-per-correction (fix + its regression test + evidence): `af3cf2f`, `7b5e0e5`,
-`dee4aa5`, `b05a8e3`. The cumulative branch size therefore grows past the
-~400-authorized-line guideline, but each 1b commit is an independently reviewable
-correction; native review applies per work-unit commit, never to the accumulated
-branch. `dee4aa5` carries the only high-risk item of the phase (item 3: it changes
-shared block routing for every model) and is the one to review alone.
 - L17 (fix, commit `c6226c9`): `RemoveTrans` pushed the transaction it detached from a group
   through its own main output, so every block after the `REMOVE` saw the remover plus one
   detached member. `TP10` pairs `REMOVE` with the `UNLINK` that follows it and the baseline
@@ -245,6 +236,23 @@ shared block routing for every model) and is the one to review alone.
   instead of rewriting published branch history.
 - L22 (final result, S10/S14): `cargo run --release -p genmsi-core --example oracle -- --runs 5
   --write` reports **20 of 20 models match, 0 partial, 0 gap** (was 13/6/1). The tolerances and
-  the baselines are untouched. `cargo test` green (93 tests), `cargo clippy --all-targets`
+  the baselines are untouched. `cargo test` green (98 tests), `cargo clippy --all-targets`
   clean. Remaining mismatched metrics per model are the documented baseline artifacts of L11 and
   L16, not engine semantics.
+
+### Fase 1b commit slice
+
+The Phase 1 construction slice (9 commits) is recorded above. Fase 1b commits are
+per-correction (fix + its regression test + evidence), in this order:
+`af3cf2f` (facility waiters), `7b5e0e5` (indirect queue operands), `dee4aa5`
+(`Salida1` routing), `b05a8e3` (`InitialLS`), `c6226c9` (`REMOVE`), `38c987b`
+(`UNLINK ALL`), `98b2d68` (`PRIORITY`), `5edf093` (`MATCH`), `e30d3d0` (test
+cleanup), plus the docs commits `1bec25f` and `aa625c9`. The cumulative branch
+size therefore grows past the ~400-authorized-line guideline, but each 1b commit
+is an independently reviewable correction; native review applies per work-unit
+commit, never to the accumulated branch.
+
+Two 1b commits carry high-risk item 3 (they change behaviour shared by every
+model) and are the ones to review alone: `dee4aa5` (block routing through
+`next_default`) and `98b2d68` (the global priority order). Each was measured
+against all 20 baselines before and after, and no model regressed.

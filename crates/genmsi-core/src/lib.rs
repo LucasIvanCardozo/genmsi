@@ -15,8 +15,10 @@
 
 pub mod error;
 pub mod expr;
+pub mod program;
 pub mod rng;
 pub mod stat;
 pub mod xact;
 
 pub use error::EngineError;
+pub use program::{Program, compile};

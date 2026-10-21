@@ -1,0 +1,2230 @@
+//! Compilation of a `.gmdl` model into an executable program.
+//!
+//! The compiler is the only place that knows the block schema: it resolves
+//! `[containerParameter]` placeholders, expands compound blocks into the GPSS
+//! statement sequence the original generates (`FacilityUse` becomes
+//! `QUEUE`/`SEIZE`/`DEPART`/`ADVANCE`/`RELEASE`, and so on), flattens container
+//! links into a block graph, and pre-parses every expression.
+
+use std::collections::HashMap;
+
+use genmsi_format::{Block, GmdlModel};
+
+use crate::error::EngineError;
+use crate::expr::{Expr, NameSource, ProgramExpr, RefKind};
+use crate::rng::BLOCK_STREAM_BASE;
+
+/// How an assignment combines the new value with the old one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AssignOp {
+    /// `=`
+    Set,
+    /// `+`
+    Add,
+    /// `-`
+    Sub,
+}
+
+impl AssignOp {
+    /// Combine the current and new value.
+    pub fn apply(self, current: f64, value: f64) -> f64 {
+        match self {
+            Self::Set => value,
+            Self::Add => current + value,
+            Self::Sub => current - value,
+        }
+    }
+
+    fn parse(text: &str, node: u32, class: &str) -> Result<Self, EngineError> {
+        match text.trim() {
+            "" | "=" => Ok(Self::Set),
+            "+" => Ok(Self::Add),
+            "-" => Ok(Self::Sub),
+            other => Err(EngineError::invalid_block(
+                node,
+                class,
+                format!("unknown assignment operator {other:?}"),
+            )),
+        }
+    }
+}
+
+/// Comparison operators of `TEST`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RelOp {
+    /// `<`
+    Lt,
+    /// `<=`
+    Le,
+    /// `=`
+    Eq,
+    /// `!=`
+    Ne,
+    /// `>=`
+    Ge,
+    /// `>`
+    Gt,
+}
+
+impl RelOp {
+    /// Parse the editor's representation (`=`, `!=`, `<=`, `>=`, `<`, `>`).
+    pub fn parse(text: &str, node: u32, class: &str) -> Result<Self, EngineError> {
+        match text.trim() {
+            "<" => Ok(Self::Lt),
+            "<=" => Ok(Self::Le),
+            "=" | "==" => Ok(Self::Eq),
+            "!=" | "<>" => Ok(Self::Ne),
+            ">=" => Ok(Self::Ge),
+            ">" => Ok(Self::Gt),
+            other => Err(EngineError::invalid_block(
+                node,
+                class,
+                format!("unknown comparison operator {other:?}"),
+            )),
+        }
+    }
+
+    /// Apply the comparison.
+    pub fn test(self, left: f64, right: f64) -> bool {
+        match self {
+            Self::Lt => left < right,
+            Self::Le => left <= right,
+            Self::Eq => left == right,
+            Self::Ne => left != right,
+            Self::Ge => left >= right,
+            Self::Gt => left > right,
+        }
+    }
+}
+
+/// A named entity operand (`Facility`, `Storage`, `Queue`, `Chain`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct EntityName {
+    /// Literal name or indirect parameter.
+    pub source: NameSource,
+}
+
+impl EntityName {
+    /// Resolve the name through a context.
+    pub fn resolve(&self, ctx: &mut dyn crate::expr::Ctx) -> String {
+        self.source.resolve(ctx)
+    }
+}
+
+impl std::fmt::Display for EntityName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.source.fmt(f)
+    }
+}
+
+/// Generator specification.
+#[derive(Debug, Clone)]
+pub struct GenerateSpec {
+    /// `Cantidad`: maximum number of transactions.
+    pub limit: Option<f64>,
+    /// `Media`: mean interarrival.
+    pub mean: ProgramExpr,
+    /// `Modificador`: spread or distribution function.
+    pub modifier: Option<ProgramExpr>,
+    /// `OffSet`: time of the first arrival.
+    pub offset: Option<ProgramExpr>,
+    /// `Prioridad`: priority of generated transactions.
+    pub priority: Option<ProgramExpr>,
+    /// Whether this generator is the one a `Clock` block synthesizes.
+    pub termination_tick: bool,
+}
+
+/// `TERMINATE` specification.
+#[derive(Debug, Clone, Copy)]
+pub struct TerminateSpec {
+    /// Operand A: units subtracted from the start counter.
+    pub units: f64,
+    /// Whether the block was synthesized from a `Clock`.
+    pub synthetic: bool,
+}
+
+/// `ADVANCE` specification.
+#[derive(Debug, Clone)]
+pub struct AdvanceSpec {
+    /// Operand A: mean time.
+    pub mean: ProgramExpr,
+    /// Operand B: spread or distribution function.
+    pub modifier: Option<ProgramExpr>,
+}
+
+/// `ASSIGN` specification.
+#[derive(Debug, Clone)]
+pub struct AssignSpec {
+    /// Parameter name.
+    pub parameter: String,
+    /// Operator.
+    pub op: AssignOp,
+    /// Operand.
+    pub value: ProgramExpr,
+}
+
+/// `SAVEVALUE` specification.
+#[derive(Debug, Clone)]
+pub struct SaveValueSpec {
+    /// Savevalue name.
+    pub savevalue: String,
+    /// Operator.
+    pub op: AssignOp,
+    /// Operand.
+    pub value: ProgramExpr,
+}
+
+/// `Counter` specification: increment a savevalue and copy it to a parameter.
+#[derive(Debug, Clone)]
+pub struct CounterSpec {
+    /// Savevalue incremented.
+    pub savevalue: String,
+    /// Parameter that receives the new value (may be empty).
+    pub parameter: Option<String>,
+    /// Increment.
+    pub increment: ProgramExpr,
+}
+
+/// `QUEUE` / `DEPART` specification.
+#[derive(Debug, Clone)]
+pub struct QueueSpec {
+    /// Queue name.
+    pub queue: EntityName,
+    /// Units to enqueue/dequeue.
+    pub units: f64,
+}
+
+/// Facility operand of `SEIZE` / `RELEASE`.
+#[derive(Debug, Clone)]
+pub struct FacilitySpec {
+    /// Facility name.
+    pub facility: EntityName,
+}
+
+/// `PREEMPT` specification (from `FacilityInt`).
+#[derive(Debug, Clone)]
+pub struct PreemptSpec {
+    /// Facility name.
+    pub facility: EntityName,
+    /// Parameter receiving the preempted owner's remaining time.
+    pub remaining: Option<String>,
+    /// Whether the owner is routed to the interrupt output.
+    pub route_owner: bool,
+}
+
+/// Storage operand of `ENTER` / `LEAVE`.
+#[derive(Debug, Clone)]
+pub struct StorageUnitsSpec {
+    /// Storage name.
+    pub storage: EntityName,
+    /// Units to take or release.
+    pub units: ProgramExpr,
+}
+
+/// `TEST` specification.
+#[derive(Debug, Clone)]
+pub struct TestSpec {
+    /// Left operand.
+    pub left: ProgramExpr,
+    /// Comparison.
+    pub op: RelOp,
+    /// Right operand.
+    pub right: ProgramExpr,
+}
+
+/// `TRANSFER` specification.
+#[derive(Debug, Clone)]
+pub struct TransferSpec {
+    /// Probability of taking the first output, as a fraction in `[0, 1]`.
+    pub probability: ProgramExpr,
+    /// Whether the probability is already a fraction (function result /1000).
+    pub thousandths: bool,
+}
+
+/// `MULTITRANSFER` (GenMSI `Multifurcacion`) specification.
+#[derive(Debug, Clone)]
+pub struct MultiTransferSpec {
+    /// Branch weights, one per output.
+    pub weights: Vec<ProgramExpr>,
+}
+
+/// Logic switch operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogicOp {
+    /// Set the switch.
+    Set,
+    /// Reset the switch.
+    Reset,
+}
+
+/// `LOGIC` specification.
+#[derive(Debug, Clone)]
+pub struct LogicSpec {
+    /// Switch name.
+    pub switch: EntityName,
+    /// Operation.
+    pub op: LogicOp,
+}
+
+/// `GATE` condition.
+#[derive(Debug, Clone)]
+pub enum GateCondition {
+    /// Logic switch is set or reset.
+    Logic {
+        /// Switch name.
+        switch: EntityName,
+        /// Required state.
+        state: bool,
+    },
+    /// Storage is empty / not empty.
+    Storage {
+        /// Storage name.
+        storage: EntityName,
+        /// `true` requires empty.
+        empty: bool,
+    },
+    /// Facility is available / unavailable.
+    Facility {
+        /// Facility name.
+        facility: EntityName,
+        /// `true` requires available.
+        available: bool,
+    },
+}
+
+/// `GATE` specification.
+#[derive(Debug, Clone)]
+pub struct GateSpec {
+    /// Tested condition.
+    pub condition: GateCondition,
+}
+
+/// `LINK` specification.
+#[derive(Debug, Clone)]
+pub struct LinkSpec {
+    /// Chain name.
+    pub chain: EntityName,
+    /// Order of insertion.
+    pub fifo: bool,
+}
+
+/// `UNLINK` specification.
+#[derive(Debug, Clone)]
+pub struct UnlinkSpec {
+    /// Chain name.
+    pub chain: EntityName,
+    /// Number of transactions to unlink.
+    pub count: ProgramExpr,
+    /// Remove every matching transaction.
+    pub all: bool,
+    /// Parameter compared, when the model filters members.
+    pub compare_parameter: Option<String>,
+    /// Value compared against the member parameter.
+    pub compare_value: Option<ProgramExpr>,
+    /// Parameter of the unlinked transaction copied back into the active one.
+    pub return_parameter: Option<String>,
+}
+
+/// `SPLIT` specification.
+#[derive(Debug, Clone)]
+pub struct SplitSpec {
+    /// Total transactions after the split (original included).
+    pub total: ProgramExpr,
+}
+
+/// `ASSEMBLE` / `GATHER` specification.
+#[derive(Debug, Clone)]
+pub struct AssembleSpec {
+    /// Number of related transactions required.
+    pub count: ProgramExpr,
+    /// Whether all transactions continue (`GATHER`) or copies are destroyed.
+    pub gather: bool,
+}
+
+/// `MATCH` specification.
+#[derive(Debug, Clone)]
+pub struct MatchSpec {
+    /// Label of the conjugate `MATCH` block.
+    pub conjugate: String,
+}
+
+/// `LOOP` specification.
+#[derive(Debug, Clone)]
+pub struct LoopSpec {
+    /// Parameter decremented.
+    pub parameter: String,
+}
+
+/// Selection mode of `SELECT`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelectMode {
+    /// Smallest metric.
+    Min,
+    /// Largest metric.
+    Max,
+    /// First entity not in use.
+    FirstFree,
+}
+
+/// `SELECT` / `SELECTF` specification.
+#[derive(Debug, Clone)]
+pub struct SelectSpec {
+    /// Entity class scanned (`Q`, `S`, `R`).
+    pub kind: RefKind,
+    /// Parameter receiving the chosen entity number.
+    pub parameter: String,
+    /// First entity number.
+    pub low: ProgramExpr,
+    /// Last entity number.
+    pub high: ProgramExpr,
+    /// Selection mode.
+    pub mode: SelectMode,
+}
+
+/// `TABULATE` specification.
+#[derive(Debug, Clone)]
+pub struct TabulateSpec {
+    /// Table name.
+    pub table: String,
+    /// Optional weight (accepted, currently recorded once per observation).
+    pub weight: Option<ProgramExpr>,
+}
+
+/// Transaction-group membership (`JOIN`).
+#[derive(Debug, Clone)]
+pub struct JoinSpec {
+    /// Group name.
+    pub group: String,
+    /// Value added to a numeric group; `None` adds the transaction itself.
+    pub number: Option<ProgramExpr>,
+}
+
+/// `EXAMINE` specification.
+#[derive(Debug, Clone)]
+pub struct ExamineSpec {
+    /// Numeric group name.
+    pub group: String,
+    /// Value tested for membership.
+    pub number: ProgramExpr,
+}
+
+/// `REMOVE` specification.
+#[derive(Debug, Clone)]
+pub struct RemoveSpec {
+    /// Transaction group name.
+    pub group: String,
+    /// Maximum number removed.
+    pub count: ProgramExpr,
+    /// Remove all matches.
+    pub all: bool,
+    /// Parameter compared.
+    pub parameter: Option<String>,
+    /// Value compared.
+    pub value: Option<ProgramExpr>,
+}
+
+/// `SCAN` specification.
+#[derive(Debug, Clone)]
+pub struct ScanSpec {
+    /// Transaction group name.
+    pub group: String,
+    /// Comparison mode: `MIN` selects the smallest `compare_parameter`.
+    pub minimum: bool,
+    /// Parameter compared (`None` means "compare a value operand").
+    pub compare_parameter: Option<String>,
+    /// Value compared when no parameter is given.
+    pub compare_value: Option<ProgramExpr>,
+    /// Parameter copied from the found member.
+    pub from_parameter: Option<String>,
+    /// Parameter receiving the copied value.
+    pub to_parameter: Option<String>,
+}
+
+/// `ALTER` specification.
+#[derive(Debug, Clone)]
+pub struct AlterSpec {
+    /// Transaction group name.
+    pub group: String,
+    /// Parameter modified in the member.
+    pub parameter: Option<String>,
+    /// New value.
+    pub value: Option<ProgramExpr>,
+    /// Number of members altered.
+    pub count: ProgramExpr,
+}
+
+/// Everything a block does at run time.
+#[derive(Debug, Clone)]
+pub enum BlockKind {
+    /// Create transactions.
+    Generate(GenerateSpec),
+    /// Remove a transaction and decrement the start counter.
+    Terminate(TerminateSpec),
+    /// Stay in the model for a delay.
+    Advance(AdvanceSpec),
+    /// Assign a parameter.
+    Assign(AssignSpec),
+    /// Modify a savevalue.
+    SaveValue(SaveValueSpec),
+    /// Increment a savevalue and copy it to a parameter.
+    Counter(CounterSpec),
+    /// Enter a queue.
+    Queue(QueueSpec),
+    /// Leave a queue.
+    Depart(QueueSpec),
+    /// Seize a facility, waiting if busy.
+    Seize(FacilitySpec),
+    /// Release a facility.
+    Release(FacilitySpec),
+    /// Preempt a facility.
+    Preempt(PreemptSpec),
+    /// Return a preempted facility.
+    Return(FacilitySpec),
+    /// Enter a storage, waiting for units.
+    Enter(StorageUnitsSpec),
+    /// Release storage units.
+    Leave(StorageUnitsSpec),
+    /// Branch on a condition.
+    Test(TestSpec),
+    /// Probabilistic branch.
+    Transfer(TransferSpec),
+    /// Multi-way probabilistic branch.
+    MultiTransfer(MultiTransferSpec),
+    /// Conditional block, optionally routing to a failure output.
+    Gate(GateSpec),
+    /// Set or reset a logic switch.
+    Logic(LogicSpec),
+    /// Put the transaction in a user chain.
+    Link(LinkSpec),
+    /// Remove transactions from a user chain.
+    Unlink(UnlinkSpec),
+    /// Split into copies.
+    Split(SplitSpec),
+    /// Wait for related transactions.
+    Assemble(AssembleSpec),
+    /// Wait for a conjugate match.
+    Match(MatchSpec),
+    /// Decrement a parameter and loop.
+    Loop(LoopSpec),
+    /// Choose among numbered entities.
+    Select(SelectSpec),
+    /// Record a value into a table.
+    Tabulate(TabulateSpec),
+    /// Change the transaction priority.
+    Priority(ProgramExpr),
+    /// Add to a group.
+    Join(JoinSpec),
+    /// Test numeric group membership.
+    Examine(ExamineSpec),
+    /// Remove members from a transaction group.
+    Remove(RemoveSpec),
+    /// Search a transaction group.
+    Scan(ScanSpec),
+    /// Alter members of a transaction group.
+    Alter(AlterSpec),
+    /// Change a logic switch at load time (no runtime effect).
+    InitialLogic(LogicSpec),
+    /// Place the transaction at the end of the current events chain.
+    Buffer,
+    /// A block with no simulation semantics (`Note`, containers).
+    NoOp,
+}
+
+/// One executable statement.
+#[derive(Debug, Clone)]
+pub struct ExecBlock {
+    /// `moduleid` of the module this statement came from.
+    pub module_id: u32,
+    /// Block class name.
+    pub class: String,
+    /// Module name.
+    pub name: String,
+    /// GPSS label (`LOC`), when the module has one.
+    pub label: Option<String>,
+    /// What the block does.
+    pub kind: BlockKind,
+    /// Target block per output port, in port order.
+    pub next: Vec<Option<usize>>,
+    /// Output port names, parallel to `next`.
+    pub port_names: Vec<String>,
+    /// Random stream used by the block's own draws.
+    pub stream: u32,
+}
+
+impl ExecBlock {
+    /// Target of the output port with `name`, falling back to the first port.
+    pub fn next_named(&self, name: &str) -> Option<usize> {
+        self.port_names
+            .iter()
+            .position(|port| port == name)
+            .and_then(|index| self.next.get(index).copied().flatten())
+            .or_else(|| self.next.first().copied().flatten())
+    }
+
+    /// Target of the first output port.
+    pub fn next_default(&self) -> Option<usize> {
+        self.next.first().copied().flatten()
+    }
+
+    /// Target of the output port at `index`.
+    pub fn next_port(&self, index: usize) -> Option<usize> {
+        self.next.get(index).copied().flatten()
+    }
+
+    /// Whether the failure output (second port) is connected.
+    pub fn has_failure_port(&self) -> bool {
+        self.next.get(1).is_some_and(Option::is_some)
+    }
+}
+
+/// Table definition.
+#[derive(Debug, Clone)]
+pub struct TableDef {
+    /// Recorded expression.
+    pub attribute: ProgramExpr,
+    /// Upper bound of the first interval.
+    pub first: f64,
+    /// Interval width.
+    pub width: f64,
+    /// Number of intervals.
+    pub intervals: usize,
+}
+
+/// Queue table definition.
+#[derive(Debug, Clone)]
+pub struct QTableDef {
+    /// Queue whose waiting times are recorded.
+    pub queue: String,
+    /// Upper bound of the first interval.
+    pub first: f64,
+    /// Interval width.
+    pub width: f64,
+    /// Number of intervals.
+    pub intervals: usize,
+}
+
+/// Function definition.
+#[derive(Debug, Clone)]
+pub enum FunctionDef {
+    /// Piecewise linear interpolation.
+    Continuous {
+        /// Argument.
+        argument: ProgramExpr,
+        /// Points `(x, y)`.
+        points: Vec<(ProgramExpr, ProgramExpr)>,
+    },
+    /// Step function.
+    Discrete {
+        /// Argument.
+        argument: ProgramExpr,
+        /// Points `(x, y)`.
+        points: Vec<(ProgramExpr, ProgramExpr)>,
+    },
+    /// Step function whose result is an expression.
+    Evaluate {
+        /// Argument.
+        argument: ProgramExpr,
+        /// Points `(x, y expression)`.
+        points: Vec<(ProgramExpr, ProgramExpr)>,
+    },
+    /// Exponential with mean 1 (`FunctionExpon`).
+    Exponential {
+        /// Random stream.
+        stream: u32,
+    },
+    /// Discrete distribution over indices 1..N (`FunctionDist`).
+    Distribution {
+        /// Random stream.
+        stream: u32,
+        /// Cumulative bounds.
+        cumulative: Vec<f64>,
+    },
+}
+
+/// Random variable (`VariableA`): uniform integer in `[min, max]`.
+#[derive(Debug, Clone)]
+pub struct RandomVariable {
+    /// Minimum.
+    pub min: ProgramExpr,
+    /// Maximum.
+    pub max: ProgramExpr,
+    /// Random stream.
+    pub stream: u32,
+}
+
+/// Everything defined outside the block flow.
+#[derive(Debug, Clone, Default)]
+pub struct Definitions {
+    /// `Function` / `FunctionExpon` / `FunctionDist` definitions.
+    pub functions: HashMap<String, FunctionDef>,
+    /// `Variable` definitions.
+    pub variables: HashMap<String, ProgramExpr>,
+    /// `VariableA` definitions.
+    pub random_variables: HashMap<String, RandomVariable>,
+    /// `StorageDef` capacities.
+    pub storages: HashMap<String, i64>,
+    /// `Table` definitions.
+    pub tables: HashMap<String, TableDef>,
+    /// `QTable` definitions.
+    pub qtables: HashMap<String, QTableDef>,
+    /// `InitiaSV` initial values.
+    pub initial_savevalues: Vec<(String, f64)>,
+    /// `InitialLS` initial switch states.
+    pub initial_logic: Vec<(String, bool)>,
+}
+
+/// A compiled, runnable model.
+#[derive(Debug, Clone)]
+pub struct Program {
+    /// Model name (file stem or main block name).
+    pub title: String,
+    /// Start counter (units the `START` statement requires).
+    pub start_counter: f64,
+    /// Executable statements.
+    pub blocks: Vec<ExecBlock>,
+    /// Definitions.
+    pub definitions: Definitions,
+    /// Non-fatal observations made while compiling.
+    pub diagnostics: Vec<String>,
+    /// Number of distinct entities declared, for report headers.
+    pub declared_blocks: usize,
+}
+
+impl Program {
+    /// Block index by module id (first statement of the module).
+    pub fn entry_index(&self, module_id: u32) -> Option<usize> {
+        self.blocks
+            .iter()
+            .position(|block| block.module_id == module_id)
+    }
+
+    /// Labels of blocks, used by `MATCH` and diagnostics.
+    pub fn label_index(&self) -> HashMap<String, usize> {
+        let mut map = HashMap::new();
+        for (index, block) in self.blocks.iter().enumerate() {
+            if let Some(label) = &block.label {
+                map.entry(label.clone()).or_insert(index);
+            }
+        }
+        map
+    }
+}
+
+/// Placeholder fallback policy.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Fallback {
+    /// SNA context: an unresolved placeholder becomes `0`.
+    Zero,
+    /// Name context: an unresolved placeholder keeps its text.
+    Literal,
+}
+
+/// Compile a model into a runnable program.
+pub fn compile(model: &GmdlModel, title: impl Into<String>) -> Result<Program, EngineError> {
+    genmsi_format::validate_runnable(model).map_err(EngineError::from)?;
+    let mut compiler = Compiler {
+        model,
+        diagnostics: Vec::new(),
+    };
+    compiler.compile(title.into())
+}
+
+struct Compiler<'a> {
+    model: &'a GmdlModel,
+    diagnostics: Vec<String>,
+}
+
+impl Compiler<'_> {
+    fn compile(&mut self, title: String) -> Result<Program, EngineError> {
+        let definitions = self.collect_definitions()?;
+        let mut blocks = Vec::new();
+        let mut entry_index: HashMap<u32, usize> = HashMap::new();
+        let mut pending_links: Vec<(u32, Vec<(String, usize)>)> = Vec::new();
+
+        for module in self.model.activity_blocks() {
+            let Some(first) = self.expand(module, &mut blocks)? else {
+                continue;
+            };
+            entry_index.insert(module.id, first);
+            let ports: Vec<(String, usize)> = module
+                .outputs
+                .iter()
+                .map(|port| (port.name.clone(), port.ioid as usize))
+                .collect();
+            // Remember which statements belong to the module so the last one can
+            // carry the module's real outputs.
+            pending_links.push((module.id, ports));
+        }
+
+        // Wire the primitives: each module's last statement gets the module outputs.
+        let mut module_last: HashMap<u32, usize> = HashMap::new();
+        for (index, block) in blocks.iter().enumerate() {
+            module_last.insert(block.module_id, index);
+        }
+        for (index, block) in blocks.iter_mut().enumerate() {
+            if module_last.get(&block.module_id) == Some(&index) {
+                continue;
+            }
+            // Intermediate statement of a compound block: single output to the next.
+            let next_index = index + 1;
+            block.next = vec![Some(next_index)];
+            block.port_names = vec!["Salida1".to_string()];
+        }
+
+        // Resolve module outputs through the container hierarchy.
+        for (module_id, ports) in &pending_links {
+            let Some(&last) = module_last.get(module_id) else {
+                continue;
+            };
+            let mut targets = Vec::new();
+            for (name, ioid) in ports {
+                let target = self.resolve_target(*module_id, *ioid as u32, &entry_index)?;
+                targets.push((name.clone(), target));
+            }
+            let block = &mut blocks[last];
+            block.port_names = targets.iter().map(|(name, _)| name.clone()).collect();
+            block.next = targets.into_iter().map(|(_, target)| target).collect();
+        }
+
+        // Check MATCH conjugates against the labels the program actually has.
+        let label_map: HashMap<String, usize> = blocks
+            .iter()
+            .enumerate()
+            .filter_map(|(index, block)| block.label.clone().map(|label| (label, index)))
+            .collect();
+        self.check_match_targets(&blocks, &label_map)?;
+        self.check_references(&blocks, &definitions)?;
+
+        Ok(Program {
+            title,
+            start_counter: 1.0,
+            declared_blocks: blocks.len(),
+            blocks,
+            definitions,
+            diagnostics: std::mem::take(&mut self.diagnostics),
+        })
+    }
+
+    /// Expand one module into one or more GPSS statements.
+    fn expand(
+        &mut self,
+        module: &Block,
+        blocks: &mut Vec<ExecBlock>,
+    ) -> Result<Option<usize>, EngineError> {
+        let class = module.class.as_str();
+        let node = module.id;
+        let label = module.label().map(str::to_string);
+        let stream = BLOCK_STREAM_BASE + node;
+        macro_rules! push {
+            ($kind:expr, $label:expr, $class:expr $(,)?) => {{
+                let index = blocks.len();
+                blocks.push(ExecBlock {
+                    module_id: node,
+                    class: $class.to_string(),
+                    name: module.name.clone(),
+                    label: $label,
+                    kind: $kind,
+                    next: Vec::new(),
+                    port_names: Vec::new(),
+                    stream,
+                });
+                index
+            }};
+        }
+
+        match class {
+            // Definitions and non-runtime modules.
+            "Function" | "FunctionDist" | "FunctionExpon" | "Variable" | "VariableA" | "Table"
+            | "QTable" | "StorageDef" | "InitiaSV" | "InitialLS" | "Note" => Ok(None),
+            "Clock" => {
+                let frequency = self.require_number(module, "Frecuencia")?;
+                let generate = push!(
+                    BlockKind::Generate(GenerateSpec {
+                        limit: None,
+                        mean: self.number_expr(frequency),
+                        modifier: None,
+                        offset: None,
+                        priority: None,
+                        termination_tick: true,
+                    }),
+                    None,
+                    "Generate",
+                );
+                let terminate = push!(
+                    BlockKind::Terminate(TerminateSpec {
+                        units: 1.0,
+                        synthetic: true,
+                    }),
+                    None,
+                    "Terminate",
+                );
+                blocks[generate].next = vec![Some(terminate)];
+                blocks[generate].port_names = vec!["Salida1".to_string()];
+                Ok(Some(generate))
+            }
+            "Generate" => {
+                let mean = self
+                    .sna(module, "Media")?
+                    .unwrap_or_else(|| self.number_expr(0.0));
+                let spec = GenerateSpec {
+                    limit: self.number(module, "Cantidad"),
+                    mean,
+                    modifier: self.sna(module, "Modificador")?,
+                    offset: self.sna(module, "OffSet")?,
+                    priority: self.sna(module, "Prioridad")?,
+                    termination_tick: false,
+                };
+                Ok(Some(push!(BlockKind::Generate(spec), label, class)))
+            }
+            "Terminate" => {
+                let units = self.number(module, "Unidades").unwrap_or(0.0);
+                Ok(Some(push!(
+                    BlockKind::Terminate(TerminateSpec {
+                        units,
+                        synthetic: false,
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "Advance" => {
+                let mean = self.sna(module, "Media")?.ok_or_else(|| {
+                    EngineError::invalid_block(node, class, "Media is required")
+                })?;
+                Ok(Some(push!(
+                    BlockKind::Advance(AdvanceSpec {
+                        mean,
+                        modifier: self.sna(module, "Modificador")?,
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "Assign" => {
+                let parameter = self.require_name(module, "Parametro")?;
+                let value = self.sna(module, "Valor")?.ok_or_else(|| {
+                    EngineError::invalid_block(node, class, "Valor is required")
+                })?;
+                let op = AssignOp::parse(
+                    &module.prop_value("Operador").unwrap_or_default(),
+                    node,
+                    class,
+                )?;
+                Ok(Some(push!(
+                    BlockKind::Assign(AssignSpec {
+                        parameter,
+                        op,
+                        value,
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "SaveValue" => {
+                let savevalue = self.require_name(module, "SaveValue")?;
+                let value = self.sna(module, "Valor")?.ok_or_else(|| {
+                    EngineError::invalid_block(node, class, "Valor is required")
+                })?;
+                let op = AssignOp::parse(
+                    &module.prop_value("Op").unwrap_or_default(),
+                    node,
+                    class,
+                )?;
+                Ok(Some(push!(
+                    BlockKind::SaveValue(SaveValueSpec {
+                        savevalue,
+                        op,
+                        value,
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "Counter" => {
+                let savevalue = self.require_name(module, "SaveValue")?;
+                let parameter = self.name(module, "Param");
+                let increment = self
+                    .sna(module, "Incremento")?
+                    .unwrap_or_else(|| self.number_expr(1.0));
+                Ok(Some(push!(
+                    BlockKind::Counter(CounterSpec {
+                        savevalue,
+                        parameter,
+                        increment,
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "Queue" => {
+                let queue = self.entity(module, "Queue")?;
+                let units = self.number(module, "Cantidad").unwrap_or(1.0);
+                Ok(Some(push!(
+                    BlockKind::Queue(QueueSpec { queue, units }),
+                    label,
+                    class,
+                )))
+            }
+            "Depart" => {
+                let queue = self.entity(module, "Queue")?;
+                let units = self.number(module, "Cantidad").unwrap_or(1.0);
+                Ok(Some(push!(
+                    BlockKind::Depart(QueueSpec { queue, units }),
+                    label,
+                    class,
+                )))
+            }
+            "FacilityUse" => {
+                let facility = self.entity(module, "Facility")?;
+                let mean = self.sna(module, "Media")?.ok_or_else(|| {
+                    EngineError::invalid_block(node, class, "Media is required")
+                })?;
+                let modifier = self.sna(module, "Modificador")?;
+                let queue = self.name(module, "Queue");
+                let first;
+                if let Some(queue) = &queue {
+                    first = Some(push!(
+                        BlockKind::Queue(QueueSpec {
+                            queue: EntityName {
+                                source: NameSource::Literal(queue.clone()),
+                            },
+                            units: 1.0,
+                        }),
+                        label.clone(),
+                        "Queue",
+                    ));
+                    blocks.push(ExecBlock {
+                        module_id: node,
+                        class: "Seize".into(),
+                        name: module.name.clone(),
+                        label: None,
+                        kind: BlockKind::Seize(FacilitySpec {
+                            facility: facility.clone(),
+                        }),
+                        next: Vec::new(),
+                        port_names: Vec::new(),
+                        stream,
+                    });
+                    blocks.push(ExecBlock {
+                        module_id: node,
+                        class: "Depart".into(),
+                        name: module.name.clone(),
+                        label: None,
+                        kind: BlockKind::Depart(QueueSpec {
+                            queue: EntityName {
+                                source: NameSource::Literal(queue.clone()),
+                            },
+                            units: 1.0,
+                        }),
+                        next: Vec::new(),
+                        port_names: Vec::new(),
+                        stream,
+                    });
+                } else {
+                    first = Some(push!(
+                        BlockKind::Seize(FacilitySpec {
+                            facility: facility.clone(),
+                        }),
+                        label.clone(),
+                        "Seize",
+                    ));
+                }
+                blocks.push(ExecBlock {
+                    module_id: node,
+                    class: "Advance".into(),
+                    name: module.name.clone(),
+                    label: None,
+                    kind: BlockKind::Advance(AdvanceSpec { mean, modifier }),
+                    next: Vec::new(),
+                    port_names: Vec::new(),
+                    stream,
+                });
+                blocks.push(ExecBlock {
+                    module_id: node,
+                    class: "Release".into(),
+                    name: module.name.clone(),
+                    label: None,
+                    kind: BlockKind::Release(FacilitySpec { facility }),
+                    next: Vec::new(),
+                    port_names: Vec::new(),
+                    stream,
+                });
+                Ok(first)
+            }
+            "Seize" => {
+                let facility = self.entity(module, "Facility")?;
+                Ok(Some(push!(
+                    BlockKind::Seize(FacilitySpec { facility }),
+                    label,
+                    class,
+                )))
+            }
+            "Release" => {
+                let facility = self.entity(module, "Facility")?;
+                Ok(Some(push!(
+                    BlockKind::Release(FacilitySpec { facility }),
+                    label,
+                    class,
+                )))
+            }
+            "FacilityInt" => {
+                let facility = self.entity(module, "Facility")?;
+                let mean = self.sna(module, "Media")?.ok_or_else(|| {
+                    EngineError::invalid_block(node, class, "Media is required")
+                })?;
+                let modifier = self.sna(module, "Modificador")?;
+                let queue = self.name(module, "Queue");
+                let remaining = self.name(module, "Remanente");
+                let route_owner = module
+                    .outputs
+                    .iter()
+                    .any(|port| port.name == "SalidaAlt" && port.label().is_some());
+                let first;
+                if let Some(queue) = &queue {
+                    first = Some(push!(
+                        BlockKind::Queue(QueueSpec {
+                            queue: EntityName {
+                                source: NameSource::Literal(queue.clone()),
+                            },
+                            units: 1.0,
+                        }),
+                        label.clone(),
+                        "Queue",
+                    ));
+                    blocks.push(ExecBlock {
+                        module_id: node,
+                        class: "Preempt".into(),
+                        name: module.name.clone(),
+                        label: None,
+                        kind: BlockKind::Preempt(PreemptSpec {
+                            facility: facility.clone(),
+                            remaining: remaining.clone(),
+                            route_owner,
+                        }),
+                        next: Vec::new(),
+                        port_names: Vec::new(),
+                        stream,
+                    });
+                    blocks.push(ExecBlock {
+                        module_id: node,
+                        class: "Depart".into(),
+                        name: module.name.clone(),
+                        label: None,
+                        kind: BlockKind::Depart(QueueSpec {
+                            queue: EntityName {
+                                source: NameSource::Literal(queue.clone()),
+                            },
+                            units: 1.0,
+                        }),
+                        next: Vec::new(),
+                        port_names: Vec::new(),
+                        stream,
+                    });
+                } else {
+                    first = Some(push!(
+                        BlockKind::Preempt(PreemptSpec {
+                            facility: facility.clone(),
+                            remaining: remaining.clone(),
+                            route_owner,
+                        }),
+                        label.clone(),
+                        "Preempt",
+                    ));
+                }
+                blocks.push(ExecBlock {
+                    module_id: node,
+                    class: "Advance".into(),
+                    name: module.name.clone(),
+                    label: None,
+                    kind: BlockKind::Advance(AdvanceSpec { mean, modifier }),
+                    next: Vec::new(),
+                    port_names: Vec::new(),
+                    stream,
+                });
+                blocks.push(ExecBlock {
+                    module_id: node,
+                    class: "Return".into(),
+                    name: module.name.clone(),
+                    label: None,
+                    kind: BlockKind::Return(FacilitySpec { facility }),
+                    next: Vec::new(),
+                    port_names: Vec::new(),
+                    stream,
+                });
+                Ok(first)
+            }
+            "StorageUse" => {
+                let storage = self.entity(module, "Storage")?;
+                let mean = self.sna(module, "Media")?.ok_or_else(|| {
+                    EngineError::invalid_block(node, class, "Media is required")
+                })?;
+                let modifier = self.sna(module, "Modificador")?;
+                let queue = self.name(module, "Queue");
+                let units = self
+                    .sna(module, "Cantidad")?
+                    .unwrap_or_else(|| self.number_expr(1.0));
+                let first;
+                if let Some(queue) = &queue {
+                    first = Some(push!(
+                        BlockKind::Queue(QueueSpec {
+                            queue: EntityName {
+                                source: NameSource::Literal(queue.clone()),
+                            },
+                            units: 1.0,
+                        }),
+                        label.clone(),
+                        "Queue",
+                    ));
+                    blocks.push(ExecBlock {
+                        module_id: node,
+                        class: "Enter".into(),
+                        name: module.name.clone(),
+                        label: None,
+                        kind: BlockKind::Enter(StorageUnitsSpec {
+                            storage: storage.clone(),
+                            units: units.clone(),
+                        }),
+                        next: Vec::new(),
+                        port_names: Vec::new(),
+                        stream,
+                    });
+                    blocks.push(ExecBlock {
+                        module_id: node,
+                        class: "Depart".into(),
+                        name: module.name.clone(),
+                        label: None,
+                        kind: BlockKind::Depart(QueueSpec {
+                            queue: EntityName {
+                                source: NameSource::Literal(queue.clone()),
+                            },
+                            units: 1.0,
+                        }),
+                        next: Vec::new(),
+                        port_names: Vec::new(),
+                        stream,
+                    });
+                } else {
+                    first = Some(push!(
+                        BlockKind::Enter(StorageUnitsSpec {
+                            storage: storage.clone(),
+                            units: units.clone(),
+                        }),
+                        label.clone(),
+                        "Enter",
+                    ));
+                }
+                blocks.push(ExecBlock {
+                    module_id: node,
+                    class: "Advance".into(),
+                    name: module.name.clone(),
+                    label: None,
+                    kind: BlockKind::Advance(AdvanceSpec { mean, modifier }),
+                    next: Vec::new(),
+                    port_names: Vec::new(),
+                    stream,
+                });
+                blocks.push(ExecBlock {
+                    module_id: node,
+                    class: "Leave".into(),
+                    name: module.name.clone(),
+                    label: None,
+                    kind: BlockKind::Leave(StorageUnitsSpec { storage, units }),
+                    next: Vec::new(),
+                    port_names: Vec::new(),
+                    stream,
+                });
+                Ok(first)
+            }
+            "Enter" => {
+                let storage = self.entity(module, "Storage")?;
+                let units = self
+                    .sna(module, "Cantidad")?
+                    .unwrap_or_else(|| self.number_expr(1.0));
+                Ok(Some(push!(
+                    BlockKind::Enter(StorageUnitsSpec { storage, units }),
+                    label,
+                    class,
+                )))
+            }
+            "Leave" => {
+                let storage = self.entity(module, "Storage")?;
+                let units = self
+                    .sna(module, "Cantidad")?
+                    .unwrap_or_else(|| self.number_expr(1.0));
+                Ok(Some(push!(
+                    BlockKind::Leave(StorageUnitsSpec { storage, units }),
+                    label,
+                    class,
+                )))
+            }
+            "Test" => {
+                let left = self.sna(module, "1_Valor")?.ok_or_else(|| {
+                    EngineError::invalid_block(node, class, "operand A is required")
+                })?;
+                let right = self.sna(module, "3_Valor")?.ok_or_else(|| {
+                    EngineError::invalid_block(node, class, "operand B is required")
+                })?;
+                let op = RelOp::parse(
+                    &module.prop_value("2_OP").unwrap_or_default(),
+                    node,
+                    class,
+                )?;
+                Ok(Some(push!(
+                    BlockKind::Test(TestSpec { left, op, right }),
+                    label,
+                    class,
+                )))
+            }
+            "Transfer" => {
+                let text = module.prop_value("Prob").unwrap_or_default();
+                let (probability, thousandths) = self.probability(module, &text)?;
+                Ok(Some(push!(
+                    BlockKind::Transfer(TransferSpec {
+                        probability,
+                        thousandths,
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "Multifurcacion" => {
+                let mut weights = Vec::new();
+                for index in 1..=module.outputs.len().max(1) {
+                    let name = format!("Prob{index}");
+                    if let Some(value) = module.prop_value(&name) {
+                        weights.push(self.number_expr(self.percent_to_fraction(&value)?));
+                    }
+                }
+                if weights.is_empty() {
+                    return Err(EngineError::invalid_block(
+                        node,
+                        class,
+                        "no probabilities defined",
+                    ));
+                }
+                Ok(Some(push!(
+                    BlockKind::MultiTransfer(MultiTransferSpec { weights }),
+                    label,
+                    class,
+                )))
+            }
+            "GateL" => {
+                let switch = self.entity(module, "LogicSwich")?;
+                let state = module
+                    .prop_value("op")
+                    .is_some_and(|op| op.eq_ignore_ascii_case("set"));
+                Ok(Some(push!(
+                    BlockKind::Gate(GateSpec {
+                        condition: GateCondition::Logic { switch, state },
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "GateS" => {
+                let storage = self.entity(module, "Storage")?;
+                let empty = module
+                    .prop_value("op")
+                    .is_some_and(|op| op.eq_ignore_ascii_case("vacio") || op.eq_ignore_ascii_case("empty"));
+                Ok(Some(push!(
+                    BlockKind::Gate(GateSpec {
+                        condition: GateCondition::Storage { storage, empty },
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "GateF" => {
+                let facility = self.entity(module, "Facility")?;
+                let available = module
+                    .prop_value("op")
+                    .is_none_or(|op| op.eq_ignore_ascii_case("libre") || op.eq_ignore_ascii_case("nu"));
+                Ok(Some(push!(
+                    BlockKind::Gate(GateSpec {
+                        condition: GateCondition::Facility {
+                            facility,
+                            available,
+                        },
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "Logic" => {
+                let switch = self.entity(module, "LogicSwich")?;
+                let op = if module
+                    .prop_value("Op")
+                    .is_some_and(|op| op.eq_ignore_ascii_case("set"))
+                {
+                    LogicOp::Set
+                } else {
+                    LogicOp::Reset
+                };
+                Ok(Some(push!(
+                    BlockKind::Logic(LogicSpec { switch, op }),
+                    label,
+                    class,
+                )))
+            }
+            "Link" => {
+                let chain = self.entity(module, "Cadena")?;
+                let fifo = module
+                    .prop_value("Modo")
+                    .is_none_or(|mode| !mode.eq_ignore_ascii_case("LIFO"));
+                Ok(Some(push!(
+                    BlockKind::Link(LinkSpec { chain, fifo }),
+                    label,
+                    class,
+                )))
+            }
+            "Unlink" => {
+                let chain = self.entity(module, "Cadena")?;
+                let count = self
+                    .sna(module, "Cantidad")?
+                    .unwrap_or_else(|| self.number_expr(1.0));
+                let all = module
+                    .prop_value("Modo")
+                    .is_some_and(|mode| mode.eq_ignore_ascii_case("Todos"));
+                let compare_parameter = self.name(module, "CompParam");
+                let compare_value = self.sna(module, "CompValue")?;
+                Ok(Some(push!(
+                    BlockKind::Unlink(UnlinkSpec {
+                        chain,
+                        count,
+                        all,
+                        compare_parameter,
+                        compare_value,
+                        return_parameter: None,
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "Split" => {
+                let total = self
+                    .sna(module, "Cantidad")?
+                    .ok_or_else(|| EngineError::invalid_block(node, class, "Cantidad is required"))?;
+                Ok(Some(push!(
+                    BlockKind::Split(SplitSpec { total }),
+                    label,
+                    class,
+                )))
+            }
+            "Assemble" | "Gather" => {
+                let count = self
+                    .sna(module, "Cantidad")?
+                    .ok_or_else(|| EngineError::invalid_block(node, class, "Cantidad is required"))?;
+                Ok(Some(push!(
+                    BlockKind::Assemble(AssembleSpec {
+                        count,
+                        gather: class == "Gather",
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "Match" => {
+                let own = module
+                    .prop_value("RotuloPropio")
+                    .or_else(|| module.label().map(str::to_string))
+                    .unwrap_or_else(|| format!("MATCH{node}"));
+                let conjugate = module.prop_value("RotuloMatch").unwrap_or_default();
+                Ok(Some(push!(
+                    BlockKind::Match(MatchSpec { conjugate }),
+                    Some(own),
+                    class
+                )))
+            }
+            "Loop" => {
+                let parameter = self.require_name(module, "Parametro")?;
+                Ok(Some(push!(
+                    BlockKind::Loop(LoopSpec { parameter }),
+                    label,
+                    class,
+                )))
+            }
+            "Priority" => {
+                let priority = self.sna(module, "Prioridad")?.ok_or_else(|| {
+                    EngineError::invalid_block(node, class, "Prioridad is required")
+                })?;
+                Ok(Some(push!(BlockKind::Priority(priority), label, class)))
+            }
+            "Select" | "SelectF" => {
+                let kind = match module
+                    .prop_value("ClaseSNA")
+                    .unwrap_or_else(|| "Q".to_string())
+                    .trim()
+                {
+                    "Q" => RefKind::Queue,
+                    "S" => RefKind::Storage,
+                    "R" => RefKind::Facility,
+                    other => {
+                        return Err(EngineError::invalid_block(
+                            node,
+                            class,
+                            format!("unsupported SELECT entity class {other:?}"),
+                        ));
+                    }
+                };
+                let parameter = self.require_name(module, "Param")?;
+                let low = self
+                    .sna(module, "minimo")?
+                    .unwrap_or_else(|| self.number_expr(1.0));
+                let high = self
+                    .sna(module, "maximo")?
+                    .unwrap_or_else(|| self.number_expr(1.0));
+                let mode = if class == "SelectF" {
+                    SelectMode::FirstFree
+                } else if module
+                    .prop_value("op")
+                    .is_some_and(|op| op.eq_ignore_ascii_case("Maximo"))
+                {
+                    SelectMode::Max
+                } else {
+                    SelectMode::Min
+                };
+                Ok(Some(push!(
+                    BlockKind::Select(SelectSpec {
+                        kind,
+                        parameter,
+                        low,
+                        high,
+                        mode,
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "Tabulate" => {
+                let table = self.require_name(module, "NombreTabla")?;
+                Ok(Some(push!(
+                    BlockKind::Tabulate(TabulateSpec {
+                        table,
+                        weight: self.sna(module, "Peso")?,
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "JoinNumber" | "JoinMe" => {
+                let group = self.require_name(module, "Grupo")?;
+                Ok(Some(push!(
+                    BlockKind::Join(JoinSpec {
+                        group,
+                        number: self.sna(module, "Numero")?,
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "ExamineNumber" => {
+                let group = self.require_name(module, "Grupo")?;
+                let number = self.sna(module, "Numero")?.ok_or_else(|| {
+                    EngineError::invalid_block(node, class, "Numero is required")
+                })?;
+                Ok(Some(push!(
+                    BlockKind::Examine(ExamineSpec { group, number }),
+                    label,
+                    class,
+                )))
+            }
+            "RemoveTrans" => {
+                let group = self.require_name(module, "Grupo")?;
+                let count = self
+                    .sna(module, "Cantidad")?
+                    .unwrap_or_else(|| self.number_expr(1.0));
+                let all = module
+                    .prop_value("Modo")
+                    .is_some_and(|mode| mode.eq_ignore_ascii_case("Todos"));
+                Ok(Some(push!(
+                    BlockKind::Remove(RemoveSpec {
+                        group,
+                        count,
+                        all,
+                        parameter: self.name(module, "CompParam"),
+                        value: self.sna(module, "CompValue")?,
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "Scan" => {
+                let group = self.require_name(module, "Grupo")?;
+                let minimum = module
+                    .prop_value("CompOp")
+                    .is_some_and(|op| op.eq_ignore_ascii_case("Minimo"));
+                Ok(Some(push!(
+                    BlockKind::Scan(ScanSpec {
+                        group,
+                        minimum,
+                        compare_parameter: self.name(module, "CompParam"),
+                        compare_value: self.sna(module, "CompValue")?,
+                        from_parameter: self.name(module, "DeParam"),
+                        to_parameter: self.name(module, "EnParam"),
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "Alter" => {
+                let group = self.require_name(module, "Grupo")?;
+                Ok(Some(push!(
+                    BlockKind::Alter(AlterSpec {
+                        group,
+                        parameter: self.name(module, "CompParam"),
+                        value: self.sna(module, "CompValue")?,
+                        count: self
+                            .sna(module, "Cantidad")?
+                            .unwrap_or_else(|| self.number_expr(1.0)),
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "Buffer" => Ok(Some(push!(BlockKind::Buffer, label, class))),
+            other => Err(EngineError::unsupported(
+                node,
+                class,
+                format!("block class {other:?} is not implemented by the engine"),
+            )),
+        }
+    }
+
+    fn check_match_targets(
+        &self,
+        blocks: &[ExecBlock],
+        labels: &HashMap<String, usize>,
+    ) -> Result<(), EngineError> {
+        for block in blocks {
+            let BlockKind::Match(spec) = &block.kind else {
+                continue;
+            };
+            if !spec.conjugate.is_empty() && !labels.contains_key(&spec.conjugate) {
+                return Err(EngineError::invalid_block(
+                    block.module_id,
+                    "Match",
+                    format!(
+                        "MATCH {} refers to unknown label {:?}",
+                        block.name, spec.conjugate
+                    ),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Verify that every statically named function and variable exists.
+    fn check_references(
+        &self,
+        blocks: &[ExecBlock],
+        definitions: &Definitions,
+    ) -> Result<(), EngineError> {
+        let mut missing: Vec<(u32, String)> = Vec::new();
+        let mut check = |node: u32, expr: &ProgramExpr| {
+            collect_references(expr.ast(), &mut |kind, name| {
+                let exists = match kind {
+                    RefKind::Function => definitions.functions.contains_key(name),
+                    RefKind::Variable => {
+                        definitions.variables.contains_key(name)
+                            || definitions.random_variables.contains_key(name)
+                    }
+                    _ => true,
+                };
+                if !exists {
+                    missing.push((node, format!("{kind}:{name}")));
+                }
+            });
+        };
+        for block in blocks {
+            for expr in block_expressions(&block.kind) {
+                check(block.module_id, expr);
+            }
+        }
+        for def in definitions.variables.values() {
+            check(0, def);
+        }
+        for table in definitions.tables.values() {
+            check(0, &table.attribute);
+        }
+        for function in definitions.functions.values() {
+            match function {
+                FunctionDef::Continuous { argument, points }
+                | FunctionDef::Discrete { argument, points }
+                | FunctionDef::Evaluate { argument, points } => {
+                    check(0, argument);
+                    for (x, y) in points {
+                        check(0, x);
+                        check(0, y);
+                    }
+                }
+                FunctionDef::Exponential { .. } | FunctionDef::Distribution { .. } => {}
+            }
+        }
+        if let Some((node, name)) = missing.first() {
+            return Err(EngineError::invalid_block(
+                *node,
+                "expression",
+                format!("{name} is referenced but never defined"),
+            ));
+        }
+        Ok(())
+    }
+
+    fn collect_definitions(&mut self) -> Result<Definitions, EngineError> {
+        let mut definitions = Definitions::default();
+        for module in self.model.activity_blocks() {
+            let node = module.id;
+            let class = module.class.as_str();
+            match class {
+                "StorageDef" => {
+                    let name = self.require_name(module, "Storage")?;
+                    let capacity = self.number(module, "Tamaño").unwrap_or(0.0) as i64;
+                    definitions.storages.insert(name, capacity.max(0));
+                }
+                "InitiaSV" => {
+                    let name = self.require_name(module, "SaveValue")?;
+                    let value = self.number(module, "Valor").unwrap_or(0.0);
+                    definitions.initial_savevalues.push((name, value));
+                }
+                "InitialLS" => {
+                    let switch = self.require_name(module, "LogicSwich")?;
+                    let state = module
+                        .prop_value("Op")
+                        .is_some_and(|op| op.eq_ignore_ascii_case("Set"));
+                    definitions.initial_logic.push((switch, state));
+                }
+                "Variable" => {
+                    let name = self.require_name(module, "NombreVar")?;
+                    let expression = self
+                        .sna(module, "Expresion")?
+                        .ok_or_else(|| {
+                            EngineError::invalid_block(node, class, "Expresion is required")
+                        })?;
+                    definitions.variables.insert(name, expression);
+                }
+                "VariableA" => {
+                    let name = self.require_name(module, "NombreVar")?;
+                    let min = self
+                        .sna(module, "Minimo")?
+                        .unwrap_or_else(|| self.number_expr(0.0));
+                    let max = self
+                        .sna(module, "Maximo")?
+                        .unwrap_or_else(|| self.number_expr(0.0));
+                    let stream = self.number(module, "Seed").unwrap_or(0.0) as u32;
+                    definitions
+                        .random_variables
+                        .insert(name, RandomVariable { min, max, stream });
+                }
+                "Function" => {
+                    let name = self.require_name(module, "NombreFunc")?;
+                    let argument = self
+                        .sna(module, "Atributo")?
+                        .unwrap_or_else(|| self.number_expr(0.0));
+                    let text = module
+                        .prop_value("Tabla")
+                        .ok_or_else(|| EngineError::invalid_block(node, class, "Tabla is required"))?;
+                    let points = self.parse_points(module, &text)?;
+                    let kind = module.prop_value("Tipo").unwrap_or_default();
+                    let def = if kind.eq_ignore_ascii_case("Continua") {
+                        FunctionDef::Continuous { argument, points }
+                    } else if kind.eq_ignore_ascii_case("Eval") {
+                        FunctionDef::Evaluate { argument, points }
+                    } else {
+                        FunctionDef::Discrete { argument, points }
+                    };
+                    definitions.functions.insert(name, def);
+                }
+                "FunctionExpon" => {
+                    let name = self.require_name(module, "NombreFunc")?;
+                    let stream = self.number(module, "Seed").unwrap_or(1.0) as u32;
+                    definitions
+                        .functions
+                        .insert(name, FunctionDef::Exponential { stream: stream.max(1) });
+                }
+                "FunctionDist" => {
+                    let name = self.require_name(module, "NombreDist")?;
+                    let text = module.prop_value("Distribucion").ok_or_else(|| {
+                        EngineError::invalid_block(node, class, "Distribucion is required")
+                    })?;
+                    let weights = self.parse_percent_list(module, &text)?;
+                    let total: f64 = weights.iter().sum();
+                    let mut cumulative = Vec::with_capacity(weights.len());
+                    let mut running = 0.0;
+                    for weight in &weights {
+                        running += weight / total;
+                        cumulative.push(running);
+                    }
+                    if let Some(last) = cumulative.last_mut() {
+                        *last = 1.0;
+                    }
+                    let stream = self.number(module, "Semilla").unwrap_or(1.0) as u32;
+                    definitions.functions.insert(
+                        name,
+                        FunctionDef::Distribution {
+                            stream: stream.max(1),
+                            cumulative,
+                        },
+                    );
+                }
+                "Table" => {
+                    let name = self.require_name(module, "NombreTabla")?;
+                    let attribute = self
+                        .sna(module, "Atributo")?
+                        .ok_or_else(|| {
+                            EngineError::invalid_block(node, class, "Atributo is required")
+                        })?;
+                    let first = self.number(module, "PrimerIntervalo").unwrap_or(0.0);
+                    let width = self.number(module, "TamFrecuencia").unwrap_or(1.0);
+                    let intervals = self.number(module, "Cantidad").unwrap_or(1.0) as usize;
+                    definitions.tables.insert(
+                        name,
+                        TableDef {
+                            attribute,
+                            first,
+                            width,
+                            intervals: intervals.max(1),
+                        },
+                    );
+                }
+                "QTable" => {
+                    let name = self.require_name(module, "NombreTabla")?;
+                    let queue = self.require_name(module, "Queue")?;
+                    let first = self.number(module, "PrimerIntervalo").unwrap_or(0.0);
+                    let width = self.number(module, "TamFrecuencia").unwrap_or(1.0);
+                    let intervals = self.number(module, "Cantidad").unwrap_or(1.0) as usize;
+                    definitions.qtables.insert(
+                        name,
+                        QTableDef {
+                            queue,
+                            first,
+                            width,
+                            intervals: intervals.max(1),
+                        },
+                    );
+                }
+                _ => {}
+            }
+        }
+        Ok(definitions)
+    }
+
+    fn parse_points(
+        &self,
+        module: &Block,
+        text: &str,
+    ) -> Result<Vec<(ProgramExpr, ProgramExpr)>, EngineError> {
+        let inner = text.trim();
+        let inner = inner
+            .strip_prefix('{')
+            .and_then(|rest| rest.strip_suffix('}'))
+            .unwrap_or(inner);
+        let mut points = Vec::new();
+        for pair in inner.split(';') {
+            let pair = pair.trim();
+            if pair.is_empty() {
+                continue;
+            }
+            let mut parts = pair.split('|');
+            let x = parts.next().unwrap_or_default();
+            let y = parts.next().unwrap_or_default();
+            points.push((
+                self.resolve_sna_text(module, x)?,
+                self.resolve_sna_text(module, y)?,
+            ));
+        }
+        if points.is_empty() {
+            return Err(EngineError::invalid_block(
+                module.id,
+                &module.class,
+                "function table is empty",
+            ));
+        }
+        Ok(points)
+    }
+
+    fn parse_percent_list(
+        &self,
+        module: &Block,
+        text: &str,
+    ) -> Result<Vec<f64>, EngineError> {
+        let inner = text.trim();
+        let inner = inner
+            .strip_prefix('{')
+            .and_then(|rest| rest.strip_suffix('}'))
+            .unwrap_or(inner);
+        let mut weights = Vec::new();
+        for entry in inner.split(';') {
+            let entry = entry.trim();
+            if entry.is_empty() {
+                continue;
+            }
+            let value = entry.trim_end_matches('%').trim();
+            let resolved = self.resolve_placeholders(module, value, Fallback::Zero)?;
+            let number = resolved.trim().parse::<f64>().map_err(|_| {
+                EngineError::invalid_block(
+                    module.id,
+                    &module.class,
+                    format!("invalid percentage {entry:?}"),
+                )
+            })?;
+            weights.push(number.max(0.0));
+        }
+        if weights.is_empty() {
+            return Err(EngineError::invalid_block(
+                module.id,
+                &module.class,
+                "distribution is empty",
+            ));
+        }
+        Ok(weights)
+    }
+
+    fn probability(
+        &self,
+        module: &Block,
+        text: &str,
+    ) -> Result<(ProgramExpr, bool), EngineError> {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            return Ok((self.number_expr(1.0), false));
+        }
+        if let Some(percent) = trimmed.strip_suffix('%') {
+            let value = percent.trim().parse::<f64>().map_err(|_| {
+                EngineError::invalid_block(
+                    module.id,
+                    &module.class,
+                    format!("invalid percentage {text:?}"),
+                )
+            })?;
+            return Ok((self.number_expr(value / 100.0), false));
+        }
+        if let Ok(value) = trimmed.parse::<f64>() {
+            return Ok((self.number_expr(value / 1000.0), false));
+        }
+        let expr = self.resolve_sna_text(module, trimmed)?;
+        Ok((expr, true))
+    }
+
+    fn percent_to_fraction(&self, text: &str) -> Result<f64, EngineError> {
+        let trimmed = text.trim();
+        let value = trimmed.trim_end_matches('%').trim();
+        let number = value.parse::<f64>().map_err(|_| EngineError::Expression {
+            text: text.to_string(),
+            message: "invalid percentage".to_string(),
+        })?;
+        Ok(number / 100.0)
+    }
+
+    /// Resolve every output port of `module` to an executable statement index.
+    ///
+    /// Containers are transparent pass-throughs with two port kinds:
+    ///
+    /// - an **entry** port appears as a link starting *at* the container
+    ///   (`(container, ioid) -> (child, ioid)`), so entering continues inside;
+    /// - an **exit** port appears as a link ending *at* the container
+    ///   (`(child, ioid) -> (container, ioid)`), so leaving continues in the
+    ///   container's parent, where a link starts at `(container, ioid)`.
+    ///
+    /// Nested containers are followed until an activity block is reached.
+    fn resolve_target(
+        &self,
+        module_id: u32,
+        ioid: u32,
+        entry_index: &HashMap<u32, usize>,
+    ) -> Result<Option<usize>, EngineError> {
+        self.resolve_in_owner(module_id, ioid, entry_index, 0)
+    }
+
+    fn resolve_in_owner(
+        &self,
+        module_id: u32,
+        ioid: u32,
+        entry_index: &HashMap<u32, usize>,
+        depth: usize,
+    ) -> Result<Option<usize>, EngineError> {
+        if depth > 64 {
+            return Err(EngineError::Graph {
+                message: format!(
+                    "container cycle while resolving module {module_id} port {ioid}"
+                ),
+            });
+        }
+        let module = self.model.block(module_id).ok_or_else(|| EngineError::Graph {
+            message: format!("link points at missing module {module_id}"),
+        })?;
+        let owner = self.model.block(module.owner).ok_or_else(|| EngineError::Graph {
+            message: format!("module {module_id} has missing owner {}", module.owner),
+        })?;
+        let Some(link) = owner
+            .links
+            .iter()
+            .find(|link| link.from_module == module_id && link.from_ioid == ioid)
+        else {
+            return Ok(None);
+        };
+        self.follow(link.to_module, link.to_ioid, entry_index, depth)
+    }
+
+    /// Continue from `(module, ioid)` after a link already reached it.
+    fn follow(
+        &self,
+        module_id: u32,
+        ioid: u32,
+        entry_index: &HashMap<u32, usize>,
+        depth: usize,
+    ) -> Result<Option<usize>, EngineError> {
+        let module = self.model.block(module_id).ok_or_else(|| EngineError::Graph {
+            message: format!("link points at missing module {module_id}"),
+        })?;
+        if !module.is_container() {
+            return Ok(entry_index.get(&module_id).copied());
+        }
+        // Exiting the container: the parent owns the continuation.
+        if module.outputs.iter().any(|port| port.ioid == ioid) {
+            return self.resolve_in_owner(module_id, ioid, entry_index, depth + 1);
+        }
+        // Entering the container: an internal link may start at the port.
+        if let Some(inner) = module
+            .links
+            .iter()
+            .find(|link| link.from_module == module_id && link.from_ioid == ioid)
+        {
+            let (next_module, next_ioid) = (inner.to_module, inner.to_ioid);
+            return self.follow(next_module, next_ioid, entry_index, depth + 1);
+        }
+        // The editor also allows an entry port without an explicit internal link;
+        // the flow then starts at the container's first child (lowest module id).
+        let first_child = self
+            .model
+            .blocks
+            .iter()
+            .filter(|block| block.owner == module_id && block.id != module_id)
+            .min_by_key(|block| block.id);
+        match first_child {
+            Some(child) if !child.is_container() => {
+                Ok(entry_index.get(&child.id).copied())
+            }
+            Some(child) => self.follow(child.id, ioid, entry_index, depth + 1),
+            None => Ok(None),
+        }
+    }
+
+    fn number_expr(&self, value: f64) -> ProgramExpr {
+        ProgramExpr::parse(&format!("{value}")).expect("formatted numbers always parse")
+    }
+
+    fn number(&self, module: &Block, name: &str) -> Option<f64> {
+        let text = module.prop_value(name)?;
+        let resolved = self
+            .resolve_placeholders(module, &text, Fallback::Zero)
+            .ok()?;
+        resolved.trim().parse::<f64>().ok()
+    }
+
+    fn require_number(&self, module: &Block, name: &str) -> Result<f64, EngineError> {
+        self.number(module, name).ok_or_else(|| {
+            EngineError::invalid_block(
+                module.id,
+                &module.class,
+                format!("{name} must be a number"),
+            )
+        })
+    }
+
+    fn name(&self, module: &Block, prop: &str) -> Option<String> {
+        let text = module.prop_value(prop)?;
+        let resolved = self
+            .resolve_placeholders(module, &text, Fallback::Literal)
+            .ok()?;
+        let trimmed = resolved.trim();
+        (!trimmed.is_empty()).then(|| trimmed.to_string())
+    }
+
+    fn require_name(&self, module: &Block, prop: &str) -> Result<String, EngineError> {
+        self.name(module, prop).ok_or_else(|| {
+            EngineError::invalid_block(
+                module.id,
+                &module.class,
+                format!("{prop} is required"),
+            )
+        })
+    }
+
+    fn entity(&self, module: &Block, prop: &str) -> Result<EntityName, EngineError> {
+        let text = module.prop_value(prop).ok_or_else(|| {
+            EngineError::invalid_block(module.id, &module.class, format!("{prop} is required"))
+        })?;
+        let resolved = self.resolve_placeholders(module, &text, Fallback::Literal)?;
+        let trimmed = resolved.trim();
+        if let Some(indirect) = trimmed.strip_prefix('*') {
+            Ok(EntityName {
+                source: NameSource::Indirect(indirect.trim().to_string()),
+            })
+        } else {
+            Ok(EntityName {
+                source: NameSource::Literal(trimmed.to_string()),
+            })
+        }
+    }
+
+    fn sna(&self, module: &Block, prop: &str) -> Result<Option<ProgramExpr>, EngineError> {
+        let Some(text) = module.prop_value(prop) else {
+            return Ok(None);
+        };
+        if text.trim().is_empty() {
+            return Ok(None);
+        }
+        self.resolve_sna_text(module, &text).map(Some)
+    }
+
+    fn resolve_sna_text(
+        &self,
+        module: &Block,
+        text: &str,
+    ) -> Result<ProgramExpr, EngineError> {
+        let resolved = self.resolve_placeholders(module, text, Fallback::Zero)?;
+        ProgramExpr::parse(&resolved).map_err(|err| match err {
+            EngineError::Expression { message, .. } => EngineError::invalid_block(
+                module.id,
+                &module.class,
+                format!("{message} in {text:?}"),
+            ),
+            other => other,
+        })
+    }
+
+    /// Replace `[name]` placeholders with the nearest container's property value.
+    fn resolve_placeholders(
+        &self,
+        module: &Block,
+        text: &str,
+        fallback: Fallback,
+    ) -> Result<String, EngineError> {
+        let mut current = text.to_string();
+        for _ in 0..8 {
+            if !current.contains('[') {
+                return Ok(current);
+            }
+            let mut out = String::with_capacity(current.len());
+            let mut rest = current.as_str();
+            while let Some(start) = rest.find('[') {
+                out.push_str(&rest[..start]);
+                let tail = &rest[start + 1..];
+                let Some(end) = tail.find(']') else {
+                    out.push_str(&rest[start..]);
+                    rest = "";
+                    break;
+                };
+                let name = &tail[..end];
+                match self.lookup_container_prop(module, name.trim()) {
+                    Some(value) => out.push_str(&value),
+                    None => match fallback {
+                        Fallback::Zero => out.push('0'),
+                        Fallback::Literal => out.push_str(name),
+                    },
+                }
+                rest = &tail[end + 1..];
+            }
+            out.push_str(rest);
+            current = out;
+        }
+        Err(EngineError::invalid_block(
+            module.id,
+            &module.class,
+            format!("placeholder nesting is too deep in {text:?}"),
+        ))
+    }
+
+    /// Resolve a `[name]` placeholder against the enclosing containers.
+    ///
+    /// The nearest container that defines a usable value wins. A container
+    /// whose value is empty or is the placeholder itself (`media = [media]`,
+    /// which the editor writes when a container inherits its parent's setting)
+    /// does not shadow the outer scope.
+    fn lookup_container_prop(&self, module: &Block, name: &str) -> Option<String> {
+        let mut owner = module.owner;
+        for _ in 0..64 {
+            let container = self.model.block(owner)?;
+            if let Some(prop) = container.prop(name)
+                && prop.is_used()
+            {
+                let value = prop.value();
+                let trimmed = value.trim();
+                if trimmed != format!("[{name}]") {
+                    return Some(value);
+                }
+            }
+            if container.is_root() {
+                return None;
+            }
+            owner = container.owner;
+        }
+        None
+    }
+}
+
+/// All expressions a block holds, for reference checking.
+fn block_expressions(kind: &BlockKind) -> Vec<&ProgramExpr> {
+    match kind {
+        BlockKind::Generate(spec) => {
+            let mut out = vec![&spec.mean];
+            out.extend(spec.modifier.iter());
+            out.extend(spec.offset.iter());
+            out.extend(spec.priority.iter());
+            out
+        }
+        BlockKind::Advance(spec) => {
+            let mut out = vec![&spec.mean];
+            out.extend(spec.modifier.iter());
+            out
+        }
+        BlockKind::Assign(spec) => vec![&spec.value],
+        BlockKind::SaveValue(spec) => vec![&spec.value],
+        BlockKind::Counter(spec) => vec![&spec.increment],
+        BlockKind::Enter(spec) | BlockKind::Leave(spec) => vec![&spec.units],
+        BlockKind::Test(spec) => vec![&spec.left, &spec.right],
+        BlockKind::Transfer(spec) => vec![&spec.probability],
+        BlockKind::MultiTransfer(spec) => spec.weights.iter().collect(),
+        BlockKind::Unlink(spec) => {
+            let mut out = vec![&spec.count];
+            out.extend(spec.compare_value.iter());
+            out
+        }
+        BlockKind::Split(spec) => vec![&spec.total],
+        BlockKind::Assemble(spec) => vec![&spec.count],
+        BlockKind::Select(spec) => vec![&spec.low, &spec.high],
+        BlockKind::Tabulate(spec) => spec.weight.iter().collect(),
+        BlockKind::Priority(expr) => vec![expr],
+        BlockKind::Join(spec) => spec.number.iter().collect(),
+        BlockKind::Examine(spec) => vec![&spec.number],
+        BlockKind::Remove(spec) => {
+            let mut out = vec![&spec.count];
+            out.extend(spec.value.iter());
+            out
+        }
+        BlockKind::Scan(spec) => spec.compare_value.iter().collect(),
+        BlockKind::Alter(spec) => {
+            let mut out = vec![&spec.count];
+            out.extend(spec.value.iter());
+            out
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// Walk an expression tree collecting statically named references.
+fn collect_references(expr: &Expr, visit: &mut impl FnMut(RefKind, &str)) {
+    match expr {
+        Expr::Ref { kind, name } => {
+            if let NameSource::Literal(name) = name {
+                visit(*kind, name);
+            }
+        }
+        Expr::Neg(inner) => collect_references(inner, visit),
+        Expr::Bin(_, left, right) => {
+            collect_references(left, visit);
+            collect_references(right, visit);
+        }
+        _ => {}
+    }
+}

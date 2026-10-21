@@ -17,7 +17,7 @@ expression: stdout(&output)
       "node": 6,
       "class": "Generate",
       "label": null,
-      "operands": "90,30,2700",
+      "operands": "90,30,2700,,",
       "entries": 9,
       "current": 1,
       "retries": 0
@@ -27,7 +27,7 @@ expression: stdout(&output)
       "node": 7,
       "class": "Generate",
       "label": null,
-      "operands": "0,,3600,1",
+      "operands": "0,,3600,1,",
       "entries": 1,
       "current": 0,
       "retries": 0
@@ -37,7 +37,7 @@ expression: stdout(&output)
       "node": 8,
       "class": "Logic",
       "label": "A_Logic",
-      "operands": "S,Puerta",
+      "operands": "S Puerta",
       "entries": 0,
       "current": 0,
       "retries": 0
@@ -57,7 +57,7 @@ expression: stdout(&output)
       "node": 10,
       "class": "GateL",
       "label": "GateL",
-      "operands": "LS,Puerta",
+      "operands": "LS Puerta",
       "entries": 9,
       "current": 9,
       "retries": 9
@@ -127,7 +127,7 @@ expression: stdout(&output)
       "node": 14,
       "class": "Generate",
       "label": null,
-      "operands": "3600",
+      "operands": "3600,,,,",
       "entries": 1,
       "current": 1,
       "retries": 0

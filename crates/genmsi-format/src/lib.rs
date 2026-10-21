@@ -1,39 +1,61 @@
-//! Parsing, validation and writing of GenMSI model files (`.gmdl`) and block
-//! class definitions (`gClasses.xml`).
+//! Parsing, validation and writing of GenMSI model files (`.gmdl`).
 //!
 //! Design rules (see `docs/DECISIONS.md`):
 //!
-//! - Semantic model and layout are stored separately: node/link semantics must
-//!   never depend on canvas positions.
+//! - The semantic model (blocks, ports, links, properties) is stored separately
+//!   from canvas layout (positions, sizes, breakpoints). Layout never
+//!   influences simulation and is preserved across a rewrite.
 //! - Every value read from XML is validated on load; the parser rejects
 //!   structurally invalid models with precise errors instead of "fixing" them
 //!   silently (the original tool accumulated structural bugs this way).
 //! - This crate is the only place that knows the `.gmdl` on-disk format.
+//!
+//! # Example
+//!
+//! ```
+//! use genmsi_format::{load, save};
+//!
+//! # let dir = std::env::temp_dir().join("genmsi-format-doc-example");
+//! # std::fs::create_dir_all(&dir).unwrap();
+//! # let path = dir.join("model.gmdl");
+//! # std::fs::write(&path, r#"<gmodel versioncode="1"><gclasses/><modules><module moduleid="0" moduleclass="main" owner="0" caption="m" name="m" kind="C"><links/><inputs/><outputs/></module><module moduleid="1" moduleclass="Clock" owner="0" caption="c" name="n" kind="A"><props><property name="Frecuencia" hint="" value="3600" type="TSNA" subType="SNA" visible="1" unique="0"/></props></module></modules></gmodel>"#).unwrap();
+//! let model = load(&path).expect("model loads");
+//! assert_eq!(model.activity_blocks().count(), 1);
+//! save(&model, &path).expect("model saves");
+//! ```
 
-/// Error type for all parsing and validation failures.
-#[derive(Debug, thiserror::Error)]
-#[allow(dead_code)] // scaffold: variants gain use in Phase 1
-pub enum FormatError {
-    /// The XML could not be parsed.
-    #[error("invalid XML at {location}: {message}")]
-    Xml { location: String, message: String },
-    /// The XML parsed but does not satisfy the model schema.
-    #[error("structural error in model: {0}")]
-    Structural(String),
+mod error;
+mod model;
+mod parser;
+mod validate;
+mod writer;
+
+pub use error::{FormatError, Location};
+pub use model::{
+    Block, ContainerHeader, CustomClass, GmdlModel, Layout, Link, Port, PortLayout, Property,
+    SectionKind, percent_decode, percent_encode,
+};
+pub use parser::{parse_file, parse_str};
+pub use validate::{validate, validate_runnable};
+pub use writer::{to_string, write_file};
+
+use std::path::Path;
+
+/// Read, parse and structurally validate a model file.
+pub fn load(path: impl AsRef<Path>) -> Result<GmdlModel, FormatError> {
+    let model = parse_file(path)?;
+    validate(&model)?;
+    Ok(model)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Parse and structurally validate model text.
+pub fn load_str(text: &str) -> Result<GmdlModel, FormatError> {
+    let model = parse_str(text)?;
+    validate(&model)?;
+    Ok(model)
+}
 
-    #[test]
-    fn format_error_display_is_actionable() {
-        let err = FormatError::Xml {
-            location: "line 3, column 10".to_string(),
-            message: "unexpected closing tag".to_string(),
-        };
-        let text = err.to_string();
-        assert!(text.contains("line 3"));
-        assert!(text.contains("unexpected closing tag"));
-    }
+/// Write a model back to a file.
+pub fn save(model: &GmdlModel, path: impl AsRef<Path>) -> Result<(), FormatError> {
+    write_file(model, path)
 }

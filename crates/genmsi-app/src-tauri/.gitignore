@@ -1,0 +1,9 @@
+# The desktop shell's build output.
+target/
+
+# The desktop shell's icons are generated, not committed: the repository
+# carries no images. Recreate them with:
+#
+#     bunx @tauri-apps/cli icon <source.png> -o crates/genmsi-app/src-tauri/icons
+#
+icons/

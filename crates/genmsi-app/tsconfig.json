@@ -19,8 +19,7 @@
     "verbatimModuleSyntax": true,
     "types": [
       "vite/client",
-      "node",
-      "bun-types"
+      "node"
     ],
     "baseUrl": ".",
     "paths": {

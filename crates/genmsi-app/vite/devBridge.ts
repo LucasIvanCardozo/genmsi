@@ -240,6 +240,24 @@ export function devBridge(): Plugin {
               const result = await run(genmsiBin, args);
               return send(res, result);
             }
+            case "trace": {
+              resolveInsideRepo(modelPath);
+              const args = ["trace", modelPath, "--json"];
+              const seed = url.searchParams.get("seed");
+              if (seed !== null && seed !== "") {
+                args.push("--seed", seed);
+              }
+              const until = url.searchParams.get("until");
+              if (until !== null && until !== "") {
+                args.push("--until", until);
+              }
+              const limit = url.searchParams.get("limit");
+              if (limit !== null && limit !== "") {
+                args.push("--limit", limit);
+              }
+              const result = await run(genmsiBin, args);
+              return send(res, result);
+            }
             case "session": {
               // The editing protocol: one request, one answer, both JSON.
               const body = await readBody(req);

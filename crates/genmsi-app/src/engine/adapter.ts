@@ -5,6 +5,7 @@ import type {
   ModelDocument,
   ReportDocument,
   SessionState,
+  TraceDocument,
 } from "../types";
 
 /** A model file the app offers. */
@@ -21,6 +22,8 @@ export interface SimulationOptions {
   seed?: number;
   /** Horizon of the run, in simulated time. */
   until?: number;
+  /** How many trace records the run keeps. */
+  limit?: number;
 }
 
 /** The outcome of a save. */
@@ -62,6 +65,8 @@ export interface EngineAdapter {
   lint(path: string): Promise<LintDocument>;
   /** The run's report (`genmsi.report/1`). */
   simulate(path: string, options?: SimulationOptions): Promise<ReportDocument>;
+  /** The run's trace (`genmsi.trace/1`). */
+  trace(path: string, options?: SimulationOptions): Promise<TraceDocument>;
   /** Open a model for editing. */
   openModel(path: string): Promise<SessionState>;
   /** Start a new, empty model. */
@@ -76,6 +81,8 @@ export interface EngineAdapter {
   save(path?: string): Promise<SaveResult>;
   /** The report of a run of the model in memory. */
   simulateCurrent(options?: SimulationOptions): Promise<ReportDocument>;
+  /** The trace of a run of the model in memory. */
+  traceCurrent(options?: SimulationOptions): Promise<TraceDocument>;
   /** The block classes the editor offers to create. */
   catalogue(): Promise<CatalogueDocument>;
 }

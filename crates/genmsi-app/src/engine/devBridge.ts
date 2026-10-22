@@ -6,6 +6,7 @@ import type {
   ReportDocument,
   SessionAnswer,
   SessionState,
+  TraceDocument,
 } from "../types";
 import { EngineError } from "./adapter";
 import type { EngineAdapter, ModelRef, SaveResult, SimulationOptions } from "./adapter";
@@ -98,6 +99,13 @@ export const devBridge: EngineAdapter = {
       seed: options?.seed,
       until: options?.until,
     }),
+  trace: (path: string, options?: SimulationOptions) =>
+    get<TraceDocument>("trace", {
+      path,
+      seed: options?.seed,
+      until: options?.until,
+      limit: options?.limit,
+    }),
   openModel: async (path: string) => stateOf(await session({ op: "open", path })),
   newModel: async () => stateOf(await session({ op: "new" })),
   apply: async (command: EditCommand) => stateOf(await session({ op: "apply", command })),
@@ -117,6 +125,15 @@ export const devBridge: EngineAdapter = {
         op: "simulateCurrent",
         seed: options?.seed ?? null,
         until: options?.until ?? null,
+      }),
+    ),
+  traceCurrent: async (options?: SimulationOptions) =>
+    documentOf<TraceDocument>(
+      await session({
+        op: "traceCurrent",
+        seed: options?.seed ?? null,
+        until: options?.until ?? null,
+        limit: options?.limit ?? null,
       }),
     ),
   catalogue: async () => documentOf<CatalogueDocument>(await session({ op: "catalogue" })),

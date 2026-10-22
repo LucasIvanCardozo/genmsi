@@ -6,6 +6,7 @@ import type {
   ReportDocument,
   SessionAnswer,
   SessionState,
+  TraceDocument,
 } from "../types";
 import { EngineError } from "./adapter";
 import type { EngineAdapter, ModelRef, SaveResult, SimulationOptions } from "./adapter";
@@ -49,6 +50,17 @@ function stateOf(answer: SessionAnswer): SessionState {
   return answer.state;
 }
 
+/**
+ * The document a command returned, parsed.
+ *
+ * The shell's commands return the engine's bytes (the document as a JSON
+ * string), the same bytes the dev bridge returns as a body: both backends
+ * deliver the same document and the frontend sees an object in both.
+ */
+function parsed<T>(text: string): T {
+  return JSON.parse(text) as T;
+}
+
 /** The document the answer carries, parsed. */
 function documentOf<T>(answer: SessionAnswer): T {
   if (answer.document === undefined) {
@@ -65,14 +77,27 @@ function documentOf<T>(answer: SessionAnswer): T {
  */
 export const tauri: EngineAdapter = {
   listModels: () => bridge().invoke<ModelRef[]>("list_models"),
-  loadModel: (path: string) => bridge().invoke<ModelDocument>("load_model", { path }),
-  lint: (path: string) => bridge().invoke<LintDocument>("lint_model", { path }),
-  simulate: (path: string, options?: SimulationOptions) =>
-    bridge().invoke<ReportDocument>("simulate_model", {
-      path,
-      seed: options?.seed ?? 1,
-      until: options?.until ?? null,
-    }),
+  loadModel: async (path: string) =>
+    parsed<ModelDocument>(await bridge().invoke<string>("load_model", { path })),
+  lint: async (path: string) =>
+    parsed<LintDocument>(await bridge().invoke<string>("lint_model", { path })),
+  simulate: async (path: string, options?: SimulationOptions) =>
+    parsed<ReportDocument>(
+      await bridge().invoke<string>("simulate_model", {
+        path,
+        seed: options?.seed ?? 1,
+        until: options?.until ?? null,
+      }),
+    ),
+  trace: async (path: string, options?: SimulationOptions) =>
+    parsed<TraceDocument>(
+      await bridge().invoke<string>("trace_model", {
+        path,
+        seed: options?.seed ?? 1,
+        until: options?.until ?? null,
+        limit: options?.limit ?? null,
+      }),
+    ),
   openModel: async (path: string) => stateOf(await session({ op: "open", path })),
   newModel: async () => stateOf(await session({ op: "new" })),
   apply: async (command: EditCommand) => stateOf(await session({ op: "apply", command })),
@@ -92,6 +117,15 @@ export const tauri: EngineAdapter = {
         op: "simulateCurrent",
         seed: options?.seed ?? null,
         until: options?.until ?? null,
+      }),
+    ),
+  traceCurrent: async (options?: SimulationOptions) =>
+    documentOf<TraceDocument>(
+      await session({
+        op: "traceCurrent",
+        seed: options?.seed ?? null,
+        until: options?.until ?? null,
+        limit: options?.limit ?? null,
       }),
     ),
   catalogue: async () => documentOf<CatalogueDocument>(await session({ op: "catalogue" })),

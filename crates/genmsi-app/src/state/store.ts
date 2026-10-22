@@ -79,29 +79,35 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   openModel: async (path: string) => {
-    set({ status: "loading", error: null, currentPath: path });
-    try {
-      const [model, lint] = await Promise.all([
-        engine().loadModel(path),
-        engine().lint(path),
-      ]);
-      set({
-        model,
-        lint,
-        report: null,
-        selectedBlockId: null,
-        status: "ready",
-        error: null,
-      });
-    } catch (error) {
+    set({ status: "loading", error: null, currentPath: path, view: "grafo" });
+    // The graph and the lint are asked for together, but they fail apart: a
+    // model the engine refuses to compile still has a graph to show.
+    const [graph, lint] = await Promise.allSettled([
+      engine().loadModel(path),
+      engine().lint(path),
+    ]);
+    if (graph.status === "rejected") {
       set({
         status: "idle",
         model: null,
         lint: null,
         report: null,
-        error: `No se pudo abrir el modelo: ${messageOf(error)}`,
+        error: `No se pudo abrir el modelo: ${messageOf(graph.reason)}`,
       });
+      return;
     }
+    const error =
+      lint.status === "rejected"
+        ? `El modelo no compila: ${messageOf(lint.reason)}`
+        : null;
+    set({
+      model: graph.value,
+      lint: lint.status === "fulfilled" ? lint.value : null,
+      report: null,
+      selectedBlockId: null,
+      status: "ready",
+      error,
+    });
   },
 
   simulate: async () => {

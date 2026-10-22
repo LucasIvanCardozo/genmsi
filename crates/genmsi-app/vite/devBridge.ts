@@ -6,7 +6,7 @@ import type { Plugin } from "vite";
 const here = path.dirname(fileURLToPath(import.meta.url));
 
 /** The repository root: the app lives in `crates/genmsi-app`. */
-export const repoRoot = path.resolve(here, "../..");
+export const repoRoot = path.resolve(here, "../../..");
 
 /** The directory the app offers as models, relative to the repository root. */
 export const modelsDir = "fixtures/models";

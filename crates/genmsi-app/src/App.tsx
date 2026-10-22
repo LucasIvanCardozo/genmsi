@@ -3,6 +3,7 @@ import { Play } from "lucide-react";
 import ErrorNotice from "./components/ErrorNotice";
 import GraphView from "./components/GraphView";
 import ModelPicker from "./components/ModelPicker";
+import ModelSummary from "./components/ModelSummary";
 import PropertiesPanel from "./components/PropertiesPanel";
 import ReportView from "./components/ReportView";
 import { useApp } from "./state/store";
@@ -24,6 +25,7 @@ export default function App() {
     selectedBlockId,
     report,
     view,
+    lint,
     loadModels,
     simulate,
     selectBlock,
@@ -122,17 +124,20 @@ export default function App() {
             Elegí un modelo para ver su grafo.
           </div>
         ) : view === "grafo" ? (
-          <div className="flex min-h-0 flex-1 gap-3">
-            <div className="min-w-0 flex-1">
-              <GraphView
-                model={model}
-                selectedBlockId={selectedBlockId}
-                onSelect={(id) => selectBlock(id)}
-              />
+          <div className="flex min-h-0 flex-1 flex-col gap-3">
+            <ModelSummary lint={lint} />
+            <div className="flex min-h-0 flex-1 gap-3">
+              <div className="min-w-0 flex-1">
+                <GraphView
+                  model={model}
+                  selectedBlockId={selectedBlockId}
+                  onSelect={(id) => selectBlock(id)}
+                />
+              </div>
+              <aside className="w-80 shrink-0 overflow-auto rounded-lg border border-slate-200 bg-white p-4">
+                <PropertiesPanel block={selectedBlock} />
+              </aside>
             </div>
-            <aside className="w-80 shrink-0 overflow-auto rounded-lg border border-slate-200 bg-white p-4">
-              <PropertiesPanel block={selectedBlock} />
-            </aside>
           </div>
         ) : report === null ? (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 text-sm text-slate-500">

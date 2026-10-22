@@ -6,7 +6,6 @@ import { useApp } from "../state/store";
  */
 export default function ModelPicker() {
   const { models, currentPath, status, openModel } = useApp();
-  const selected = currentPath ?? models[0]?.path ?? "";
 
   return (
     <div className="flex items-center gap-2">
@@ -16,19 +15,16 @@ export default function ModelPicker() {
       <select
         aria-label="Modelo"
         className="min-w-64 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 shadow-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-        value={selected}
+        value={currentPath ?? ""}
         onChange={(event) => void openModel(event.target.value)}
         disabled={status === "loading"}
       >
-        {models.length === 0 ? (
-          <option value="">Sin modelos</option>
-        ) : (
-          models.map((model) => (
-            <option key={model.path} value={model.path}>
-              {model.name}
-            </option>
-          ))
-        )}
+        <option value="">Elegí un modelo…</option>
+        {models.map((model) => (
+          <option key={model.path} value={model.path}>
+            {model.name}
+          </option>
+        ))}
       </select>
     </div>
   );

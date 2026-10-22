@@ -28,6 +28,7 @@ interface BlockData extends Record<string, unknown> {
 /** One block of the model, drawn as a node of the graph. */
 function BlockNode({ data }: NodeProps<Node<BlockData>>) {
   const container = data.kind === "C";
+  const note = data.title === "Note";
   return (
     <div
       className={[
@@ -35,14 +36,16 @@ function BlockNode({ data }: NodeProps<Node<BlockData>>) {
         container
           ? "border-slate-300 border-dashed bg-slate-50/80"
           : "border-slate-400 bg-white",
+        note ? "opacity-70" : "",
         data.selected ? "ring-2 ring-indigo-500" : "",
       ].join(" ")}
     >
       <Handle type="target" position={Position.Top} className="!size-2 !border-0 !bg-slate-400" />
       <span
         className={[
-          "truncate text-[11px] font-semibold tracking-tight",
+          "truncate text-xs font-semibold tracking-tight",
           container ? "text-slate-500" : "text-slate-800",
+          note ? "italic" : "",
         ].join(" ")}
       >
         {data.title}
@@ -110,7 +113,7 @@ function graphOf(model: ModelDocument): { nodes: Node<BlockData>[]; edges: Edge[
       target: String(edge.to_module),
       label: edge.label ?? undefined,
       animated: false,
-      style: { stroke: "#94a3b8", strokeWidth: 1.5 },
+      style: { stroke: "#94a3b8", strokeWidth: 1.75 },
       labelStyle: { fontSize: 10, fill: "#64748b" },
       labelBgStyle: { fill: "#f8fafc", fillOpacity: 0.9 },
     }));
@@ -150,21 +153,38 @@ export default function GraphView({
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        onInit={(instance) => {
+          // The first view frames the model's flow: the annotations (the
+          // blocks the original uses as notes) stay reachable, but they do not
+          // push the flow into a corner.
+          const flowNodes = nodes.filter((node) => node.data.kind === "A");
+          instance.fitView({
+            nodes: flowNodes.length > 0 ? flowNodes : nodes,
+            padding: 0.15,
+            minZoom: 0.5,
+          });
+        }}
         onNodeClick={(_event, node) => onSelect(Number(node.id))}
         onPaneClick={() => onSelect(null)}
         nodesDraggable={false}
         nodesConnectable={false}
         edgesReconnectable={false}
         elementsSelectable
-        fitView
-        fitViewOptions={{ padding: 0.15 }}
+        fitView={false}
         minZoom={0.1}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >
         <Background color="#e2e8f0" gap={16} />
         <Controls showInteractive={false} />
-        <MiniMap pannable zoomable className="!bg-white" />
+        <MiniMap
+          pannable
+          zoomable
+          className="!bg-white"
+          nodeColor="#cbd5e1"
+          nodeStrokeColor="#94a3b8"
+          maskColor="rgba(241, 245, 249, 0.55)"
+        />
       </ReactFlow>
     </div>
   );

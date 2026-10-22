@@ -8,6 +8,12 @@ The loop is part of the definition of done of every slice. The screenshots are
 **not** committed: the repository does not carry images (the phase's decision
 `S4`).
 
+The whole loop is one runnable script, `crates/genmsi-app/scripts/
+check-visual-loop.sh`; it runs these steps in order, takes the four
+screenshots and exits non-zero if any step fails. The manual steps below are
+the same commands, spelled out one by one — when the script changes, this
+document changes with it.
+
 ## What it takes
 
 ```bash
@@ -45,33 +51,36 @@ export AGENT_BROWSER_SESSION="genmsi-$(agent-browser session id --scope worktree
 agent-browser open http://127.0.0.1:5173/
 agent-browser wait --text "GenMSI"
 agent-browser snapshot -i          # the interactive elements, with their refs
-agent-browser screenshot /tmp/genmsi-app/01-inicio.png
-```
-
-The screenshots go to `/tmp/genmsi-app/`:
-
-```bash
-mkdir -p /tmp/genmsi-app
 ```
 
 ## 3. Drive the slice
 
-The slice's own flow, with the refs of the last snapshot:
-
 ```bash
-# The model picker: open a reference model.
-agent-browser find role combobox select --name "Modelo" "fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl"
-agent-browser wait --text "Puerta Banco"
-agent-browser screenshot /tmp/genmsi-app/02-grafo.png
+# The model picker: the options arrive after `GET /api/models`, so wait for
+# one model's name before selecting. Selecting earlier is a silent no-op.
+agent-browser wait --text "TP2__problema1"
 
-# Select a block of the graph and read its properties.
-agent-browser find text "Generate" click
-agent-browser screenshot /tmp/genmsi-app/03-propiedades.png
+# Open a reference model. `agent-browser select` takes a CSS selector and the
+# option's value (the model's path, as `GET /api/models` lists it); the older
+# `find role combobox select` form does not exist in agent-browser 0.38.
+agent-browser select '[aria-label="Modelo"]' "fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl"
+agent-browser wait --text "Puerta Banco"
+agent-browser screenshot /tmp/genmsi-app/01-grafo.png
+
+# Select a block of the graph by its node id (a click by text lands on the
+# element that covers the node) and read its properties.
+agent-browser click '.react-flow__node[data-id="6"]'
+agent-browser screenshot /tmp/genmsi-app/02-propiedades.png
 
 # Run the model and read the report.
 agent-browser find role button click --name "Simular"
 agent-browser wait --text "Bloques"
-agent-browser screenshot /tmp/genmsi-app/04-reporte.png
+agent-browser screenshot /tmp/genmsi-app/03-reporte.png
+
+# A model the engine refuses: the engine's message, not an empty graph.
+agent-browser select '[aria-label="Modelo"]' "fixtures/models/TP9__tp9.gmdl"
+agent-browser wait --text "Unlink"
+agent-browser screenshot /tmp/genmsi-app/04-error.png
 ```
 
 `agent-browser wait --text ...` is the wait to use after an action: the app is a
@@ -83,7 +92,8 @@ the thing that appeared is the condition to wait for.
 Read the screenshot (`agent-browser screenshot` prints the path; open the file
 with the image reader of the session). The things to look at:
 
-- the graph is placed with the model's own geometry and every block is legible;
+- the graph is placed with the model's own geometry, and the containers count
+  in the frame: no block and no container is cut off;
 - the selected block shows its properties, decoded;
 - the report's tables carry the engine's numbers, with the original's comma
   decimals;
@@ -108,12 +118,13 @@ shows up.
 
 1. `cargo build -p genmsi-cli -p genmsi-app-engine` (the engine did not move,
    but the build must be there).
-2. Start the dev server, wait for it.
-3. Open it, take the screenshots of the flow the slice adds.
-4. Look at them; fix what they show.
-5. `bun test` (the dev bridge's bytes against `genmsi simulate --json`).
-6. `bunx tsc --noEmit`.
-7. Close the browser and the server.
+2. `crates/genmsi-app/scripts/check-visual-loop.sh`, or the manual steps
+   above: start the dev server, wait for it, open it, take the screenshots of
+   the flow the slice adds, look at them, fix what they show.
+3. `node --test tests/*.test.ts` (the dev bridge's bytes against
+   `genmsi simulate --json`; that is the `test` script of `package.json`).
+4. `bunx tsc --noEmit`.
+5. Close the browser and the server.
 
 ## The desktop shell
 

@@ -121,7 +121,7 @@ export default function App() {
 
         {model === null ? (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 text-sm text-slate-500">
-            Elegí un modelo para ver su grafo.
+            Selecciona un modelo para ver su grafo.
           </div>
         ) : view === "grafo" ? (
           <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -141,7 +141,7 @@ export default function App() {
           </div>
         ) : report === null ? (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 text-sm text-slate-500">
-            Simulá el modelo para ver su reporte.
+            Ejecuta la simulación para ver su reporte.
           </div>
         ) : (
           <ReportView report={report} />

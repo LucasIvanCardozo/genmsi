@@ -19,7 +19,7 @@ export default function ModelPicker() {
         onChange={(event) => void openModel(event.target.value)}
         disabled={status === "loading"}
       >
-        <option value="">Elegí un modelo…</option>
+        <option value="">Selecciona un modelo…</option>
         {models.map((model) => (
           <option key={model.path} value={model.path}>
             {model.name}

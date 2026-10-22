@@ -24,7 +24,7 @@ export default function PropertiesPanel({ block }: { block: ModelBlock | null })
   if (block === null) {
     return (
       <p className="px-1 py-6 text-sm text-slate-500">
-        Elegí un bloque del grafo para ver sus propiedades.
+        Selecciona un bloque del grafo para ver sus propiedades.
       </p>
     );
   }

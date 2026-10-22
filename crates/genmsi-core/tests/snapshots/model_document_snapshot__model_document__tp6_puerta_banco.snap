@@ -1,0 +1,617 @@
+---
+source: crates/genmsi-core/tests/model_document_snapshot.rs
+expression: text
+---
+{
+  "schema": "genmsi.model/1",
+  "path": "../../fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl",
+  "title": "Puerta Banco",
+  "blocks": [
+    {
+      "id": 0,
+      "class": "main",
+      "kind": "C",
+      "name": "Puerta Banco",
+      "caption": "Modelo",
+      "label": null,
+      "container": 0,
+      "layout": null,
+      "properties": []
+    },
+    {
+      "id": 4,
+      "class": "",
+      "kind": "C",
+      "name": "Enunciado",
+      "caption": "Un banco abre su puerta a las 10:00. \r\nLos clientes comienza a llegar desde las 9:45 cada \r\n90 +/- 30 segundos y forman fila frente a la puerta. \r\nLos clientes demoran 2 +/- 1 segundo en atravesar la \r\npuerta de ingreso. ",
+      "label": null,
+      "container": 0,
+      "layout": {
+        "x": 523,
+        "y": 56,
+        "width": 318,
+        "height": 91
+      },
+      "properties": []
+    },
+    {
+      "id": 6,
+      "class": "Generate",
+      "kind": "A",
+      "name": "Generate",
+      "caption": "Clientes",
+      "label": null,
+      "container": 0,
+      "layout": {
+        "x": 100,
+        "y": 43,
+        "width": 120,
+        "height": 63
+      },
+      "properties": [
+        {
+          "name": "Cantidad",
+          "value": "",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        },
+        {
+          "name": "Media",
+          "value": "90",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        },
+        {
+          "name": "Modificador",
+          "value": "30",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        },
+        {
+          "name": "OffSet",
+          "value": "2700",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        },
+        {
+          "name": "Prioridad",
+          "value": "",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "class": "Generate",
+      "kind": "A",
+      "name": "Generate1",
+      "caption": "Control",
+      "label": null,
+      "container": 0,
+      "layout": {
+        "x": 249,
+        "y": 46,
+        "width": 120,
+        "height": 63
+      },
+      "properties": [
+        {
+          "name": "Cantidad",
+          "value": "1",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        },
+        {
+          "name": "Media",
+          "value": "",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        },
+        {
+          "name": "Modificador",
+          "value": "",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        },
+        {
+          "name": "OffSet",
+          "value": "3600",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        },
+        {
+          "name": "Prioridad",
+          "value": "",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "class": "Logic",
+      "kind": "A",
+      "name": "Logic",
+      "caption": "Logic",
+      "label": "A_Logic",
+      "container": 0,
+      "layout": {
+        "x": 232,
+        "y": 206,
+        "width": 96,
+        "height": 32
+      },
+      "properties": [
+        {
+          "name": "LogicSwich",
+          "value": "Puerta",
+          "ty": "EntityUse",
+          "subtype": "LogicSwich"
+        },
+        {
+          "name": "Op",
+          "value": "Set",
+          "ty": "Listed",
+          "subtype": "op_Swich"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "class": "Terminate",
+      "kind": "A",
+      "name": "Terminate",
+      "caption": "Terminate",
+      "label": "A_Terminate",
+      "container": 0,
+      "layout": {
+        "x": 232,
+        "y": 360,
+        "width": 84,
+        "height": 64
+      },
+      "properties": [
+        {
+          "name": "Unidades",
+          "value": "",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "class": "GateL",
+      "kind": "A",
+      "name": "GateL",
+      "caption": "GateL",
+      "label": "GateL",
+      "container": 0,
+      "layout": {
+        "x": 86,
+        "y": 202,
+        "width": 102,
+        "height": 48
+      },
+      "properties": [
+        {
+          "name": "LogicSwich",
+          "value": "Puerta",
+          "ty": "EntityUse",
+          "subtype": "LogicSwich"
+        },
+        {
+          "name": "op",
+          "value": "Set",
+          "ty": "Listed",
+          "subtype": "op_Logic_Swich"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "class": "FacilityUse",
+      "kind": "A",
+      "name": "FacilityUse",
+      "caption": "FacilityUse",
+      "label": "A_FacilityUse",
+      "container": 0,
+      "layout": {
+        "x": 73,
+        "y": 352,
+        "width": 100,
+        "height": 40
+      },
+      "properties": [
+        {
+          "name": "Facility",
+          "value": "Puerta",
+          "ty": "EntityUse",
+          "subtype": "Facility"
+        },
+        {
+          "name": "Media",
+          "value": "2",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        },
+        {
+          "name": "Modificador",
+          "value": "1",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        },
+        {
+          "name": "Queue",
+          "value": "qPuerta",
+          "ty": "EntityUse",
+          "subtype": "Queue"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "class": "",
+      "kind": "C",
+      "name": "IngresoBanco",
+      "caption": "Ingreso Banco",
+      "label": "A_Advance",
+      "container": 0,
+      "layout": {
+        "x": 73,
+        "y": 433,
+        "width": 100,
+        "height": 42
+      },
+      "properties": []
+    },
+    {
+      "id": 23,
+      "class": "Advance",
+      "kind": "A",
+      "name": "Advance",
+      "caption": "Advance",
+      "label": "A_Advance",
+      "container": 12,
+      "layout": {
+        "x": 74,
+        "y": 109,
+        "width": 80,
+        "height": 32
+      },
+      "properties": [
+        {
+          "name": "Media",
+          "value": "1800",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        },
+        {
+          "name": "Modificador",
+          "value": "900",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "class": "Clock",
+      "kind": "A",
+      "name": "Clock",
+      "caption": "Clock",
+      "label": null,
+      "container": 0,
+      "layout": {
+        "x": 399,
+        "y": 155,
+        "width": 50,
+        "height": 50
+      },
+      "properties": [
+        {
+          "name": "Frecuencia",
+          "value": "3600",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "class": "Note",
+      "kind": "A",
+      "name": "Note",
+      "caption": "Simular 6 hrs",
+      "label": null,
+      "container": 0,
+      "layout": {
+        "x": 517,
+        "y": 154,
+        "width": 116,
+        "height": 31
+      },
+      "properties": []
+    },
+    {
+      "id": 16,
+      "class": "Queue",
+      "kind": "A",
+      "name": "Queue",
+      "caption": "Queue",
+      "label": "A_Queue",
+      "container": 0,
+      "layout": {
+        "x": 86,
+        "y": 127,
+        "width": 97,
+        "height": 32
+      },
+      "properties": [
+        {
+          "name": "Cantidad",
+          "value": "",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        },
+        {
+          "name": "Queue",
+          "value": "qAfuera",
+          "ty": "EntityUse",
+          "subtype": "Queue"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "class": "Depart",
+      "kind": "A",
+      "name": "Depart",
+      "caption": "Depart",
+      "label": "A_Depart",
+      "container": 0,
+      "layout": {
+        "x": 86,
+        "y": 279,
+        "width": 97,
+        "height": 32
+      },
+      "properties": [
+        {
+          "name": "Cantidad",
+          "value": "",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        },
+        {
+          "name": "Queue",
+          "value": "qAfuera",
+          "ty": "EntityUse",
+          "subtype": "Queue"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "class": "Buffer",
+      "kind": "A",
+      "name": "Buffer",
+      "caption": "Buffer",
+      "label": "A_Buffer",
+      "container": 0,
+      "layout": {
+        "x": 222,
+        "y": 133,
+        "width": 88,
+        "height": 32
+      },
+      "properties": []
+    },
+    {
+      "id": 20,
+      "class": "Buffer",
+      "kind": "A",
+      "name": "Buffer1",
+      "caption": "Buffer1",
+      "label": "A_Buffer1",
+      "container": 0,
+      "layout": {
+        "x": 222,
+        "y": 276,
+        "width": 88,
+        "height": 32
+      },
+      "properties": []
+    },
+    {
+      "id": 22,
+      "class": "Note",
+      "kind": "A",
+      "name": "Note1",
+      "caption": "Simular paso a paso",
+      "label": null,
+      "container": 0,
+      "layout": {
+        "x": 518,
+        "y": 195,
+        "width": 116,
+        "height": 28
+      },
+      "properties": []
+    },
+    {
+      "id": 37,
+      "class": "Terminate",
+      "kind": "A",
+      "name": "Terminate1",
+      "caption": "Terminate1",
+      "label": "A_Terminate1",
+      "container": 0,
+      "layout": {
+        "x": 83,
+        "y": 518,
+        "width": 84,
+        "height": 64
+      },
+      "properties": [
+        {
+          "name": "Unidades",
+          "value": "",
+          "ty": "TSNA",
+          "subtype": "SNA"
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "class": "",
+      "kind": "C",
+      "name": "Tapa",
+      "caption": "",
+      "label": null,
+      "container": 0,
+      "layout": {
+        "x": 87,
+        "y": 293,
+        "width": 158,
+        "height": 571
+      },
+      "properties": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "0:6:1->16:1",
+      "container": 0,
+      "from_module": 6,
+      "from_ioid": 1,
+      "from_port": "Salida1",
+      "to_module": 16,
+      "to_ioid": 1,
+      "to_port": "Entrada1",
+      "label": "A_Queue"
+    },
+    {
+      "id": "0:7:1->18:1",
+      "container": 0,
+      "from_module": 7,
+      "from_ioid": 1,
+      "from_port": "Salida1",
+      "to_module": 18,
+      "to_ioid": 1,
+      "to_port": "Entrada1",
+      "label": "A_Buffer"
+    },
+    {
+      "id": "0:8:2->20:1",
+      "container": 0,
+      "from_module": 8,
+      "from_ioid": 2,
+      "from_port": "Salida1",
+      "to_module": 20,
+      "to_ioid": 1,
+      "to_port": "Entrada1",
+      "label": "A_Buffer1"
+    },
+    {
+      "id": "0:10:2->17:1",
+      "container": 0,
+      "from_module": 10,
+      "from_ioid": 2,
+      "from_port": "Salida1",
+      "to_module": 17,
+      "to_ioid": 1,
+      "to_port": "Entrada1",
+      "label": "A_Depart"
+    },
+    {
+      "id": "0:11:2->12:1",
+      "container": 0,
+      "from_module": 11,
+      "from_ioid": 2,
+      "from_port": "Salida1",
+      "to_module": 12,
+      "to_ioid": 1,
+      "to_port": "Entrada 1",
+      "label": "A_Advance"
+    },
+    {
+      "id": "0:12:2->37:1",
+      "container": 0,
+      "from_module": 12,
+      "from_ioid": 2,
+      "from_port": "Salida 1",
+      "to_module": 37,
+      "to_ioid": 1,
+      "to_port": "Entrada1",
+      "label": "A_Terminate1"
+    },
+    {
+      "id": "0:16:2->10:1",
+      "container": 0,
+      "from_module": 16,
+      "from_ioid": 2,
+      "from_port": "Salida1",
+      "to_module": 10,
+      "to_ioid": 1,
+      "to_port": "Entrada1",
+      "label": "GateL"
+    },
+    {
+      "id": "0:17:2->11:1",
+      "container": 0,
+      "from_module": 17,
+      "from_ioid": 2,
+      "from_port": "Salida1",
+      "to_module": 11,
+      "to_ioid": 1,
+      "to_port": "Entrada1",
+      "label": "A_FacilityUse"
+    },
+    {
+      "id": "0:18:2->8:1",
+      "container": 0,
+      "from_module": 18,
+      "from_ioid": 2,
+      "from_port": "Salida1",
+      "to_module": 8,
+      "to_ioid": 1,
+      "to_port": "Entrada1",
+      "label": "A_Logic"
+    },
+    {
+      "id": "0:20:2->9:1",
+      "container": 0,
+      "from_module": 20,
+      "from_ioid": 2,
+      "from_port": "Salida1",
+      "to_module": 9,
+      "to_ioid": 1,
+      "to_port": "Entrada1",
+      "label": "A_Terminate"
+    },
+    {
+      "id": "12:12:1->23:1",
+      "container": 12,
+      "from_module": 12,
+      "from_ioid": 1,
+      "from_port": "",
+      "to_module": 23,
+      "to_ioid": 1,
+      "to_port": "Entrada1",
+      "label": "A_Advance"
+    },
+    {
+      "id": "12:23:2->12:2",
+      "container": 12,
+      "from_module": 23,
+      "from_ioid": 2,
+      "from_port": "Salida1",
+      "to_module": 12,
+      "to_ioid": 2,
+      "to_port": "",
+      "label": "A_Terminate1"
+    }
+  ]
+}

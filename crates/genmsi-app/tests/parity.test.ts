@@ -15,6 +15,7 @@ const appEngineBin =
 
 const model = "fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl";
 const refused = "fixtures/models/TP9__tp9.gmdl";
+const refusedBridge = "fixtures/models/Problema 2__puenteLevadizo.gmdl";
 
 /** Build the engine binaries the test compares. */
 function ensureBinaries(): void {
@@ -45,6 +46,11 @@ async function devServer(): Promise<{ url: string; close: () => Promise<void> }>
     root: appDir,
     server: { port: 0, strictPort: false },
     logLevel: "error",
+    // The esbuild pre-bundler scans the source while the tests run and
+    // restarts underneath itself, which prints a long Vite stack trace on
+    // stderr. The dependencies are the ones the config already lists, so the
+    // scan discovers nothing new and can stay quiet.
+    optimizeDeps: { noDiscovery: true },
   });
   await server.listen();
   const url = server.resolvedUrls?.local[0];
@@ -106,5 +112,87 @@ test(
     } finally {
       await server.close();
     }
+  },
+);
+
+test(
+  "the dev bridge returns the CLI's lint bytes for the other reviewed models",
+  { timeout: 180_000 },
+  async () => {
+    ensureBinaries();
+    const linted = [
+      "fixtures/models/TP2__problema1.gmdl",
+      "fixtures/models/Parcial 6-11-23__Veron - Parcial.gmdl",
+    ];
+    const server = await devServer();
+    try {
+      for (const path of linted) {
+        const response = await fetch(`${server.url}api/lint?path=${encodeURIComponent(path)}`);
+        assert.equal(response.status, 200, path);
+        const body = Buffer.from(await response.arrayBuffer());
+        assert.ok(body.equals(cliBytes(["lint", path, "--json"])), `the lint bytes differ for ${path}`);
+      }
+    } finally {
+      await server.close();
+    }
+  },
+);
+
+test(
+  "the facade refuses a model exactly as the CLI does",
+  { timeout: 180_000 },
+  () => {
+    ensureBinaries();
+    for (const path of [refused, refusedBridge]) {
+      const cli = spawnSync(genmsiBin, ["simulate", path, "--json"], {
+        cwd: repoRoot,
+        maxBuffer: 32 * 1024 * 1024,
+        encoding: "buffer",
+      });
+      const facade = spawnSync(appEngineBin, ["simulate", path], {
+        cwd: repoRoot,
+        maxBuffer: 32 * 1024 * 1024,
+        encoding: "buffer",
+      });
+      assert.equal(cli.status, 1, path);
+      assert.equal(facade.status, 1, path);
+      assert.equal(facade.stdout.length, 0, `${path}: the refused facade printed to stdout`);
+      assert.ok(
+        facade.stderr.equals(cli.stderr),
+        `the refusal message differs for ${path}`, 
+      );
+    }
+  },
+);
+
+test(
+  "the facade honours `--seed` and `--until` exactly as the CLI does",
+  { timeout: 180_000 },
+  () => {
+    ensureBinaries();
+    const runs: string[][] = [
+      ["--seed", "7"],
+      ["--until", "50"],
+    ];
+    for (const knobs of runs) {
+      const bytes = facadeBytes(["simulate", model, ...knobs]);
+      assert.ok(
+        bytes.equals(cliBytes(["simulate", model, "--json", ...knobs])),
+        `the report bytes differ for ${knobs.join(" ")}`,
+      );
+    }
+  },
+);
+
+test(
+  "the facade still publishes the model document of a refused model",
+  { timeout: 180_000 },
+  () => {
+    ensureBinaries();
+    const document = JSON.parse(
+      facadeBytes(["model", refused]).toString("utf8"),
+    ) as { schema: string; blocks: unknown[]; edges: unknown[] };
+    assert.equal(document.schema, "genmsi.model/1");
+    assert.ok(document.blocks.length > 0, "the refused model still has a graph");
   },
 );

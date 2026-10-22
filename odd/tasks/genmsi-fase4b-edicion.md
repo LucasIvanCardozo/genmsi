@@ -120,6 +120,7 @@ documents; `DECISIONS.md` only to append an entry) and `odd/tasks/`.
 | T10 | `9bfc2f8` `test(app): the editing invariants and the byte-identical save` |
 | T11 | `f2171d2` `test(app): the visual loop of the editing steps`, `68902e7` `test(app): the smoke check of the desktop shell`, `6af8e3a` `fix(app): the desktop shell looked for the models one level too high` |
 | T12 | `d22b7a3` `docs(app): the editing, the session and the commands` |
+| Review's fix | `1f0183c` `fix(format): a failed command changed the model, and the dirty flag forgot the save` |
 
 ## Log
 
@@ -223,3 +224,27 @@ FASE 4b — GenMSI-rs: genmsi-app (edición de nodos). Sos la sesión de la Fase
   document only grew fields, and the snapshot pins the new shape. Risk item 6 does
   not apply: the bytes the app shows are compared with the CLI's by a test, and
   the frontend's pure logic has its own tests.
+- L14 (native review): the RDD switch is on, so the native review ran over the
+  highest-risk work unit alone (the editing API of `genmsi-format`, 1.7k lines),
+  with the `review-risk` and `review-reliability` lenses. The risk lens came back
+  admitted. The reliability lens found two real defects, both now fixed and pinned
+  by new tests: a command that failed half way left the model changed (the
+  positions of a re-layout were applied one by one, so a valid position followed
+  by an unknown block moved the first block and then failed, and the undo steps of
+  the change were thrown away), and the dirty flag counted the commands instead of
+  following the last checkpoint (undoing an edit that came after a save left the
+  model exactly as it was saved and the flag said it had changes). The fix
+  (`1f0183c`) runs every command on a copy of the model, so a command that fails
+  changes nothing, and the flag now compares the model with the checkpoint.
+  The review transaction could **not** be closed: the provider asked for a refuter
+  slot and, after the correction, for the acknowledged capture of the corrected
+  candidate, and the capture tool refused those slots as stale (the native CLI
+  reports the authority as needing a repair, which the facade does not support).
+  The review is therefore **not** an approval, and the phase's proof is the
+  verification suite (241 tests, clippy clean, 19 frontend tests, the visual loop
+  and the desktop shell's smoke check).
+- L15 (verification, after the review's fix): `cargo test --workspace` is green
+  (241 tests) and clippy is clean; the frontend's own checks are green too (`bun
+  test` 19 of 19 and `bunx tsc --noEmit` clean). The two new tests of the format
+  crate pin the fixed behaviour: a failed command leaves the model byte for byte
+  and leaves no undo entry.

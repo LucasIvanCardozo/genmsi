@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   Controls,
@@ -13,6 +13,7 @@ import {
   type Node,
   type NodeChange,
   type NodeProps,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { ModelBody, ModelBlock } from "../types";
@@ -33,8 +34,6 @@ interface BlockData extends Record<string, unknown> {
   subtitle: string;
   /** `A` for an activity block, `C` for a container. */
   kind: string;
-  /** Whether the user selected the block. */
-  selected: boolean;
   /** The block's input ports. */
   inputs: PortData[];
   /** The block's output ports. */
@@ -42,7 +41,7 @@ interface BlockData extends Record<string, unknown> {
 }
 
 /** One block of the model, drawn as a node of the graph. */
-function BlockNode({ data }: NodeProps<Node<BlockData>>) {
+function BlockNode({ data, selected }: NodeProps<Node<BlockData>>) {
   const container = data.kind === "C";
   const note = data.title === "Note";
   const spread = (count: number, index: number): string =>
@@ -55,7 +54,7 @@ function BlockNode({ data }: NodeProps<Node<BlockData>>) {
           ? "border-slate-300 border-dashed bg-slate-50/80"
           : "border-slate-400 bg-white",
         note ? "opacity-70" : "",
-        data.selected ? "ring-2 ring-indigo-500" : "",
+        selected ? "ring-2 ring-indigo-500" : "",
       ].join(" ")}
     >
       {data.inputs.map((port, index) => (
@@ -69,6 +68,22 @@ function BlockNode({ data }: NodeProps<Node<BlockData>>) {
           className="!size-2.5 !border-0 !bg-slate-400"
         />
       ))}
+      {/* A container is entered through one of its input ports and left
+          through one of its output ports: those links start and end at the
+          container itself, so the container needs a source and a target
+          handle for them. */}
+      {container &&
+        data.inputs.map((port, index) => (
+          <Handle
+            key={`entry-${port.ioid}`}
+            type="source"
+            position={Position.Top}
+            id={`in-${port.ioid}`}
+            title={port.name}
+            style={{ left: spread(data.inputs.length, index), top: -6 }}
+            className="!size-2.5 !border-0 !bg-transparent"
+          />
+        ))}
       <span
         className={[
           "truncate text-xs font-semibold tracking-tight",
@@ -92,6 +107,18 @@ function BlockNode({ data }: NodeProps<Node<BlockData>>) {
           className="!size-2.5 !border-0 !bg-slate-400"
         />
       ))}
+      {container &&
+        data.outputs.map((port, index) => (
+          <Handle
+            key={`exit-${port.ioid}`}
+            type="target"
+            position={Position.Bottom}
+            id={`out-${port.ioid}`}
+            title={port.name}
+            style={{ left: spread(data.outputs.length, index), bottom: -6 }}
+            className="!size-2.5 !border-0 !bg-transparent"
+          />
+        ))}
     </div>
   );
 }
@@ -115,10 +142,7 @@ function subtitleOf(block: ModelBlock): string {
 }
 
 /** The nodes and the edges of the model's graph. */
-function graphOf(
-  model: ModelBody,
-  selectedBlockIds: number[],
-): { nodes: Node<BlockData>[]; edges: Edge[] } {
+function graphOf(model: ModelBody): { nodes: Node<BlockData>[]; edges: Edge[] } {
   const placed = new Map<number, ModelBlock>();
   for (const block of model.blocks) {
     if (block.layout !== null) {
@@ -136,7 +160,6 @@ function graphOf(
         title: titleOf(block),
         subtitle: subtitleOf(block),
         kind: block.kind,
-        selected: selectedBlockIds.includes(block.id),
         inputs: block.inputs.map((port) => ({ ioid: port.ioid, name: port.name })),
         outputs: block.outputs.map((port) => ({ ioid: port.ioid, name: port.name })),
       },
@@ -152,9 +175,11 @@ function graphOf(
     .map((edge) => ({
       id: edge.id,
       source: String(edge.from_module),
-      sourceHandle: String(edge.from_ioid),
+      sourceHandle:
+        edge.from_module === edge.container ? `in-${edge.from_ioid}` : String(edge.from_ioid),
       target: String(edge.to_module),
-      targetHandle: String(edge.to_ioid),
+      targetHandle:
+        edge.to_module === edge.container ? `out-${edge.to_ioid}` : String(edge.to_ioid),
       label: edge.label ?? undefined,
       animated: false,
       style: { stroke: "#94a3b8", strokeWidth: 1.75 },
@@ -195,21 +220,48 @@ export interface GraphActions {
  */
 export default function GraphView({
   model,
-  selectedBlockIds,
   actions,
+  fitSignal,
 }: {
   model: ModelBody;
-  selectedBlockIds: number[];
   actions: GraphActions;
+  /** A counter that asks the graph to frame the model again. */
+  fitSignal: number;
 }) {
   const [nodes, setNodes] = useState<Node<BlockData>[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  // The instance of the graph, to frame it when a model arrives.
+  const instance = useRef<ReactFlowInstance<Node<BlockData>, Edge> | null>(null);
+  // The model the view was framed for: a change of the model reframes the
+  // graph, an edit of the model does not.
+  const framed = useRef<string | null>(null);
+  // The blocks the user had selected, so a change of the model does not take
+  // the selection away.
+  const selected = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    const graph = graphOf(model, selectedBlockIds);
-    setNodes(graph.nodes);
+    const graph = graphOf(model);
+    setNodes(
+      graph.nodes.map((node) => ({ ...node, selected: selected.current.has(node.id) })),
+    );
     setEdges(graph.edges);
-  }, [model, selectedBlockIds]);
+    // The first view frames the flow of the model: the blocks that simulate.
+    // The containers are the frames around them, and framing them too would
+    // shrink the picture until nothing could be read.
+    const key = `${model.path}|${model.title}`;
+    if (framed.current !== key) {
+      framed.current = key;
+      fitFlow(instance.current, graph.nodes);
+    }
+  }, [model]);
+
+  // The user asks for the picture to be framed again.
+  useEffect(() => {
+    if (fitSignal === 0) {
+      return;
+    }
+    fitFlow(instance.current, graphOf(model).nodes);
+  }, [fitSignal, model]);
 
   const onNodesChange = useCallback((changes: NodeChange<Node<BlockData>>[]) => {
     setNodes((current) => applyNodeChanges(changes, current));
@@ -275,18 +327,17 @@ export default function GraphView({
         nodes={projected.nodes}
         edges={projected.edges}
         nodeTypes={nodeTypes}
-        onInit={(instance) => {
-          // The first view frames the whole model: the containers are part of
-          // the picture, so their bounds count too and nothing is cut off.
-          instance.fitView({ nodes, padding: 0.15, minZoom: 0.5 });
+        onInit={(flow) => {
+          instance.current = flow;
         }}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={(_event, node) => actions.onSelect([Number(node.id)])}
         onPaneClick={() => actions.onSelect([])}
-        onSelectionChange={({ nodes: selected }) =>
-          actions.onSelect(selected.map((node) => Number(node.id)))
-        }
+        onSelectionChange={({ nodes: picked }) => {
+          selected.current = new Set(picked.map((node) => node.id));
+          actions.onSelect(picked.map((node) => Number(node.id)));
+        }}
         onNodeDragStop={(_event, node) =>
           actions.onMove(Number(node.id), Math.round(node.position.x), Math.round(node.position.y))
         }
@@ -327,6 +378,21 @@ export default function GraphView({
       </ReactFlow>
     </div>
   );
+}
+
+/**
+ * Frame the flow of the model: the blocks that simulate.
+ *
+ * The containers are the frames around them; framing them as well would
+ * shrink the picture until nothing could be read.
+ */
+function fitFlow(instance: ReactFlowInstance<Node<BlockData>, Edge> | null, nodes: Node<BlockData>[]): void {
+  const flow = nodes.filter((node) => node.data.kind !== "C");
+  instance?.fitView({
+    nodes: flow.length > 0 ? flow : nodes,
+    padding: 0.2,
+    minZoom: 0.4,
+  });
 }
 
 /**

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eraser, LayoutGrid, Redo2, Save, Undo2 } from "lucide-react";
+import { Eraser, LayoutGrid, Redo2, Save, Scan, Undo2 } from "lucide-react";
 
 /**
  * The editing actions of the app.
@@ -19,6 +19,7 @@ export default function Toolbar({
   onUndo,
   onRedo,
   onRelayout,
+  onFit,
   onDelete,
   onConfirmSave,
   onDismissSave,
@@ -45,6 +46,8 @@ export default function Toolbar({
   onRedo: () => void;
   /** Reorder the graph in layers. */
   onRelayout: () => void;
+  /** Frame the graph again. */
+  onFit: () => void;
   /** Delete the selected blocks. */
   onDelete: () => void;
   /** Answer the confirmation of a save with yes. */
@@ -106,6 +109,16 @@ export default function Toolbar({
       >
         <Redo2 className="size-3.5" aria-hidden />
         Rehacer
+      </button>
+      <button
+        type="button"
+        className={button}
+        onClick={onFit}
+        disabled={!hasModel}
+        title="Encuadrar el grafo"
+      >
+        <Scan className="size-3.5" aria-hidden />
+        Encuadrar
       </button>
       <button
         type="button"

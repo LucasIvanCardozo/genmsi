@@ -44,6 +44,7 @@ export default function BlockPalette({
             <button
               key={classSpec.class}
               type="button"
+              data-block-class={classSpec.class}
               draggable
               onDragStart={(event) => {
                 event.dataTransfer.setData("application/genmsi-block", classSpec.class);

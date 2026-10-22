@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Play } from "lucide-react";
 import BlockPalette from "./components/BlockPalette";
 import DiagnosticsPanel from "./components/DiagnosticsPanel";
@@ -105,6 +105,31 @@ export default function App() {
 
   const selectedBlock =
     model?.blocks.find((block) => block.id === selectedBlockIds[0]) ?? null;
+  // The counter that asks the graph to frame the model again.
+  const [fitSignal, setFitSignal] = useState(0);
+
+  // The actions of the graph keep their identity: the graph reports the
+  // selection on every render, and a new function would start a loop.
+  const actions = useMemo(
+    () => ({
+      onSelect: select,
+      onMove: (id: number, x: number, y: number) => void apply({ op: "moveBlock", id, x, y }),
+      onConnect: (from: number, fromIoid: number, to: number, toIoid: number) =>
+        void apply({ op: "connect", from, fromIoid, to, toIoid }),
+      onRemove: (ids: number[]) => {
+        if (ids.length === 1) {
+          void apply({ op: "removeBlock", id: ids[0] });
+        } else {
+          void apply({ op: "removeBlocks", ids });
+        }
+      },
+      onDisconnect: (container: number, from: number, fromIoid: number) =>
+        void apply({ op: "disconnect", container, from, fromIoid }),
+      onDropBlock: (className: string, x: number, y: number) =>
+        void addBlock(className, x, y),
+    }),
+    [select, apply, addBlock],
+  );
 
   return (
     <div className="flex h-full flex-col bg-slate-100 text-slate-900">
@@ -179,6 +204,7 @@ export default function App() {
             onUndo={() => void undo()}
             onRedo={() => void redo()}
             onRelayout={() => void relayout()}
+            onFit={() => setFitSignal((current) => current + 1)}
             onDelete={() => void deleteSelection()}
             onConfirmSave={() => void confirmSave()}
             onDismissSave={dismissSave}
@@ -219,26 +245,7 @@ export default function App() {
             <DiagnosticsPanel diagnostics={diagnostics} />
             <div className="flex min-h-0 flex-1 gap-3">
               <div className="min-w-0 flex-1">
-                <GraphView
-                  model={model}
-                  selectedBlockIds={selectedBlockIds}
-                  actions={{
-                    onSelect: select,
-                    onMove: (id, x, y) => void apply({ op: "moveBlock", id, x, y }),
-                    onConnect: (from, fromIoid, to, toIoid) =>
-                      void apply({ op: "connect", from, fromIoid, to, toIoid }),
-                    onRemove: (ids) => {
-                      if (ids.length === 1) {
-                        void apply({ op: "removeBlock", id: ids[0] });
-                      } else {
-                        void apply({ op: "removeBlocks", ids });
-                      }
-                    },
-                    onDisconnect: (container, from, fromIoid) =>
-                      void apply({ op: "disconnect", container, from, fromIoid }),
-                    onDropBlock: (className, x, y) => void addBlock(className, x, y),
-                  }}
-                />
+                <GraphView model={model} actions={actions} fitSignal={fitSignal} />
               </div>
               <aside className="w-80 shrink-0 overflow-auto rounded-lg border border-slate-200 bg-white p-4">
                 <PropertiesPanel

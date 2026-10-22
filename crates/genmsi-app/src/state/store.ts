@@ -107,16 +107,21 @@ function messageOf(error: unknown): string {
 }
 
 /**
- * A free spot for a new block: to the right of the graph, on its first row.
+ * A free spot for a new block: under the model, at its left.
+ *
+ * The spot stays inside the picture the author left, so the graph does not
+ * grow every time a block is added and the view stays readable.
  */
 function freeSpot(model: ModelBody): { x: number; y: number } {
   const placed = model.blocks.filter((block) => block.layout !== null);
   if (placed.length === 0) {
     return { x: 40, y: 40 };
   }
-  const right = Math.max(...placed.map((block) => (block.layout?.x ?? 0) + (block.layout?.width ?? 0)));
-  const top = Math.min(...placed.map((block) => block.layout?.y ?? 0));
-  return { x: right + 60, y: top };
+  const left = Math.min(...placed.map((block) => block.layout?.x ?? 0));
+  const bottom = Math.max(
+    ...placed.map((block) => (block.layout?.y ?? 0) + (block.layout?.height ?? 0)),
+  );
+  return { x: left, y: bottom + 60 };
 }
 
 /**
@@ -340,7 +345,16 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
 
-  select: (ids: number[]) => set({ selectedBlockIds: ids }),
+  select: (ids: number[]) => {
+    // The same selection does not change the state: the graph reports it
+    // again on every render, and a new array would start a loop.
+    const current = get().selectedBlockIds;
+    const same =
+      current.length === ids.length && current.every((id) => ids.includes(id));
+    if (!same) {
+      set({ selectedBlockIds: ids });
+    }
+  },
 
   addBlock: async (className: string, x?: number, y?: number) => {
     const model = get().model;

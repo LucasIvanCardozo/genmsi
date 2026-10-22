@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { BALL_RADIUS, FLIGHT_SECONDS, TRAIL_SECONDS, ballsAt, type Move } from "../monitor/balls";
+import { BALL_RADIUS, FLIGHT_SECONDS, ballsAt, type Move } from "../monitor/balls";
 import type { ModelBody } from "../types";
 
 /** The space the picture leaves around the blocks, in model units. */
@@ -21,7 +21,6 @@ export default function MonitorCanvas({
   moves,
   moveTimes,
   clock,
-  speed,
 }: {
   model: ModelBody;
   /** The transactions inside every block of the model, by block id. */
@@ -36,8 +35,6 @@ export default function MonitorCanvas({
   moveTimes: number[];
   /** The clock of the replay. */
   clock: number;
-  /** The speed of the reproduction, as a multiple of the real time. */
-  speed: number;
 }) {
   const picture = useMemo(() => {
     const placed = model.blocks.filter((block) => block.layout !== null);
@@ -104,17 +101,10 @@ export default function MonitorCanvas({
     () =>
       picture === null
         ? []
-        : ballsAt(
-            moves,
-            moveTimes,
-            clock,
-            FLIGHT_SECONDS,
-            // The trail is a matter of legibility, so it is measured in the
-            // screen: it lasts the same for the reader at every speed.
-            TRAIL_SECONDS * speed,
-            (block) => picture.places.get(block),
+        : ballsAt(moves, moveTimes, clock, FLIGHT_SECONDS, (block) =>
+            picture.places.get(block),
           ),
-    [picture, moves, moveTimes, clock, speed],
+    [picture, moves, moveTimes, clock],
   );
 
   if (picture === null) {

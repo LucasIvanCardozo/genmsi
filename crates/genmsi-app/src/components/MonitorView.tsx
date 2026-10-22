@@ -350,7 +350,6 @@ export default function MonitorView() {
               moves={transitions?.moves ?? []}
               moveTimes={transitions?.times ?? []}
               clock={clock}
-              speed={speed}
             />
           </div>
           <aside className="w-80 shrink-0 overflow-auto rounded-lg border border-slate-200 bg-white p-4">

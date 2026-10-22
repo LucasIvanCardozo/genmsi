@@ -15,20 +15,12 @@
  * instance does, so the picture says what the run says.
  *
  * The flight is a fixed stretch of the **run** (`FLIGHT_SECONDS`), so the
- * faster the reader runs the reproduction, the quicker the ball crosses: 200 ms
- * of screen at 1x, 100 ms at 2x, and so on.
- *
- * After landing, the ball stays as a fading mark for `trail` seconds. The
- * trail is measured in **screen** time, because a trail is about legibility:
- * a mark that lasted 0.2 seconds of the run would be invisible at any speed
- * above 1x.
+ * faster the reader runs the reproduction, the quicker the ball crosses: two
+ * seconds of screen at 1x, one at 2x, and so on.
  */
 
 /** How long a ball crosses, in seconds of the run. */
-export const FLIGHT_SECONDS = 0.2;
-
-/** How long a ball stays as a fading mark, in seconds of the screen. */
-export const TRAIL_SECONDS = 1.5;
+export const FLIGHT_SECONDS = 2;
 
 /** The radius of a ball, in the canvas' own units. */
 export const BALL_RADIUS = 5;
@@ -51,7 +43,7 @@ export interface Move {
   time: number;
 }
 
-/** One ball on its way, or the mark it leaves behind. */
+/** One ball on its way. */
 export interface Ball {
   /** The middle of the block it comes from. */
   from: Place;
@@ -59,8 +51,6 @@ export interface Ball {
   to: Place;
   /** How far along it is, from 0 to 1. */
   progress: number;
-  /** How visible it is, from 0 to 1. */
-  opacity: number;
 }
 
 /**
@@ -87,28 +77,28 @@ export function firstMoveAfter(times: number[], time: number): number {
 /**
  * The balls that are on screen at `time`.
  *
- * A ball is on screen from the moment it leaves its block until its mark has
- * faded. The moves that matter are the ones of the last `trail` seconds and
- * the ones of the next `flight` seconds, so the search finds both ends and
- * the walk between them is the number of balls, not the number of moves.
+ * A ball is on screen while it flies: it left `flight` before the instance
+ * reached its destination, so the moves that matter are the ones of the last
+ * `flight` seconds of the run. The search finds where to start and the walk
+ * goes backwards from there, so the cost is the number of balls and not the
+ * number of moves.
  */
 export function ballsAt(
   moves: Move[],
   times: number[],
   time: number,
   flight: number,
-  trail: number,
   placeOf: (block: number) => Place | undefined,
 ): Ball[] {
   const balls: Ball[] = [];
   if (moves.length === 0) {
     return balls;
   }
-  // The moves that have not landed yet are the ones after the clock, up to the
-  // end of the flight.
+  // The moves whose ball is on screen: the ball of a move that happens at `t`
+  // flies while the clock is between `t - flight` and `t`, so the moves of
+  // the next `flight` seconds are the ones that have not landed yet.
   const end = firstMoveAfter(times, time + flight);
-  // And the ones that landed: their mark is still fading.
-  const oldest = time - trail;
+  const oldest = time - flight;
   for (let index = end - 1; index >= 0; index -= 1) {
     const move = moves[index];
     if (move.time < oldest) {
@@ -119,25 +109,12 @@ export function ballsAt(
     if (from === undefined || to === undefined) {
       continue;
     }
-    if (time <= move.time) {
-      // The ball is still flying: it leaves `flight` before the instance
-      // reaches its destination.
-      const progress = flight <= 0 ? 1 : (time - (move.time - flight)) / flight;
-      balls.push({
-        from,
-        to,
-        progress: progress < 0 ? 0 : progress > 1 ? 1 : progress,
-        opacity: 1,
-      });
-    } else {
-      // The ball has landed: its mark fades.
-      const age = time - move.time;
-      const opacity = trail <= 0 ? 0 : 1 - age / trail;
-      if (opacity <= 0) {
-        continue;
-      }
-      balls.push({ from, to, progress: 1, opacity });
-    }
+    const progress = flight <= 0 ? 1 : (time - (move.time - flight)) / flight;
+    balls.push({
+      from,
+      to,
+      progress: progress < 0 ? 0 : progress > 1 ? 1 : progress,
+    });
   }
   return balls;
 }

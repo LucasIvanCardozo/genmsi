@@ -30,6 +30,9 @@ PORT=5173
 SHOTS="${GENMSI_SHOTS:-/tmp/genmsi-app}"
 LOG="$SHOTS/vite.log"
 MODEL="fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl"
+# The model of the monitor: it has queues, facilities and tables, so the
+# charts of the run have something to draw.
+MONITOR_MODEL="fixtures/models/TP4__supermercado.gmdl"
 REFUSED="fixtures/models/TP9__tp9.gmdl"
 # The copy the loop edits: the development work directory is the only place
 # the development path writes.
@@ -100,6 +103,16 @@ drag_node() {
   agent-browser mouse down left
   agent-browser mouse move "$((x + dx))" "$((y + dy))" --duration 400 --steps 12
   agent-browser mouse up left
+}
+
+# Move a range input, the way React sees it.
+#
+# React reads the value of the input from its own tracker, so the value is
+# set through the native setter and the input event is dispatched: the
+# component sees the change and the picture follows.
+set_range_middle() {
+  local selector="$1"
+  agent-browser eval "(() => { const input = document.querySelector('$selector'); if (!input) return 'not found'; const max = Number(input.max); const value = String(Math.floor(max / 2)); const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set; setter.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); return value; })()" >/dev/null
 }
 
 # 1. The copy the loop edits. The reference model stays untouched.
@@ -225,6 +238,33 @@ agent-browser wait --text "$REFUSAL_TEXT"
 # model stays on screen while the next one loads.
 agent-browser wait --fn '!document.body.innerText.includes("Cargando")'
 agent-browser screenshot "$SHOTS/11-error.png"
+
+# 6. The monitor: the run, the replay and the charts.
+#
+# The model of the monitor is the one with tables, queues and facilities:
+# the charts need a model that has all of them.
+agent-browser select '[aria-label="Modelo"]' "$MONITOR_MODEL"
+agent-browser wait --text "supermercado"
+agent-browser find role button click --name "Monitor"
+agent-browser wait --text "Ejecutar y reproducir"
+agent-browser find role button click --name "Ejecutar y reproducir"
+# The header of the monitor says how many records the trace kept.
+agent-browser wait --text "Registros"
+agent-browser screenshot "$SHOTS/12-monitor.png"
+
+# The replay is paused and put at the middle of the run, so the picture is
+# the same on every run: the blocks that hold transactions are marked and the
+# clock says where the replay is.
+agent-browser find role button click --name "Pausar"
+set_range_middle '[aria-label="Posición de la reproducción"]'
+agent-browser wait --fn 'document.querySelector("input[aria-label=\"Posición de la reproducción\"]").value === String(Math.floor(Number(document.querySelector("input[aria-label=\"Posición de la reproducción\"]").max) / 2))'
+agent-browser screenshot "$SHOTS/13-monitor-reproduccion.png"
+
+# The charts of the run: the time series of the entities and the histogram of
+# the tables of the model.
+agent-browser click '[data-monitor-panel="graficos"]'
+agent-browser wait --text "Histograma"
+agent-browser screenshot "$SHOTS/14-monitor-graficos.png"
 
 agent-browser close
 echo "==> the visual loop ran; the screenshots are in $SHOTS"

@@ -232,6 +232,7 @@ export default function MonitorView() {
           <button
             key={candidate.id}
             type="button"
+            data-monitor-panel={candidate.id}
             onClick={() => setPanel(candidate.id)}
             className={[
               "-mb-px rounded-t-md border-b-2 px-4 py-1.5 text-sm font-medium transition",

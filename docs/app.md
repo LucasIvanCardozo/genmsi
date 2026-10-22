@@ -3,11 +3,12 @@
 The desktop application of GenMSI: a thin client over the engine
 (`genmsi-core`), the same way the CLI and the MCP server are.
 
-This document describes the **second vertical slice** (Phase 4b): the app
+This document describes the **third vertical slice** (Phase 4c): the app
 opens a `.gmdl`, shows its graph, **edits it** — creating, deleting,
 connecting and moving blocks, editing their properties, undoing, copying
-and pasting — and saves the model back to a `.gmdl` that the original
-editor still opens. The live monitor and the charts come later (Phase 4c).
+and pasting — saves the model back to a `.gmdl` that the original editor
+still opens, and **replays a finished run** in a monitor of its own, with the
+clock, the state of the entities and the charts of the run.
 
 ## The shape of the app
 
@@ -41,11 +42,13 @@ The frontend knows one interface (`src/engine/adapter.ts`):
 | `loadModel(path)` | `genmsi.model/1` | The model's blocks, geometry and links. |
 | `lint(path)` | `genmsi.lint/1` | What the model compiles to. |
 | `simulate(path, options)` | `genmsi.report/1` | The run's report. |
+| `trace(path, options)` | `genmsi.trace/1` | The run's trace: every event of the run. |
 | `openModel(path)` / `newModel()` | the session state | The model in memory, ready to edit. |
 | `apply(command)` | the session state | One editing command, applied. |
 | `undo()` / `redo()` | the session state | One step of the command stack. |
 | `save(path?)` | the outcome of a save | The model written back to a `.gmdl`. |
 | `simulateCurrent(options)` | `genmsi.report/1` | The run of the model **in memory**. |
+| `traceCurrent(options)` | `genmsi.trace/1` | The trace of the run of the model **in memory**. |
 | `catalogue()` | `genmsi.catalogue/1` | The block classes the editor offers. |
 
 Two backends implement it:
@@ -143,8 +146,9 @@ similarity with the original.
 - **Toolbar**: the editing actions — `Nuevo`, `Guardar`, `Guardar como…`,
   `Deshacer`, `Rehacer`, `Encuadrar`, `Borrar` and `Reacomodar` — and the
   palette that creates a block (`Añadir bloque`).
-- **Two views**: *Grafo* and *Reporte*. The graph shows the blocks with the
-  geometry the model carries; the report shows the engine's tables.
+- **Three views**: *Grafo*, *Monitor* and *Reporte*. The graph shows the blocks
+  with the geometry the model carries; the monitor replays the last run; the
+  report shows the engine's tables.
 - **Property panel**: the selected block's identity and its declared
   properties, one editor per declared type.
 - **Diagnostics**: what the model compiles to, recomputed after every
@@ -177,6 +181,59 @@ What cannot be checked without the engine (an expression's grammar, an
 entity that exists) is left to the engine: the diagnostics panel says so
 after every change.
 
+### The monitor replays the run
+
+The monitor is a tab of its own: the graph stays clean and the replay has its
+own space, with the clock and the metrics.
+
+**The replay is a projection of the documents the engine published**, never a
+second simulation. The run emits the report (the final state) and the trace
+(every event of the run); the monitor walks the trace and rebuilds what the
+run had at every instant:
+
+| What the monitor shows | Where it comes from |
+|---|---|
+| The clock | The time of the event. |
+| The content of the queues | A transaction enters a queue when it enters the queue's block and leaves it when it enters the block that departs from it. |
+| The owner of the facilities | A transaction takes a facility when it leaves the seize block, and frees it when it enters the release block. |
+| The units in use of the storages | The same walk, on the enter and leave blocks. |
+| The transactions inside every block | The entries and the departures the trace records. |
+
+**No metric the engine computes is derived.** The average content and the
+utilization are *not* rebuilt: the report document does not carry them (the
+phase 4b review removed the column that implied otherwise), so the app does
+not show them. What the monitor shows is the *state*, which is what a monitor
+shows.
+
+The replay is **deterministic**: the state at an event is a pure function of
+the prefix of the trace, and a test pins it (the same prefix always gives the
+same state).
+
+The **index is built once** per run: the frames of the trace with what each
+one changes, and the instants each entity's value changes. The animation
+reads the index, so the replay of a big trace (`Parcial 6-11-23`, 82k events)
+never walks the whole trace again per frame.
+
+The trace has a **record limit** (the CLI keeps 100 by default; the app asks
+for 200000), and the document says when the bound cut the trace: the monitor
+says so instead of implying that it replayed everything.
+
+### The charts read the documents
+
+The charts of the run are drawn with **Recharts** (the only charting library,
+as D8 says):
+
+- the **time series** of the queues and the facilities: the content of a
+  queue and the busy state of a facility over the time. The series is the
+  *exact* history of the entity (the instants its value changes), not a
+  sample of the trace: a queue that fills and empties between two samples
+  would be invisible in a sample, and a facility that is free for a moment
+  would look busy.
+- the **histogram** of every table and QTable of the model: the bars are the
+  frequencies the report publishes and the curve is their running total. A
+  table with more than 200 intervals is grouped, and the label says how many
+  intervals each bar covers.
+
 ### The re-layout is explicit
 
 `Reacomodar` reorders the graph in layers: a block with no incoming link
@@ -192,10 +249,12 @@ the user asks for a new one.
 | Path | What it is |
 |---|---|
 | `crates/genmsi-app/src/engine/` | The adapter and its two backends. |
-| `crates/genmsi-app/src/components/` | The graph, the property panel, the report, the picker, the toolbar. |
+| `crates/genmsi-app/src/components/` | The graph, the property panel, the report, the monitor, the charts, the picker, the toolbar. |
 | `crates/genmsi-app/src/edit/` | The pure parts of the editor: the layout and the property editors. |
+| `crates/genmsi-app/src/monitor/` | The replay: the projection of the trace and the state it rebuilds. |
 | `crates/genmsi-app/src/state/store.ts` | The app's state (Zustand). |
 | `crates/genmsi-app/src/types/generated/` | The types generated from the Rust schema. |
+| `crates/genmsi-app/src/format.ts` | The numbers of the app, with the original's comma decimals. |
 | `crates/genmsi-app/vite/devBridge.ts` | The Vite middleware that serves the engine's documents. |
 | `crates/genmsi-app/engine/` | `genmsi-app-engine`: the facade both backends share. |
 | `crates/genmsi-app/src-tauri/` | The desktop shell (outside the workspace: its dependency tree is heavy). |
@@ -222,7 +281,8 @@ crates/genmsi-app/scripts/check-tauri-shell.sh
 
 ```bash
 cd crates/genmsi-app
-bun test        # the dev bridge's bytes against `genmsi simulate --json`
+bun test        # the dev bridge's bytes against the engine's, the deterministic
+                # layout, the property editors and the replay of the trace
 bunx tsc --noEmit
 ```
 
@@ -235,5 +295,9 @@ cargo clippy --workspace --all-targets -- -D warnings
 
 ## What this slice does not do
 
-The live monitor and the charts are Phase 4c. Nothing of them is stubbed
-here: the app opens, shows, edits, saves and runs.
+The **live monitor is not here yet**: this phase replays a *finished* run.
+The stepping engine (a model that runs and waits, `new`/`step`/snapshot) is
+Phase 4d, a separate unit whose exit gate is the oracle 20/20.
+
+The engine does not change in this phase: the trace the monitor replays is
+the `genmsi.trace/1` document the CLI already published.

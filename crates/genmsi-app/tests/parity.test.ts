@@ -99,6 +99,41 @@ test(
 );
 
 test(
+  "the dev bridge returns the bytes of `genmsi trace --json`",
+  { timeout: 180_000 },
+  async () => {
+    ensureBinaries();
+    const server = await devServer();
+    try {
+      const response = await fetch(
+        `${server.url}api/trace?path=${encodeURIComponent(model)}&limit=50`,
+      );
+      assert.equal(response.status, 200);
+      const body = Buffer.from(await response.arrayBuffer());
+      assert.ok(
+        body.equals(cliBytes(["trace", model, "--json", "--limit", "50"])),
+        "the trace bytes differ",
+      );
+    } finally {
+      await server.close();
+    }
+  },
+);
+
+test(
+  "the engine facade returns the bytes of `genmsi trace --json`",
+  { timeout: 180_000 },
+  () => {
+    ensureBinaries();
+    const bytes = facadeBytes(["trace", model, "--limit", "50"]);
+    assert.ok(
+      bytes.equals(cliBytes(["trace", model, "--json", "--limit", "50"])),
+      "the facade's trace bytes differ",
+    );
+  },
+);
+
+test(
   "the dev bridge reports the engine's refusal as an error",
   { timeout: 180_000 },
   async () => {

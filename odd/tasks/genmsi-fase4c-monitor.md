@@ -129,15 +129,15 @@ itself), `docs/` and `odd/tasks/`.
 
 | Task | Commit |
 |---|---|
-| T1 | `docs(odd): phase 4c feature document for the monitor and the charts` |
-| T2 | `feat(app): the facade publishes the trace document` |
-| T3 | `feat(core): the generated types of the trace document` |
-| T4 | `feat(app): the adapter asks the engine for the trace` |
-| T5 | `feat(app): the replay is a projection of the trace` |
-| T6 | `feat(app): the Monitor tab replays the run` |
-| T7 | `feat(app): the time series and the histograms` |
-| T8 | `test(app): the visual loop of the monitor` |
-| T9 | `docs(app): the monitor, the replay and the charts` |
+| T1 | `03d75df` `docs(odd): phase 4c feature document for the monitor and the charts` |
+| T2 | `716906e` `feat(app): the facade publishes the trace document` |
+| T3 | `36358f6` `feat(core): the generated types of the trace document` |
+| T4 | `13730f3` `feat(app): the adapter asks the engine for the trace` |
+| T5 | `7c21a1e` `feat(app): the replay is a projection of the trace`, `2683a74` `test(app): the series of the entities tells every instant the state changes` |
+| T6 | `ea7c7fa` `feat(app): the Monitor tab replays the run` |
+| T7 | `91b8dbb` `feat(app): the time series and the histograms` |
+| T8 | `fc50d71` `test(app): the visual loop of the monitor` |
+| T9 | the documentation and the close of this document |
 
 ## Log
 
@@ -200,3 +200,56 @@ FASE 4c — GenMSI-rs: genmsi-app (monitor por reproducción y gráficos). Sos l
   not resolved by the frontend, and the monitor says so instead of guessing. The number of
   units of a queue is the model's `Cantidad` property, which is a plain number in every
   reference model.
+- L9 (evidence, the trace's grammar): the trace records `generate`, `enter`, `wait`, `leave`
+  and `terminate`. The engine counts a block's transactions the same way the trace records
+  them (an entry on `enter`, a departure on `leave` and on `terminate`), with one exception:
+  a generator block holds *the generator itself* in the engine's count, so it is not part
+  of the comparison between the projection and the report.
+- L10 (evidence, the fidelity of the projection): the replay of the reference model and of
+  the big model (`Parcial 6-11-23`, 82 325 events) ends in exactly the state the report
+  publishes: the content of every queue and the transactions of every block (the generator
+  blocks apart). The test compares both, so a divergence between the projection and the
+  engine would fail the suite and not the picture.
+- L11 (decision, the series): the series of the charts is the **exact** history of the
+  entity (the instants its value changes), not a sample of the trace. The sample was tried
+  first and it lied: a queue that fills and empties between two samples was invisible, and a
+  facility that is free for a moment looked busy. The chart of the facilities was a comb of
+  random teeth. With the exact series the queue's sawtooth and the facility's free moments
+  are the ones the run had.
+- L12 (fix, the desktop shell): the shell's document commands (`load_model`, `lint_model`,
+  `simulate_model`) answer with the engine's bytes (a JSON string) and the frontend's Tauri
+  backend took them for an object: the graph and the report of the desktop shell were a
+  string where the frontend expected a document. The Vite loop (the visual gate) hid it.
+  The backend now parses the bytes, as the session path always did.
+- L13 (evidence, the visual loop): the loop grew with the monitor's steps (the run, the
+  monitor tab, the replay at the middle of the run and the charts) and it found three
+  things, all fixed: the canvas framed the containers as well as the flow, so the picture
+  shrank until nothing could be read; the containers were drawn over the blocks they hold;
+  and the axis of the time series showed the times with three decimals (the report's rule)
+  where an axis needs a second. The replay is paused and put at the middle of the run by
+  the loop, so the picture is the same on every run.
+- L14 (verification, close): `cargo test --workspace` is green (245 tests) and
+  `cargo clippy --workspace --all-targets -- -D warnings` is clean. The frontend's own
+  checks are green too: `bun test` 30 of 30 (the dev bridge's bytes against the engine's
+  for the report *and* the trace, the deterministic layout, the property editors and the
+  replay) and `bunx tsc --noEmit` clean. The visual loop ran end to end with fourteen
+  screenshots, and the desktop shell's smoke check passed (the window, the capture with
+  1364 distinct colours and the `invoke` path).
+- L15 (delivery, slices): the phase's commits are ten. Three are bigger than the ~400
+  authored lines and the reason is recorded instead of hidden: the replay module (the
+  projection and its tests), the Monitor tab (the canvas, the controls and the state panel)
+  and the charts (the series, the histograms and the dependency). They are one unit each
+  — the projection without the tab is not a feature, and the charts without the series are
+  not charts — and they are split by the behaviour they add, not by the file they touch.
+  The unit that could be delegated was the facade's trace command (T2), and it was: a
+  writer did it in the background while this session wrote the frontend, with disjoint
+  surfaces.
+- L16 (risk): the change adds a document to the app's own protocol (the trace) and a
+  dependency (Recharts, the only charting library of D8), so item 3 applies to the protocol
+  and item 5 to the dependency. Item 3 is covered by the parity: the facade's bytes and the
+  dev bridge's bytes are the ones `genmsi trace --json` prints, byte for byte, and the
+  document the engine publishes does not change. Item 5 is covered by the version of the
+  dependency and by the lock file. Item 6 does not apply: the replay's logic has its own
+  tests (the determinism, the purity of the prefix and the fidelity against the report),
+  and the visual loop is the gate of the picture. Risk: item 3 (the app's protocol grows
+  two operations) and item 5 (a new dependency).

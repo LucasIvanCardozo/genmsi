@@ -10,8 +10,10 @@
 #
 # The loop covers the editing: it creates a node, connects it, drags it,
 # undoes, redoes, saves, reopens the file and shows that the change is
-# there. The model it edits is a COPY in the development work directory: the
-# reference models of `fixtures/models` are read-only oracle material.
+# there, and then the monitor: it runs the model, replays the trace and
+# shows the charts of the run. The model it edits is a COPY in the
+# development work directory: the reference models of `fixtures/models` are
+# read-only oracle material.
 #
 # Usage:
 #   cargo build -p genmsi-cli -p genmsi-app-engine   # once, before the loop

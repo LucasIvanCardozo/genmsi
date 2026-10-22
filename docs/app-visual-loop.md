@@ -153,6 +153,40 @@ agent-browser screenshot /tmp/genmsi-app/11-error.png
 is a single page that renders when the engine's document arrives, so the
 text of the thing that appeared is the condition to wait for.
 
+### The monitor
+
+The monitor tab replays a finished run: the engine publishes the trace of the
+run next to the report, and the app rebuilds the state of the run by walking
+it.
+
+```bash
+# The model of the monitor: it has queues, facilities and tables, so the
+# charts have something to draw.
+agent-browser select '[aria-label="Modelo"]' "fixtures/models/TP4__supermercado.gmdl"
+agent-browser wait --text "supermercado"
+
+# The monitor tab, and the run it needs.
+agent-browser find role button click --name "Monitor"
+agent-browser wait --text "Ejecutar y reproducir"
+agent-browser find role button click --name "Ejecutar y reproducir"
+agent-browser wait --text "Registros"
+agent-browser screenshot /tmp/genmsi-app/12-monitor.png
+
+# The replay is paused and put at the middle of the run, so the picture is
+# the same on every run. React reads the value of the input from its own
+# tracker, so the value is set through the native setter and the input event
+# is dispatched: the component sees the change.
+agent-browser find role button click --name "Pausar"
+agent-browser eval "(() => { const input = document.querySelector('[aria-label=\"Posición de la reproducción\"]'); const max = Number(input.max); const value = String(Math.floor(max / 2)); const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set; setter.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); return value; })()"
+agent-browser screenshot /tmp/genmsi-app/13-monitor-reproduccion.png
+
+# The charts of the run: the time series of the entities and the histogram
+# of the tables.
+agent-browser click '[data-monitor-panel="graficos"]'
+agent-browser wait --text "Histograma"
+agent-browser screenshot /tmp/genmsi-app/14-monitor-graficos.png
+```
+
 ## 4. Look, fix, repeat
 
 Read the screenshot (`agent-browser screenshot` prints the path; open the file
@@ -168,6 +202,11 @@ with the image reader of the session). The things to look at:
 - the diagnostics say what the model compiles to, after every change;
 - the report's tables carry the engine's numbers, with the original's comma
   decimals;
+- the monitor's clock moves with the replay, the blocks that hold
+  transactions are marked, and the panel shows the content of the queues and
+  the owner of the facilities at that instant;
+- the charts show the time series of the entities and the histogram of the
+  tables of the model, with the frequencies the report publishes;
 - a model the engine refuses shows the engine's message, not an empty graph;
 - no text is in another language than Spanish.
 

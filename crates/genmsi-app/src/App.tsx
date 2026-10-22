@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Play } from "lucide-react";
 import ErrorNotice from "./components/ErrorNotice";
+import GraphView from "./components/GraphView";
 import ModelPicker from "./components/ModelPicker";
 import { useApp } from "./state/store";
 
@@ -11,8 +12,20 @@ import { useApp } from "./state/store";
  * the report of the last run.
  */
 export default function App() {
-  const { model, currentPath, status, error, seed, until, loadModels, simulate, setSeed, setUntil } =
-    useApp();
+  const {
+    model,
+    currentPath,
+    status,
+    error,
+    seed,
+    until,
+    selectedBlockId,
+    loadModels,
+    simulate,
+    selectBlock,
+    setSeed,
+    setUntil,
+  } = useApp();
 
   useEffect(() => {
     void loadModels();
@@ -72,11 +85,17 @@ export default function App() {
 
       <main className="flex flex-1 flex-col gap-3 overflow-hidden p-4">
         {error !== null && <ErrorNotice message={error} />}
-        <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 text-sm text-slate-500">
-          {model === null
-            ? "Elegí un modelo para ver su grafo."
-            : "El grafo del modelo aparece aquí."}
-        </div>
+        {model === null ? (
+          <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 text-sm text-slate-500">
+            Elegí un modelo para ver su grafo.
+          </div>
+        ) : (
+          <GraphView
+            model={model}
+            selectedBlockId={selectedBlockId}
+            onSelect={(id) => selectBlock(id)}
+          />
+        )}
       </main>
     </div>
   );

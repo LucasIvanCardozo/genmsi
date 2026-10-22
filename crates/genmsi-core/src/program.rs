@@ -728,6 +728,68 @@ enum Fallback {
     Literal,
 }
 
+/// The block classes the compiler understands.
+///
+/// The editor's catalogue (`genmsi_format::catalogue`) must stay inside this
+/// list: a class the compiler does not know would create a block that
+/// simulates nothing, and the user would only find out when the model runs.
+pub fn known_classes() -> &'static [&'static str] {
+    &[
+        "Advance",
+        "Alter",
+        "Assemble",
+        "Assign",
+        "Buffer",
+        "Clock",
+        "Counter",
+        "Depart",
+        "Enter",
+        "ExamineNumber",
+        "FacilityInt",
+        "FacilityUse",
+        "Function",
+        "FunctionDist",
+        "FunctionExpon",
+        "GateF",
+        "GateL",
+        "GateS",
+        "Gather",
+        "Generate",
+        "InitiaSV",
+        "InitialLS",
+        "JoinMe",
+        "JoinNumber",
+        "Leave",
+        "Link",
+        "Logic",
+        "Loop",
+        "Match",
+        "Multifurcacion",
+        "Note",
+        "Priority",
+        "QTable",
+        "Queue",
+        "Release",
+        "RemoveTrans",
+        "SaveValue",
+        "Scan",
+        "Seize",
+        "Select",
+        "SelectF",
+        "Split",
+        "StorageDef",
+        "StorageUse",
+        "Table",
+        "Tabulate",
+        "Terminate",
+        "Test",
+        "Transfer",
+        "Unlink",
+        "Variable",
+        "VariableA",
+    ]
+}
+
 /// Compile a model into a runnable program.
 pub fn compile(model: &GmdlModel, title: impl Into<String>) -> Result<Program, EngineError> {
     genmsi_format::validate_runnable(model).map_err(EngineError::from)?;

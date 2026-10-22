@@ -22,6 +22,8 @@ pub const TRACE_SCHEMA: &str = "genmsi.trace/1";
 pub const EXPLAIN_SCHEMA: &str = "genmsi.explain/1";
 /// Schema id of the model document.
 pub const MODEL_SCHEMA: &str = "genmsi.model/1";
+/// Schema id of the catalogue document.
+pub const CATALOGUE_SCHEMA: &str = "genmsi.catalogue/1";
 
 /// A versioned document: the schema id followed by the body fields.
 #[derive(Debug, Serialize)]
@@ -43,7 +45,7 @@ pub fn to_pretty_json<T: Serialize + ?Sized>(schema: &str, body: &T) -> String {
 }
 
 /// Counts of the definitions a model declares.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct DefinitionCounts {
     /// `Function` / `FunctionExpon` / `FunctionDist` definitions.
@@ -139,6 +141,26 @@ pub struct ModelProperty {
     pub ty: String,
     /// Declared subtype (`SNA`, `Facility`, `Queue`, ...).
     pub subtype: String,
+    /// Tooltip the editor shows, decoded.
+    pub hint: String,
+    /// Whether the property defines an entity.
+    pub unique: bool,
+    /// Whether the editor shows the property.
+    pub visible: bool,
+}
+
+/// One port of a block: a connection point.
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ModelPort {
+    /// Port id, unique inside the block.
+    pub ioid: u32,
+    /// Port name (`Entrada1`, `Salida1`, ...).
+    pub name: String,
+    /// Port caption the editor shows, decoded.
+    pub caption: String,
+    /// Connection label shared by the two ends of a link.
+    pub label: Option<String>,
 }
 
 /// One block of the model: an activity block or a container.
@@ -163,6 +185,10 @@ pub struct ModelBlock {
     pub layout: Option<ModelRect>,
     /// Properties, in the order the model declares them.
     pub properties: Vec<ModelProperty>,
+    /// Input ports, in file order.
+    pub inputs: Vec<ModelPort>,
+    /// Output ports, in file order.
+    pub outputs: Vec<ModelPort>,
 }
 
 /// One link between two blocks.
@@ -189,8 +215,21 @@ pub struct ModelEdge {
     pub label: Option<String>,
 }
 
+/// The ports of a block, in file order, with their decoded captions.
+fn ports_of(ports: &[genmsi_format::Port]) -> Vec<ModelPort> {
+    ports
+        .iter()
+        .map(|port| ModelPort {
+            ioid: port.ioid,
+            name: port.name.clone(),
+            caption: percent_decode(&port.caption),
+            label: port.label().map(percent_decode),
+        })
+        .collect()
+}
+
 /// Body of the `genmsi.model/1` document: the model's blocks and its links.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts", ts(export))]
 pub struct ModelDocument {
@@ -236,8 +275,13 @@ pub fn model_document(model: &GmdlModel, path: &str) -> ModelDocument {
                     value: property.value(),
                     ty: property.ty.clone(),
                     subtype: property.subtype.clone(),
+                    hint: percent_decode(&property.hint),
+                    unique: property.unique,
+                    visible: property.visible,
                 })
                 .collect(),
+            inputs: ports_of(&block.inputs),
+            outputs: ports_of(&block.outputs),
         })
         .collect();
 
@@ -280,6 +324,112 @@ pub fn model_document(model: &GmdlModel, path: &str) -> ModelDocument {
         blocks,
         edges,
     }
+}
+
+/// One port of a block class, as the catalogue declares it.
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct CataloguePort {
+    /// Port id, unique inside the block.
+    pub ioid: u32,
+    /// Port name (`Entrada1`, `Salida1`, ...).
+    pub name: String,
+    /// Port caption the editor shows.
+    pub caption: String,
+}
+
+/// One property of a block class, as the catalogue declares it.
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct CatalogueProperty {
+    /// Property name (`Media`, `Queue`, ...).
+    pub name: String,
+    /// Tooltip the editor shows.
+    pub hint: String,
+    /// Declared type (`TSNA`, `EntityUse`, `Listed`, ...).
+    pub ty: String,
+    /// Declared subtype (`SNA`, `Queue`, ...).
+    pub subtype: String,
+    /// Whether the property defines an entity.
+    pub unique: bool,
+    /// The options a `Listed` property offers; empty for every other type.
+    pub options: Vec<String>,
+}
+
+/// One block class the editor offers to create.
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct CatalogueClass {
+    /// `moduleclass` the blocks of this class carry.
+    pub class: String,
+    /// What the class does, in the words of the interface.
+    pub title: String,
+    /// Input ports, in file order.
+    pub inputs: Vec<CataloguePort>,
+    /// Output ports, in file order.
+    pub outputs: Vec<CataloguePort>,
+    /// Properties, in schema order.
+    pub properties: Vec<CatalogueProperty>,
+}
+
+/// Body of the `genmsi.catalogue/1` document.
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct CatalogueDocument {
+    /// The classes the editor offers, in alphabetical order.
+    pub classes: Vec<CatalogueClass>,
+}
+
+/// Build the `genmsi.catalogue/1` body: the block classes an editor needs to
+/// create a block.
+///
+/// The catalogue lives in `genmsi-format` (it says what a block looks like in
+/// the file); this document only carries it to the clients. The classes the
+/// compiler understands live in [`crate::program::known_classes`], and a test
+/// pins the catalogue inside that list.
+pub fn catalogue_document() -> CatalogueDocument {
+    let classes = genmsi_format::catalogue::CLASSES
+        .iter()
+        .map(|class| CatalogueClass {
+            class: class.class.to_string(),
+            title: class.title.to_string(),
+            inputs: class
+                .inputs
+                .iter()
+                .map(|port| CataloguePort {
+                    ioid: port.ioid,
+                    name: port.name.to_string(),
+                    caption: port.caption.to_string(),
+                })
+                .collect(),
+            outputs: class
+                .outputs
+                .iter()
+                .map(|port| CataloguePort {
+                    ioid: port.ioid,
+                    name: port.name.to_string(),
+                    caption: port.caption.to_string(),
+                })
+                .collect(),
+            properties: class
+                .properties
+                .iter()
+                .map(|property| CatalogueProperty {
+                    name: property.name.to_string(),
+                    hint: property.hint.to_string(),
+                    ty: property.ty.to_string(),
+                    subtype: property.subtype.to_string(),
+                    unique: property.unique,
+                    options: genmsi_format::catalogue::listed_options(property.subtype)
+                        .iter()
+                        .map(|option| option.to_string())
+                        .collect(),
+                })
+                .collect(),
+        })
+        .collect();
+    CatalogueDocument { classes }
 }
 
 /// Body of the `genmsi.trace/1` document.

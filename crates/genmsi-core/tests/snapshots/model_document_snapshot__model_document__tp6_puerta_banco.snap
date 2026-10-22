@@ -16,7 +16,9 @@ expression: text
       "label": null,
       "container": 0,
       "layout": null,
-      "properties": []
+      "properties": [],
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": 4,
@@ -32,7 +34,9 @@ expression: text
         "width": 318,
         "height": 91
       },
-      "properties": []
+      "properties": [],
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": 6,
@@ -53,31 +57,55 @@ expression: text
           "name": "Cantidad",
           "value": "",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Cantidad de Transacciones a generar",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "Media",
           "value": "90",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Frecuencia media de arribos",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "Modificador",
           "value": "30",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Desvio o modificador",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "OffSet",
           "value": "2700",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Tiempo de espera",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "Prioridad",
           "value": "",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Prioridad de la transaccion generada",
+          "unique": false,
+          "visible": true
+        }
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "ioid": 1,
+          "name": "Salida1",
+          "caption": "",
+          "label": "A_Queue"
         }
       ]
     },
@@ -100,31 +128,55 @@ expression: text
           "name": "Cantidad",
           "value": "1",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Cantidad de Transacciones a generar",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "Media",
           "value": "",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Frecuencia media de arribos",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "Modificador",
           "value": "",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Desvio o modificador",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "OffSet",
           "value": "3600",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Tiempo de espera",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "Prioridad",
           "value": "",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Prioridad de la transaccion generada",
+          "unique": false,
+          "visible": true
+        }
+      ],
+      "inputs": [],
+      "outputs": [
+        {
+          "ioid": 1,
+          "name": "Salida1",
+          "caption": "",
+          "label": "A_Buffer"
         }
       ]
     },
@@ -147,13 +199,35 @@ expression: text
           "name": "LogicSwich",
           "value": "Puerta",
           "ty": "EntityUse",
-          "subtype": "LogicSwich"
+          "subtype": "LogicSwich",
+          "hint": "Llave lógica a configurar",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "Op",
           "value": "Set",
           "ty": "Listed",
-          "subtype": "op_Swich"
+          "subtype": "op_Swich",
+          "hint": "Operador de configuracción de la llave lógica",
+          "unique": false,
+          "visible": true
+        }
+      ],
+      "inputs": [
+        {
+          "ioid": 1,
+          "name": "Entrada1",
+          "caption": "Ingreso",
+          "label": "A_Logic"
+        }
+      ],
+      "outputs": [
+        {
+          "ioid": 2,
+          "name": "Salida1",
+          "caption": "",
+          "label": "A_Buffer1"
         }
       ]
     },
@@ -176,9 +250,21 @@ expression: text
           "name": "Unidades",
           "value": "",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Cantidad de unidades a decrementar del START, por cada transacción que llega al módulo",
+          "unique": false,
+          "visible": true
         }
-      ]
+      ],
+      "inputs": [
+        {
+          "ioid": 1,
+          "name": "Entrada1",
+          "caption": "Ingreso",
+          "label": "A_Terminate"
+        }
+      ],
+      "outputs": []
     },
     {
       "id": 10,
@@ -199,13 +285,41 @@ expression: text
           "name": "LogicSwich",
           "value": "Puerta",
           "ty": "EntityUse",
-          "subtype": "LogicSwich"
+          "subtype": "LogicSwich",
+          "hint": "Logic Swich a evaluar.",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "op",
           "value": "Set",
           "ty": "Listed",
-          "subtype": "op_Logic_Swich"
+          "subtype": "op_Logic_Swich",
+          "hint": "Operador logico del logic swich.",
+          "unique": false,
+          "visible": true
+        }
+      ],
+      "inputs": [
+        {
+          "ioid": 1,
+          "name": "Entrada1",
+          "caption": "Ingreso",
+          "label": "GateL"
+        }
+      ],
+      "outputs": [
+        {
+          "ioid": 2,
+          "name": "Salida1",
+          "caption": "",
+          "label": "A_Depart"
+        },
+        {
+          "ioid": 3,
+          "name": "Salida2",
+          "caption": "fallo",
+          "label": null
         }
       ]
     },
@@ -228,25 +342,53 @@ expression: text
           "name": "Facility",
           "value": "Puerta",
           "ty": "EntityUse",
-          "subtype": "Facility"
+          "subtype": "Facility",
+          "hint": "Recurso utilizado",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "Media",
           "value": "2",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Tiempo Medio de uso del recurso",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "Modificador",
           "value": "1",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Desvio o Modificador de la media",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "Queue",
           "value": "qPuerta",
           "ty": "EntityUse",
-          "subtype": "Queue"
+          "subtype": "Queue",
+          "hint": "cola del recurso utilizado",
+          "unique": false,
+          "visible": true
+        }
+      ],
+      "inputs": [
+        {
+          "ioid": 1,
+          "name": "Entrada1",
+          "caption": "Ingreso al recurso",
+          "label": "A_FacilityUse"
+        }
+      ],
+      "outputs": [
+        {
+          "ioid": 2,
+          "name": "Salida1",
+          "caption": "",
+          "label": "A_Advance"
         }
       ]
     },
@@ -264,7 +406,23 @@ expression: text
         "width": 100,
         "height": 42
       },
-      "properties": []
+      "properties": [],
+      "inputs": [
+        {
+          "ioid": 1,
+          "name": "Entrada 1",
+          "caption": "",
+          "label": "A_Advance"
+        }
+      ],
+      "outputs": [
+        {
+          "ioid": 2,
+          "name": "Salida 1",
+          "caption": "",
+          "label": "A_Terminate1"
+        }
+      ]
     },
     {
       "id": 23,
@@ -285,13 +443,35 @@ expression: text
           "name": "Media",
           "value": "1800",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Tiempo Medio de espera",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "Modificador",
           "value": "900",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Desvio o Modificador",
+          "unique": false,
+          "visible": true
+        }
+      ],
+      "inputs": [
+        {
+          "ioid": 1,
+          "name": "Entrada1",
+          "caption": "Ingresa",
+          "label": "A_Advance"
+        }
+      ],
+      "outputs": [
+        {
+          "ioid": 2,
+          "name": "Salida1",
+          "caption": "",
+          "label": "A_Terminate1"
         }
       ]
     },
@@ -314,9 +494,14 @@ expression: text
           "name": "Frecuencia",
           "value": "3600",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "frecuencia, en unidad de tiempo, con la que se descuenta 1 unidad del START",
+          "unique": false,
+          "visible": true
         }
-      ]
+      ],
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": 15,
@@ -332,7 +517,9 @@ expression: text
         "width": 116,
         "height": 31
       },
-      "properties": []
+      "properties": [],
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": 16,
@@ -353,13 +540,35 @@ expression: text
           "name": "Cantidad",
           "value": "",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Cantidad de ingresos en la cola",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "Queue",
           "value": "qAfuera",
           "ty": "EntityUse",
-          "subtype": "Queue"
+          "subtype": "Queue",
+          "hint": "Queue en la que ingresa la transacción",
+          "unique": false,
+          "visible": true
+        }
+      ],
+      "inputs": [
+        {
+          "ioid": 1,
+          "name": "Entrada1",
+          "caption": "Ingreso",
+          "label": "A_Queue"
+        }
+      ],
+      "outputs": [
+        {
+          "ioid": 2,
+          "name": "Salida1",
+          "caption": "",
+          "label": "GateL"
         }
       ]
     },
@@ -382,13 +591,35 @@ expression: text
           "name": "Cantidad",
           "value": "",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Cantidad de egresos",
+          "unique": false,
+          "visible": true
         },
         {
           "name": "Queue",
           "value": "qAfuera",
           "ty": "EntityUse",
-          "subtype": "Queue"
+          "subtype": "Queue",
+          "hint": "Queue de la cual se egresa",
+          "unique": false,
+          "visible": true
+        }
+      ],
+      "inputs": [
+        {
+          "ioid": 1,
+          "name": "Entrada1",
+          "caption": "Ingreso",
+          "label": "A_Depart"
+        }
+      ],
+      "outputs": [
+        {
+          "ioid": 2,
+          "name": "Salida1",
+          "caption": "",
+          "label": "A_FacilityUse"
         }
       ]
     },
@@ -406,7 +637,23 @@ expression: text
         "width": 88,
         "height": 32
       },
-      "properties": []
+      "properties": [],
+      "inputs": [
+        {
+          "ioid": 1,
+          "name": "Entrada1",
+          "caption": "Ingreso",
+          "label": "A_Buffer"
+        }
+      ],
+      "outputs": [
+        {
+          "ioid": 2,
+          "name": "Salida1",
+          "caption": "",
+          "label": "A_Logic"
+        }
+      ]
     },
     {
       "id": 20,
@@ -422,7 +669,23 @@ expression: text
         "width": 88,
         "height": 32
       },
-      "properties": []
+      "properties": [],
+      "inputs": [
+        {
+          "ioid": 1,
+          "name": "Entrada1",
+          "caption": "Ingreso",
+          "label": "A_Buffer1"
+        }
+      ],
+      "outputs": [
+        {
+          "ioid": 2,
+          "name": "Salida1",
+          "caption": "",
+          "label": "A_Terminate"
+        }
+      ]
     },
     {
       "id": 22,
@@ -438,7 +701,9 @@ expression: text
         "width": 116,
         "height": 28
       },
-      "properties": []
+      "properties": [],
+      "inputs": [],
+      "outputs": []
     },
     {
       "id": 37,
@@ -459,9 +724,21 @@ expression: text
           "name": "Unidades",
           "value": "",
           "ty": "TSNA",
-          "subtype": "SNA"
+          "subtype": "SNA",
+          "hint": "Cantidad de unidades a decrementar del START, por cada transacción que llega al módulo",
+          "unique": false,
+          "visible": true
         }
-      ]
+      ],
+      "inputs": [
+        {
+          "ioid": 1,
+          "name": "Entrada1",
+          "caption": "Ingreso",
+          "label": "A_Terminate1"
+        }
+      ],
+      "outputs": []
     },
     {
       "id": 38,
@@ -477,7 +754,9 @@ expression: text
         "width": 158,
         "height": 571
       },
-      "properties": []
+      "properties": [],
+      "inputs": [],
+      "outputs": []
     }
   ],
   "edges": [

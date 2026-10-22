@@ -19,4 +19,16 @@ ty: string,
 /**
  * Declared subtype (`SNA`, `Facility`, `Queue`, ...).
  */
-subtype: string, };
+subtype: string, 
+/**
+ * Tooltip the editor shows, decoded.
+ */
+hint: string, 
+/**
+ * Whether the property defines an entity.
+ */
+unique: boolean, 
+/**
+ * Whether the editor shows the property.
+ */
+visible: boolean, };

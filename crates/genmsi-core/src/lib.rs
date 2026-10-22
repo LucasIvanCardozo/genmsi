@@ -37,12 +37,14 @@ pub mod stat;
 pub mod xact;
 
 pub use documents::{
+    CatalogueClass, CatalogueDocument, CataloguePort, CatalogueProperty, CATALOGUE_SCHEMA,
     DefinitionCounts, EXPLAIN_SCHEMA, Envelope, LINT_SCHEMA, LintDocument, MODEL_SCHEMA,
-    ModelBlock, ModelDocument, ModelEdge, ModelProperty, ModelRect, REPORT_SCHEMA, TRACE_SCHEMA,
-    TraceDocument, lint_document, model_document, to_pretty_json, trace_document,
+    ModelBlock, ModelDocument, ModelEdge, ModelPort, ModelProperty, ModelRect, REPORT_SCHEMA,
+    TRACE_SCHEMA, TraceDocument, catalogue_document, lint_document, model_document, to_pretty_json,
+    trace_document,
 };
 pub use error::EngineError;
-pub use program::{Program, compile};
+pub use program::{Program, compile, known_classes};
 pub use report::{json_report, program_json, render, to_csv, to_json};
 pub use replication::{
     MetricSummary, ReplicationConfig, ReplicationResult, render_summary, replicate,

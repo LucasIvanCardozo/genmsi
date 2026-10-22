@@ -90,12 +90,16 @@ pub struct BlockStats {
 
 /// One trace record.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
 pub struct TraceEvent {
     /// Simulation time.
     pub time: f64,
     /// Transaction id.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub xact: XactId,
     /// Block index in the program.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub block: usize,
     /// Block class.
     pub class: String,

@@ -1,6 +1,7 @@
 import type { LintDocument as LintBody } from "./generated/LintDocument";
 import type { JsonReport as ReportBody } from "./generated/JsonReport";
 import type { ModelDocument as ModelBody } from "./generated/ModelDocument";
+import type { TraceDocument as TraceBody } from "./generated/TraceDocument";
 
 /**
  * A versioned document: the schema id plus the body fields.
@@ -17,9 +18,12 @@ export type LintDocument = Schema<LintBody>;
 export type ReportDocument = Schema<ReportBody>;
 /** The `genmsi.model/1` document. */
 export type ModelDocument = Schema<ModelBody>;
+/** The `genmsi.trace/1` document: the events of a run, in simulation order. */
+export type TraceDocument = Schema<TraceBody>;
 
-export type { LintBody, ReportBody, ModelBody };
+export type { LintBody, ReportBody, ModelBody, TraceBody };
 export type { JsonBlock } from "./generated/JsonBlock";
+export type { TraceEvent } from "./generated/TraceEvent";
 export type { Entities } from "./generated/Entities";
 export type { Facility } from "./generated/Facility";
 export type { Queue } from "./generated/Queue";

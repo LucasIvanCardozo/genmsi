@@ -434,10 +434,13 @@ pub fn catalogue_document() -> CatalogueDocument {
 
 /// Body of the `genmsi.trace/1` document.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
 pub struct TraceDocument<'a> {
     /// Program title.
     pub title: &'a str,
     /// Seed used.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub seed: u64,
     /// Start time.
     pub start_time: f64,
@@ -446,8 +449,10 @@ pub struct TraceDocument<'a> {
     /// Why the run ended (`terminated`, `no_events` or `time_limit`).
     pub end_reason: &'a str,
     /// Record limit this run used.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub limit: usize,
     /// Records actually kept.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub records: usize,
     /// Whether the limit may have cut the trace.
     pub truncated: bool,

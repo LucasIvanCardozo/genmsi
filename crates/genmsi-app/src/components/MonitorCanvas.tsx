@@ -15,10 +15,16 @@ const PADDING = 40;
 export default function MonitorCanvas({
   model,
   activity,
+  totals,
+  classes,
 }: {
   model: ModelBody;
   /** The transactions inside every block of the model, by block id. */
   activity: Map<number, number>;
+  /** The entries every block has had since the run started, by block id. */
+  totals: Map<number, number>;
+  /** The class of every block of the model, by block id. */
+  classes: Map<number, string>;
 }) {
   const picture = useMemo(() => {
     const placed = model.blocks.filter((block) => block.layout !== null);
@@ -76,12 +82,14 @@ export default function MonitorCanvas({
   }
 
   return (
-    <svg
+    <div className="flex h-full flex-col gap-1">
+      <svg
       viewBox={`0 0 ${picture.width} ${picture.height}`}
       className="h-full w-full"
       role="img"
       aria-label="Los bloques del modelo y su actividad en la reproducción"
     >
+
       <g stroke="#cbd5e1" strokeWidth={2}>
         {picture.links.map((link) => (
           <line key={link.id} x1={link.x1} y1={link.y1} x2={link.x2} y2={link.y2} />
@@ -93,47 +101,79 @@ export default function MonitorCanvas({
           return null;
         }
         const count = activity.get(block.id) ?? 0;
+        const total = totals.get(block.id) ?? 0;
         const x = (layout.x ?? 0) - picture.left + PADDING;
         const y = (layout.y ?? 0) - picture.top + PADDING;
         const container = block.kind === "C";
         const title = block.caption !== "" ? block.caption : block.class;
+        const className = classes.get(block.id) ?? block.class;
+        const width = layout.width ?? 100;
+        const height = layout.height ?? 40;
+        // The two numbers of a block: how many transactions are inside it now
+        // and how many have gone through it since the run started.
+        const now = count;
+        const ever = total;
+        const busy = now > 0;
         return (
           <g key={block.id}>
             <rect
               x={x}
               y={y}
-              width={layout.width ?? 100}
-              height={layout.height ?? 40}
+              width={width}
+              height={height}
               rx={6}
-              fill={count > 0 ? "#e0e7ff" : container ? "#f8fafc" : "#ffffff"}
-              stroke={count > 0 ? "#6366f1" : container ? "#cbd5e1" : "#94a3b8"}
-              strokeWidth={count > 0 ? 2.5 : 1.5}
+              fill={busy ? "#e0e7ff" : container ? "#f8fafc" : "#ffffff"}
+              stroke={busy ? "#6366f1" : container ? "#cbd5e1" : "#94a3b8"}
+              strokeWidth={busy ? 2.5 : 1.5}
               strokeDasharray={container ? "6 4" : undefined}
             />
             <text
               x={x + 8}
               y={y + 18}
               fontSize={13}
-              fill={count > 0 ? "#3730a3" : "#334155"}
-              fontWeight={count > 0 ? 600 : 400}
+              fill={busy ? "#3730a3" : "#334155"}
+              fontWeight={busy ? 600 : 400}
             >
               {title.length > 22 ? `${title.slice(0, 21)}…` : title}
             </text>
-            {count > 0 && (
-              <text
-                x={x + (layout.width ?? 100) - 8}
-                y={y + 18}
-                fontSize={13}
-                fill="#4338ca"
-                textAnchor="end"
-                fontWeight={600}
-              >
-                {count}
-              </text>
+            {/* The class of the block, so a queue reads as a queue. */}
+            <text x={x + 8} y={y + 32} fontSize={9} fill="#94a3b8">
+              {className}
+            </text>
+            {ever > 0 && (
+              /* The count of the moment, and the total of the block under
+                 it: "3 / 145" reads as "three now, a hundred and forty-five in
+                 all", which is what the two numbers are. */
+              <>
+                <text
+                  x={x + width - 8}
+                  y={y + 17}
+                  fontSize={13}
+                  fill={busy ? "#4338ca" : "#64748b"}
+                  textAnchor="end"
+                  fontWeight={600}
+                >
+                  {now}
+                </text>
+                <text
+                  x={x + width - 8}
+                  y={y + 31}
+                  fontSize={10}
+                  fill="#94a3b8"
+                  textAnchor="end"
+                >
+                  / {ever}
+                </text>
+              </>
             )}
           </g>
         );
       })}
-    </svg>
+      </svg>
+      <p className="px-1 text-[11px] text-slate-400">
+        Cada bloque muestra las transacciones que tiene ahora y, debajo, el total que
+        lleva desde el comienzo de la corrida.
+      </p>
+    </div>
   );
 }

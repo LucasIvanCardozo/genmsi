@@ -2,11 +2,13 @@ import { create } from "zustand";
 import { engine } from "../engine";
 import type { ModelRef } from "../engine/adapter";
 import { relayout } from "../edit/layout";
+import { buildIndex, type ReplayIndex } from "../monitor/replay";
 import type {
   CatalogueDocument,
   Diagnostics,
   ModelBody,
   ReportDocument,
+  TraceDocument,
 } from "../types";
 import type { EditCommand } from "../types/generated/EditCommand";
 
@@ -14,7 +16,15 @@ import type { EditCommand } from "../types/generated/EditCommand";
 export type Status = "idle" | "loading" | "ready" | "running";
 
 /** The view the body shows. */
-export type View = "grafo" | "reporte";
+export type View = "grafo" | "reporte" | "monitor";
+
+/**
+ * How many trace records the monitor asks the engine for.
+ *
+ * The CLI keeps 100 by default, which is a sample and not a run: the replay
+ * needs the whole trace, and the document says when the bound cut it.
+ */
+export const TRACE_LIMIT = 200_000;
 
 /** How far a pasted copy is moved, so it does not sit on the original. */
 const PASTE_OFFSET = { dx: 180, dy: 90 };
@@ -30,6 +40,16 @@ export interface AppState {
   diagnostics: Diagnostics | null;
   /** The last run's report. */
   report: ReportDocument | null;
+  /** The trace of the last run, the one the monitor replays. */
+  trace: TraceDocument | null;
+  /** The index of the replay: what the monitor reads, built once per run. */
+  monitor: ReplayIndex | null;
+  /** The frame the replay is at. */
+  playhead: number;
+  /** Whether the replay is running. */
+  playing: boolean;
+  /** How fast the replay runs. */
+  speed: number;
   /** The blocks the user selected in the graph. */
   selectedBlockIds: number[];
   /** The blocks the user copied. */
@@ -74,6 +94,14 @@ export interface AppState {
   save: (path?: string) => Promise<void>;
   /** Run the open model and read its report. */
   simulate: () => Promise<void>;
+  /** Run the open model and prepare its replay. */
+  runMonitor: () => Promise<void>;
+  /** Move the replay to a frame. */
+  setPlayhead: (frame: number) => void;
+  /** Play or pause the replay. */
+  setPlaying: (playing: boolean) => void;
+  /** Set how fast the replay runs. */
+  setSpeed: (speed: number) => void;
   /** Select the blocks of the graph. */
   select: (ids: number[]) => void;
   /** Add a block of a class, at a position or in the first free spot. */
@@ -165,6 +193,11 @@ export const useApp = create<AppState>((set, get) => ({
   model: null,
   diagnostics: null,
   report: null,
+  trace: null,
+  monitor: null,
+  playhead: 0,
+  playing: false,
+  speed: 1,
   selectedBlockIds: [],
   clipboard: [],
   seed: 1,
@@ -209,6 +242,10 @@ export const useApp = create<AppState>((set, get) => ({
         canUndo: state.canUndo,
         canRedo: state.canRedo,
         report: null,
+        trace: null,
+        monitor: null,
+        playhead: 0,
+        playing: false,
         selectedBlockIds: [],
         clipboard: [],
         status: "ready",
@@ -238,6 +275,10 @@ export const useApp = create<AppState>((set, get) => ({
         canUndo: state.canUndo,
         canRedo: state.canRedo,
         report: null,
+        trace: null,
+        monitor: null,
+        playhead: 0,
+        playing: false,
         selectedBlockIds: [],
         clipboard: [],
         status: "ready",
@@ -258,6 +299,13 @@ export const useApp = create<AppState>((set, get) => ({
         dirty: state.dirty,
         canUndo: state.canUndo,
         canRedo: state.canRedo,
+        // The model moved: the run the monitor replays is not the model any
+        // more, so the replay goes away with it.
+        report: null,
+        trace: null,
+        monitor: null,
+        playhead: 0,
+        playing: false,
         error: null,
         status: "ready",
       });
@@ -275,6 +323,11 @@ export const useApp = create<AppState>((set, get) => ({
         dirty: state.dirty,
         canUndo: state.canUndo,
         canRedo: state.canRedo,
+        report: null,
+        trace: null,
+        monitor: null,
+        playhead: 0,
+        playing: false,
         error: null,
       });
     } catch (error) {
@@ -291,6 +344,11 @@ export const useApp = create<AppState>((set, get) => ({
         dirty: state.dirty,
         canUndo: state.canUndo,
         canRedo: state.canRedo,
+        report: null,
+        trace: null,
+        monitor: null,
+        playhead: 0,
+        playing: false,
         error: null,
       });
     } catch (error) {
@@ -339,11 +397,62 @@ export const useApp = create<AppState>((set, get) => ({
         seed: get().seed,
         until: get().until ?? undefined,
       });
-      set({ report, status: "ready", view: "reporte" });
+      set({
+        report,
+        // The run is not the one the monitor replays: the replay needs the
+        // trace, and the monitor asks for it when it runs the model.
+        trace: null,
+        monitor: null,
+        playhead: 0,
+        playing: false,
+        status: "ready",
+        view: "reporte",
+      });
     } catch (error) {
       set({ status: "ready", error: `No se pudo simular el modelo: ${messageOf(error)}` });
     }
   },
+
+  runMonitor: async () => {
+    const model = get().model;
+    if (model === null) {
+      set({ error: "No hay ningún modelo abierto para reproducir." });
+      return;
+    }
+    set({ status: "running", error: null });
+    try {
+      const options = {
+        seed: get().seed,
+        until: get().until ?? undefined,
+        limit: TRACE_LIMIT,
+      };
+      // The report and the trace are two runs of the same model with the same
+      // seed: the engine is deterministic, so the trace belongs to the report.
+      const report = await engine().simulateCurrent(options);
+      const trace = await engine().traceCurrent(options);
+      const monitor = buildIndex(trace, report, model);
+      set({
+        report,
+        trace,
+        monitor,
+        playhead: 0,
+        playing: monitor.frames.length > 0,
+        status: "ready",
+        view: "monitor",
+      });
+    } catch (error) {
+      set({
+        status: "ready",
+        error: `No se pudo reproducir la simulación: ${messageOf(error)}`,
+      });
+    }
+  },
+
+  setPlayhead: (frame: number) => set({ playhead: frame }),
+
+  setPlaying: (playing: boolean) => set({ playing }),
+
+  setSpeed: (speed: number) => set({ speed }),
 
   select: (ids: number[]) => {
     // The same selection does not change the state: the graph reports it

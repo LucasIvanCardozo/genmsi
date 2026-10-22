@@ -6,6 +6,7 @@ import ErrorNotice from "./components/ErrorNotice";
 import GraphView from "./components/GraphView";
 import ModelPicker from "./components/ModelPicker";
 import ModelSummary from "./components/ModelSummary";
+import MonitorView from "./components/MonitorView";
 import PropertiesPanel from "./components/PropertiesPanel";
 import ReportView from "./components/ReportView";
 import Toolbar from "./components/Toolbar";
@@ -216,6 +217,7 @@ export default function App() {
           {(
             [
               { id: "grafo", label: "Grafo" },
+              { id: "monitor", label: "Monitor" },
               { id: "reporte", label: "Reporte" },
             ] as const
           ).map((candidate) => (
@@ -259,6 +261,8 @@ export default function App() {
               </aside>
             </div>
           </div>
+        ) : view === "monitor" ? (
+          <MonitorView />
         ) : report === null ? (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 text-sm text-slate-500">
             Ejecuta la simulación para ver su reporte.

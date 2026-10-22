@@ -1,16 +1,6 @@
 import { useState } from "react";
+import { number } from "../format";
 import type { ReportDocument } from "../types";
-
-/** A number the way the original's report shows it: comma decimals. */
-function number(value: number): string {
-  if (!Number.isFinite(value)) {
-    return "0,000";
-  }
-  if (Math.abs(value - Math.round(value)) < 1e-9 && Math.abs(value) < 1e12) {
-    return String(Math.round(value));
-  }
-  return value.toFixed(3).replace(".", ",");
-}
 
 /** A table of the report. */
 function DataTable<T>({

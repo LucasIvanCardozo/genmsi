@@ -29,6 +29,7 @@ pub fn run() {
             commands::load_model,
             commands::lint_model,
             commands::simulate_model,
+            commands::session,
         ])
         .run(tauri::generate_context!())
         .expect("the GenMSI application could not start");

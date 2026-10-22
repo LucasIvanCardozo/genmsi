@@ -5,8 +5,24 @@
 //! returns the document's bytes. The dev bridge spawns the `genmsi-app-engine`
 //! binary and moves its stdout verbatim; the Tauri backend calls these
 //! functions directly. Both paths carry the same bytes for the same model.
+//!
+//! The facade also owns the *editing session*: the model in memory, its undo
+//! stack and the save. Every mutation goes through the additive API of
+//! `genmsi-format`, so the app never touches the XML of a model.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// The protocol the app's backends speak with the facade.
+pub mod protocol;
+/// The editing session: the model in memory, its undo stack and its save.
+pub mod session;
+
+pub use protocol::{SessionRequest, SessionResponse, answer};
+pub use session::{Diagnostics, SaveOutcome, Session, SessionState};
+
+/// Schema id of the app's own model list; an application document, not an
+/// engine document.
+pub const MODELS_SCHEMA: &str = "genmsi.models/1";
 
 /// A failure of the facade.
 #[derive(Debug, thiserror::Error)]
@@ -63,6 +79,55 @@ fn document_bytes(schema: &str, body: &impl serde::Serialize) -> String {
     )
 }
 
+/// Body of the `genmsi.models/1` list document.
+#[derive(Debug, serde::Serialize)]
+struct ModelsBody<'a> {
+    /// Directory as the caller named it.
+    dir: &'a str,
+    /// Models, sorted by file name.
+    models: &'a [ModelFile],
+}
+
+/// The `genmsi.models/1` document: the `.gmdl` files of the given directories.
+pub fn models_document_bytes(dirs: &[PathBuf]) -> Result<String, AppError> {
+    let mut models = Vec::new();
+    for dir in dirs {
+        models.extend(list_models(dir)?);
+    }
+    models.sort_by(|a, b| {
+        let name = |model: &ModelFile| {
+            Path::new(&model.path)
+                .file_name()
+                .map(|name| name.to_os_string())
+        };
+        name(a).cmp(&name(b))
+    });
+    let body = ModelsBody {
+        dir: &dirs
+            .iter()
+            .map(|dir| dir.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", "),
+        models: &models,
+    };
+    Ok(format!(
+        "{}\n",
+        genmsi_core::documents::to_pretty_json(MODELS_SCHEMA, &body)
+    ))
+}
+
+/// The `genmsi.catalogue/1` document: the block classes the editor offers.
+pub fn catalogue_document_bytes() -> String {
+    let body = genmsi_core::documents::catalogue_document();
+    format!(
+        "{}\n",
+        genmsi_core::documents::to_pretty_json(
+            genmsi_core::documents::CATALOGUE_SCHEMA,
+            &body,
+        )
+    )
+}
+
 /// The `genmsi.model/1` document of a model: its blocks and its links.
 ///
 /// The document is built from the file's semantic model, so a model that does
@@ -89,8 +154,29 @@ pub fn simulate_document_bytes(
     until: Option<f64>,
 ) -> Result<String, AppError> {
     let model = genmsi_format::load(path).map_err(|error| model_error(path, error))?;
-    let program =
-        genmsi_core::compile_model(&model).map_err(|error| model_error(path, error))?;
+    simulate_bytes(&model, path, seed, until)
+}
+
+/// The `genmsi.report/1` document of a run of a model that is in memory.
+///
+/// The bytes are the ones the CLI prints for the same model and the same
+/// seed: the document does not know where the model came from.
+pub fn simulate_model_bytes(
+    model: &genmsi_format::GmdlModel,
+    seed: u64,
+    until: Option<f64>,
+) -> Result<String, AppError> {
+    simulate_bytes(model, Path::new(""), seed, until)
+}
+
+/// The report of a run, with the path the failure names.
+fn simulate_bytes(
+    model: &genmsi_format::GmdlModel,
+    path: &Path,
+    seed: u64,
+    until: Option<f64>,
+) -> Result<String, AppError> {
+    let program = genmsi_core::compile_model(model).map_err(|error| model_error(path, error))?;
     let config = genmsi_core::SimConfig {
         seed,
         stop_time: until,

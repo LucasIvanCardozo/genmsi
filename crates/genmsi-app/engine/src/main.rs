@@ -4,16 +4,17 @@
 //! bridge, prints one document to stdout and nothing else. On failure it
 //! prints one line `error: <message>` to stderr and exits with code 1, the
 //! same contract the `genmsi` CLI follows.
+//!
+//! The `session` subcommand is the exception: it keeps one model in memory
+//! and speaks the editing protocol, one JSON request per line and one JSON
+//! answer per line. It is what the dev bridge holds open while the user
+//! edits.
 
-use std::io::{self, Write as _};
+use std::io::{self, BufRead, Write as _};
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
-use genmsi_app_engine::{self as engine, AppError};
-
-/// Schema id of the app's own model list; an application document, not an
-/// engine document.
-const MODELS_SCHEMA: &str = "genmsi.models/1";
+use genmsi_app_engine::{self as engine, AppError, SessionRequest};
 
 #[derive(Parser)]
 #[command(
@@ -53,15 +54,13 @@ enum Command {
         /// Directory to scan (default: the current directory).
         dir: Option<PathBuf>,
     },
-}
-
-/// Body of the `genmsi.models/1` list document.
-#[derive(serde::Serialize)]
-struct ModelsBody<'a> {
-    /// Directory as the caller named it.
-    dir: &'a str,
-    /// Models, sorted by file name.
-    models: &'a [engine::ModelFile],
+    /// The `genmsi.catalogue/1` document: the block classes the editor offers.
+    Catalogue,
+    /// Keep one model in memory and speak the editing protocol.
+    ///
+    /// One JSON request per line on stdin, one JSON answer per line on
+    /// stdout. The dev bridge holds this process open while the user edits.
+    Session,
 }
 
 /// Print text to stdout; a closed pipe is success, not an error.
@@ -77,6 +76,36 @@ fn print(text: &str) {
     }
 }
 
+/// Run the editing protocol until the input ends.
+///
+/// Every answer is one line of compact JSON, flushed as soon as it is written:
+/// the dev bridge reads it before it sends the next request.
+fn run_session() -> Result<(), AppError> {
+    let stdin = io::stdin();
+    let mut session: Option<engine::Session> = None;
+    let stdout = io::stdout();
+    let mut out = stdout.lock();
+    for line in stdin.lock().lines() {
+        let line = line
+            .map_err(|error| AppError::Usage(format!("cannot read the request: {error}")))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let request: SessionRequest = serde_json::from_str(&line).map_err(|error| {
+            AppError::Usage(format!("cannot read the request: {error}"))
+        })?;
+        let response = engine::answer(&mut session, request);
+        let text =
+            serde_json::to_string(&response).expect("the answers of the facade always serialize");
+        writeln!(out, "{text}").map_err(|error| {
+            AppError::Usage(format!("cannot write the answer: {error}"))
+        })?;
+        out.flush()
+            .map_err(|error| AppError::Usage(format!("cannot write the answer: {error}")))?;
+    }
+    Ok(())
+}
+
 fn run(command: Command) -> Result<String, AppError> {
     match command {
         Command::Model { path } => engine::model_document_bytes(&path),
@@ -88,15 +117,12 @@ fn run(command: Command) -> Result<String, AppError> {
         } => engine::simulate_document_bytes(&path, seed, until),
         Command::Models { dir } => {
             let dir = dir.unwrap_or_else(|| PathBuf::from("."));
-            let models = engine::list_models(&dir)?;
-            let body = ModelsBody {
-                dir: &dir.display().to_string(),
-                models: &models,
-            };
-            Ok(format!(
-                "{}\n",
-                genmsi_core::documents::to_pretty_json(MODELS_SCHEMA, &body)
-            ))
+            engine::models_document_bytes(&[dir])
+        }
+        Command::Catalogue => Ok(engine::catalogue_document_bytes()),
+        Command::Session => {
+            run_session()?;
+            Ok(String::new())
         }
     }
 }

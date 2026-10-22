@@ -49,8 +49,10 @@ export default function MonitorView() {
   // the next while the replay runs forward, and rebuilt when it goes back.
   const carried = useRef<{ run: unknown; frame: number; state: ReplayState } | null>(null);
 
-  // The clock: the time of the frame the replay is at.
-  const clock = monitor?.frames[playhead]?.time ?? monitor?.startTime ?? 0;
+  // The clock of the replay: the time the run has reached, kept up to date by
+  // the animation. It used to be the time of the last record, which made it
+  // jump from one event to the next instead of ticking.
+  const [clock, setClock] = useState(0);
 
   // The state at the playhead.
   const state = useMemo(() => {
@@ -85,10 +87,6 @@ export default function MonitorView() {
   // The playhead the monitor set itself, to tell the reader's moves from its
   // own.
   const setRef = useRef(-1);
-  // The real time the reproduction has been running: the wall clock the
-  // reader spends on it, which is not the time of the run.
-  const [elapsed, setElapsed] = useState(0);
-  const realRef = useRef({ running: 0, since: 0 });
   useEffect(() => {
     if (!playing || monitor === null) {
       return;
@@ -109,9 +107,13 @@ export default function MonitorView() {
       if (clockRef.current === null || current !== setRef.current) {
         clockRef.current = monitor.frames[current]?.time ?? monitor.startTime;
         setRef.current = current;
+        setClock(clockRef.current);
       }
       const clock = advanceClock(clockRef.current, elapsed, rate);
       clockRef.current = clock;
+      // The clock the reader sees follows the animation, so it ticks instead
+      // of jumping from one record to the next.
+      setClock(clock);
       if (clock >= monitor.endTime) {
         setPlayhead(monitor.frames.length - 1);
         setPlaying(false);
@@ -128,35 +130,16 @@ export default function MonitorView() {
     return () => cancelAnimationFrame(handle);
   }, [playing, monitor, speed, setPlayhead, setPlaying]);
 
-  // The real time the reader has spent on the reproduction: it counts while
-  // the replay plays and keeps what it counted when it pauses.
-  useEffect(() => {
-    if (!playing) {
-      return;
-    }
-    realRef.current.since = performance.now();
-    const tick = () => {
-      setElapsed(realRef.current.running + (performance.now() - realRef.current.since) / 1000);
-    };
-    tick();
-    const handle = window.setInterval(tick, 200);
-    return () => {
-      window.clearInterval(handle);
-      realRef.current.running += (performance.now() - realRef.current.since) / 1000;
-      realRef.current.since = 0;
-    };
-  }, [playing]);
-
   // A new run starts its clock again, and going back to the start does too.
   useEffect(() => {
     clockRef.current = null;
     setRef.current = -1;
-    realRef.current = { running: 0, since: 0 };
-    setElapsed(0);
+    setClock(0);
   }, [monitor]);
   const backToStart = () => {
     clockRef.current = null;
     setRef.current = -1;
+    setClock(monitor?.startTime ?? 0);
     setPlayhead(0);
     setPlaying(false);
   };
@@ -250,31 +233,12 @@ export default function MonitorView() {
           Registros{" "}
           <span className="font-mono text-slate-800">{monitor.records}</span>
         </span>
+        {/* One clock: the time of the run. The wall clock the reader spends
+            on it is told apart by the scale, which says how much of the run
+            a second of screen is. */}
         <span className="text-slate-500">
           Reloj{" "}
           <span className="font-mono text-slate-800">{chronometer(clock)}</span>
-        </span>
-        {/* The real time the reproduction has been running: the wall clock
-            the reader has spent on it. */}
-        <span className="text-slate-500">
-          Real{" "}
-          <span className="font-mono text-slate-800">{chronometer(elapsed)}</span>
-        </span>
-        {/* The scale of the reproduction: what a second of screen means, and
-            how long the whole run takes at this speed. Without it the clock
-            reads as if it were the wall clock. */}
-        <span className="text-slate-500">
-          Escala{" "}
-          <span className="font-mono text-slate-800">
-            1 s de pantalla = {number(speed)} s de modelo
-          </span>
-        </span>
-        <span className="text-slate-500">
-          Durará{" "}
-          <span className="font-mono text-slate-800">
-            {number((monitor.endTime - monitor.startTime) / speed)} s
-          </span>{" "}
-          de pantalla
         </span>
       </div>
 
@@ -318,6 +282,11 @@ export default function MonitorView() {
               </option>
             ))}
           </select>
+          {/* How long the playback lasts at this speed: the one thing the
+              speed does not say on its own. */}
+          <span className="font-mono text-[11px] text-slate-400">
+            dura {chronometer((monitor.endTime - monitor.startTime) / speed)}
+          </span>
         </label>
         <input
           type="range"
@@ -335,6 +304,7 @@ export default function MonitorView() {
             const time = Number(event.target.value);
             clockRef.current = time;
             setRef.current = frameAt(monitor, time);
+            setClock(time);
             setPlayhead(frameAt(monitor, time));
           }}
           className="min-w-40 flex-1"

@@ -25,6 +25,7 @@
 //! ```
 
 pub mod catalogue;
+pub mod edit;
 pub mod error;
 pub mod model;
 pub mod parser;
@@ -32,6 +33,7 @@ pub mod validate;
 pub mod writer;
 
 pub use catalogue::{ClassSpec, PortSpec, PropertySpec, build_block, class_spec, listed_options};
+pub use edit::{EditCommand, EditSession, Position, UndoStep};
 pub use error::{FormatError, Location};
 pub use model::{
     Block, ContainerHeader, CustomClass, GmdlModel, Layout, Link, Port, PortLayout, Property,

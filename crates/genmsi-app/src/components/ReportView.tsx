@@ -144,7 +144,7 @@ export default function ReportView({ report }: { report: ReportDocument }) {
             columns={[
               { label: "Facilidad", value: (row) => row.name },
               { label: "Entries", value: (row) => number(row.entries) },
-              { label: "Util.", value: (row) => number(row.busy_time) },
+              { label: "Ocupado", value: (row) => number(row.busy_time) },
               { label: "Ocupada", value: (row) => (row.busy ? "sí" : "no") },
               { label: "Disponible", value: (row) => (row.available ? "sí" : "no") },
               { label: "Retry", value: (row) => number(row.retry) },

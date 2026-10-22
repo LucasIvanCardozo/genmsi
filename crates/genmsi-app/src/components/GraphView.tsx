@@ -154,12 +154,10 @@ export default function GraphView({
         edges={edges}
         nodeTypes={nodeTypes}
         onInit={(instance) => {
-          // The first view frames the model's flow: the annotations (the
-          // blocks the original uses as notes) stay reachable, but they do not
-          // push the flow into a corner.
-          const flowNodes = nodes.filter((node) => node.data.kind === "A");
+          // The first view frames the whole model: the containers are part of
+          // the picture, so their bounds count too and nothing is cut off.
           instance.fitView({
-            nodes: flowNodes.length > 0 ? flowNodes : nodes,
+            nodes,
             padding: 0.15,
             minZoom: 0.5,
           });

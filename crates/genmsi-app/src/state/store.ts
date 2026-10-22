@@ -2,7 +2,13 @@ import { create } from "zustand";
 import { engine } from "../engine";
 import type { ModelRef } from "../engine/adapter";
 import { relayout } from "../edit/layout";
-import { buildIndex, fittingSpeed, type ReplayIndex } from "../monitor/replay";
+import {
+  buildIndex,
+  buildTransitions,
+  fittingSpeed,
+  type ReplayIndex,
+  type TransitionIndex,
+} from "../monitor/replay";
 import type {
   CatalogueDocument,
   Diagnostics,
@@ -44,6 +50,8 @@ export interface AppState {
   trace: TraceDocument | null;
   /** The index of the replay: what the monitor reads, built once per run. */
   monitor: ReplayIndex | null;
+  /** The moves of the run, read from the trace. */
+  transitions: TransitionIndex | null;
   /** The frame the replay is at. */
   playhead: number;
   /** Whether the replay is running. */
@@ -195,6 +203,7 @@ export const useApp = create<AppState>((set, get) => ({
   report: null,
   trace: null,
   monitor: null,
+  transitions: null,
   playhead: 0,
   playing: false,
   speed: 1,
@@ -244,6 +253,7 @@ export const useApp = create<AppState>((set, get) => ({
         report: null,
         trace: null,
         monitor: null,
+        transitions: null,
         playhead: 0,
         playing: false,
         selectedBlockIds: [],
@@ -277,6 +287,7 @@ export const useApp = create<AppState>((set, get) => ({
         report: null,
         trace: null,
         monitor: null,
+        transitions: null,
         playhead: 0,
         playing: false,
         selectedBlockIds: [],
@@ -304,6 +315,7 @@ export const useApp = create<AppState>((set, get) => ({
         report: null,
         trace: null,
         monitor: null,
+        transitions: null,
         playhead: 0,
         playing: false,
         error: null,
@@ -326,6 +338,7 @@ export const useApp = create<AppState>((set, get) => ({
         report: null,
         trace: null,
         monitor: null,
+        transitions: null,
         playhead: 0,
         playing: false,
         error: null,
@@ -347,6 +360,7 @@ export const useApp = create<AppState>((set, get) => ({
         report: null,
         trace: null,
         monitor: null,
+        transitions: null,
         playhead: 0,
         playing: false,
         error: null,
@@ -403,6 +417,7 @@ export const useApp = create<AppState>((set, get) => ({
         // trace, and the monitor asks for it when it runs the model.
         trace: null,
         monitor: null,
+        transitions: null,
         playhead: 0,
         playing: false,
         status: "ready",
@@ -431,10 +446,16 @@ export const useApp = create<AppState>((set, get) => ({
       const report = await engine().simulateCurrent(options);
       const trace = await engine().traceCurrent(options);
       const monitor = buildIndex(trace, report, model);
+      // The moves of the run, read from the trace. The program blocks are
+      // mapped to the blocks of the model, because a ball travels between the
+      // rectangles the reader sees.
+      const nodeOf = (block: number) => report.blocks[block]?.node ?? null;
+      const transitions = buildTransitions(trace, nodeOf);
       set({
         report,
         trace,
         monitor,
+        transitions,
         playhead: 0,
         playing: monitor.frames.length > 0,
         // The speed is a multiple of the real time. The default is the one

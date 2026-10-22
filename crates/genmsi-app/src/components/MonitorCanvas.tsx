@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { BALL_RADIUS, FLIGHT_SECONDS, TRAIL_SECONDS, ballsAt, type Move } from "../monitor/balls";
 import type { ModelBody } from "../types";
 
 /** The space the picture leaves around the blocks, in model units. */
@@ -17,6 +18,10 @@ export default function MonitorCanvas({
   activity,
   totals,
   classes,
+  moves,
+  moveTimes,
+  clock,
+  speed,
 }: {
   model: ModelBody;
   /** The transactions inside every block of the model, by block id. */
@@ -25,6 +30,14 @@ export default function MonitorCanvas({
   totals: Map<number, number>;
   /** The class of every block of the model, by block id. */
   classes: Map<number, string>;
+  /** The moves of the run, in the order they happened. */
+  moves: Move[];
+  /** The times the moves happened, in the same order. */
+  moveTimes: number[];
+  /** The clock of the replay. */
+  clock: number;
+  /** The speed of the reproduction, as a multiple of the real time. */
+  speed: number;
 }) {
   const picture = useMemo(() => {
     const placed = model.blocks.filter((block) => block.layout !== null);
@@ -70,8 +83,39 @@ export default function MonitorCanvas({
       const containerB = b.kind === "C" ? 0 : 1;
       return containerA - containerB;
     });
-    return { left, top, width, height, placed: drawn, links };
+    // The middle of every block, which is where the balls start and end.
+    const places = new Map<number, { x: number; y: number }>();
+    for (const block of placed) {
+      const layout = block.layout;
+      if (layout === null) {
+        continue;
+      }
+      places.set(block.id, {
+        x: (layout.x ?? 0) - left + PADDING + (layout.width ?? 100) / 2,
+        y: (layout.y ?? 0) - top + PADDING + (layout.height ?? 40) / 2,
+      });
+    }
+    return { left, top, width, height, placed: drawn, links, places };
   }, [model]);
+
+  // The balls on screen at this instant: a function of the clock, so the
+  // reader can scrub the reproduction and the picture follows.
+  const balls = useMemo(
+    () =>
+      picture === null
+        ? []
+        : ballsAt(
+            moves,
+            moveTimes,
+            clock,
+            FLIGHT_SECONDS,
+            // The trail is a matter of legibility, so it is measured in the
+            // screen: it lasts the same for the reader at every speed.
+            TRAIL_SECONDS * speed,
+            (block) => picture.places.get(block),
+          ),
+    [picture, moves, moveTimes, clock, speed],
+  );
 
   if (picture === null) {
     return (
@@ -93,6 +137,20 @@ export default function MonitorCanvas({
       <g stroke="#cbd5e1" strokeWidth={2}>
         {picture.links.map((link) => (
           <line key={link.id} x1={link.x1} y1={link.y1} x2={link.x2} y2={link.y2} />
+        ))}
+      </g>
+      {/* The balls: the transactions crossing a link at this instant. */}
+      <g>
+        {balls.map((ball, index) => (
+          <circle
+            key={index}
+            cx={ball.from.x + (ball.to.x - ball.from.x) * ball.progress}
+            cy={ball.from.y + (ball.to.y - ball.from.y) * ball.progress}
+            r={BALL_RADIUS}
+            fill="#4f46e5"
+            stroke="#ffffff"
+            strokeWidth={1.5}
+          />
         ))}
       </g>
       {picture.placed.map((block) => {

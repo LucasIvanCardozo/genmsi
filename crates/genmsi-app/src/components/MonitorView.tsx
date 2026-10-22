@@ -35,6 +35,7 @@ export default function MonitorView() {
     report,
     trace,
     monitor,
+    transitions,
     playhead,
     playing,
     speed,
@@ -341,7 +342,16 @@ export default function MonitorView() {
       {panel === "reproduccion" ? (
         <div className="flex min-h-0 flex-1 gap-3">
           <div className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white p-2">
-            <MonitorCanvas model={model} activity={activity} totals={totals} classes={classes} />
+            <MonitorCanvas
+              model={model}
+              activity={activity}
+              totals={totals}
+              classes={classes}
+              moves={transitions?.moves ?? []}
+              moveTimes={transitions?.times ?? []}
+              clock={clock}
+              speed={speed}
+            />
           </div>
           <aside className="w-80 shrink-0 overflow-auto rounded-lg border border-slate-200 bg-white p-4">
             <StatePanel state={state} />

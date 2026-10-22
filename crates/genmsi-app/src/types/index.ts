@@ -1,0 +1,32 @@
+import type { LintDocument as LintBody } from "./generated/LintDocument";
+import type { JsonReport as ReportBody } from "./generated/JsonReport";
+import type { ModelDocument as ModelBody } from "./generated/ModelDocument";
+
+/**
+ * A versioned document: the schema id plus the body fields.
+ *
+ * The body types are generated from the Rust types
+ * (`crates/genmsi-app/scripts/generate-types.sh`); the envelope is the one
+ * shape the engine's documents share.
+ */
+export type Schema<T> = T & { schema: string };
+
+/** The `genmsi.lint/1` document. */
+export type LintDocument = Schema<LintBody>;
+/** The `genmsi.report/1` document. */
+export type ReportDocument = Schema<ReportBody>;
+/** The `genmsi.model/1` document. */
+export type ModelDocument = Schema<ModelBody>;
+
+export type { LintBody, ReportBody, ModelBody };
+export type { JsonBlock } from "./generated/JsonBlock";
+export type { Entities } from "./generated/Entities";
+export type { Facility } from "./generated/Facility";
+export type { Queue } from "./generated/Queue";
+export type { Storage } from "./generated/Storage";
+export type { Chain } from "./generated/Chain";
+export type { Table } from "./generated/Table";
+export type { ModelBlock } from "./generated/ModelBlock";
+export type { ModelEdge } from "./generated/ModelEdge";
+export type { ModelProperty } from "./generated/ModelProperty";
+export type { ModelRect } from "./generated/ModelRect";

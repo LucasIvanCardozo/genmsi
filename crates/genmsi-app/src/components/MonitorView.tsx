@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, RotateCcw } from "lucide-react";
-import { number } from "../format";
+import { chronometer, number } from "../format";
 import {
   SPEEDS,
   advance,
@@ -85,6 +85,10 @@ export default function MonitorView() {
   // The playhead the monitor set itself, to tell the reader's moves from its
   // own.
   const setRef = useRef(-1);
+  // The real time the reproduction has been running: the wall clock the
+  // reader spends on it, which is not the time of the run.
+  const [elapsed, setElapsed] = useState(0);
+  const realRef = useRef({ running: 0, since: 0 });
   useEffect(() => {
     if (!playing || monitor === null) {
       return;
@@ -124,10 +128,31 @@ export default function MonitorView() {
     return () => cancelAnimationFrame(handle);
   }, [playing, monitor, speed, setPlayhead, setPlaying]);
 
+  // The real time the reader has spent on the reproduction: it counts while
+  // the replay plays and keeps what it counted when it pauses.
+  useEffect(() => {
+    if (!playing) {
+      return;
+    }
+    realRef.current.since = performance.now();
+    const tick = () => {
+      setElapsed(realRef.current.running + (performance.now() - realRef.current.since) / 1000);
+    };
+    tick();
+    const handle = window.setInterval(tick, 200);
+    return () => {
+      window.clearInterval(handle);
+      realRef.current.running += (performance.now() - realRef.current.since) / 1000;
+      realRef.current.since = 0;
+    };
+  }, [playing]);
+
   // A new run starts its clock again, and going back to the start does too.
   useEffect(() => {
     clockRef.current = null;
     setRef.current = -1;
+    realRef.current = { running: 0, since: 0 };
+    setElapsed(0);
   }, [monitor]);
   const backToStart = () => {
     clockRef.current = null;
@@ -206,8 +231,6 @@ export default function MonitorView() {
     );
   }
 
-  const frames = monitor.frames;
-  const total = Math.max(frames.length - 1, 0);
   const truncated = trace?.truncated ?? monitor.truncated;
 
   return (
@@ -228,7 +251,14 @@ export default function MonitorView() {
           <span className="font-mono text-slate-800">{monitor.records}</span>
         </span>
         <span className="text-slate-500">
-          Reloj <span className="font-mono text-slate-800">{number(clock)}</span>
+          Reloj{" "}
+          <span className="font-mono text-slate-800">{chronometer(clock)}</span>
+        </span>
+        {/* The real time the reproduction has been running: the wall clock
+            the reader has spent on it. */}
+        <span className="text-slate-500">
+          Real{" "}
+          <span className="font-mono text-slate-800">{chronometer(elapsed)}</span>
         </span>
         {/* The scale of the reproduction: what a second of screen means, and
             how long the whole run takes at this speed. Without it the clock
@@ -292,17 +322,25 @@ export default function MonitorView() {
         <input
           type="range"
           aria-label="Posición de la reproducción"
-          min={0}
-          max={total}
-          value={Math.min(playhead, total)}
+          min={monitor.startTime}
+          max={monitor.endTime}
+          step={(monitor.endTime - monitor.startTime) / 1000}
+          // The slider is a clock: its ends are the times of the run and its
+          // value is the time of the replay.
+          value={clock}
           onChange={(event) => {
             setPlaying(false);
-            setPlayhead(Number(event.target.value));
+            // The slider is a clock: the reader picks a time and the replay
+            // goes to the last record at or before it.
+            const time = Number(event.target.value);
+            clockRef.current = time;
+            setRef.current = frameAt(monitor, time);
+            setPlayhead(frameAt(monitor, time));
           }}
           className="min-w-40 flex-1"
         />
         <span className="font-mono text-[11px] text-slate-500">
-          {Math.min(playhead + 1, frames.length)} / {frames.length}
+          {chronometer(clock)} / {chronometer(monitor.endTime)}
         </span>
       </div>
 

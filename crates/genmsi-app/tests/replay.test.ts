@@ -294,3 +294,17 @@ test("the speeds are absolute multiples of the real time", () => {
   assert.equal(advanceClock(0, 1, 1), 1, "at 1x a second is a second");
   assert.equal(advanceClock(0, 1, 250), 250, "at 250x a second is 250 seconds");
 });
+
+test("the slider is a clock: a time selects the last record at or before it", () => {
+  // The slider of the monitor is a time, not an index of records: dragging it
+  // picks a moment of the run and the replay goes to the last record that
+  // happened at or before it.
+  const index = buildIndex(smallTrace, smallReport, smallModel);
+  const times = index.frames.map((frame) => frame.time);
+  const at = (time: number) => times[frameAt(index, time)];
+  assert.equal(at(0), 0, "the beginning of the run");
+  assert.equal(at(1.5), 1, "the last record at or before 1.5");
+  assert.equal(at(2), 2, "the exact instant of a record");
+  assert.equal(at(9.9), 4, "the last record of the run");
+  assert.equal(frameAt(index, -5), 0, "before the run, the first record");
+});

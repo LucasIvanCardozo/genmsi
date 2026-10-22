@@ -16,3 +16,23 @@ export function number(value: number): string {
   }
   return value.toFixed(3).replace(".", ",");
 }
+
+/**
+ * A duration as a literal chronometer: `h:mm:ss`.
+ *
+ * The report of the CLI prints its times as plain seconds, which is what a
+ * table of numbers needs. A clock that the reader watches needs the shape of
+ * a clock: the monitor shows the time of the run as `0:39:59`, not as
+ * `2399,673`, and the same shape is used for the elapsed wall clock.
+ */
+export function chronometer(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return "0:00:00";
+  }
+  const total = Math.floor(seconds);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const rest = total % 60;
+  const pad = (value: number) => value.toString().padStart(2, "0");
+  return `${hours}:${pad(minutes)}:${pad(rest)}`;
+}

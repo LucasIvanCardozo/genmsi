@@ -3,6 +3,7 @@ import { Play } from "lucide-react";
 import ErrorNotice from "./components/ErrorNotice";
 import GraphView from "./components/GraphView";
 import ModelPicker from "./components/ModelPicker";
+import PropertiesPanel from "./components/PropertiesPanel";
 import { useApp } from "./state/store";
 
 /**
@@ -30,6 +31,9 @@ export default function App() {
   useEffect(() => {
     void loadModels();
   }, [loadModels]);
+
+  const selectedBlock =
+    model?.blocks.find((block) => block.id === selectedBlockId) ?? null;
 
   return (
     <div className="flex h-full flex-col bg-slate-100 text-slate-900">
@@ -90,11 +94,18 @@ export default function App() {
             Elegí un modelo para ver su grafo.
           </div>
         ) : (
-          <GraphView
-            model={model}
-            selectedBlockId={selectedBlockId}
-            onSelect={(id) => selectBlock(id)}
-          />
+          <div className="flex min-h-0 flex-1 gap-3">
+            <div className="min-w-0 flex-1">
+              <GraphView
+                model={model}
+                selectedBlockId={selectedBlockId}
+                onSelect={(id) => selectBlock(id)}
+              />
+            </div>
+            <aside className="w-80 shrink-0 overflow-auto rounded-lg border border-slate-200 bg-white p-4">
+              <PropertiesPanel block={selectedBlock} />
+            </aside>
+          </div>
         )}
       </main>
     </div>

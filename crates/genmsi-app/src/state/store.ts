@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { engine } from "../engine";
 import type { ModelRef } from "../engine/adapter";
 import { relayout } from "../edit/layout";
-import { buildIndex, type ReplayIndex } from "../monitor/replay";
+import { buildIndex, fittingSpeed, type ReplayIndex } from "../monitor/replay";
 import type {
   CatalogueDocument,
   Diagnostics,
@@ -437,6 +437,10 @@ export const useApp = create<AppState>((set, get) => ({
         monitor,
         playhead: 0,
         playing: monitor.frames.length > 0,
+        // The speed is a multiple of the real time. The default is the one
+        // that fits the run in a few seconds, and the monitor says which one
+        // it is: the reader always knows the scale.
+        speed: fittingSpeed(monitor.endTime - monitor.startTime),
         status: "ready",
         view: "monitor",
       });

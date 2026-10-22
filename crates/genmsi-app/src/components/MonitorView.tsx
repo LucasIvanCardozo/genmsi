@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { number } from "../format";
-import { advance, advanceClock, frameAt, stateAt, type ReplayState } from "../monitor/replay";
+import {
+  SPEEDS,
+  advance,
+  advanceClock,
+  frameAt,
+  stateAt,
+  type ReplayState,
+} from "../monitor/replay";
 import { useApp } from "../state/store";
 import MonitorCanvas from "./MonitorCanvas";
 import MonitorCharts from "./MonitorCharts";
 
-/** How many seconds the whole run takes to replay at one speed. */
-const REPLAY_SECONDS = 12;
+
 
 /** The part of the monitor the body shows. */
 type Panel = "reproduccion" | "graficos";
@@ -64,25 +70,44 @@ export default function MonitorView() {
 
   // The animation: the clock moves at a constant rate and the playhead
   // follows it. The index is read, never walked again.
+  //
+  // The clock of the replay accumulates: it is the time the run has reached,
+  // and it only moves by what the wall clock spent. Anchoring it at the time
+  // of the current frame instead would make the replay stall whenever a
+  // paint advances less than the gap between two frames, and only the fastest
+  // speeds would move at all.
+  //
+  // It lives in a ref so that changing the speed or pausing does not throw
+  // the time away: the effect restarts and the clock carries on from where
+  // the run had reached. Going back to the start is the one thing that moves
+  // it, and it does so explicitly.
+  const clockRef = useRef<number | null>(null);
+  // The playhead the monitor set itself, to tell the reader's moves from its
+  // own.
+  const setRef = useRef(-1);
   useEffect(() => {
     if (!playing || monitor === null) {
       return;
     }
     let handle = 0;
     let last = performance.now();
-    const span = Math.max(monitor.endTime - monitor.startTime, 1);
-    const rate = (span / REPLAY_SECONDS) * speed;
-    // The clock of the replay accumulates: it is the time the run has
-    // reached, and it only moves by what the wall clock spent. Anchoring it
-    // at the time of the current frame instead would make the replay stall
-    // whenever a paint advances less than the gap between two frames, and
-    // only the fastest speeds would move at all.
-    let clock = monitor.frames[useApp.getState().playhead]?.time ?? monitor.startTime;
+    // The speed is a multiple of the real time: one simulated second per
+    // second of wall clock at 1x.
+    const rate = speed;
     const step = (now: number) => {
       const elapsed = (now - last) / 1000;
       last = now;
       const current = useApp.getState().playhead;
-      clock = advanceClock(clock, elapsed, rate);
+      // The reader moved the playhead (the slider, or "Al inicio"): the clock
+      // follows it instead of running on from where it was. The playhead the
+      // monitor set itself is remembered, so the clock is not re-seeded on
+      // every frame it moves.
+      if (clockRef.current === null || current !== setRef.current) {
+        clockRef.current = monitor.frames[current]?.time ?? monitor.startTime;
+        setRef.current = current;
+      }
+      const clock = advanceClock(clockRef.current, elapsed, rate);
+      clockRef.current = clock;
       if (clock >= monitor.endTime) {
         setPlayhead(monitor.frames.length - 1);
         setPlaying(false);
@@ -90,6 +115,7 @@ export default function MonitorView() {
       }
       const frame = frameAt(monitor, clock);
       if (frame !== current) {
+        setRef.current = frame;
         setPlayhead(frame);
       }
       handle = requestAnimationFrame(step);
@@ -97,6 +123,18 @@ export default function MonitorView() {
     handle = requestAnimationFrame(step);
     return () => cancelAnimationFrame(handle);
   }, [playing, monitor, speed, setPlayhead, setPlaying]);
+
+  // A new run starts its clock again, and going back to the start does too.
+  useEffect(() => {
+    clockRef.current = null;
+    setRef.current = -1;
+  }, [monitor]);
+  const backToStart = () => {
+    clockRef.current = null;
+    setRef.current = -1;
+    setPlayhead(0);
+    setPlaying(false);
+  };
 
   // The transactions inside every block of the model: the program blocks of a
   // block (a facility use expands into several) are added up.
@@ -192,6 +230,22 @@ export default function MonitorView() {
         <span className="text-slate-500">
           Reloj <span className="font-mono text-slate-800">{number(clock)}</span>
         </span>
+        {/* The scale of the reproduction: what a second of screen means, and
+            how long the whole run takes at this speed. Without it the clock
+            reads as if it were the wall clock. */}
+        <span className="text-slate-500">
+          Escala{" "}
+          <span className="font-mono text-slate-800">
+            1 s de pantalla = {number(speed)} s de modelo
+          </span>
+        </span>
+        <span className="text-slate-500">
+          Durará{" "}
+          <span className="font-mono text-slate-800">
+            {number((monitor.endTime - monitor.startTime) / speed)} s
+          </span>{" "}
+          de pantalla
+        </span>
       </div>
 
       {truncated && (
@@ -213,10 +267,7 @@ export default function MonitorView() {
         </button>
         <button
           type="button"
-          onClick={() => {
-            setPlayhead(0);
-            setPlaying(false);
-          }}
+          onClick={backToStart}
           aria-label="Volver al principio"
           className="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
         >
@@ -231,7 +282,7 @@ export default function MonitorView() {
             onChange={(event) => setSpeed(Number(event.target.value))}
             className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-mono text-slate-800 outline-none focus:border-slate-500"
           >
-            {[0.25, 0.5, 1, 2, 4, 8].map((option) => (
+            {SPEEDS.map((option) => (
               <option key={option} value={option}>
                 {option}×
               </option>

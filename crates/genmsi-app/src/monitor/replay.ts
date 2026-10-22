@@ -554,6 +554,40 @@ export function advance(state: ReplayState, index: ReplayIndex, from: number, to
 }
 
 /**
+ * The speeds the monitor offers, as multiples of the real time.
+ *
+ * A speed is absolute: `1x` is one simulated second per second of wall
+ * clock, whatever the length of the run. Multiplying a fixed number of
+ * seconds for the whole run instead made the same label mean a different
+ * thing in every model — 300x in a one-hour run, 2400x in an eight-hour one —
+ * and left the reader without a way to know the scale.
+ */
+export const SPEEDS = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1000] as const;
+
+/**
+ * How many seconds of wall clock the whole run takes at the default speed.
+ *
+ * The default is not a round multiple of the real time: a run of an hour
+ * would take an hour to watch at 1x. It is the multiple that fits the run in
+ * this many seconds, and the monitor says which one it is, so the scale is
+ * never a mystery.
+ */
+export const DEFAULT_REPLAY_SECONDS = 12;
+
+/**
+ * The multiple of the real time that plays a run of `span` seconds in
+ * `seconds` of wall clock: the first round speed that is fast enough.
+ */
+export function fittingSpeed(span: number, seconds: number = DEFAULT_REPLAY_SECONDS): number {
+  if (span <= 0) {
+    return 1;
+  }
+  const wanted = span / seconds;
+  const nice = SPEEDS.find((option) => option >= wanted);
+  return nice ?? SPEEDS[SPEEDS.length - 1];
+}
+
+/**
  * The clock of a replay that advances by `elapsed` seconds of wall clock.
  *
  * The clock **accumulates**: it is the time the run has reached, and it only

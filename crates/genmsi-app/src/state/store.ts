@@ -6,6 +6,9 @@ import type { LintDocument, ModelDocument, ReportDocument } from "../types";
 /** What the app is doing right now. */
 export type Status = "idle" | "loading" | "ready" | "running";
 
+/** The view the body shows. */
+export type View = "grafo" | "reporte";
+
 export interface AppState {
   /** The models the app offers. */
   models: ModelRef[];
@@ -25,6 +28,8 @@ export interface AppState {
   until: number | null;
   /** What the app is doing. */
   status: Status;
+  /** The view the body shows. */
+  view: View;
   /** The message of the last failure, if any. */
   error: string | null;
   /** Ask the engine for the models the app offers. */
@@ -35,6 +40,8 @@ export interface AppState {
   simulate: () => Promise<void>;
   /** Select a block of the graph. */
   selectBlock: (id: number | null) => void;
+  /** Show one of the views. */
+  setView: (view: View) => void;
   /** Set the seed of the next run. */
   setSeed: (seed: number) => void;
   /** Set the horizon of the next run. */
@@ -59,6 +66,7 @@ export const useApp = create<AppState>((set, get) => ({
   seed: 1,
   until: null,
   status: "idle",
+  view: "grafo",
   error: null,
 
   loadModels: async () => {
@@ -107,13 +115,15 @@ export const useApp = create<AppState>((set, get) => ({
         seed: get().seed,
         until: get().until ?? undefined,
       });
-      set({ report, status: "ready" });
+      set({ report, status: "ready", view: "reporte" });
     } catch (error) {
       set({ status: "ready", error: `No se pudo simular el modelo: ${messageOf(error)}` });
     }
   },
 
   selectBlock: (id: number | null) => set({ selectedBlockId: id }),
+
+  setView: (view: View) => set({ view }),
 
   setSeed: (seed: number) => set({ seed }),
 

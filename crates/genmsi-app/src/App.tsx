@@ -4,6 +4,7 @@ import ErrorNotice from "./components/ErrorNotice";
 import GraphView from "./components/GraphView";
 import ModelPicker from "./components/ModelPicker";
 import PropertiesPanel from "./components/PropertiesPanel";
+import ReportView from "./components/ReportView";
 import { useApp } from "./state/store";
 
 /**
@@ -21,11 +22,14 @@ export default function App() {
     seed,
     until,
     selectedBlockId,
+    report,
+    view,
     loadModels,
     simulate,
     selectBlock,
     setSeed,
     setUntil,
+    setView,
   } = useApp();
 
   useEffect(() => {
@@ -89,11 +93,35 @@ export default function App() {
 
       <main className="flex flex-1 flex-col gap-3 overflow-hidden p-4">
         {error !== null && <ErrorNotice message={error} />}
+
+        <div className="flex gap-1 border-b border-slate-200">
+          {(
+            [
+              { id: "grafo", label: "Grafo" },
+              { id: "reporte", label: "Reporte" },
+            ] as const
+          ).map((candidate) => (
+            <button
+              key={candidate.id}
+              type="button"
+              onClick={() => setView(candidate.id)}
+              className={[
+                "-mb-px rounded-t-md border-b-2 px-4 py-1.5 text-sm font-medium transition",
+                view === candidate.id
+                  ? "border-indigo-500 text-indigo-700"
+                  : "border-transparent text-slate-500 hover:text-slate-800",
+              ].join(" ")}
+            >
+              {candidate.label}
+            </button>
+          ))}
+        </div>
+
         {model === null ? (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 text-sm text-slate-500">
             Elegí un modelo para ver su grafo.
           </div>
-        ) : (
+        ) : view === "grafo" ? (
           <div className="flex min-h-0 flex-1 gap-3">
             <div className="min-w-0 flex-1">
               <GraphView
@@ -106,6 +134,12 @@ export default function App() {
               <PropertiesPanel block={selectedBlock} />
             </aside>
           </div>
+        ) : report === null ? (
+          <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 text-sm text-slate-500">
+            Simulá el modelo para ver su reporte.
+          </div>
+        ) : (
+          <ReportView report={report} />
         )}
       </main>
     </div>

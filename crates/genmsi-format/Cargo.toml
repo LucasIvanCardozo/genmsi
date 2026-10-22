@@ -10,3 +10,13 @@ authors.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 roxmltree.workspace = true
+# The TypeScript types of the editing commands are generated from these types,
+# the same way genmsi-core publishes its documents. The feature is optional so
+# the default build does not carry the generator.
+ts-rs = { version = "12", optional = true }
+
+[features]
+ts = ["dep:ts-rs"]
+
+[dev-dependencies]
+serde_json.workspace = true

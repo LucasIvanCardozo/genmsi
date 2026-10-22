@@ -24,12 +24,14 @@
 //! save(&model, &path).expect("model saves");
 //! ```
 
-mod error;
-mod model;
-mod parser;
-mod validate;
-mod writer;
+pub mod catalogue;
+pub mod error;
+pub mod model;
+pub mod parser;
+pub mod validate;
+pub mod writer;
 
+pub use catalogue::{ClassSpec, PortSpec, PropertySpec, build_block, class_spec, listed_options};
 pub use error::{FormatError, Location};
 pub use model::{
     Block, ContainerHeader, CustomClass, GmdlModel, Layout, Link, Port, PortLayout, Property,

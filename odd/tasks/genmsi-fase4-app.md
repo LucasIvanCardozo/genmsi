@@ -122,6 +122,23 @@ with the reading the assignment itself supports, and both are reversible:
    readable as a set of tabs (the block table is the long one and scrolls); nothing is
    curated away in this slice.
 
+## Commits
+
+| Task | Commit |
+|---|---|
+| Feature document (T1) | `08ad3ba` `docs(odd): phase 4 feature document for the app session` |
+| T2 | `b1c0699` `feat(core): publish the model graph document` |
+| T3 | `4ba7393` `feat(app): generate the TypeScript types from the Rust schema` |
+| T4 | `00df376` `feat(app): the engine facade shared by both backends` |
+| T5 | `5b1f824` `feat(app): the frontend under Vite with the dev bridge` |
+| T6 | `e401c5f` `feat(app): the block graph from the model's own geometry` |
+| T7 | `a53f714` `feat(app): the property panel of the selected block` |
+| T8 | `0eb50c8` `feat(app): the report tables from the engine's JSON` |
+| T9 | `6a89773` `feat(app): the model picker, the error state and the Spanish interface` |
+| T10 | `93ef928` `feat(app): the Tauri shell behind the same adapter`, `745816f` `build(app): keep the desktop shell out of the workspace`, `d8ac080` `build(app): pin the desktop shell's dependencies`, `9b62325` `build(app): the desktop shell's configuration schemas` |
+| T11, T12 | `ff3650f` `docs(app): the design, the structure and the visual loop` |
+| T13 | `13dd640` `test(app): the dev bridge returns the engine's bytes` |
+
 ## Log
 
 - L1 (verbatim, first message):
@@ -162,3 +179,57 @@ FASE 4 — GenMSI-rs: genmsi-app (vertical slice). Sos la sesión de la Fase 4 d
   model's graph, so `genmsi-core` gains `genmsi.model/1` (T2). That is the additive public
   API the assignment allows; nothing else in `genmsi-core` or `genmsi-format` changes
   behaviour, and `crates/genmsi-cli/` and `crates/genmsi-mcp/` are not touched.
+- L6 (evidence, the engine facade): `genmsi-app-engine` returns the engine's bytes, byte for
+  byte. `genmsi lint --json` and `genmsi-app-engine lint` on
+  `fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl` give an empty `diff` (`LINT-OK`), and the
+  same for `simulate` (`SIM-OK`). The model the engine refuses (`TP9__tp9.gmdl`) exits `1` on
+  both, with the same stderr (`error: fixtures/models/TP9__tp9.gmdl: (node 68): Unlink: the
+  operand B must not be null; ...`) and an empty stdout. The crate's five tests pin the bytes
+  against `genmsi_core::documents`, the schema id and the error's shape.
+- L7 (evidence, the generated types): `crates/genmsi-app/scripts/generate-types.sh` writes
+  fifteen TypeScript files from the Rust types (the three documents and their dependencies).
+  The `ts` feature of `genmsi-core` is optional, so the default workspace build does not carry
+  the generator: `cargo test --workspace` and `cargo clippy --workspace --all-targets -- -D
+  warnings` do not change because of it.
+- L8 (evidence, the visual loop): the loop ran on every slice with `agent-browser` and the
+  screenshots stayed in `/tmp/genmsi-app/` (never committed, per `S4`). It found and fixed
+  four things: the dev bridge resolved the repository root one level too high (the engine
+  binaries were not found), the graph opened at a zoom of 0.47 (the first view now frames the
+  model's flow), the model picker showed a model that was not open (it now offers "Elegí un
+  modelo…"), and a model that does not compile lost its graph (the graph and the lint are now
+  asked for apart, so the blocks stay on screen next to the engine's message).
+- L9 (evidence, the parity test): `crates/genmsi-app/tests/parity.test.ts` (`bun test`, four
+  tests) compares the dev bridge's response with `genmsi lint --json` and `genmsi simulate
+  --json` byte for byte, compares the facade's bytes with the same documents, and checks that
+  a refused model arrives as an error and not as an empty document.
+- L10 (evidence, the desktop shell): `crates/genmsi-app/src-tauri` compiles
+  (`cargo build`, tauri 2.12.5) and is clippy-clean in its own workspace; the binary starts
+  under a virtual display without an error. Its window was not captured: the environment has
+  no window manager, so the root screenshot is black. The shell's icons are generated, not
+  committed (the repository carries no images): `bunx @tauri-apps/cli icon <source.png> -o
+  crates/genmsi-app/src-tauri/icons`.
+- L11 (verification, close): `cargo test --workspace` is green (202 tests, 31 suites) and
+  `cargo clippy --workspace --all-targets -- -D warnings` is clean. The frontend's own checks
+  are green too: `bun test` (4 tests) and `bunx tsc --noEmit`. The CLI's snapshots did not
+  move: `crates/genmsi-cli/` was not modified in this phase.
+- L12 (delivery, slices): the phase's commits are 15. Three of them are bigger than the ~400
+  authored lines, and the reason is recorded instead of hidden: the generated TypeScript
+  bindings and the lock files are machine output (the bindings are 15 files of one type each,
+  the lock file pins 107 Node packages), and the desktop shell's lock file pins the Tauri
+  dependency tree. The hand-written slices stay inside the guideline: the facade (381 lines),
+  the graph (197), the report (292), the property panel (99) and the Spanish interface (114).
+- L13 (decision, the dev bridge's binaries): the dev bridge spawns the `genmsi` CLI for the
+  lint and the report (their stdout comes back verbatim) and the `genmsi-app-engine` binary
+  for the model's graph, because the CLI has no command that publishes it and
+  `crates/genmsi-cli/` is outside this phase's allowed edit paths. Both binaries run the same
+  engine functions, and the parity test proves the two paths agree with the CLI byte for
+  byte.
+- L14 (decision, the report view): every table the report carries is shown, in tabs, with the
+  engine's numbers and the original's comma decimals. The block table is the long one and
+  scrolls inside its panel; nothing is curated away and nothing is computed in the app.
+- L15 (risk): the change adds a document to the engine (`genmsi.model/1`) and a crate that
+  consumes the engine's documents, so risk item 3 (a contract others consume) applies to the
+  new document's shape: it is versioned, additive within its major version, and pinned by the
+  facade's tests and by the parity test. Risk item 6 does not apply: the bytes the app shows
+  are compared with the CLI's by a test that fails if they drift. The native review candidate
+  is a work unit, not the accumulated branch.

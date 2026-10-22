@@ -111,7 +111,15 @@ documents; `DECISIONS.md` only to append an entry) and `odd/tasks/`.
 
 | Task | Commit |
 |---|---|
-| T1 | _pending_ |
+| T1 | `230e2ef` `docs(odd): phase 4b feature document for the node editor` |
+| T2 | `c40d712` `feat(format): the catalogue of the block classes`, `e34d5b9` `feat(format): the additive editing API and the undo stack` |
+| T3 | `2c67393` `feat(core): the block catalogue document and the editable model document` |
+| T4 | `2fc3cef` `feat(app): the editing session in the facade` |
+| T5 | `149bc56` `feat(app): the dev bridge speaks the editing session` |
+| T6–T9 | `ab08e5a` `feat(app): the editable graph, the property editors and the undo stack`, `a50e87a` `fix(app): the graph looped on the selection and the frame cut the picture` |
+| T10 | `9bfc2f8` `test(app): the editing invariants and the byte-identical save` |
+| T11 | `f2171d2` `test(app): the visual loop of the editing steps`, `68902e7` `test(app): the smoke check of the desktop shell`, `6af8e3a` `fix(app): the desktop shell looked for the models one level too high` |
+| T12 | `d22b7a3` `docs(app): the editing, the session and the commands` |
 
 ## Log
 
@@ -148,3 +156,70 @@ FASE 4b — GenMSI-rs: genmsi-app (edición de nodos). Sos la sesión de la Fase
   and the Tauri shell keeps the same session in a static. The alternative (the
   frontend carrying the model) would have made the frontend the owner of the format,
   which the assignment forbids.
+- L5 (evidence, the format crate): the unit was delegated to a writer and came back
+  with the catalogue (51 classes, their ports with their ids and their properties
+  with the declared type) and the editing API (`EditCommand`, `EditSession`,
+  `UndoStep`). Its own checks: `cargo test -p genmsi-format` 67 tests green,
+  clippy clean, and the optional `ts` feature compiles. The writer decided four
+  things the assignment left open and they are recorded here: the session has a
+  `mark_saved` (the dirty flag is real, and undoing past a save diverges from the
+  saved file); the paste refuses containers (a container copy without its children
+  would be silent data loss); the wire form renames the multi-word fields by hand
+  (`fromIoid`, `toIoid`) so serde and `ts-rs` agree; and the `Listed` options are
+  ASCII only, because the file's encoding is CP1252 and the editor must not write
+  a value it cannot encode the way the original did.
+- L6 (decision, where the catalogue lives): the catalogue says what a block looks
+  like in the file (its ports, its properties), so it lives in `genmsi-format`; the
+  engine's semantics stay in `genmsi-core`, which publishes the classes it
+  compiles and a test pins the catalogue inside that list. A class the compiler
+  does not know would create a block that simulates nothing.
+- L7 (evidence, the documents): `genmsi.model/1` grew the ports of every block, the
+  tooltip of every property and whether the property defines an entity — additive
+  inside the major version, so the shape of the document is not broken for the
+  clients that read it (D13). The snapshot of the document moved with it, and the
+  new `genmsi.catalogue/1` carries the classes an editor offers to create.
+- L8 (evidence, the visual loop): the loop ran on every step of the editing and
+  found five things, all fixed: the graph reported the selection on every render
+  and the actions were a new object every time, so the report and the store
+  answered each other in a loop; the first view framed the containers as well as
+  the flow and the picture shrank until nothing could be read; the new blocks
+  landed far to the right, outside the picture; the list of classes scrolls, so a
+  class has to be on the picture before it can be clicked; and the drag is a real
+  mouse drag, because React Flow listens to the pointer events. The loop ends with
+  eleven distinct screenshots, including the file reopened and the change in it.
+- L9 (evidence, the desktop shell): the shell's window opens under `Xvfb` and the
+  picture can be captured (1440×900 with 1345 distinct colours), and the log proves
+  the frontend reaches the facade through `invoke` (`list_models: 25 modelos`). Three
+  causes were behind the black window, and only one of them was the code: the
+  WebKitGTK notes of Tauri (`v2.tauri.app/develop/debug/linux-graphics`) give the
+  two flags the webview needs under Xvfb (`LIBGL_ALWAYS_SOFTWARE=1` and
+  `WEBKIT_DISABLE_COMPOSITING_MODE=1`), the debug build of the shell loads the
+  frontend from the dev server and not from the embedded assets, and the shell
+  moved to the root of the repository climbing two levels instead of three, so the
+  model list came back empty.
+- L10 (verification, close): `cargo test --workspace` is green (239 tests) and
+  `cargo clippy --workspace --all-targets -- -D warnings` is clean. The frontend's
+  own checks are green too: `bun test` 19 of 19 (the dev bridge's bytes against the
+  CLI's, the deterministic layout and the property editors) and `bunx tsc --noEmit`
+  clean. The visual loop ran end to end with eleven screenshots and the desktop
+  shell's smoke check passed.
+- L11 (delivery, slices): the phase's commits are thirteen. Two of them are bigger
+  than the ~400 authored lines and the reason is recorded instead of hidden: the
+  catalogue (962 lines of data for 51 classes) and the editing API (1.5k lines with
+  its tests) are one delegated unit of the format crate, and they are the two
+  halves of it — the catalogue first, because the API builds blocks from it. The
+  rest of the slices stay inside the guideline.
+- L12 (limits, recorded): the paste refuses containers (a container carries its
+  children, and copying one without them would lose data silently); the `Listed`
+  options are the ones the reference models use, so a model with another value
+  keeps it (the editor shows the current value among the options); the re-layout
+  grows the containers to hold their blocks, which changes the size of a container
+  in the file — it is one command, so it is one undo entry.
+- L13 (risk): the change writes files (the save) and grows a document other
+  clients read (`genmsi.model/1`), so risk items 1 and 3 apply. Item 1 is covered
+  by the byte-identical save: a save without changes of the reference models
+  produces the same bytes, and the paste test proves that the saved file loads,
+  validates and compiles. Item 3 is covered by the versioned envelope (D13): the
+  document only grew fields, and the snapshot pins the new shape. Risk item 6 does
+  not apply: the bytes the app shows are compared with the CLI's by a test, and
+  the frontend's pure logic has its own tests.

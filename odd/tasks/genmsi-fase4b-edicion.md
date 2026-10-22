@@ -248,3 +248,38 @@ FASE 4b — GenMSI-rs: genmsi-app (edición de nodos). Sos la sesión de la Fase
   test` 19 of 19 and `bunx tsc --noEmit` clean). The two new tests of the format
   crate pin the fixed behaviour: a failed command leaves the model byte for byte
   and leaves no undo entry.
+
+### Coordinator review (independent probes, no native review)
+
+The phase's native review found two real defects and fixed them in `1f0183c` (a failed
+command left the model changed — commands now run on a copy — and the dirty flag followed
+the wrong checkpoint). The review transaction itself could not be closed: the provider
+demands a refuter slot and then an acknowledged capture of the corrected candidate, the
+facade rejects both as stale, and the native CLI reports the authority as needing repair
+(`repair.status: unsupported`). The user decided not to pursue per-commit reviews; the
+phase's proof is this verification suite.
+
+What the coordinator verified with its own probes on the branch:
+
+- **Save is byte-identical, 24 of 25**: load + write every reference model with a scratch
+  binary; 24 byte-identical, 0 different, 1 reader-refused by design (the writer preserves
+  it byte for byte).
+- **One edit is one change** (S5): `SetProperty Media` on `TP6` changes exactly the bytes
+  `90`→`123` in one attribute — 1939 B of common prefix, 8371 B of common suffix, nothing
+  else moves. `MoveBlock` changes exactly `x="100" y="43"`→`x="400" y="120"`. `AddBlock`
+  inserts one well-formed module with a fresh id and returns it.
+- **Undo restores the file byte for byte** after each of those, and `dirty` returns to
+  false; `mark_saved` follows the checkpoint.
+- **A failed command leaves the model untouched** (`id: 999_999`), re-proving `1f0183c`'s
+  fix, and a two-undo sequence walks back to the original bytes each time.
+- **The visual loop runs over the branch** (`check-visual-loop.sh`, exit 0): eleven distinct
+  screenshots — graph, properties, report, created node, connected, dragged, undone,
+  redone, saved, reopened showing the change, and the refused model with the engine's
+  message. The editing toolbar, the continuous diagnostics line ("El modelo compila sin
+  observaciones") and the property editors are visible in the captures. The loop edits a
+  scratch copy; the fixtures and the worktree stay untouched.
+- 241 tests green (36 suites), clippy clean, 19/19 frontend tests, `tsc` clean.
+
+Not verified here: the Tauri capture's content (the smoke check proves the window and the
+invoke path; the visual gate is the Vite loop), and the paste path beyond the session's own
+tests (its id-uniqueness and link-remap tests were not re-run by this review).

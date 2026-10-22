@@ -8,6 +8,9 @@ members = [
     "crates/genmsi-app/engine",
 ]
 # genmsi-app (Tauri 2 + React) joins the workspace in Phase 4.
+# The desktop shell (crates/genmsi-app/src-tauri) stays out: its dependency
+# tree is heavy and the workspace's build must not slow down.
+exclude = ["crates/genmsi-app/src-tauri"]
 
 [workspace.package]
 version = "0.1.0"

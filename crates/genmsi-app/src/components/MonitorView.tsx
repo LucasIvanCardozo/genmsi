@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { number } from "../format";
-import { advance, frameAt, stateAt, type ReplayState } from "../monitor/replay";
+import { advance, advanceClock, frameAt, stateAt, type ReplayState } from "../monitor/replay";
 import { useApp } from "../state/store";
 import MonitorCanvas from "./MonitorCanvas";
 import MonitorCharts from "./MonitorCharts";
@@ -72,18 +72,23 @@ export default function MonitorView() {
     let last = performance.now();
     const span = Math.max(monitor.endTime - monitor.startTime, 1);
     const rate = (span / REPLAY_SECONDS) * speed;
+    // The clock of the replay accumulates: it is the time the run has
+    // reached, and it only moves by what the wall clock spent. Anchoring it
+    // at the time of the current frame instead would make the replay stall
+    // whenever a paint advances less than the gap between two frames, and
+    // only the fastest speeds would move at all.
+    let clock = monitor.frames[useApp.getState().playhead]?.time ?? monitor.startTime;
     const step = (now: number) => {
       const elapsed = (now - last) / 1000;
       last = now;
       const current = useApp.getState().playhead;
-      const time = monitor.frames[current]?.time ?? monitor.startTime;
-      const next = time + elapsed * rate;
-      if (next >= monitor.endTime) {
+      clock = advanceClock(clock, elapsed, rate);
+      if (clock >= monitor.endTime) {
         setPlayhead(monitor.frames.length - 1);
         setPlaying(false);
         return;
       }
-      const frame = frameAt(monitor, next);
+      const frame = frameAt(monitor, clock);
       if (frame !== current) {
         setPlayhead(frame);
       }
@@ -106,6 +111,34 @@ export default function MonitorView() {
     }
     return byNode;
   }, [report, state]);
+
+  // The entries every block has had since the run started, the same way: the
+  // program blocks of a block are added up. This is the total the report
+  // publishes, rebuilt from the trace.
+  const totals = useMemo(() => {
+    const byNode = new Map<number, number>();
+    if (report === null || state === null) {
+      return byNode;
+    }
+    for (const block of report.blocks) {
+      const count = state.totals[block.line - 1] ?? 0;
+      byNode.set(block.node, (byNode.get(block.node) ?? 0) + count);
+    }
+    return byNode;
+  }, [report, state]);
+
+  // The class of every block of the model, so the canvas can tell a queue
+  // from a facility and show what the block is about.
+  const classes = useMemo(() => {
+    const byNode = new Map<number, string>();
+    if (report === null) {
+      return byNode;
+    }
+    for (const block of report.blocks) {
+      byNode.set(block.node, block.class);
+    }
+    return byNode;
+  }, [report]);
 
   if (model === null) {
     return (
@@ -249,7 +282,7 @@ export default function MonitorView() {
       {panel === "reproduccion" ? (
         <div className="flex min-h-0 flex-1 gap-3">
           <div className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white p-2">
-            <MonitorCanvas model={model} activity={activity} />
+            <MonitorCanvas model={model} activity={activity} totals={totals} classes={classes} />
           </div>
           <aside className="w-80 shrink-0 overflow-auto rounded-lg border border-slate-200 bg-white p-4">
             <StatePanel state={state} />

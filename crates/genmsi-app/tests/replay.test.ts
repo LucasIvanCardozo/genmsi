@@ -5,8 +5,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  advanceClock,
   buildIndex,
   checkFidelity,
+  frameAt,
   mergeSeries,
   stateAt,
   type ModelDocumentLike,
@@ -89,10 +91,10 @@ const smallModel: ModelDocumentLike = {
 
 const smallReport: ReportDocumentLike = {
   blocks: [
-    { line: 1, node: 1, class: "Queue", current: 0 },
-    { line: 2, node: 2, class: "Depart", current: 0 },
-    { line: 3, node: 3, class: "Seize", current: 0 },
-    { line: 4, node: 4, class: "Release", current: 0 },
+    { line: 1, node: 1, class: "Queue", current: 0, entries: 1 },
+    { line: 2, node: 2, class: "Depart", current: 0, entries: 1 },
+    { line: 3, node: 3, class: "Seize", current: 0, entries: 1 },
+    { line: 4, node: 4, class: "Release", current: 0, entries: 1 },
   ],
   entities: { queues: { qA: { name: "qA", content: 0 } } },
 };
@@ -203,6 +205,11 @@ test("the replay of a big trace is faithful and is built once", { timeout: 600_0
   const fidelity = checkFidelity(index, documentsOf.report);
   assert.deepEqual(fidelity.queueMismatches, [], "the queues differ");
   assert.deepEqual(fidelity.blockMismatches, [], "the blocks differ");
+  assert.deepEqual(
+    fidelity.entryMismatches,
+    [],
+    "the entries rebuilt from the trace differ from the engine's own totals",
+  );
 
   // The index is what the animation reads: it is built once and it holds one
   // point per change of the state, not one per event.
@@ -218,4 +225,54 @@ test("a truncated trace says so instead of pretending it replayed everything", {
   assert.equal(index.truncated, true);
   assert.equal(index.records, 5);
   assert.equal(index.limit, 5);
+});
+
+test("the clock of the replay accumulates instead of restarting at every frame", () => {
+  // The bug this pins: the clock used to be re-anchored at the time of the
+  // current frame on every paint, so a paint that advanced less than the gap
+  // between two frames never crossed the next one and the replay stood still
+  // at the slow speeds.
+  assert.equal(advanceClock(100, 0.5, 10), 105, "the clock moves by the wall time spent");
+  assert.equal(advanceClock(105, 0.5, 10), 110, "and it keeps the distance it had");
+
+  // A whole replay at 60 paints per second: with a clock that accumulates,
+  // the run crosses every frame.
+  const index = buildIndex(smallTrace, smallReport, smallModel);
+  const span = Math.max(index.endTime - index.startTime, 1);
+  const rate = span / 12;
+  let clock = index.frames[0]?.time ?? index.startTime;
+  let playhead = 0;
+  let advanced = 0;
+  for (let paint = 0; paint < 60 * 12; paint += 1) {
+    clock = advanceClock(clock, 1 / 60, rate);
+    if (clock >= index.endTime) {
+      break;
+    }
+    const frame = frameAt(index, clock);
+    if (frame !== playhead) {
+      playhead = frame;
+      advanced += 1;
+    }
+  }
+  assert.ok(advanced > 0, "the replay moved");
+  assert.ok(
+    clock >= index.endTime - 1,
+    `the clock reached the end of the run (${clock} of ${index.endTime})`,
+  );
+});
+
+test("the entries of every block are rebuilt from the trace and match the engine", () => {
+  // The totals the monitor shows under each block: the entries every block
+  // counted since the run started. They are rebuilt from the trace, so they
+  // have to come out equal to the engine's own numbers.
+  const index = buildIndex(smallTrace, smallReport, smallModel);
+  const state = stateAt(index, index.frames.length - 1);
+  assert.equal(state.totals[0], 1, "the queue counted one entry");
+  assert.equal(state.totals[1], 1, "the depart counted one entry");
+  assert.equal(state.totals[2], 1, "the seize counted one entry");
+  assert.equal(state.totals[3], 1, "the release counted one entry");
+
+  const fidelity = checkFidelity(index, smallReport);
+  assert.deepEqual(fidelity.entryMismatches, [], "the entries differ from the report");
+  assert.equal(fidelity.entries, true);
 });

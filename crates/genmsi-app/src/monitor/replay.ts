@@ -75,6 +75,8 @@ export interface ReportBlockLike {
   class: string;
   /** The transactions inside the block at the end of the run. */
   current: number;
+  /** The entries the block counted during the whole run. */
+  entries: number;
 }
 
 /** The part of the report the replay reads. */
@@ -114,6 +116,8 @@ export interface ReplayState {
   storages: Record<string, number>;
   /** The transactions inside every program block. */
   blocks: Record<number, number>;
+  /** The entries every program block has had, since the run started. */
+  totals: Record<number, number>;
 }
 
 /** What one trace event changes in the state of the run. */
@@ -132,6 +136,8 @@ export interface StateChange {
   entered?: number;
   /** The program block that loses a transaction. */
   left?: number;
+  /** The program block that counts an entry. */
+  entered_count?: number;
 }
 
 /** One frame of the replay: a trace event and what it changes. */
@@ -218,6 +224,7 @@ export function emptyState(): ReplayState {
     facilities: {},
     storages: {},
     blocks: {},
+    totals: {},
   };
 }
 
@@ -423,10 +430,15 @@ export function buildIndex(
     // departure the same way the trace records them.
     if (event.event === "enter") {
       change.entered = index;
+      change.entered_count = index;
       if (!seen.block.has(index)) {
         seen.block.add(index);
         blocks.push(index);
       }
+    } else if (event.event === "generate") {
+      // A generator counts an entry for every transaction it creates, which
+      // is what the engine's report counts for its block.
+      change.entered_count = index;
     } else if (event.event === "leave" || event.event === "terminate") {
       change.left = index;
       if (!seen.block.has(index)) {
@@ -485,6 +497,7 @@ export function applyFrame(state: ReplayState, frame: Frame): ReplayState {
   let facilities = state.facilities;
   let storages = state.storages;
   let blocks = state.blocks;
+  let totals = state.totals;
   if (change.queue !== undefined) {
     const content = Math.max(0, (queues[change.queue.name] ?? 0) + change.queue.delta);
     queues = { ...queues, [change.queue.name]: content };
@@ -502,7 +515,10 @@ export function applyFrame(state: ReplayState, frame: Frame): ReplayState {
   if (change.left !== undefined) {
     blocks = { ...blocks, [change.left]: Math.max(0, (blocks[change.left] ?? 0) - 1) };
   }
-  return { time: frame.time, queues, facilities, storages, blocks };
+  if (change.entered_count !== undefined) {
+    totals = { ...totals, [change.entered_count]: (totals[change.entered_count] ?? 0) + 1 };
+  }
+  return { time: frame.time, queues, facilities, storages, blocks, totals };
 }
 
 /**
@@ -535,6 +551,25 @@ export function advance(state: ReplayState, index: ReplayIndex, from: number, to
     current = applyFrame(current, index.frames[position]);
   }
   return current;
+}
+
+/**
+ * The clock of a replay that advances by `elapsed` seconds of wall clock.
+ *
+ * The clock **accumulates**: it is the time the run has reached, and it only
+ * moves forward by what the wall clock spent. Anchoring it at the time of the
+ * current frame instead (the obvious way to write it) makes the replay stall
+ * whenever the step is smaller than the gap between two frames: the clock
+ * restarts from the frame's time on every paint, so it never crosses the next
+ * frame and the playhead stays where it was. A model whose events are ten
+ * seconds apart would then only move at the speeds whose step exceeds ten
+ * seconds.
+ *
+ * The returned clock is the time the run has reached, which may be past the
+ * last frame: the playhead is the last frame at or before it.
+ */
+export function advanceClock(clock: number, elapsed: number, rate: number): number {
+  return clock + elapsed * rate;
 }
 
 /**
@@ -648,6 +683,10 @@ export interface Fidelity {
   queueMismatches: string[];
   /** The blocks whose derived count differs from the report's. */
   blockMismatches: number[];
+  /** Whether the derived entries of every block are the ones the report publishes. */
+  entries: boolean;
+  /** The blocks whose derived entries differ from the report's. */
+  entryMismatches: number[];
   /** The generator blocks, which the engine counts apart. */
   generators: number;
 }
@@ -665,6 +704,7 @@ export function checkFidelity(index: ReplayIndex, report: ReportDocumentLike): F
     }
   }
   const blockMismatches: number[] = [];
+  const entryMismatches: number[] = [];
   let generators = 0;
   for (const block of report.blocks) {
     // A generator block holds the generator itself in the engine's count, not
@@ -677,12 +717,20 @@ export function checkFidelity(index: ReplayIndex, report: ReportDocumentLike): F
     if (derived !== block.current) {
       blockMismatches.push(block.line - 1);
     }
+    // The entries the run counted for the block, rebuilt from the trace: the
+    // engine's own total has to come out of the walk.
+    const entries = final.totals[block.line - 1] ?? 0;
+    if (entries !== block.entries) {
+      entryMismatches.push(block.line - 1);
+    }
   }
   return {
     queues: queueMismatches.length === 0,
     blocks: blockMismatches.length === 0,
+    entries: entryMismatches.length === 0,
     queueMismatches,
     blockMismatches,
+    entryMismatches,
     generators,
   };
 }

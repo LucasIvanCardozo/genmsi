@@ -426,6 +426,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "genmsi-app-engine"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "genmsi-core",
+ "genmsi-format",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "genmsi-cli"
 version = "0.1.0"
 dependencies = [

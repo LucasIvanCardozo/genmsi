@@ -1,0 +1,23 @@
+[package]
+name = "genmsi-app-engine"
+description = "Engine facade the app's backends share: loads a model and returns the engine's documents as bytes"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+authors = ["Lucas Cardozo"]
+
+# The values above are written out, not inherited from the workspace: this
+# package is later built from the Tauri crate's own workspace, outside this
+# repository's workspace (Phase 4, decision: one facade, two backends).
+
+[[bin]]
+name = "genmsi-app-engine"
+path = "src/main.rs"
+
+[dependencies]
+genmsi-core = { path = "../../genmsi-core" }
+genmsi-format = { path = "../../genmsi-format" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+clap = { version = "4", features = ["derive"] }

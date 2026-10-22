@@ -5,6 +5,7 @@ members = [
     "crates/genmsi-core",
     "crates/genmsi-cli",
     "crates/genmsi-mcp",
+    "crates/genmsi-app/engine",
 ]
 # genmsi-app (Tauri 2 + React) joins the workspace in Phase 4.
 

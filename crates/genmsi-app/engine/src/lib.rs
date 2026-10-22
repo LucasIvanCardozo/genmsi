@@ -1,0 +1,232 @@
+//! The engine facade both app backends share.
+//!
+//! The facade is a thin client (decision D2: no simulation logic here): it
+//! loads a model, asks `genmsi-core` for one of the engine's documents and
+//! returns the document's bytes. The dev bridge spawns the `genmsi-app-engine`
+//! binary and moves its stdout verbatim; the Tauri backend calls these
+//! functions directly. Both paths carry the same bytes for the same model.
+
+use std::path::Path;
+
+/// A failure of the facade.
+#[derive(Debug, thiserror::Error)]
+pub enum AppError {
+    /// The model did not load, validate, compile or run.
+    ///
+    /// The path comes first so a log line says which model failed; the engine
+    /// message keeps the source line and the node it carries.
+    #[error("{path}: {message}")]
+    Model {
+        /// Model path, as the caller named it.
+        path: String,
+        /// Engine message.
+        message: String,
+    },
+    /// An argument is well-formed but cannot be used.
+    #[error("{0}")]
+    Usage(String),
+}
+
+/// A `.gmdl` file of a directory, named for the app's model picker.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ModelFile {
+    /// File stem, decoded for display.
+    pub name: String,
+    /// Full path, as the facade would open it.
+    pub path: String,
+}
+
+/// A model failure, with the path the caller asked for.
+///
+/// The reader attaches the file to its own location, so an engine message can
+/// already start with the path (`model.gmdl:9 (node 3): ...`); stripping that
+/// prefix keeps the path from appearing twice, exactly like the CLI does.
+fn model_error(path: &Path, error: impl std::fmt::Display) -> AppError {
+    let path_text = path.display().to_string();
+    let message = error.to_string();
+    let message = message
+        .strip_prefix(&format!("{path_text}:"))
+        .map(|rest| rest.trim_start().to_string())
+        .unwrap_or(message);
+    AppError::Model {
+        path: path_text,
+        message,
+    }
+}
+
+/// One document of the engine, rendered the way the CLI prints it: pretty
+/// JSON under its schema id, with the trailing newline the CLI adds.
+fn document_bytes(schema: &str, body: &impl serde::Serialize) -> String {
+    format!(
+        "{}\n",
+        genmsi_core::documents::to_pretty_json(schema, body)
+    )
+}
+
+/// The `genmsi.model/1` document of a model: its blocks and its links.
+///
+/// The document is built from the file's semantic model, so a model that does
+/// not compile still has a graph; only a file the reader refuses fails here.
+pub fn model_document_bytes(path: &Path) -> Result<String, AppError> {
+    let model = genmsi_format::load(path).map_err(|error| model_error(path, error))?;
+    let body = genmsi_core::documents::model_document(&model, &path.display().to_string());
+    Ok(document_bytes(genmsi_core::documents::MODEL_SCHEMA, &body))
+}
+
+/// The `genmsi.lint/1` document of a model: what it compiles to.
+pub fn lint_document_bytes(path: &Path) -> Result<String, AppError> {
+    let model = genmsi_format::load(path).map_err(|error| model_error(path, error))?;
+    let program =
+        genmsi_core::compile_model(&model).map_err(|error| model_error(path, error))?;
+    let body = genmsi_core::documents::lint_document(&program, &path.display().to_string());
+    Ok(document_bytes(genmsi_core::documents::LINT_SCHEMA, &body))
+}
+
+/// The `genmsi.report/1` document of a finished run.
+pub fn simulate_document_bytes(
+    path: &Path,
+    seed: u64,
+    until: Option<f64>,
+) -> Result<String, AppError> {
+    let model = genmsi_format::load(path).map_err(|error| model_error(path, error))?;
+    let program =
+        genmsi_core::compile_model(&model).map_err(|error| model_error(path, error))?;
+    let config = genmsi_core::SimConfig {
+        seed,
+        stop_time: until,
+        ..genmsi_core::SimConfig::default()
+    };
+    let result = genmsi_core::Simulation::new(&program, config)
+        .run()
+        .map_err(|error| model_error(path, error))?;
+    let body = genmsi_core::json_report(&result, &program);
+    Ok(document_bytes(genmsi_core::documents::REPORT_SCHEMA, &body))
+}
+
+/// The `.gmdl` files of one directory level, sorted by file name.
+pub fn list_models(dir: &Path) -> Result<Vec<ModelFile>, AppError> {
+    if !dir.is_dir() {
+        return Err(AppError::Usage(format!(
+            "{}: not a directory",
+            dir.display()
+        )));
+    }
+    let entries =
+        std::fs::read_dir(dir).map_err(|error| AppError::Usage(format!("{}: {error}", dir.display())))?;
+    let mut models = Vec::new();
+    for entry in entries {
+        let entry = entry
+            .map_err(|error| AppError::Usage(format!("{}: {error}", dir.display())))?;
+        let path = entry.path();
+        if path.is_file() && path.extension().is_some_and(|ext| ext == "gmdl") {
+            models.push(ModelFile {
+                name: path
+                    .file_stem()
+                    .map(|stem| stem.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
+                path: path.display().to_string(),
+            });
+        }
+    }
+    models.sort_by(|a, b| {
+        let name = |model: &ModelFile| {
+            Path::new(&model.path)
+                .file_name()
+                .map(|name| name.to_os_string())
+        };
+        name(a).cmp(&name(b))
+    });
+    Ok(models)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    /// The reference models of the repository.
+    fn fixtures() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../fixtures/models")
+    }
+
+    /// The reference model of the app's slice.
+    fn reference() -> PathBuf {
+        fixtures().join("TP6__Clase 6_1_PuertaBanco.gmdl")
+    }
+
+    #[test]
+    fn the_lint_bytes_match_the_engine_document() {
+        let path = reference();
+        let model = genmsi_format::load(&path).expect("the reference model loads");
+        let program = genmsi_core::compile_model(&model).expect("the reference model compiles");
+        let path_text = path.display().to_string();
+        let expected = format!(
+            "{}\n",
+            genmsi_core::documents::to_pretty_json(
+                genmsi_core::documents::LINT_SCHEMA,
+                &genmsi_core::documents::lint_document(&program, &path_text),
+            )
+        );
+        assert_eq!(lint_document_bytes(&path).expect("lints"), expected);
+    }
+
+    #[test]
+    fn the_simulate_bytes_match_the_engine_document() {
+        let path = reference();
+        let model = genmsi_format::load(&path).expect("the reference model loads");
+        let program = genmsi_core::compile_model(&model).expect("the reference model compiles");
+        let result = genmsi_core::Simulation::new(&program, genmsi_core::SimConfig {
+            seed: 1,
+            ..genmsi_core::SimConfig::default()
+        })
+        .run()
+        .expect("the reference model runs");
+        let expected = format!(
+            "{}\n",
+            genmsi_core::documents::to_pretty_json(
+                genmsi_core::documents::REPORT_SCHEMA,
+                &genmsi_core::json_report(&result, &program),
+            )
+        );
+        assert_eq!(
+            simulate_document_bytes(&path, 1, None).expect("runs"),
+            expected
+        );
+    }
+
+    #[test]
+    fn the_model_bytes_parse_and_name_their_schema() {
+        let bytes = model_document_bytes(&reference()).expect("builds");
+        let document: serde_json::Value = serde_json::from_str(&bytes).expect("parses");
+        assert_eq!(document["schema"], "genmsi.model/1");
+    }
+
+    #[test]
+    fn a_refused_model_is_a_model_error_naming_it_once() {
+        let path = fixtures().join("TP9__tp9.gmdl");
+        let error = simulate_document_bytes(&path, 1, None).expect_err("the engine refuses it");
+        let text = error.to_string();
+        let path_text = path.display().to_string();
+        assert!(matches!(error, AppError::Model { .. }), "{text}");
+        assert!(text.contains(&path_text), "{text}");
+        assert_eq!(
+            text.matches(&path_text).count(),
+            1,
+            "path printed twice: {text}"
+        );
+        assert!(!text.starts_with("error"), "{text}");
+    }
+
+    #[test]
+    fn list_models_returns_the_reference_models_sorted() {
+        let models = list_models(&fixtures()).expect("lists");
+        assert_eq!(models.len(), 25, "{models:?}");
+        let names: Vec<&str> = models.iter().map(|model| model.name.as_str()).collect();
+        let mut sorted = names.clone();
+        sorted.sort();
+        assert_eq!(names, sorted, "not sorted: {names:?}");
+        let first = &models[0];
+        assert_eq!(first.name, "Parcial 6-11-23__Veron - Parcial");
+        assert!(first.path.ends_with(".gmdl"), "{}", first.path);
+    }
+}

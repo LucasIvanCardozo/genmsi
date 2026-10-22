@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   buildIndex,
   checkFidelity,
+  mergeSeries,
   stateAt,
   type ModelDocumentLike,
   type ReportDocumentLike,
@@ -146,7 +147,36 @@ test("the same trace always gives the same replay", () => {
   const first = buildIndex(smallTrace, smallReport, smallModel);
   const second = buildIndex(smallTrace, smallReport, smallModel);
   assert.deepEqual(second.frames, first.frames);
-  assert.deepEqual(second.series, first.series);
+  assert.deepEqual(second.queuePoints, first.queuePoints);
+  assert.deepEqual(second.facilityPoints, first.facilityPoints);
+});
+
+test("the series of an entity tells every instant its value changes", () => {
+  const index = buildIndex(smallTrace, smallReport, smallModel);
+  const queue = index.queuePoints.get("qA") ?? [];
+  assert.deepEqual(queue, [
+    { time: 0, value: 1 },
+    { time: 1, value: 0 },
+  ]);
+  const facility = index.facilityPoints.get("F") ?? [];
+  assert.deepEqual(facility, [
+    { time: 3, value: 1 },
+    { time: 4, value: 0 },
+  ]);
+});
+
+test("the rows of a chart carry the value each entity had at that instant", () => {
+  const index = buildIndex(smallTrace, smallReport, smallModel);
+  const rows = mergeSeries(["qA"], index.queuePoints);
+  assert.deepEqual(rows, [
+    { time: 0, qA: 1 },
+    { time: 1, qA: 0 },
+  ]);
+  const facilities = mergeSeries(["F"], index.facilityPoints);
+  assert.deepEqual(facilities, [
+    { time: 3, F: 1 },
+    { time: 4, F: 0 },
+  ]);
 });
 
 test("the replay of the reference model ends in the state the report publishes", { timeout: 300_000 }, () => {
@@ -174,10 +204,11 @@ test("the replay of a big trace is faithful and is built once", { timeout: 600_0
   assert.deepEqual(fidelity.queueMismatches, [], "the queues differ");
   assert.deepEqual(fidelity.blockMismatches, [], "the blocks differ");
 
-  // The index is what the animation reads: it is built once and it is much
-  // smaller than the trace it comes from.
+  // The index is what the animation reads: it is built once and it holds one
+  // point per change of the state, not one per event.
   assert.ok(index.frames.length > 10_000, `${index.frames.length} frames`);
-  assert.ok(index.series.length <= 300, `${index.series.length} points`);
+  const points = [...index.queuePoints.values()].reduce((total, list) => total + list.length, 0);
+  assert.ok(points > 100, `${points} points`);
   assert.ok(elapsed < 10_000, `the index took ${elapsed} ms`);
 });
 

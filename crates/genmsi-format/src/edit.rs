@@ -215,22 +215,20 @@ pub struct EditSession {
     model: GmdlModel,
     undo_stack: Vec<Vec<UndoStep>>,
     redo_stack: Vec<Vec<UndoStep>>,
-    /// Whether the model differs from the last saved (or initial) state.
-    dirty: bool,
-    /// Whether [`EditSession::mark_saved`] ever ran: from then on the clean
-    /// state is the saved one, not the initial one.
-    saved_once: bool,
+    /// The text of the last checkpoint: the state the session was created
+    /// with, or the state of the last [`EditSession::mark_saved`].
+    checkpoint: String,
 }
 
 impl EditSession {
     /// Take ownership of a model with a clean, empty stack.
     pub fn new(model: GmdlModel) -> Self {
+        let checkpoint = crate::to_string(&model);
         Self {
             model,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
-            dirty: false,
-            saved_once: false,
+            checkpoint,
         }
     }
 
@@ -239,17 +237,20 @@ impl EditSession {
         &self.model
     }
 
-    /// Whether the model differs from the state the session was created
-    /// with, or from the state of the last [`EditSession::mark_saved`].
-    /// Undoing every command cleans a session that was never saved.
+    /// Whether the model differs from the last checkpoint: the state the
+    /// session was created with, or the state of the last
+    /// [`EditSession::mark_saved`].
+    ///
+    /// The flag follows the checkpoint instead of counting the commands:
+    /// undoing an edit that came after a save leaves the model exactly as it
+    /// was saved, and the model is clean again.
     pub fn dirty(&self) -> bool {
-        self.dirty
+        crate::to_string(&self.model) != self.checkpoint
     }
 
     /// Mark the current state as saved (the caller just wrote the file).
     pub fn mark_saved(&mut self) {
-        self.dirty = false;
-        self.saved_once = true;
+        self.checkpoint = crate::to_string(&self.model);
     }
 
     /// Whether there is something to undo.
@@ -268,6 +269,29 @@ impl EditSession {
     /// A failed command changes nothing and clears no redo entry.
     pub fn apply(&mut self, command: EditCommand) -> Result<Vec<u32>, FormatError> {
         let mut steps = Vec::new();
+        // The command runs on a copy of the model: a command that fails
+        // changes nothing, and the promise the session makes to the app
+        // holds for every command, not only for the ones that change one
+        // block.
+        let mut trial = EditSession {
+            model: self.model.clone(),
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            checkpoint: self.checkpoint.clone(),
+        };
+        let produced = trial.run(command, &mut steps)?;
+        self.model = trial.model;
+        self.undo_stack.push(steps);
+        self.redo_stack.clear();
+        Ok(produced)
+    }
+
+    /// Run one command over the model, collecting the steps it takes.
+    fn run(
+        &mut self,
+        command: EditCommand,
+        steps: &mut Vec<UndoStep>,
+    ) -> Result<Vec<u32>, FormatError> {
         let produced = match command {
             EditCommand::AddBlock {
                 class,
@@ -275,11 +299,11 @@ impl EditSession {
                 x,
                 y,
             } => {
-                let id = self.add_block(&class, container, x, y, &mut steps)?;
+                let id = self.add_block(&class, container, x, y, &mut *steps)?;
                 vec![id]
             }
             EditCommand::RemoveBlock { id } => {
-                self.remove_block(id, &mut steps)?;
+                self.remove_block(id, &mut *steps)?;
                 Vec::new()
             }
             EditCommand::RemoveBlocks { ids } => {
@@ -290,17 +314,17 @@ impl EditSession {
                     // A block that another removal took with it is already
                     // gone: there is nothing left to remove.
                     if self.model.block(id).is_some() {
-                        self.remove_block(id, &mut steps)?;
+                        self.remove_block(id, &mut *steps)?;
                     }
                 }
                 Vec::new()
             }
             EditCommand::MoveBlock { id, x, y } => {
-                self.move_block(id, x, y, &mut steps)?;
+                self.move_block(id, x, y, &mut *steps)?;
                 Vec::new()
             }
             EditCommand::SetLayouts { positions } => {
-                self.set_layouts(&positions, &mut steps)?;
+                self.set_layouts(&positions, &mut *steps)?;
                 Vec::new()
             }
             EditCommand::Connect {
@@ -309,7 +333,7 @@ impl EditSession {
                 to,
                 to_ioid,
             } => {
-                self.connect(from, from_ioid, to, to_ioid, &mut steps)?;
+                self.connect(from, from_ioid, to, to_ioid, &mut *steps)?;
                 Vec::new()
             }
             EditCommand::Disconnect {
@@ -317,7 +341,7 @@ impl EditSession {
                 from,
                 from_ioid,
             } => {
-                self.disconnect(container, from, from_ioid, &mut steps)?;
+                self.disconnect(container, from, from_ioid, &mut *steps)?;
                 Vec::new()
             }
             EditCommand::SetProperty {
@@ -325,18 +349,15 @@ impl EditSession {
                 property,
                 value,
             } => {
-                self.set_property(id, &property, &value, &mut steps)?;
+                self.set_property(id, &property, &value, &mut *steps)?;
                 Vec::new()
             }
             EditCommand::SetCaption { id, caption } => {
-                self.set_caption(id, &caption, &mut steps)?;
+                self.set_caption(id, &caption, &mut *steps)?;
                 Vec::new()
             }
-            EditCommand::Paste { ids, dx, dy } => self.paste(&ids, dx, dy, &mut steps)?,
+            EditCommand::Paste { ids, dx, dy } => self.paste(&ids, dx, dy, &mut *steps)?,
         };
-        self.undo_stack.push(steps);
-        self.redo_stack.clear();
-        self.dirty = true;
         Ok(produced)
     }
 
@@ -348,9 +369,6 @@ impl EditSession {
         };
         apply_steps(&mut self.model, &steps, false)?;
         self.redo_stack.push(steps);
-        // Without a save, an emptied stack means the initial state is back;
-        // with one, every undo diverges from the saved state.
-        self.dirty = self.saved_once || !self.undo_stack.is_empty();
         Ok(true)
     }
 
@@ -362,7 +380,6 @@ impl EditSession {
         };
         apply_steps(&mut self.model, &steps, true)?;
         self.undo_stack.push(steps);
-        self.dirty = true;
         Ok(true)
     }
 
@@ -1459,19 +1476,71 @@ mod tests {
     }
 
     #[test]
-    fn mark_saved_makes_the_current_state_clean_and_undo_dirties_it() {
+    fn the_dirty_flag_follows_the_last_checkpoint() {
         let mut session = EditSession::new(model());
         session.apply(EditCommand::MoveBlock { id: 1, x: 1, y: 1 }).expect("cmd");
         assert!(session.dirty());
         session.mark_saved();
         assert!(!session.dirty(), "the saved state is clean");
+        // An edit after the save is a difference from the saved state.
+        session.apply(EditCommand::MoveBlock { id: 1, x: 2, y: 2 }).expect("cmd");
+        assert!(session.dirty());
+        // Undoing it leaves the model exactly as it was saved: the model is
+        // clean again, not "changed since the save".
         session.undo().expect("undo");
-        assert!(session.dirty(), "undoing diverges from the saved state");
+        assert!(!session.dirty(), "the model is the saved one again");
+        // And so is redoing it back to the saved state.
+        session.redo().expect("redo");
+        assert!(session.dirty());
+        session.undo().expect("undo");
+        assert!(!session.dirty());
         // Without a save, undoing everything returns to the clean start.
         let mut session = EditSession::new(model());
         session.apply(EditCommand::MoveBlock { id: 1, x: 1, y: 1 }).expect("cmd");
         session.undo().expect("undo");
         assert!(!session.dirty());
+    }
+
+    #[test]
+    fn a_failed_command_changes_nothing() {
+        let mut session = EditSession::new(model());
+        let before = crate::to_string(session.model());
+        // A position of a block that does not exist: the command fails after
+        // the first position was already applied.
+        let error = session
+            .apply(EditCommand::SetLayouts {
+                positions: vec![
+                    Position { id: 1, x: 1, y: 1, width: None, height: None },
+                    Position { id: 999, x: 2, y: 2, width: None, height: None },
+                ],
+            })
+            .expect_err("the unknown block is refused");
+        assert!(error.to_string().contains("999"), "{error}");
+        assert_eq!(
+            crate::to_string(session.model()),
+            before,
+            "the failed command changed the model"
+        );
+        assert!(!session.can_undo(), "the failed command left an undo entry");
+        assert!(!session.dirty(), "the failed command made the model dirty");
+    }
+
+    #[test]
+    fn a_failed_removal_changes_nothing() {
+        let mut session = EditSession::new(model());
+        let before = crate::to_string(session.model());
+        // The model root cannot be removed: the command fails and the model
+        // keeps the block that was removed before the failure.
+        let error = session
+            .apply(EditCommand::RemoveBlocks { ids: vec![1, 0] })
+            .expect_err("the root is refused");
+        assert!(error.to_string().contains("raíz"), "{error}");
+        assert_eq!(
+            crate::to_string(session.model()),
+            before,
+            "the failed command changed the model"
+        );
+        assert!(!session.can_undo());
     }
 
     #[test]

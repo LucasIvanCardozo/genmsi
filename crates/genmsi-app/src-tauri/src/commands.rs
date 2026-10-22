@@ -15,6 +15,7 @@ use std::sync::Mutex;
 use genmsi_app_engine::{
     ModelFile, Session, SessionRequest, answer, lint_document_bytes,
     list_models as list_model_files, model_document_bytes, simulate_document_bytes,
+    trace_document_bytes,
 };
 
 /// The directory the shell offers as models.
@@ -64,6 +65,24 @@ pub fn simulate_model(
     log(&format!("simulate_model: {path}"));
     simulate_document_bytes(Path::new(&path), seed.unwrap_or(1), until)
         .map_err(|error| error.to_string())
+}
+
+/// The run's trace (`genmsi.trace/1`).
+#[tauri::command]
+pub fn trace_model(
+    path: String,
+    seed: Option<u64>,
+    until: Option<f64>,
+    limit: Option<usize>,
+) -> Result<String, String> {
+    log(&format!("trace_model: {path}"));
+    trace_document_bytes(
+        Path::new(&path),
+        seed.unwrap_or(1),
+        until,
+        limit.unwrap_or(100),
+    )
+    .map_err(|error| error.to_string())
 }
 
 /// One request of the editing protocol, answered by the same facade the dev

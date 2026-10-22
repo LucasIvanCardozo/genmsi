@@ -189,6 +189,55 @@ fn simulate_bytes(
     Ok(document_bytes(genmsi_core::documents::REPORT_SCHEMA, &body))
 }
 
+/// The `genmsi.trace/1` document of a finished run.
+pub fn trace_document_bytes(
+    path: &Path,
+    seed: u64,
+    until: Option<f64>,
+    limit: usize,
+) -> Result<String, AppError> {
+    let model = genmsi_format::load(path).map_err(|error| model_error(path, error))?;
+    trace_bytes(&model, path, seed, until, limit)
+}
+
+/// The `genmsi.trace/1` document of a run of a model that is in memory.
+///
+/// The bytes are the ones the CLI prints for the same model, seed and limit:
+/// the document does not know where the model came from.
+pub fn trace_model_bytes(
+    model: &genmsi_format::GmdlModel,
+    seed: u64,
+    until: Option<f64>,
+    limit: usize,
+) -> Result<String, AppError> {
+    trace_bytes(model, Path::new(""), seed, until, limit)
+}
+
+/// The trace of a run, with the path the failure names.
+fn trace_bytes(
+    model: &genmsi_format::GmdlModel,
+    path: &Path,
+    seed: u64,
+    until: Option<f64>,
+    limit: usize,
+) -> Result<String, AppError> {
+    let program = genmsi_core::compile_model(model).map_err(|error| model_error(path, error))?;
+    let config = genmsi_core::SimConfig {
+        seed,
+        stop_time: until,
+        trace: true,
+        trace_limit: limit,
+        ..genmsi_core::SimConfig::default()
+    };
+    let result = genmsi_core::Simulation::new(&program, config)
+        .run()
+        .map_err(|error| model_error(path, error))?;
+    Ok(document_bytes(
+        genmsi_core::documents::TRACE_SCHEMA,
+        &genmsi_core::documents::trace_document(&result, limit),
+    ))
+}
+
 /// The `.gmdl` files of one directory level, sorted by file name.
 pub fn list_models(dir: &Path) -> Result<Vec<ModelFile>, AppError> {
     if !dir.is_dir() {
@@ -301,6 +350,49 @@ mod tests {
             "path printed twice: {text}"
         );
         assert!(!text.starts_with("error"), "{text}");
+    }
+
+    #[test]
+    fn the_trace_bytes_parse_and_name_their_schema() {
+        let bytes =
+            trace_document_bytes(&reference(), 1, None, 100).expect("runs");
+        let document: serde_json::Value = serde_json::from_str(&bytes).expect("parses");
+        assert_eq!(document["schema"], "genmsi.trace/1");
+    }
+
+    #[test]
+    fn the_same_model_seed_and_limit_give_the_same_trace_bytes() {
+        let path = reference();
+        let first = trace_document_bytes(&path, 7, None, 100).expect("runs");
+        let second = trace_document_bytes(&path, 7, None, 100).expect("runs");
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn a_small_limit_truncates_and_a_big_one_does_not() {
+        let path = reference();
+        let small = trace_document_bytes(&path, 1, None, 5).expect("runs");
+        let small: serde_json::Value = serde_json::from_str(&small).expect("parses");
+        assert_eq!(small["limit"], 5);
+        assert!(small["records"].as_u64().is_some_and(|r| r <= 5));
+        assert_eq!(small["truncated"], true);
+
+        let big = trace_document_bytes(&path, 1, None, 200_000).expect("runs");
+        let big: serde_json::Value = serde_json::from_str(&big).expect("parses");
+        assert_eq!(big["truncated"], false);
+        assert!(
+            big["records"].as_u64().is_some_and(|r| r > 5),
+            "the run keeps more than a small limit of records"
+        );
+    }
+
+    #[test]
+    fn the_trace_of_the_model_in_memory_is_the_trace_of_its_file() {
+        let path = reference();
+        let model = genmsi_format::load(&path).expect("the reference model loads");
+        let from_file = trace_document_bytes(&path, 1, None, 100).expect("runs");
+        let from_memory = trace_model_bytes(&model, 1, None, 100).expect("runs");
+        assert_eq!(from_file, from_memory);
     }
 
     #[test]

@@ -13,7 +13,7 @@ use genmsi_format::edit::EditCommand;
 use crate::session::{SaveOutcome, Session, SessionState};
 use crate::{
     AppError, catalogue_document_bytes, lint_document_bytes, model_document_bytes,
-    models_document_bytes, simulate_document_bytes,
+    models_document_bytes, simulate_document_bytes, trace_document_bytes, trace_model_bytes,
 };
 
 /// One request of the protocol.
@@ -63,6 +63,26 @@ pub enum SessionRequest {
         seed: Option<u64>,
         /// Stop the run at this simulation time.
         until: Option<f64>,
+    },
+    /// The trace of a run of a file on disk.
+    Trace {
+        /// Path of the model.
+        path: String,
+        /// Seed of the run.
+        seed: Option<u64>,
+        /// Stop the run at this simulation time.
+        until: Option<f64>,
+        /// Maximum number of trace records kept.
+        limit: Option<usize>,
+    },
+    /// The trace of a run of the model in memory.
+    TraceCurrent {
+        /// Seed of the run.
+        seed: Option<u64>,
+        /// Stop the run at this simulation time.
+        until: Option<f64>,
+        /// Maximum number of trace records kept.
+        limit: Option<usize>,
     },
     /// The graph of a file on disk.
     Model {
@@ -201,6 +221,36 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
                 Err(error) => SessionResponse::error(error),
             }
         }
+        SessionRequest::Trace {
+            path,
+            seed,
+            until,
+            limit,
+        } => match trace_document_bytes(
+            Path::new(&path),
+            seed.unwrap_or(1),
+            until,
+            limit.unwrap_or(100),
+        ) {
+            Ok(document) => SessionResponse::document(document),
+            Err(error) => SessionResponse::error(error),
+        },
+        SessionRequest::TraceCurrent {
+            seed,
+            until,
+            limit,
+        } => match session.as_mut() {
+            Some(session) => match trace_model_bytes(
+                session.model(),
+                seed.unwrap_or(1),
+                until,
+                limit.unwrap_or(100),
+            ) {
+                Ok(document) => SessionResponse::document(document),
+                Err(error) => SessionResponse::error(error),
+            },
+            None => SessionResponse::error(AppError::Usage("no model is open".to_string())),
+        },
         SessionRequest::Model { path } => match model_document_bytes(Path::new(&path)) {
             Ok(document) => SessionResponse::document(document),
             Err(error) => SessionResponse::error(error),

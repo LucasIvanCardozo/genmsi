@@ -49,6 +49,20 @@ enum Command {
         #[arg(long)]
         until: Option<f64>,
     },
+    /// The `genmsi.trace/1` document of a finished run.
+    Trace {
+        /// Model file.
+        path: PathBuf,
+        /// Seed of the run.
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        /// Stop the run at this simulation time.
+        #[arg(long)]
+        until: Option<f64>,
+        /// Maximum number of trace records kept.
+        #[arg(long, default_value_t = 100)]
+        limit: usize,
+    },
     /// The app's model list: the `.gmdl` files of one directory.
     Models {
         /// Directory to scan (default: the current directory).
@@ -115,6 +129,12 @@ fn run(command: Command) -> Result<String, AppError> {
             seed,
             until,
         } => engine::simulate_document_bytes(&path, seed, until),
+        Command::Trace {
+            path,
+            seed,
+            until,
+            limit,
+        } => engine::trace_document_bytes(&path, seed, until, limit),
         Command::Models { dir } => {
             let dir = dir.unwrap_or_else(|| PathBuf::from("."));
             engine::models_document_bytes(&[dir])

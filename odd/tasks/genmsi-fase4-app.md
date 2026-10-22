@@ -250,3 +250,36 @@ FASE 4 — GenMSI-rs: genmsi-app (vertical slice). Sos la sesión de la Fase 4 d
   are green too (`bun test`: 4 of 4, `bunx tsc --noEmit`: clean, `bun run build`: the bundle
   compiles). The worktree is clean apart from the generated caches (`.vite/`, `target/`,
   `dist/`), which the app's `.gitignore` covers.
+
+### Coordinator review and the slice boundary
+
+Twenty-two commits on `feat/phase4-app` over `69e6016`, ~8.9k authored lines: the phase's
+eighteen, plus four from the review. The size is a whole new frontend plus a Rust facade;
+each commit is a reviewable unit (types, frontend skeleton, graph, properties, report,
+shell, docs, facade, picker/error/Spanish, workspace isolation, parity test, shell config,
+and the review's four).
+
+What the independent verification confirmed: the facade returns the CLI's bytes for `lint`
+and `simulate` on three models and for the refused ones (same exit code, empty stdout, same
+stderr); `genmsi.model/1` is additive, checked against a build of `69e6016` with 100
+document comparisons and 25 plain runs and zero byte differences; `ts-rs` stays out of the
+default build; no simulation logic in the UI, no stubs of the out-of-scope features; the
+workspace still builds 5 members and never the Tauri shell.
+
+What it found and this review fixed: the documented visual loop did not run as written
+(`find … select` is not an agent-browser action, so it died at step 3 and produced four
+identical screenshots), the refused-model step captured the transition instead of the error
+notice, the report's `Util.` column showed busy time, fit-view clipped containers, and four
+interface strings used voseo against S3. All four are fixed and the loop is now a script
+that runs end to end with four distinct screenshots.
+
+Decision recorded: the other commits were **not** reviewed individually. The provider
+rejects the accumulated branch (`lens_context_budget_exceeded`), the only new contract
+(`genmsi.model/1`) already passed native review (`review-727b0f0abe82623d`, authority
+burned), and the user chose not to force per-commit reviews; the facade parity tests, the
+model snapshot and this verification cover the rest.
+
+Still open, deliberately: the Tauri window could not be captured (no window manager on the
+virtual display), so the `invoke` path has no visual evidence yet — it belongs to Phase 4b,
+where editing makes the round trip through Tauri necessary. Editing, the live monitor and
+the charts are 4b/4c and have no stubs here.

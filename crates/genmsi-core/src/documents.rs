@@ -44,23 +44,32 @@ pub fn to_pretty_json<T: Serialize + ?Sized>(schema: &str, body: &T) -> String {
 
 /// Counts of the definitions a model declares.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct DefinitionCounts {
     /// `Function` / `FunctionExpon` / `FunctionDist` definitions.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub functions: usize,
     /// `Variable` definitions.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub variables: usize,
     /// `VariableA` definitions.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub random_variables: usize,
     /// `StorageDef` capacities.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub storages: usize,
     /// `Table` definitions.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub tables: usize,
     /// `QTable` definitions.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub qtables: usize,
 }
 
 /// Body of the `genmsi.lint/1` document.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
 pub struct LintDocument<'a> {
     /// Model path, as the user wrote it.
     pub path: String,
@@ -69,6 +78,7 @@ pub struct LintDocument<'a> {
     /// Program title (the model root's name).
     pub title: &'a str,
     /// Executable statements the model compiles to.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub blocks: usize,
     /// Definitions the model declares.
     pub definitions: DefinitionCounts,
@@ -105,6 +115,7 @@ pub fn lint_document<'a>(program: &'a Program, path: &str) -> LintDocument<'a> {
 
 /// Canvas geometry of a block, in the model's own canvas units.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ModelRect {
     /// Horizontal position.
     pub x: i32,
@@ -118,6 +129,7 @@ pub struct ModelRect {
 
 /// One property of a block, with its decoded value.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ModelProperty {
     /// Property name as the block schema declares it (`Media`, `Queue`, ...).
     pub name: String,
@@ -131,6 +143,7 @@ pub struct ModelProperty {
 
 /// One block of the model: an activity block or a container.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ModelBlock {
     /// `moduleid`, unique in the model.
     pub id: u32,
@@ -154,6 +167,7 @@ pub struct ModelBlock {
 
 /// One link between two blocks.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ModelEdge {
     /// Stable id of the link (`<container>:<from>:<port>-><to>:<port>`).
     pub id: String,
@@ -177,6 +191,8 @@ pub struct ModelEdge {
 
 /// Body of the `genmsi.model/1` document: the model's blocks and its links.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
 pub struct ModelDocument {
     /// Model path, as the caller named it.
     pub path: String,

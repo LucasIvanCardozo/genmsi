@@ -12,10 +12,12 @@ use crate::xact::XactId;
 
 /// Facility (single-server resource).
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Facility {
     /// Entity name.
     pub name: String,
     /// Number of successful seizures.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub entries: u64,
     /// Time the facility was busy.
     pub busy_time: f64,
@@ -25,25 +27,33 @@ pub struct Facility {
     pub available: bool,
     /// Transaction that owns the facility.
     #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
     pub owner: Option<XactId>,
     /// Owner saved when the facility was preempted.
     #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
     pub preempted: Option<Preempted>,
     /// Transactions waiting to seize.
     #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
     pub waiters: Vec<XactId>,
     /// Transactions blocked by a GATE test on this facility.
     #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
     pub gate_waiters: Vec<XactId>,
     /// Failed attempts reported as RETRY.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub retry: u64,
     /// Interruptions observed.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub inter: u64,
     /// Time the current owner started using the facility.
     #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
     pub seized_at: f64,
     /// Integration bookkeeping.
     #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
     pub last_change: f64,
 }
 
@@ -113,27 +123,35 @@ impl Facility {
 
 /// Queue entity.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Queue {
     /// Entity name.
     pub name: String,
     /// Current content.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub content: u64,
     /// Maximum content observed.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub max: u64,
     /// Total enqueues.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub entries: u64,
     /// Enqueues whose wait was zero.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub zero_entries: u64,
     /// Accumulated waiting time.
     pub total_time: f64,
     /// Content × time integral.
     pub area: f64,
     /// Transactions that failed to enter (retries).
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub retry: u64,
     /// Failed admission attempts.
     #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
     pub enqueued_at: BTreeMap<XactId, f64>,
     #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
     pub last_change: f64,
 }
 
@@ -215,32 +233,43 @@ impl Queue {
 
 /// Storage entity (multi-unit resource).
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Storage {
     /// Entity name.
     pub name: String,
     /// Declared capacity.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub capacity: i64,
     /// Units currently in use.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub in_use: i64,
     /// Units × time integral.
     pub area: f64,
     /// Minimum in use observed.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub min_use: i64,
     /// Maximum in use observed.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub max_use: i64,
     /// Number of ENTER operations completed.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub entries: u64,
     /// Failed ENTER attempts.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub retry: u64,
     /// Transactions delayed by a GATE test on this storage.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub delay: u64,
     /// Transactions waiting for units.
     #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
     pub waiters: Vec<XactId>,
     /// Transactions blocked by a GATE test on this storage.
     #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
     pub gate_waiters: Vec<XactId>,
     #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
     pub last_change: f64,
 }
 
@@ -323,14 +352,18 @@ impl Storage {
 
 /// User chain entity.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Chain {
     /// Entity name.
     pub name: String,
     /// Current chain size.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub content: u64,
     /// Maximum size observed.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub max: u64,
     /// Total LINK operations.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub entries: u64,
     /// Accumulated time in the chain.
     pub total_time: f64,
@@ -338,10 +371,13 @@ pub struct Chain {
     pub area: f64,
     /// Members in chain order.
     #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
     pub members: Vec<XactId>,
     #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
     pub linked_at: BTreeMap<XactId, f64>,
     #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
     pub last_change: f64,
 }
 
@@ -388,6 +424,7 @@ impl Chain {
 
 /// Histogram recorded by TABULATE.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Table {
     /// Entity name.
     pub name: String,
@@ -396,8 +433,10 @@ pub struct Table {
     /// Interval width.
     pub width: f64,
     /// Number of intervals.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub intervals: usize,
     /// Recorded values.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub samples: u64,
     /// Sum of recorded values.
     pub sum: f64,
@@ -406,8 +445,10 @@ pub struct Table {
     /// Largest value recorded.
     pub max_value: f64,
     /// Frequency per interval.
+    #[cfg_attr(feature = "ts", ts(as = "Vec<f64>"))]
     pub frequencies: Vec<u64>,
     /// Values beyond the last interval.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub overflow: u64,
 }
 
@@ -464,6 +505,7 @@ impl Table {
 
 /// All entities of a run.
 #[derive(Debug, Clone, Default, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Entities {
     /// Facilities by name.
     pub facilities: BTreeMap<String, Facility>,

@@ -16,6 +16,13 @@ rand = "0.9"
 rand_chacha = "0.9"
 pest = "2"
 pest_derive = "2"
+# The TypeScript types of the published documents are generated from these
+# types (S7). The feature is optional so the default build does not carry the
+# generator; `crates/genmsi-app/scripts/generate-types.sh` turns it on.
+ts-rs = { version = "12", optional = true }
+
+[features]
+ts = ["dep:ts-rs"]
 
 [dev-dependencies]
 insta = "1"

@@ -691,8 +691,10 @@ fn type_and_operands(block: &ExecBlock, program: &Program) -> String {
 
 /// One block row in the JSON export.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct JsonBlock<'a> {
     /// 1-based line the report shows.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub line: usize,
     /// Module id.
     pub node: u32,
@@ -703,19 +705,25 @@ pub struct JsonBlock<'a> {
     /// Operands, rendered.
     pub operands: String,
     /// Entry count.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub entries: u64,
     /// Current count.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub current: u64,
     /// Retry count.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub retries: u64,
 }
 
 /// JSON document exported by the CLI and stored by the MCP tool.
 #[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
 pub struct JsonReport<'a> {
     /// Program title.
     pub title: &'a str,
     /// Seed used.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub seed: u64,
     /// Start time.
     pub start_time: f64,
@@ -724,8 +732,10 @@ pub struct JsonReport<'a> {
     /// End reason.
     pub end_reason: &'a str,
     /// Transactions created.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub transactions: u64,
     /// Events processed.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub events: u64,
     /// Block table.
     pub blocks: Vec<JsonBlock<'a>>,

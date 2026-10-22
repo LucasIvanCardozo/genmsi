@@ -588,6 +588,103 @@ export function fittingSpeed(span: number, seconds: number = DEFAULT_REPLAY_SECO
 }
 
 /**
+ * A transaction moving from one block of the model to another.
+ *
+ * The trace states the move itself: the `leave` record of a block carries the
+ * block it goes to (`-> 12`), and the transaction's id says which instance
+ * moved. A transition is therefore read from the trace, never inferred.
+ */
+export interface Transition {
+  /** The transaction that moved. */
+  xact: number;
+  /** The model block the instance left. */
+  from: number;
+  /** The model block the instance went to. */
+  to: number;
+  /** The time of the run at which the move happened. */
+  time: number;
+}
+
+/**
+ * The moves of the run, as the model shows them.
+ *
+ * The trace's blocks are the program's statements, and one block of the model
+ * is several of them (a facility use is a queue, a seize, a depart, an advance
+ * and a release). A move that stays inside the same block of the model is not
+ * a move a reader can see, so it is left out: the ball travels between the
+ * rectangles the canvas draws.
+ *
+ * The moves are grouped by the instant they happen, so the animation can find
+ * the ones of a moment without walking the whole list.
+ */
+export interface TransitionIndex {
+  /** The moves, ordered by the time they happened. */
+  moves: Transition[];
+  /** The times the moves happened, sorted (the same order as `moves`). */
+  times: number[];
+}
+
+/**
+ * The moves of the run, read from the trace.
+ *
+ * `nodeOf` maps a program block to the block of the model it belongs to.
+ */
+export function buildTransitions(
+  trace: TraceDocumentLike,
+  nodeOf: (block: number) => number | null,
+): TransitionIndex {
+  const moves: Transition[] = [];
+  // The block each transaction is in, to know where a move comes from when the
+  // trace does not say it (a transaction that enters a block without leaving
+  // another one first).
+  const inside = new Map<number, number>();
+  for (const event of trace.events) {
+    if (event.event === "leave") {
+      const target = targetOf(event.detail);
+      const from = nodeOf(event.block);
+      if (target !== null && from !== null) {
+        const to = nodeOf(target);
+        // A move that stays inside the same block of the model is invisible.
+        if (to !== null && to !== from) {
+          moves.push({ xact: event.xact, from, to, time: event.time });
+        }
+      }
+      if (target !== null) {
+        inside.set(event.xact, target);
+      }
+      continue;
+    }
+    if (event.event === "enter") {
+      const to = nodeOf(event.block);
+      // The move that brought the transaction here: the trace says it on the
+      // `leave` of the previous block, which was already counted.
+      if (to !== null) {
+        inside.set(event.xact, event.block);
+      }
+      continue;
+    }
+    if (event.event === "generate" || event.event === "terminate") {
+      inside.delete(event.xact);
+    }
+  }
+  const times = moves.map((move) => move.time);
+  return { moves, times };
+}
+
+/**
+ * The block a `leave` record goes to, or null when it does not say.
+ */
+function targetOf(detail: string): number | null {
+  const text = detail.trim();
+  if (!text.startsWith("->")) {
+    return null;
+  }
+  const target = text.slice(2).trim();
+  const value = Number.parseInt(target, 10);
+  return Number.isNaN(value) ? null : value;
+}
+
+/**
  * The clock of a replay that advances by `elapsed` seconds of wall clock.
  *
  * The clock **accumulates**: it is the time the run has reached, and it only

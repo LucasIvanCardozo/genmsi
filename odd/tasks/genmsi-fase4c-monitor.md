@@ -270,3 +270,34 @@ FASE 4c — GenMSI-rs: genmsi-app (monitor por reproducción y gráficos). Sos l
   session. **The review is therefore not an approval, and the phase's proof is the
   verification suite** (245 tests, clippy clean, 30 frontend tests, the visual loop with
   fourteen screenshots and the desktop shell's smoke check).
+
+### Coordinator review (own probes, merge decision)
+
+The coordinator verified the branch with its own probes before the merge:
+
+- Workspace and frontend green on the branch and after: 245 tests (36 suites), clippy clean,
+  30/30 frontend tests, `tsc` clean, `bun run build` compiles.
+- The engine diff over `fa66029` is four `#[cfg_attr(feature = "ts", ...)]` attributes plus
+  the ts export of `TraceDocument`/`TraceEvent`: no behaviour, no document body change; the
+  prohibited paths (`genmsi-cli`, `genmsi-mcp`, `fixtures`, `oracle.rs`) are untouched.
+- `check-visual-loop.sh` runs end to end (exit 0) with fourteen distinct screenshots, after
+  the coordinator found a stale dev server from a previous run holding port 5173 and killed
+  it — the script's own guard worked as written ("port 5173 is already in use; close the
+  other dev server first").
+- The monitor screenshots show what the phase claims: the replay header with the clock
+  (2399,673 of 3600), the event position (4821 / 9641), the playback controls, per-block
+  state markers on the canvas (the Advance with 143 transactions, Pago with 1), the live
+  queue/facility panel, and the three chart families with their entity selectors.
+- The parity tests compare the facade's trace document byte for byte with
+  `genmsi trace --json`; the replay tests pin determinism, prefix-purity, the exact-change
+  series, the truncated-trace honesty and the faithfulness of the reference and big traces.
+- The bucketing notice is real (`Cada barra cubre {n} intervalos`, `MonitorCharts.tsx:294`),
+  the accumulated curve is a running total of the published frequencies (S10), and no
+  utilization or average is derived in the frontend.
+
+Native review: the two open lineages (`review-7372e6a7797e7ad1` over the branch,
+`review-eb06d5bcad7291e5` over the loop unit) stay open. The user decides whether to
+abandon them; the coordinator did not touch them. As in 4b, the phase's proof is this
+verification suite, and the provider-side wall (the facade rejecting the provider's own
+bindings as stale, byte-compared against the canonical form STATUS had just published) is
+documented in L14.

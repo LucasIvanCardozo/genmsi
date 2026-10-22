@@ -154,15 +154,16 @@ export interface Frame {
   change: StateChange | null;
 }
 
-/** One point of a time series: the state of the entities at one instant. */
+/** One point of an entity's series: its value at one instant. */
 export interface SeriesPoint {
   /** The simulated time. */
   time: number;
-  /** The transactions inside every queue. */
-  queues: Record<string, number>;
-  /** Whether every facility is busy (1) or free (0). */
-  facilities: Record<string, number>;
+  /** The value of the entity (the content of a queue, the busy state of a facility). */
+  value: number;
 }
+
+/** The rows of a chart: the instants of the entities and the value of each. */
+export type SeriesRow = { time: number } & Record<string, number>;
 
 /** The index of a run: what the replay reads, computed once. */
 export interface ReplayIndex {
@@ -178,8 +179,10 @@ export interface ReplayIndex {
   storages: string[];
   /** The program blocks that had activity, in the order the run mentions them. */
   blocks: number[];
-  /** The time series of the entities, sampled over the run. */
-  series: SeriesPoint[];
+  /** The instants each queue's content changes, with the content it takes. */
+  queuePoints: Map<string, SeriesPoint[]>;
+  /** The instants each facility's state changes, with the state it takes. */
+  facilityPoints: Map<string, SeriesPoint[]>;
   /** Whether the trace may have been cut by its record limit. */
   truncated: boolean;
   /** How many records the trace kept. */
@@ -191,9 +194,6 @@ export interface ReplayIndex {
   /** The time the run ended. */
   endTime: number;
 }
-
-/** How many points the time series has. */
-export const SERIES_POINTS = 240;
 
 /** The property that holds the entity of each program class. */
 const ENTITY_PROPERTY: Record<string, string> = {
@@ -447,7 +447,9 @@ export function buildIndex(
     });
   }
 
-  const series = buildSeries(frames, queues, facilities, trace.start_time, trace.end_time);
+  const queuePoints = new Map<string, SeriesPoint[]>();
+  const facilityPoints = new Map<string, SeriesPoint[]>();
+  collectPoints(frames, queuePoints, facilityPoints);
 
   return {
     frames,
@@ -456,7 +458,8 @@ export function buildIndex(
     facilities,
     storages,
     blocks,
-    series,
+    queuePoints,
+    facilityPoints,
     truncated: trace.truncated,
     records: trace.records,
     limit: trace.limit,
@@ -476,31 +479,30 @@ export function applyFrame(state: ReplayState, frame: Frame): ReplayState {
   if (change === null) {
     return state.time === frame.time ? state : { ...state, time: frame.time };
   }
-  const next: ReplayState = {
-    time: frame.time,
-    queues: { ...state.queues },
-    facilities: { ...state.facilities },
-    storages: { ...state.storages },
-    blocks: { ...state.blocks },
-  };
+  // Only the records that change are copied: the replay of a big trace
+  // applies thousands of frames, and copying what did not move is the cost.
+  let queues = state.queues;
+  let facilities = state.facilities;
+  let storages = state.storages;
+  let blocks = state.blocks;
   if (change.queue !== undefined) {
-    const content = Math.max(0, (next.queues[change.queue.name] ?? 0) + change.queue.delta);
-    next.queues[change.queue.name] = content;
+    const content = Math.max(0, (queues[change.queue.name] ?? 0) + change.queue.delta);
+    queues = { ...queues, [change.queue.name]: content };
   }
   if (change.facility !== undefined) {
-    next.facilities[change.facility.name] = change.facility.owner;
+    facilities = { ...facilities, [change.facility.name]: change.facility.owner };
   }
   if (change.storage !== undefined) {
-    const units = Math.max(0, (next.storages[change.storage.name] ?? 0) + change.storage.delta);
-    next.storages[change.storage.name] = units;
+    const units = Math.max(0, (storages[change.storage.name] ?? 0) + change.storage.delta);
+    storages = { ...storages, [change.storage.name]: units };
   }
   if (change.entered !== undefined) {
-    next.blocks[change.entered] = (next.blocks[change.entered] ?? 0) + 1;
+    blocks = { ...blocks, [change.entered]: (blocks[change.entered] ?? 0) + 1 };
   }
   if (change.left !== undefined) {
-    next.blocks[change.left] = Math.max(0, (next.blocks[change.left] ?? 0) - 1);
+    blocks = { ...blocks, [change.left]: Math.max(0, (blocks[change.left] ?? 0) - 1) };
   }
-  return next;
+  return { time: frame.time, queues, facilities, storages, blocks };
 }
 
 /**
@@ -557,65 +559,77 @@ export function frameAt(index: ReplayIndex, time: number): number {
 }
 
 /**
- * The time series of the entities, sampled over the run.
+ * The instants each entity's value changes, with the value it takes.
  *
- * The series is built once, when the index is built: the animation reads it
- * instead of walking the whole trace per frame. The points are a sample of
- * the trace (the same instants for the same trace), and the view says so.
+ * The series is the **exact** history of the entity, not a sample of it: a
+ * queue that fills and empties between two samples of the trace would be
+ * invisible in a sample, and a facility that is free for a moment would look
+ * busy. The series is built once, when the index is built, by folding the
+ * frames; the chart reads it.
  */
-function buildSeries(
+function collectPoints(
   frames: Frame[],
-  queues: string[],
-  facilities: string[],
-  startTime: number,
-  endTime: number,
-): SeriesPoint[] {
-  const points: SeriesPoint[] = [];
-  if (frames.length === 0) {
-    return points;
-  }
-  const step = Math.max(1, Math.ceil(frames.length / SERIES_POINTS));
-  const queueContent: Record<string, number> = {};
-  const busy: Record<string, number> = {};
-  let position = 0;
-  for (let sample = 0; sample < frames.length; sample += step) {
-    while (position <= sample) {
-      const change = frames[position].change;
-      if (change !== null) {
-        if (change.queue !== undefined) {
-          queueContent[change.queue.name] = Math.max(
-            0,
-            (queueContent[change.queue.name] ?? 0) + change.queue.delta,
-          );
-        }
-        if (change.facility !== undefined) {
-          busy[change.facility.name] = change.facility.owner === null ? 0 : 1;
-        }
-      }
-      position += 1;
+  queuePoints: Map<string, SeriesPoint[]>,
+  facilityPoints: Map<string, SeriesPoint[]>,
+): void {
+  let state = emptyState();
+  for (const frame of frames) {
+    state = applyFrame(state, frame);
+    const change = frame.change;
+    if (change === null) {
+      continue;
     }
-    points.push({
-      time: frames[sample].time,
-      queues: { ...queueContent },
-      facilities: { ...busy },
-    });
+    if (change.queue !== undefined) {
+      const list = queuePoints.get(change.queue.name) ?? [];
+      list.push({ time: frame.time, value: state.queues[change.queue.name] ?? 0 });
+      queuePoints.set(change.queue.name, list);
+    }
+    if (change.facility !== undefined) {
+      const list = facilityPoints.get(change.facility.name) ?? [];
+      list.push({
+        time: frame.time,
+        value: state.facilities[change.facility.name] === null ? 0 : 1,
+      });
+      facilityPoints.set(change.facility.name, list);
+    }
   }
-  // The last point is the end of the run.
-  const last = frames[frames.length - 1];
-  points.push({
-    time: last.time,
-    queues: { ...queueContent },
-    facilities: { ...busy },
-  });
-  if (points.length > 1 && points[0].time === startTime) {
-    // The first point is the start of the run: the state before anything
-    // happened is empty, and the first frame already carries its change.
-    points[0] = { time: startTime, queues: {}, facilities: {} };
+}
+
+/**
+ * The rows of a chart: the instants of the entities, with the value of each.
+ *
+ * The rows are the union of the instants of the chosen entities, and the
+ * value of an entity is the one it had at that instant.
+ */
+export function mergeSeries(
+  entities: string[],
+  points: Map<string, SeriesPoint[]>,
+): SeriesRow[] {
+  const times = new Set<number>();
+  for (const name of entities) {
+    for (const point of points.get(name) ?? []) {
+      times.add(point.time);
+    }
   }
-  if (endTime < last.time) {
-    points.push({ time: endTime, queues: { ...queueContent }, facilities: { ...busy } });
+  const sorted = [...times].sort((a, b) => a - b);
+  const cursors = new Map<string, number>();
+  const values = new Map<string, number>();
+  const rows: SeriesRow[] = [];
+  for (const time of sorted) {
+    const row: SeriesRow = { time };
+    for (const name of entities) {
+      const list = points.get(name) ?? [];
+      let cursor = cursors.get(name) ?? 0;
+      while (cursor < list.length && list[cursor].time <= time) {
+        values.set(name, list[cursor].value);
+        cursor += 1;
+      }
+      cursors.set(name, cursor);
+      row[name] = values.get(name) ?? 0;
+    }
+    rows.push(row);
   }
-  return points;
+  return rows;
 }
 
 /**

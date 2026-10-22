@@ -233,3 +233,20 @@ FASE 4 — GenMSI-rs: genmsi-app (vertical slice). Sos la sesión de la Fase 4 d
   facade's tests and by the parity test. Risk item 6 does not apply: the bytes the app shows
   are compared with the CLI's by a test that fails if they drift. The native review candidate
   is a work unit, not the accumulated branch.
+- L16 (native review): the RDD switch is on, so the native review ran. `gentle-ai review
+  assess` over the whole branch returned `nativeRisk: high` and `reviewDue: true`, but the
+  provider refused the accumulated candidate (`lens_context_budget_exceeded`: "review this
+  change as smaller candidates that each fit under it"), which is terminal for that candidate.
+  The review was therefore run over the highest-risk work unit alone, T2 (the new
+  `genmsi.model/1` document: 2 files, 238 lines): the change was staged in the worktree as
+  the uncommitted diff so the provider reviewed exactly that range, with the untracked build
+  artifacts excluded from the inventory. One reviewer run over the `review-reliability` lens
+  came back **approved**, and the authority was acknowledged and burned
+  (`review-727b0f0abe82623d`). The other fifteen commits of the branch were not natively
+  reviewed: the provider does not accept the accumulated branch, and reviewing them one by one
+  is a coordinator decision.
+- L17 (verification, close): `cargo test --workspace` is green (202 tests in 28 suites) and
+  `cargo clippy --workspace --all-targets -- -D warnings` is clean; the frontend's own checks
+  are green too (`bun test`: 4 of 4, `bunx tsc --noEmit`: clean, `bun run build`: the bundle
+  compiles). The worktree is clean apart from the generated caches (`.vite/`, `target/`,
+  `dist/`), which the app's `.gitignore` covers.

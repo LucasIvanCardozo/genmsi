@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
   Controls,
@@ -6,12 +6,24 @@ import {
   MiniMap,
   Position,
   ReactFlow,
+  applyNodeChanges,
+  type Connection,
   type Edge,
+  type EdgeChange,
   type Node,
+  type NodeChange,
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { ModelBlock, ModelDocument } from "../types";
+import type { ModelBody, ModelBlock } from "../types";
+
+/** One port of a block, as the node draws it. */
+interface PortData {
+  /** Port id, unique inside the block. */
+  ioid: number;
+  /** Port name (`Entrada1`, `Salida1`, ...). */
+  name: string;
+}
 
 /** What a block of the graph shows. */
 interface BlockData extends Record<string, unknown> {
@@ -23,12 +35,18 @@ interface BlockData extends Record<string, unknown> {
   kind: string;
   /** Whether the user selected the block. */
   selected: boolean;
+  /** The block's input ports. */
+  inputs: PortData[];
+  /** The block's output ports. */
+  outputs: PortData[];
 }
 
 /** One block of the model, drawn as a node of the graph. */
 function BlockNode({ data }: NodeProps<Node<BlockData>>) {
   const container = data.kind === "C";
   const note = data.title === "Note";
+  const spread = (count: number, index: number): string =>
+    `${((index + 1) / (count + 1)) * 100}%`;
   return (
     <div
       className={[
@@ -40,7 +58,17 @@ function BlockNode({ data }: NodeProps<Node<BlockData>>) {
         data.selected ? "ring-2 ring-indigo-500" : "",
       ].join(" ")}
     >
-      <Handle type="target" position={Position.Top} className="!size-2 !border-0 !bg-slate-400" />
+      {data.inputs.map((port, index) => (
+        <Handle
+          key={`in-${port.ioid}`}
+          type="target"
+          position={Position.Top}
+          id={String(port.ioid)}
+          title={port.name}
+          style={{ left: spread(data.inputs.length, index), top: -6 }}
+          className="!size-2.5 !border-0 !bg-slate-400"
+        />
+      ))}
       <span
         className={[
           "truncate text-xs font-semibold tracking-tight",
@@ -53,7 +81,17 @@ function BlockNode({ data }: NodeProps<Node<BlockData>>) {
       {data.subtitle !== "" && (
         <span className="truncate text-[10px] text-slate-500">{data.subtitle}</span>
       )}
-      <Handle type="source" position={Position.Bottom} className="!size-2 !border-0 !bg-slate-400" />
+      {data.outputs.map((port, index) => (
+        <Handle
+          key={`out-${port.ioid}`}
+          type="source"
+          position={Position.Bottom}
+          id={String(port.ioid)}
+          title={port.name}
+          style={{ left: spread(data.outputs.length, index), bottom: -6 }}
+          className="!size-2.5 !border-0 !bg-slate-400"
+        />
+      ))}
     </div>
   );
 }
@@ -77,7 +115,10 @@ function subtitleOf(block: ModelBlock): string {
 }
 
 /** The nodes and the edges of the model's graph. */
-function graphOf(model: ModelDocument): { nodes: Node<BlockData>[]; edges: Edge[] } {
+function graphOf(
+  model: ModelBody,
+  selectedBlockIds: number[],
+): { nodes: Node<BlockData>[]; edges: Edge[] } {
   const placed = new Map<number, ModelBlock>();
   for (const block of model.blocks) {
     if (block.layout !== null) {
@@ -95,14 +136,15 @@ function graphOf(model: ModelDocument): { nodes: Node<BlockData>[]; edges: Edge[
         title: titleOf(block),
         subtitle: subtitleOf(block),
         kind: block.kind,
-        selected: false,
+        selected: selectedBlockIds.includes(block.id),
+        inputs: block.inputs.map((port) => ({ ioid: port.ioid, name: port.name })),
+        outputs: block.outputs.map((port) => ({ ioid: port.ioid, name: port.name })),
       },
       style: {
         width: Math.max(block.layout?.width ?? 100, 72),
         height: Math.max(block.layout?.height ?? 40, 32),
       },
       zIndex: block.kind === "C" ? 0 : 2,
-      draggable: false,
     }));
 
   const edges: Edge[] = model.edges
@@ -110,63 +152,162 @@ function graphOf(model: ModelDocument): { nodes: Node<BlockData>[]; edges: Edge[
     .map((edge) => ({
       id: edge.id,
       source: String(edge.from_module),
+      sourceHandle: String(edge.from_ioid),
       target: String(edge.to_module),
+      targetHandle: String(edge.to_ioid),
       label: edge.label ?? undefined,
       animated: false,
       style: { stroke: "#94a3b8", strokeWidth: 1.75 },
       labelStyle: { fontSize: 10, fill: "#64748b" },
       labelBgStyle: { fill: "#f8fafc", fillOpacity: 0.9 },
+      data: {
+        container: edge.container,
+        from: edge.from_module,
+        fromIoid: edge.from_ioid,
+      },
     }));
 
   return { nodes, edges };
 }
 
+/** What the graph asks the app to do. */
+export interface GraphActions {
+  /** The blocks the user selected. */
+  onSelect: (ids: number[]) => void;
+  /** The user moved a block. */
+  onMove: (id: number, x: number, y: number) => void;
+  /** The user connected two ports. */
+  onConnect: (from: number, fromIoid: number, to: number, toIoid: number) => void;
+  /** The user removed a block. */
+  onRemove: (ids: number[]) => void;
+  /** The user removed a link. */
+  onDisconnect: (container: number, from: number, fromIoid: number) => void;
+  /** The user dropped a new block of a class. */
+  onDropBlock: (className: string, x: number, y: number) => void;
+}
+
 /**
- * The model's graph, read-only.
+ * The model's graph, editable.
  *
  * The blocks are placed with the geometry the `.gmdl` carries, so the picture
- * is the one the original editor drew; the slice does not lay out anything.
+ * is the one the original editor drew. Every change leaves the graph as a
+ * command for the facade: the app never rewrites the file itself.
  */
 export default function GraphView({
   model,
-  selectedBlockId,
-  onSelect,
+  selectedBlockIds,
+  actions,
 }: {
-  model: ModelDocument;
-  selectedBlockId: number | null;
-  onSelect: (id: number | null) => void;
+  model: ModelBody;
+  selectedBlockIds: number[];
+  actions: GraphActions;
 }) {
-  const { nodes, edges } = useMemo(() => {
-    const graph = graphOf(model);
-    return {
-      nodes: graph.nodes.map((node) => ({
-        ...node,
-        data: { ...node.data, selected: node.id === String(selectedBlockId) },
-      })),
-      edges: graph.edges,
-    };
-  }, [model, selectedBlockId]);
+  const [nodes, setNodes] = useState<Node<BlockData>[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
+
+  useEffect(() => {
+    const graph = graphOf(model, selectedBlockIds);
+    setNodes(graph.nodes);
+    setEdges(graph.edges);
+  }, [model, selectedBlockIds]);
+
+  const onNodesChange = useCallback((changes: NodeChange<Node<BlockData>>[]) => {
+    setNodes((current) => applyNodeChanges(changes, current));
+  }, []);
+
+  const onEdgesChange = useCallback((changes: EdgeChange[]) => {
+    setEdges((current) => changes.reduce((acc, change) => {
+      if (change.type === "remove") {
+        return acc.filter((edge) => edge.id !== change.id);
+      }
+      return acc;
+    }, current));
+  }, []);
+
+  const onConnect = useCallback(
+    (connection: Connection) => {
+      if (connection.source === null || connection.target === null) {
+        return;
+      }
+      if (connection.sourceHandle === null || connection.targetHandle === null) {
+        return;
+      }
+      actions.onConnect(
+        Number(connection.source),
+        Number(connection.sourceHandle),
+        Number(connection.target),
+        Number(connection.targetHandle),
+      );
+    },
+    [actions],
+  );
+
+  const onDrop = useCallback(
+    (event: React.DragEvent) => {
+      event.preventDefault();
+      const className = event.dataTransfer.getData("application/genmsi-block");
+      if (className === "") {
+        return;
+      }
+      const position = projectPosition(event);
+      if (position !== null) {
+        actions.onDropBlock(className, position.x, position.y);
+      }
+    },
+    [actions],
+  );
+
+  const projected = useMemo(
+    () => ({ nodes, edges }),
+    [nodes, edges],
+  );
 
   return (
-    <div className="h-full w-full overflow-hidden rounded-lg border border-slate-200 bg-white">
+    <div
+      className="h-full w-full overflow-hidden rounded-lg border border-slate-200 bg-white"
+      onDrop={onDrop}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "copy";
+      }}
+    >
       <ReactFlow
-        nodes={nodes}
-        edges={edges}
+        nodes={projected.nodes}
+        edges={projected.edges}
         nodeTypes={nodeTypes}
         onInit={(instance) => {
           // The first view frames the whole model: the containers are part of
           // the picture, so their bounds count too and nothing is cut off.
-          instance.fitView({
-            nodes,
-            padding: 0.15,
-            minZoom: 0.5,
-          });
+          instance.fitView({ nodes, padding: 0.15, minZoom: 0.5 });
         }}
-        onNodeClick={(_event, node) => onSelect(Number(node.id))}
-        onPaneClick={() => onSelect(null)}
-        nodesDraggable={false}
-        nodesConnectable={false}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={(_event, node) => actions.onSelect([Number(node.id)])}
+        onPaneClick={() => actions.onSelect([])}
+        onSelectionChange={({ nodes: selected }) =>
+          actions.onSelect(selected.map((node) => Number(node.id)))
+        }
+        onNodeDragStop={(_event, node) =>
+          actions.onMove(Number(node.id), Math.round(node.position.x), Math.round(node.position.y))
+        }
+        onConnect={onConnect}
+        onNodesDelete={(deleted) => actions.onRemove(deleted.map((node) => Number(node.id)))}
+        onEdgesDelete={(deleted) => {
+          for (const edge of deleted) {
+            const data = edge.data as
+              | { container: number; from: number; fromIoid: number }
+              | undefined;
+            if (data !== undefined) {
+              actions.onDisconnect(data.container, data.from, data.fromIoid);
+            }
+          }
+        }}
+        nodesDraggable
+        nodesConnectable
         edgesReconnectable={false}
+        deleteKeyCode={["Delete", "Backspace"]}
+        selectionOnDrag
+        multiSelectionKeyCode={["Control", "Meta"]}
         elementsSelectable
         fitView={false}
         minZoom={0.1}
@@ -186,4 +327,19 @@ export default function GraphView({
       </ReactFlow>
     </div>
   );
+}
+
+/**
+ * The canvas position of a drop.
+ *
+ * The graph knows where the pointer is in the canvas, so a block dropped on
+ * the picture lands there.
+ */
+function projectPosition(event: React.DragEvent): { x: number; y: number } | null {
+  const target = event.currentTarget as HTMLElement;
+  const bounds = target.getBoundingClientRect();
+  return {
+    x: Math.round(event.clientX - bounds.left),
+    y: Math.round(event.clientY - bounds.top),
+  };
 }

@@ -1,18 +1,22 @@
 import { useEffect } from "react";
 import { Play } from "lucide-react";
+import BlockPalette from "./components/BlockPalette";
+import DiagnosticsPanel from "./components/DiagnosticsPanel";
 import ErrorNotice from "./components/ErrorNotice";
 import GraphView from "./components/GraphView";
 import ModelPicker from "./components/ModelPicker";
 import ModelSummary from "./components/ModelSummary";
 import PropertiesPanel from "./components/PropertiesPanel";
 import ReportView from "./components/ReportView";
+import Toolbar from "./components/Toolbar";
 import { useApp } from "./state/store";
 
 /**
  * The app's shell.
  *
- * The header opens a model and runs it; the body shows the model's graph and
- * the report of the last run.
+ * The header opens a model and runs it; the toolbar holds the editing
+ * actions; the body shows the model's graph, the properties of the selected
+ * block and the report of the last run.
  */
 export default function App() {
   const {
@@ -22,24 +26,85 @@ export default function App() {
     error,
     seed,
     until,
-    selectedBlockId,
+    selectedBlockIds,
     report,
     view,
-    lint,
+    diagnostics,
+    dirty,
+    canUndo,
+    canRedo,
+    catalogue,
+    pendingSave,
+    savedMessage,
     loadModels,
+    loadCatalogue,
+    newModel,
+    apply,
+    undo,
+    redo,
+    save,
     simulate,
-    selectBlock,
+    select,
+    copy,
+    paste,
+    relayout,
+    addBlock,
+    deleteSelection,
     setSeed,
     setUntil,
     setView,
+    confirmSave,
+    dismissSave,
   } = useApp();
 
   useEffect(() => {
     void loadModels();
-  }, [loadModels]);
+    void loadCatalogue();
+  }, [loadModels, loadCatalogue]);
+
+  // The keyboard of the editor: undo, redo, copy and paste.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName ?? "";
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+        return;
+      }
+      const withControl = event.ctrlKey || event.metaKey;
+      if (!withControl) {
+        return;
+      }
+      const key = event.key.toLowerCase();
+      if (key === "z") {
+        event.preventDefault();
+        if (event.shiftKey) {
+          void redo();
+        } else {
+          void undo();
+        }
+        return;
+      }
+      if (key === "y") {
+        event.preventDefault();
+        void redo();
+        return;
+      }
+      if (key === "c") {
+        event.preventDefault();
+        copy();
+        return;
+      }
+      if (key === "v") {
+        event.preventDefault();
+        void paste();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [undo, redo, copy, paste]);
 
   const selectedBlock =
-    model?.blocks.find((block) => block.id === selectedBlockId) ?? null;
+    model?.blocks.find((block) => block.id === selectedBlockIds[0]) ?? null;
 
   return (
     <div className="flex h-full flex-col bg-slate-100 text-slate-900">
@@ -80,7 +145,7 @@ export default function App() {
         <button
           type="button"
           onClick={() => void simulate()}
-          disabled={currentPath === null || status === "running"}
+          disabled={currentPath === null && model === null}
           className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-300"
         >
           <Play className="size-3.5" aria-hidden />
@@ -95,6 +160,31 @@ export default function App() {
 
       <main className="flex flex-1 flex-col gap-3 overflow-hidden p-4">
         {error !== null && <ErrorNotice message={error} />}
+        {savedMessage !== null && (
+          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-900">
+            {savedMessage}
+          </p>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Toolbar
+            dirty={dirty}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            hasModel={model !== null}
+            pendingSave={pendingSave}
+            onNew={() => void newModel()}
+            onSave={() => void save()}
+            onSaveAs={(path) => void save(path)}
+            onUndo={() => void undo()}
+            onRedo={() => void redo()}
+            onRelayout={() => void relayout()}
+            onDelete={() => void deleteSelection()}
+            onConfirmSave={() => void confirmSave()}
+            onDismissSave={dismissSave}
+          />
+          <BlockPalette catalogue={catalogue} onAdd={(className) => void addBlock(className)} />
+        </div>
 
         <div className="flex gap-1 border-b border-slate-200">
           {(
@@ -125,17 +215,40 @@ export default function App() {
           </div>
         ) : view === "grafo" ? (
           <div className="flex min-h-0 flex-1 flex-col gap-3">
-            <ModelSummary lint={lint} />
+            <ModelSummary diagnostics={diagnostics} />
+            <DiagnosticsPanel diagnostics={diagnostics} />
             <div className="flex min-h-0 flex-1 gap-3">
               <div className="min-w-0 flex-1">
                 <GraphView
                   model={model}
-                  selectedBlockId={selectedBlockId}
-                  onSelect={(id) => selectBlock(id)}
+                  selectedBlockIds={selectedBlockIds}
+                  actions={{
+                    onSelect: select,
+                    onMove: (id, x, y) => void apply({ op: "moveBlock", id, x, y }),
+                    onConnect: (from, fromIoid, to, toIoid) =>
+                      void apply({ op: "connect", from, fromIoid, to, toIoid }),
+                    onRemove: (ids) => {
+                      if (ids.length === 1) {
+                        void apply({ op: "removeBlock", id: ids[0] });
+                      } else {
+                        void apply({ op: "removeBlocks", ids });
+                      }
+                    },
+                    onDisconnect: (container, from, fromIoid) =>
+                      void apply({ op: "disconnect", container, from, fromIoid }),
+                    onDropBlock: (className, x, y) => void addBlock(className, x, y),
+                  }}
                 />
               </div>
               <aside className="w-80 shrink-0 overflow-auto rounded-lg border border-slate-200 bg-white p-4">
-                <PropertiesPanel block={selectedBlock} />
+                <PropertiesPanel
+                  block={selectedBlock}
+                  catalogue={catalogue}
+                  onSetProperty={(id, property, value) =>
+                    void apply({ op: "setProperty", id, property, value })
+                  }
+                  onSetCaption={(id, caption) => void apply({ op: "setCaption", id, caption })}
+                />
               </aside>
             </div>
           </div>

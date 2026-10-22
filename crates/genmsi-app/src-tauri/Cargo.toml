@@ -1,0 +1,24 @@
+[package]
+name = "genmsi-app-desktop"
+description = "The GenMSI desktop shell: a Tauri window around the same frontend"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+authors = ["Lucas Cardozo"]
+
+# The desktop shell is its own workspace: the Tauri dependency tree is heavy
+# and the repository's workspace build stays exactly as it was.
+[workspace]
+
+[lib]
+name = "genmsi_app_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+genmsi-app-engine = { path = "../engine" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

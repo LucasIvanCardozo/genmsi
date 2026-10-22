@@ -7,11 +7,6 @@ interface TauriInternals {
   invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
 }
 
-/** The list document of the app (`genmsi.models/1`). */
-interface ModelsDocument {
-  models: ModelRef[];
-}
-
 /** The Tauri bridge of the running shell. */
 function bridge(): TauriInternals {
   const value = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
@@ -28,7 +23,7 @@ function bridge(): TauriInternals {
  * both backends return the same documents.
  */
 export const tauri: EngineAdapter = {
-  listModels: async () => (await bridge().invoke<ModelsDocument>("list_models")).models,
+  listModels: () => bridge().invoke<ModelRef[]>("list_models"),
   loadModel: (path: string) => bridge().invoke<ModelDocument>("load_model", { path }),
   lint: (path: string) => bridge().invoke<LintDocument>("lint_model", { path }),
   simulate: (path: string, options?: SimulationOptions) =>

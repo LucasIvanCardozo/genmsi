@@ -235,7 +235,7 @@ FASE 4c — GenMSI-rs: genmsi-app (monitor por reproducción y gráficos). Sos l
   replay) and `bunx tsc --noEmit` clean. The visual loop ran end to end with fourteen
   screenshots, and the desktop shell's smoke check passed (the window, the capture with
   1364 distinct colours and the `invoke` path).
-- L15 (delivery, slices): the phase's commits are ten. Three are bigger than the ~400
+- L15 (delivery, slices): the phase's commits are eleven. Three are bigger than the ~400
   authored lines and the reason is recorded instead of hidden: the replay module (the
   projection and its tests), the Monitor tab (the canvas, the controls and the state panel)
   and the charts (the series, the histograms and the dependency). They are one unit each
@@ -253,3 +253,20 @@ FASE 4c — GenMSI-rs: genmsi-app (monitor por reproducción y gráficos). Sos l
   tests (the determinism, the purity of the prefix and the fidelity against the report),
   and the visual loop is the gate of the picture. Risk: item 3 (the app's protocol grows
   two operations) and item 5 (a new dependency).
+- L17 (native review): the RDD switch is on, so the phase was assessed and reviewed. The
+  assessment of the whole branch returned `high_risk` (the shell script of the visual loop
+  is a `process_boundary` signal), so the review was started. The capture could **not** be
+  made: the facade refuses the provider's own collect bindings as stale
+  (`collectBinding is missing or stale for current STATUS`, and the group
+  `collectBindings must be the complete distinct current reviewer group in exact provider
+  order`), with the bindings the very same STATUS had just published — verified byte for
+  byte against the published canonical form. The same wall stopped the phase 4b review
+  (the native CLI reports the authority as needing a repair, which the facade does not
+  support). The reviews of the work units say the same: the replay module (the projection
+  and its tests) is `under_budget` and not due, and the visual loop's unit is due because
+  of the same shell signal but its capture is refused in the same way. Two lineages stay
+  open (`review-7372e6a7797e7ad1` over the branch and `review-eb06d5bcad7291e5` over the
+  visual loop's unit): abandoning them is a decision of the maintainer, not of this
+  session. **The review is therefore not an approval, and the phase's proof is the
+  verification suite** (245 tests, clippy clean, 30 frontend tests, the visual loop with
+  fourteen screenshots and the desktop shell's smoke check).

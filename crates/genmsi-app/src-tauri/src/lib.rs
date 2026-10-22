@@ -9,13 +9,17 @@ mod commands;
 /// The root of the repository the shell reads its models from.
 ///
 /// While the app is developed it is the repository itself, so the model paths
-/// the frontend uses are the same ones the dev bridge uses.
+/// the frontend uses are the same ones the dev bridge uses. The shell lives
+/// in `crates/genmsi-app/src-tauri`, so the root is three levels up.
 pub fn app_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
 }
 
 /// Start the shell.
 pub fn run() {
+    // The shell has no console of its own: the line goes to the log the
+    // smoke check reads, so the path of the desktop app is observable.
+    eprintln!("[genmsi-app] el shell arranca");
     let root = app_root();
     if std::env::set_current_dir(&root).is_err() {
         eprintln!(

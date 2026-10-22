@@ -1,6 +1,14 @@
-import type { LintDocument, ModelDocument, ReportDocument } from "../types";
+import type { EditCommand } from "../types/generated/EditCommand";
+import type {
+  CatalogueDocument,
+  LintDocument,
+  ModelDocument,
+  ReportDocument,
+  SessionAnswer,
+  SessionState,
+} from "../types";
 import { EngineError } from "./adapter";
-import type { EngineAdapter, ModelRef, SimulationOptions } from "./adapter";
+import type { EngineAdapter, ModelRef, SaveResult, SimulationOptions } from "./adapter";
 
 /** The list document of the app (`genmsi.models/1`). */
 interface ModelsDocument {
@@ -44,6 +52,41 @@ function messageOf(text: string): string {
   return text;
 }
 
+/**
+ * Send one request of the session protocol.
+ *
+ * The answer is the facade's: the state of the session for the editing
+ * operations, and the engine's bytes for the documents.
+ */
+async function session(request: unknown): Promise<SessionAnswer> {
+  const response = await fetch("/api/session", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const answer = (await response.json()) as SessionAnswer;
+  if (!answer.ok) {
+    throw new EngineError(answer.error ?? "el motor no pudo responder");
+  }
+  return answer;
+}
+
+/** The state the answer carries, or a failure when it carries none. */
+function stateOf(answer: SessionAnswer): SessionState {
+  if (answer.state === undefined) {
+    throw new EngineError("el motor no devolvió el estado del modelo");
+  }
+  return answer.state;
+}
+
+/** The document the answer carries, parsed. */
+function documentOf<T>(answer: SessionAnswer): T {
+  if (answer.document === undefined) {
+    throw new EngineError("el motor no devolvió el documento");
+  }
+  return JSON.parse(answer.document) as T;
+}
+
 /** The dev bridge backend: the Vite middleware of the development server. */
 export const devBridge: EngineAdapter = {
   listModels: async () => (await get<ModelsDocument>("models", {})).models,
@@ -55,4 +98,26 @@ export const devBridge: EngineAdapter = {
       seed: options?.seed,
       until: options?.until,
     }),
+  openModel: async (path: string) => stateOf(await session({ op: "open", path })),
+  newModel: async () => stateOf(await session({ op: "new" })),
+  apply: async (command: EditCommand) => stateOf(await session({ op: "apply", command })),
+  undo: async () => stateOf(await session({ op: "undo" })),
+  redo: async () => stateOf(await session({ op: "redo" })),
+  save: async (path?: string): Promise<SaveResult> => {
+    const answer = await session({ op: "save", path: path ?? null });
+    return {
+      state: stateOf(answer),
+      path: answer.path ?? path ?? "",
+      bytes: answer.bytes ?? 0,
+    };
+  },
+  simulateCurrent: async (options?: SimulationOptions) =>
+    documentOf<ReportDocument>(
+      await session({
+        op: "simulateCurrent",
+        seed: options?.seed ?? null,
+        until: options?.until ?? null,
+      }),
+    ),
+  catalogue: async () => documentOf<CatalogueDocument>(await session({ op: "catalogue" })),
 };

@@ -1,4 +1,6 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
+import { mkdirSync } from "node:fs";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
@@ -10,6 +12,15 @@ export const repoRoot = path.resolve(here, "../../..");
 
 /** The directory the app offers as models, relative to the repository root. */
 export const modelsDir = "fixtures/models";
+
+/**
+ * The directory the development path writes.
+ *
+ * The reference models of `fixtures/models` are read-only oracle material, so
+ * the copy the user edits lives here. Only the development server writes, and
+ * only here.
+ */
+export const workDir = "crates/genmsi-app/.devmodels";
 
 /** The engine's CLI: the dev bridge returns its stdout verbatim. */
 export const genmsiBin =
@@ -74,13 +85,113 @@ export function failureMessage(result: RunResult): string {
   return `el motor terminó con el código ${result.code}`;
 }
 
+/** The answer of the session process to one request. */
+export interface SessionAnswer {
+  /** Whether the request succeeded. */
+  ok: boolean;
+  /** The message of a failure. */
+  error?: string;
+  /** The state of the session, for the editing operations. */
+  state?: unknown;
+  /** A document of the engine, byte for byte as the CLI prints it. */
+  document?: string;
+  /** Where a model was written. */
+  path?: string;
+  /** How many bytes the written model has. */
+  bytes?: number;
+}
+
+/**
+ * The long-lived session process of the dev bridge.
+ *
+ * One request per line, one answer per line. The process keeps the model in
+ * memory while the user edits it: that is what makes the undo stack, the
+ * diagnostics after every change and the save possible.
+ */
+class SessionProcess {
+  /** The child process, once it is started. */
+  private child: ChildProcess | null = null;
+  /** What arrived but is not a whole line yet. */
+  private buffer = "";
+  /** The requests waiting for their answer, in order. */
+  private waiters: Array<(line: string) => void> = [];
+
+  /** Start the process, or return the one that runs. */
+  private start(): ChildProcess {
+    if (this.child !== null) {
+      return this.child;
+    }
+    const child = spawn(appEngineBin, ["session"], {
+      cwd: repoRoot,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    child.stdout?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk: string) => {
+      this.read(chunk);
+    });
+    child.stderr?.on("data", (chunk: string) => {
+      process.stderr.write(`[genmsi-session] ${chunk}`);
+    });
+    child.on("close", () => {
+      this.child = null;
+    });
+    this.child = child;
+    return child;
+  }
+
+  /** Take the whole lines out of what arrived. */
+  private read(chunk: string): void {
+    this.buffer += chunk;
+    let index = this.buffer.indexOf("\n");
+    while (index >= 0) {
+      const line = this.buffer.slice(0, index);
+      this.buffer = this.buffer.slice(index + 1);
+      const waiter = this.waiters.shift();
+      if (waiter !== undefined) {
+        waiter(line);
+      }
+      index = this.buffer.indexOf("\n");
+    }
+  }
+
+  /** Send one request and wait for its answer. */
+  send(request: unknown): Promise<SessionAnswer> {
+    const child = this.start();
+    return new Promise((resolve) => {
+      this.waiters.push((line) => {
+        try {
+          resolve(JSON.parse(line) as SessionAnswer);
+        } catch (error) {
+          resolve({
+            ok: false,
+            error: `la respuesta del motor no se pudo leer: ${(error as Error).message}`,
+          });
+        }
+      });
+      child.stdin?.write(`${JSON.stringify(request)}\n`);
+    });
+  }
+}
+
+/** The one session of the dev server. */
+const session = new SessionProcess();
+
+/** Read the body of a request. */
+async function readBody(request: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) {
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 /**
  * The dev bridge: a Vite middleware that serves the engine's documents.
  *
  * It moves the engine's bytes and never builds a document of its own: the
- * lint and the report come from the `genmsi` CLI verbatim, and the model's
- * graph comes from the app's engine facade, which builds it with the same
- * engine functions.
+ * lint and the report come from the `genmsi` CLI verbatim, the model's graph
+ * comes from the app's engine facade, and the editing session is answered by
+ * the same facade in a long-lived process.
  */
 export function devBridge(): Plugin {
   return {
@@ -94,8 +205,16 @@ export function devBridge(): Plugin {
         try {
           switch (route) {
             case "models": {
-              const result = await run(appEngineBin, ["models", modelsDir]);
-              return send(res, result);
+              // The models of the reference set and of the development work
+              // directory, where the copy the user edits lives.
+              const answer = await session.send({
+                op: "models",
+                dirs: [modelsDir, workDir],
+              });
+              res.statusCode = answer.ok ? 200 : 400;
+              res.setHeader("content-type", "application/json; charset=utf-8");
+              res.end(answer.document ?? JSON.stringify({ error: answer.error ?? "" }));
+              return;
             }
             case "model": {
               resolveInsideRepo(modelPath);
@@ -121,6 +240,23 @@ export function devBridge(): Plugin {
               const result = await run(genmsiBin, args);
               return send(res, result);
             }
+            case "session": {
+              // The editing protocol: one request, one answer, both JSON.
+              const body = await readBody(req);
+              const request = JSON.parse(body) as unknown;
+              const answer = await session.send(request);
+              res.statusCode = answer.ok ? 200 : 400;
+              res.setHeader("content-type", "application/json; charset=utf-8");
+              res.end(JSON.stringify(answer));
+              return;
+            }
+            case "catalogue": {
+              const answer = await session.send({ op: "catalogue" });
+              res.statusCode = answer.ok ? 200 : 400;
+              res.setHeader("content-type", "application/json; charset=utf-8");
+              res.end(JSON.stringify(answer));
+              return;
+            }
             default: {
               res.statusCode = 404;
               res.setHeader("content-type", "application/json; charset=utf-8");
@@ -133,12 +269,17 @@ export function devBridge(): Plugin {
           res.end(JSON.stringify({ error: (error as Error).message }));
         }
       });
+      // The dev bridge is the only path that writes, and it writes here.
+      mkdirSync(path.resolve(repoRoot, workDir), { recursive: true });
+      server.config.logger.info(
+        `el puente de desarrollo escribe solo en desarrollo, en ${workDir}`,
+      );
     },
   };
 }
 
 /** Write one engine document to the response, byte for byte. */
-function send(res: { statusCode: number; setHeader: (name: string, value: string) => void; end: (body?: string) => void }, result: RunResult) {
+function send(res: ServerResponse, result: RunResult): void {
   res.setHeader("content-type", "application/json; charset=utf-8");
   if (result.code === 0) {
     res.statusCode = 200;

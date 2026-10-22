@@ -26,7 +26,20 @@ export type { Queue } from "./generated/Queue";
 export type { Storage } from "./generated/Storage";
 export type { Chain } from "./generated/Chain";
 export type { Table } from "./generated/Table";
+export type {
+  Diagnostics,
+  SessionAnswer,
+  SessionState,
+} from "./protocol";
+
 export type { ModelBlock } from "./generated/ModelBlock";
 export type { ModelEdge } from "./generated/ModelEdge";
+export type { ModelPort } from "./generated/ModelPort";
 export type { ModelProperty } from "./generated/ModelProperty";
 export type { ModelRect } from "./generated/ModelRect";
+export type { CatalogueDocument } from "./generated/CatalogueDocument";
+export type { CatalogueClass } from "./generated/CatalogueClass";
+export type { CataloguePort } from "./generated/CataloguePort";
+export type { CatalogueProperty } from "./generated/CatalogueProperty";
+export type { EditCommand } from "./generated/EditCommand";
+export type { Position } from "./generated/Position";

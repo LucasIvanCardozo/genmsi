@@ -2,3 +2,7 @@
 node_modules/
 dist/
 .vite/
+
+# The development work directory: the copy of a model the user edits while
+# the development server runs. The reference models are read-only.
+.devmodels/

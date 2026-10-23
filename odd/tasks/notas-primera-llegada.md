@@ -3,7 +3,9 @@
 Rama `feature/primera-llegada`, worktree `../genmsi-primera`, desde el HEAD
 `3ca6fb9`. **Esta sesión no tocó el core**: lo que hay aquí es evidencia,
 veredicto y propuesta. Los dos scripts que producen la tabla están en
-`scripts/` de este worktree.
+`scripts/wine-oracle/` (se movieron ahí cuando el trabajo llegó a `main`:
+leen las bases del original, que es donde viven las herramientas que leen el
+original).
 
 ## La pregunta (verbatim)
 
@@ -366,25 +368,27 @@ función `operand_parts`, rama `BlockKind::Generate`.
 
 ## Cómo se reproduce
 
-En el worktree `../genmsi-primera`:
+Desde la raíz del repo:
 
 ```bash
 cargo build --release -p genmsi-cli
 
 # la tabla de la evidencia, modelo por modelo, con nuestro conteo al lado
-python3 scripts/comparar_generate.py 1
+python3 scripts/wine-oracle/compare_generate.py 1
 
 # sólo la evidencia del original (sin correr nuestro motor)
-python3 scripts/primera_evidence.py
+python3 scripts/wine-oracle/first_arrival_evidence.py
 ```
 
-`scripts/comparar_generate.py` corre nuestro motor con el horizonte que
-declara el reporte del original, empareja las filas GENERATE por sus operandos
-y aplica el modelo de conteo (entradas = llegadas + 1 pendiente).
+`scripts/wine-oracle/compare_generate.py` corre nuestro motor con el
+horizonte que declara el reporte del original, empareja las filas GENERATE por
+sus operandos y aplica el modelo de conteo (entradas = llegadas + 1
+pendiente).
 
 ## Lo que esta sesión NO tocó
 
 - Ningún fichero del core (`crates/genmsi-core/**`), ni `docs/format-and-engine.md`.
 - El worktree principal: no se editó ningún fichero suyo ni se cambió su
   estado de git (sólo se leyó).
-- Sólo se añadieron este documento y los dos scripts de `scripts/`.
+- Sólo se añadieron este documento y los dos scripts (que después se movieron
+  a `scripts/wine-oracle/`).

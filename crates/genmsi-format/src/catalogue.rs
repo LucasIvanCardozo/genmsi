@@ -63,6 +63,26 @@ pub static CLASSES: &[ClassSpec] = &[
     STORAGEDEF, STORAGEUSE, TABLE, TABULATE, TERMINATE, TEST, TRANSFER, UNLINK, VARIABLE, VARIABLEA,
 ];
 
+/// The value a new block of a class comes with, per property.
+///
+/// The row is `(class, property, value)`: the value is the raw one, the
+/// text the file carries (the digits of a number). The original editor hands
+/// a new block these defaults; the classes whose defaults are known are
+/// added here, one row at a time.
+pub static DEFAULTS: &[(&str, &str, &str)] = &[
+    // The clock counts in units of time: the original gives it a whole hour.
+    ("Clock", "Frecuencia", "3600"),
+];
+
+/// The default value a new block of `class` comes with for `property`, when
+/// the class has one.
+pub fn default_value(class: &str, property: &str) -> Option<&'static str> {
+    DEFAULTS
+        .iter()
+        .find(|(c, p, _)| *c == class && *p == property)
+        .map(|(_, _, value)| *value)
+}
+
 /// Options of a `Listed` property, by its subtype.
 ///
 /// Only ASCII values: the file's encoding is CP1252 and the editor must not
@@ -104,11 +124,12 @@ pub fn class_spec(class: &str) -> Option<&'static ClassSpec> {
 /// Build the `Block` of a catalogue class with the given owner and layout.
 ///
 /// The block gets id `0`: the caller assigns the real id. The ports come from
-/// the catalogue with empty labels and no port layout, the properties with an
-/// empty value. The sections are the ones the block actually has, in the
-/// order `Inputs`, `Outputs`, `Props`; a class with no ports and no
-/// properties (a note) gets none at all, so the writer emits the
-/// self-closing form the original uses.
+/// the catalogue with empty labels and no port layout, the properties with
+/// the default value of their class (see [`DEFAULTS`]) or with an empty one
+/// when the class has no default for them. The sections are the ones the
+/// block actually has, in the order `Inputs`, `Outputs`, `Props`; a class with
+/// no ports and no properties (a note) gets none at all, so the writer emits
+/// the self-closing form the original uses.
 pub fn build_block(class: &str, owner: u32, layout: Option<Layout>) -> Result<Block, FormatError> {
     let spec = class_spec(class).ok_or_else(|| {
         FormatError::structural(0, format!("clase de bloque desconocida: {class}"))
@@ -142,7 +163,9 @@ pub fn build_block(class: &str, owner: u32, layout: Option<Layout>) -> Result<Bl
         .map(|p| Property {
             name: p.name.to_string(),
             hint: p.hint.to_string(),
-            raw_value: String::new(),
+            raw_value: default_value(spec.class, p.name)
+                .map(str::to_string)
+                .unwrap_or_default(),
             ty: p.ty.to_string(),
             subtype: p.subtype.to_string(),
             visible: true,

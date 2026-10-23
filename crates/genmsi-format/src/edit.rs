@@ -1076,9 +1076,9 @@ mod tests {
     fn add_block_refuses_unknown_classes_and_non_containers() {
         let mut session = EditSession::new(model());
         let err = session
-            .apply(EditCommand::AddBlock { class: "Multifurcacion".into(), container: 0, x: 0, y: 0 })
+            .apply(EditCommand::AddBlock { class: "MacroPropio".into(), container: 0, x: 0, y: 0 })
             .expect_err("custom macros are not in the catalogue");
-        assert!(err.to_string().contains("Multifurcacion"), "{err}");
+        assert!(err.to_string().contains("MacroPropio"), "{err}");
         let err = session
             .apply(EditCommand::AddBlock { class: "Advance".into(), container: 99, x: 0, y: 0 })
             .expect_err("missing container");

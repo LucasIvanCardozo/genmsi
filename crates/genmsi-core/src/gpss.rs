@@ -721,16 +721,17 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
             statement(out, "SCAN", &operands);
         }
         BlockKind::Alter(spec) => {
-            // The original writes the group, the number of transactions, the
+            // The original writes: the group, the number of transactions, the
             // parameter it alters and its value, and the parameter it
-            // compares and its value. The compiled program only carries the
-            // comparison.
+            // compares and its value.
             let operands = format!(
-                "E {},{},,,{},{}",
+                "E {},{},{},{},{},{}",
                 spec.group,
                 sna(&spec.count),
-                spec.parameter.clone().unwrap_or_default(),
-                spec.value.as_ref().map(sna).unwrap_or_default(),
+                spec.altered_parameter.clone().unwrap_or_default(),
+                spec.altered_value.as_ref().map(sna).unwrap_or_default(),
+                spec.compared_parameter.clone().unwrap_or_default(),
+                spec.compared_value.as_ref().map(sna).unwrap_or_default(),
             );
             statement(out, "ALTER", &operands);
         }

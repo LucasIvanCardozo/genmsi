@@ -3,16 +3,15 @@
 //! Direction pinned by this test: for every block of every reference model
 //! whose class IS in the catalogue,
 //!
-//! 1. the block declares EXACTLY the catalogue's ports — same ids and names,
-//!    nothing more and nothing less (both directions);
+//! 1. the block declares the catalogue's ports — same ids and names, and the
+//!    model may declare fewer of them than its class does;
 //! 2. every VISIBLE property the block declares exists in the catalogue's
 //!    class with the same declared `type` and `subType` (one direction: the
 //!    models may omit properties the catalogue declares).
 //!
-//! Blocks whose class is NOT in the catalogue (custom macros like
-//! `Multifurcacion`, plain containers with an empty class, the model root)
-//! are skipped: they are not offered by the editor and the catalogue makes no
-//! claim about them.
+//! Blocks whose class is NOT in the catalogue (custom macros, plain
+//! containers with an empty class, the model root) are skipped: they are not
+//! offered by the editor and the catalogue makes no claim about them.
 
 use std::path::{Path, PathBuf};
 
@@ -48,7 +47,10 @@ fn every_catalogued_block_matches_the_catalogue() {
             };
             checked += 1;
 
-            // 1. Ports: exactly the catalogue's ports, same ids and names.
+            // 1. Ports: the catalogue's ports, same ids and names. A model
+            //    may declare fewer of them than its class does: the original
+            //    keeps the ports a model declares (the `Multifurcacion` of the
+            //    reference model has three of the five its class declares).
             let catalogue_inputs: Vec<(u32, &str)> =
                 spec.inputs.iter().map(|p| (p.ioid, p.name)).collect();
             let catalogue_outputs: Vec<(u32, &str)> =
@@ -57,14 +59,16 @@ fn every_catalogued_block_matches_the_catalogue() {
                 block.inputs.iter().map(|p| (p.ioid, p.name.as_str())).collect();
             let model_outputs: Vec<(u32, &str)> =
                 block.outputs.iter().map(|p| (p.ioid, p.name.as_str())).collect();
-            assert_eq!(
-                model_inputs, catalogue_inputs,
-                "{name}: block {} ({}) input ports differ from the catalogue",
+            assert!(
+                catalogue_inputs.starts_with(&model_inputs),
+                "{name}: block {} ({}) input ports differ from the catalogue: \
+                 the model declares {model_inputs:?} and the catalogue {catalogue_inputs:?}",
                 block.id, block.class
             );
-            assert_eq!(
-                model_outputs, catalogue_outputs,
-                "{name}: block {} ({}) output ports differ from the catalogue",
+            assert!(
+                catalogue_outputs.starts_with(&model_outputs),
+                "{name}: block {} ({}) output ports differ from the catalogue: \
+                 the model declares {model_outputs:?} and the catalogue {catalogue_outputs:?}",
                 block.id, block.class
             );
 
@@ -187,7 +191,9 @@ fn build_block_produces_the_reference_shape() {
         Some((120, 48, 10, 20))
     );
 
-    // An unknown class is refused.
-    let err = build_block("Multifurcacion", 0, None).expect_err("custom macro");
-    assert!(err.to_string().contains("Multifurcacion"), "{err}");
+    // An unknown class is refused. `Multifurcacion` is a class of the
+    // original and the catalogue offers it; a custom macro of a model is
+    // not.
+    let err = build_block("MacroPropio", 0, None).expect_err("custom macro");
+    assert!(err.to_string().contains("MacroPropio"), "{err}");
 }

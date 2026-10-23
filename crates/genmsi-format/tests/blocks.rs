@@ -4,8 +4,12 @@
 //! starts counting at one hour). The catalogue carries those defaults in
 //! `catalogue::DEFAULTS`, and `build_block` fills them in; every property the
 //! table does not name stays empty.
+//!
+//! The classes the original declares and our catalogue does not offer are
+//! pinned here too: the ports and the defaults come from the original's own
+//! class library (`Genmsi_20230711.backup/gClasses.xml`).
 
-use genmsi_format::catalogue::{build_block, CLASSES, DEFAULTS};
+use genmsi_format::catalogue::{build_block, class_spec, CLASSES, DEFAULTS};
 use genmsi_format::{parse_str, to_string, validate, EditCommand, EditSession, Link};
 
 /// The default the table gives to a property of a class, if it gives one.
@@ -268,4 +272,128 @@ fn adding_a_clock_through_the_editing_api_gives_it_the_default() {
         frequency.raw_value, "3600",
         "the added clock starts at a whole hour"
     );
+}
+
+// The classes the original declares and our catalogue did not offer.
+//
+// Their shape comes from the original's own class library
+// (`Genmsi_20230711.backup/gClasses.xml`): the ports the class graph
+// declares and the properties its macro code declares, with the default
+// value the macro code carries.
+
+/// The ports of a class, as `(id, name)` pairs.
+fn ports(spec: &genmsi_format::catalogue::ClassSpec, inputs: bool) -> Vec<(u32, &str)> {
+    let list = if inputs {
+        spec.inputs
+    } else {
+        spec.outputs
+    };
+    list.iter().map(|port| (port.ioid, port.name)).collect()
+}
+
+#[test]
+fn the_catalogue_offers_the_four_classes_the_original_declares() {
+    // The `Preempt` class: one input, the main output and the output of the
+    // owner it interrupts.
+    let preempt = class_spec("Preempt").expect("the catalogue offers Preempt");
+    assert_eq!(
+        ports(preempt, true),
+        vec![(1, "Entrada1")],
+        "the Preempt class takes one input"
+    );
+    assert_eq!(
+        ports(preempt, false),
+        vec![(2, "Salida1"), (3, "SalidaAlt")],
+        "the owner of the interrupted facility goes to SalidaAlt"
+    );
+    assert_eq!(
+        preempt
+            .properties
+            .iter()
+            .map(|property| property.name)
+            .collect::<Vec<_>>(),
+        vec!["Facility", "ModoArrebato", "ModoInterrupcion", "Remanente"],
+        "the properties the macro code of the class declares"
+    );
+
+    // The `Return` class: the facility it gives back.
+    let returns = class_spec("Return").expect("the catalogue offers Return");
+    assert_eq!(ports(returns, true), vec![(1, "Entrada1")]);
+    assert_eq!(ports(returns, false), vec![(2, "Salida1")]);
+    assert_eq!(
+        returns
+            .properties
+            .iter()
+            .map(|property| property.name)
+            .collect::<Vec<_>>(),
+        vec!["Facility"]
+    );
+
+    // The two multifurcations: one input and five outputs.
+    for (class, caption) in [
+        ("Multifurcacion", "%5BProb1%5D"),
+        ("MultifurcacionP", "%5BParametro%5D%3D1"),
+    ] {
+        let spec = class_spec(class).expect("the catalogue offers the class");
+        assert_eq!(ports(spec, true), vec![(1, "Entrada")], "{class}");
+        assert_eq!(
+            ports(spec, false),
+            vec![
+                (2, "Salida1"),
+                (3, "SalidaProb2"),
+                (4, "SalidaProb3"),
+                (5, "SalidaProb4"),
+                (6, "SalidaProb5"),
+            ],
+            "{class}"
+        );
+        assert_eq!(spec.outputs[0].caption, caption, "{class}");
+    }
+}
+
+#[test]
+fn a_new_block_of_the_four_classes_comes_with_the_defaults_of_the_original() {
+    // The `Preempt` class: the facility, the mode, the parameter and the way
+    // the owner goes on.
+    let block = build_block("Preempt", 0, None).expect("Preempt is in the catalogue");
+    let value = |name: &str| {
+        block
+            .props
+            .iter()
+            .find(|prop| prop.name == name)
+            .unwrap_or_else(|| panic!("the class declares {name}"))
+            .raw_value
+            .clone()
+    };
+    assert_eq!(value("Facility"), "Recurso");
+    assert_eq!(value("ModoInterrupcion"), "Prioridad");
+    assert_eq!(value("ModoArrebato"), "NoRemover");
+    assert_eq!(value("Remanente"), "Remanente");
+
+    // The `Return` class: the facility it gives back.
+    let block = build_block("Return", 0, None).expect("Return is in the catalogue");
+    assert_eq!(block.props.len(), 1);
+    assert_eq!(block.props[0].name, "Facility");
+    assert_eq!(block.props[0].raw_value, "Recurso");
+
+    // The multifurcations: the functions they create and the five shares.
+    for class in ["Multifurcacion", "MultifurcacionP"] {
+        let block = build_block(class, 0, None).expect("the class is in the catalogue");
+        for index in 1..=5 {
+            let prob = block
+                .props
+                .iter()
+                .find(|prop| prop.name == format!("Prob{index}"))
+                .expect("the class declares the share");
+            assert_eq!(prob.raw_value, "20%25", "{class}: the fifth of the traffic");
+            assert_eq!(prob.value(), "20%", "{class}: the share as the editor shows it");
+        }
+        let go = block
+            .props
+            .iter()
+            .find(|prop| prop.name == "MultifurcacionGO")
+            .expect("the class creates the function it routes by");
+        assert_eq!(go.raw_value, "MultifurcacionGO");
+        assert!(go.unique, "{class}: the function is defined by the block");
+    }
 }

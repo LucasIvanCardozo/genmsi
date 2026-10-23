@@ -125,3 +125,221 @@ fn transfer_share_matches_the_monorriel_baseline() {
          five replications give {share:.3}"
     );
 }
+
+// The two multifurcations: the class that splits the traffic with the shares
+// it stores and the class that routes by a parameter of the transaction.
+//
+// The original's own bench of the class (`scripts/wine-oracle/benches/
+// Multifurcacion.gmdl`, run against the original by the wine oracle) says
+// that the five branches take 9, 10, 16, 12 and 15 of the 62 transactions
+// the run created: the shares the class declares (a fifth each) with the
+// noise of the draw.
+
+/// A `Multifurcacion` with the five shares of the original's class.
+fn multifurcacion_model() -> genmsi_core::Program {
+    let nodes = [
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("T1"))],
+            &[("Media", "1"), ("Modificador", "0")],
+        ),
+        node(
+            2,
+            "Multifurcacion",
+            Some("T1"),
+            &[
+                ("Salida1", Some("B1")),
+                ("SalidaProb2", Some("B2")),
+                ("SalidaProb3", Some("B3")),
+                ("SalidaProb4", Some("B4")),
+                ("SalidaProb5", Some("B5")),
+            ],
+            &[
+                ("Prob1", "20%"),
+                ("Prob2", "20%"),
+                ("Prob3", "20%"),
+                ("Prob4", "20%"),
+                ("Prob5", "20%"),
+            ],
+        ),
+        node(3, "Terminate", Some("B1"), &[], &[("Unidades", "0")]),
+        node(4, "Terminate", Some("B2"), &[], &[("Unidades", "0")]),
+        node(5, "Terminate", Some("B3"), &[], &[("Unidades", "0")]),
+        node(6, "Terminate", Some("B4"), &[], &[("Unidades", "0")]),
+        node(7, "Terminate", Some("B5"), &[], &[("Unidades", "0")]),
+    ];
+    let links = [(1, 0, 2, 0), (2, 0, 3, 0), (2, 1, 4, 0), (2, 2, 5, 0), (2, 3, 6, 0), (2, 4, 7, 0)];
+    wired(&nodes, &links, 3600.0)
+}
+
+#[test]
+fn the_multifurcacion_class_splits_the_traffic_in_the_shares_it_stores() {
+    let program = multifurcacion_model();
+    let result = run(&program, 2000.0, 1);
+    let mut total = 0u64;
+    let mut shares = Vec::new();
+    for label in ["B1", "B2", "B3", "B4", "B5"] {
+        let count = entries(&program, &result, label);
+        total += count;
+        shares.push(count as f64);
+    }
+    assert!(total > 1000, "the run must create enough transactions: {total}");
+    // 2000 draws at p = 0.2: sd = 0.011, so +-0.03 is beyond 2.5 sigma.
+    for (index, share) in shares.iter().enumerate() {
+        let share = share / total as f64;
+        assert!(
+            (share - 0.2).abs() < 0.03,
+            "branch {index} took {share:.3} of the traffic, a fifth each is the rule"
+        );
+    }
+}
+
+/// A `MultifurcacionP` whose parameter says which branch the transaction
+/// takes.
+fn multifurcacionp_model(value: &'static str) -> genmsi_core::Program {
+    let nodes = [
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("T1"))],
+            &[("Media", "1"), ("Modificador", "0")],
+        ),
+        node(
+            2,
+            "Assign",
+            Some("T1"),
+            &[("Salida1", Some("T2"))],
+            &[("Parametro", "Param"), ("Operador", "="), ("Valor", value)],
+        ),
+        node(
+            3,
+            "MultifurcacionP",
+            Some("T2"),
+            &[
+                ("Salida1", Some("B1")),
+                ("SalidaProb2", Some("B2")),
+                ("SalidaProb3", Some("B3")),
+                ("SalidaProb4", Some("B4")),
+                ("SalidaProb5", Some("B5")),
+            ],
+            &[("Parametro", "Param")],
+        ),
+        node(4, "Terminate", Some("B1"), &[], &[("Unidades", "0")]),
+        node(5, "Terminate", Some("B2"), &[], &[("Unidades", "0")]),
+        node(6, "Terminate", Some("B3"), &[], &[("Unidades", "0")]),
+        node(7, "Terminate", Some("B4"), &[], &[("Unidades", "0")]),
+        node(8, "Terminate", Some("B5"), &[], &[("Unidades", "0")]),
+    ];
+    let links = [
+        (1, 0, 2, 0),
+        (2, 0, 3, 0),
+        (3, 0, 4, 0),
+        (3, 1, 5, 0),
+        (3, 2, 6, 0),
+        (3, 3, 7, 0),
+        (3, 4, 8, 0),
+    ];
+    wired(&nodes, &links, 3600.0)
+}
+
+#[test]
+fn the_multifurcacionp_class_routes_by_the_parameter_of_the_transaction() {
+    // The class library of the original routes by the parameter
+    // (`MULTITRANSFER MultifurcacionGO,P:[Parametro],{...}`): the value of
+    // the parameter says which branch the transaction takes, and the branch
+    // writes its own number in the parameter.
+    for (value, branch) in [("1", "B1"), ("2", "B2"), ("3", "B3"), ("4", "B4"), ("5", "B5")] {
+        let program = multifurcacionp_model(value);
+        let result = run(&program, 200.0, 1);
+        let total: u64 = ["B1", "B2", "B3", "B4", "B5"]
+            .iter()
+            .map(|label| entries(&program, &result, label))
+            .sum();
+        assert!(total > 100, "the run must create transactions: {total}");
+        for label in ["B1", "B2", "B3", "B4", "B5"] {
+            let count = entries(&program, &result, label);
+            if label == branch {
+                assert_eq!(count, total, "the parameter {value} takes the branch {branch}");
+            } else {
+                assert_eq!(count, 0, "the parameter {value} takes no other branch");
+            }
+        }
+    }
+}
+
+#[test]
+fn the_multifurcacionp_class_writes_the_branch_it_took_in_the_parameter() {
+    // The captions of the original's class say what each branch does:
+    // `[Parametro]=1`, `[Parametro]=2`, ... A transaction that arrives
+    // without a value takes the first branch, and the branch writes its own
+    // number in the parameter.
+    let nodes = [
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("T1"))],
+            &[("Media", "1"), ("Modificador", "0")],
+        ),
+        node(
+            2,
+            "MultifurcacionP",
+            Some("T1"),
+            &[
+                ("Salida1", Some("T2")),
+                ("SalidaProb2", Some("B2")),
+                ("SalidaProb3", Some("B3")),
+                ("SalidaProb4", Some("B4")),
+                ("SalidaProb5", Some("B5")),
+            ],
+            &[("Parametro", "Param")],
+        ),
+        node(
+            3,
+            "SaveValue",
+            Some("T2"),
+            &[("Salida1", Some("T3"))],
+            &[("SaveValue", "V"), ("Op", "="), ("Valor", "Param")],
+        ),
+        node(4, "Terminate", Some("T3"), &[], &[("Unidades", "0")]),
+        node(5, "Terminate", Some("B2"), &[], &[("Unidades", "0")]),
+        node(6, "Terminate", Some("B3"), &[], &[("Unidades", "0")]),
+        node(7, "Terminate", Some("B4"), &[], &[("Unidades", "0")]),
+        node(8, "Terminate", Some("B5"), &[], &[("Unidades", "0")]),
+    ];
+    let links = [
+        (1, 0, 2, 0),
+        (2, 0, 3, 0),
+        (3, 0, 4, 0),
+        (2, 1, 5, 0),
+        (2, 2, 6, 0),
+        (2, 3, 7, 0),
+        (2, 4, 8, 0),
+    ];
+    let program = wired(&nodes, &links, 3600.0);
+    let result = Simulation::new(
+        &program,
+        SimConfig {
+            seed: 1,
+            stop_time: Some(20.0),
+            trace: true,
+            ..SimConfig::default()
+        },
+    )
+    .run()
+    .expect("runs");
+    let values: Vec<&str> = result
+        .trace
+        .iter()
+        .filter(|event| event.event == "value")
+        .map(|event| event.detail.as_str())
+        .collect();
+    assert!(!values.is_empty(), "the trace must publish the value");
+    assert!(
+        values.iter().all(|detail| detail.ends_with(" 1")),
+        "the branch writes its own number in the parameter: {values:?}"
+    );
+}

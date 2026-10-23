@@ -12,8 +12,8 @@ use serde::Serialize;
 use crate::error::EngineError;
 use crate::expr::{Ctx, ProgramExpr, RefKind};
 use crate::program::{
-    BlockKind, EntityName, ExecBlock, FunctionDef, GateCondition, GenerateSpec, LogicOp, Program,
-    SelectMode, TerminateSpec, UnlinkSpec,
+    BlockKind, EntityName, ExecBlock, FunctionDef, GateCondition, GenerateSpec, LogicOp,
+    MultiTransferSelection, PreemptPriority, Program, SelectMode, TerminateSpec, UnlinkSpec,
 };
 use crate::report::number;
 use crate::rng::Streams;
@@ -23,6 +23,30 @@ use crate::xact::{Transaction, XactId, XactState};
 
 /// Capacity used for storages referenced without a `StorageDef`.
 const UNDECLARED_STORAGE_CAPACITY: i64 = 1_000_000;
+
+/// What the interruption of a facility's owner left behind.
+struct OwnerInterruption {
+    /// The block the owner was in.
+    block: Option<usize>,
+    /// Whether that block already gave the owner back: an `ADVANCE` holds the
+    /// transaction inside the block, so it does.
+    left_the_block: bool,
+    /// The time the owner had left.
+    remaining: f64,
+}
+
+/// The target of the output port named `name`, when it is connected.
+///
+/// The block's own `next_named` falls back to the first output, which would
+/// send a preempted owner to the wrong place when the interrupt output is
+/// not connected.
+fn port_target(block: &ExecBlock, name: &str) -> Option<usize> {
+    block
+        .port_names
+        .iter()
+        .position(|port| port == name)
+        .and_then(|index| block.next.get(index).copied().flatten())
+}
 
 /// How a run ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -765,19 +789,42 @@ impl<'p> Simulation<'p> {
                 let name = self.resolve_name(&spec.facility, xact);
                 let previous = {
                     let facility = self.entities.facility(&name, self.now);
-                    let previous = facility.owner.filter(|owner| *owner != xact);
-                    if previous.is_some() {
-                        facility.inter += 1;
-                    }
-                    previous
+                    facility.owner.filter(|owner| *owner != xact)
                 };
                 if let Some(previous) = previous {
-                    let remaining = self.suspend_owner(previous, spec.remaining.as_deref());
-                    if let Some(facility) = self.entities.facilities.get_mut(&name) {
-                        facility.preempted = Some(crate::stat::Preempted {
-                            xact: previous,
-                            remaining,
-                        });
+                    // The `PR` operand: the preempting transaction's own
+                    // priority decides whether it may take the facility. The
+                    // owner keeps it when it outranks the newcomer.
+                    if spec.priority == PreemptPriority::Preempting
+                        && self.priority_of(previous) >= self.priority_of(xact)
+                    {
+                        self.wait_for_facility(xact, block_index, &name);
+                        return Ok(());
+                    }
+                    self.entities.facility(&name, self.now).inter += 1;
+                    // The owner is interrupted: the time it had left is saved
+                    // and it goes on the way the class says.
+                    let interrupted = self.interrupt_owner(previous, spec.remaining.as_deref());
+                    let alt = if spec.route_owner {
+                        port_target(&block, "SalidaAlt")
+                    } else {
+                        None
+                    };
+                    match (spec.remove_owner, alt) {
+                        (true, _) => self.remove_transaction(previous),
+                        // The original routes the owner to the interrupt output
+                        // of the block (`SalidaAlt`, the "Propietaria").
+                        (false, Some(target)) => self.route_owner(previous, interrupted, target),
+                        // Nobody routes it: the owner waits for the `RETURN`
+                        // that gives the facility back.
+                        (false, None) => {
+                            if let Some(facility) = self.entities.facilities.get_mut(&name) {
+                                facility.preempted = Some(crate::stat::Preempted {
+                                    xact: previous,
+                                    remaining: interrupted.remaining,
+                                });
+                            }
+                        }
                     }
                 }
                 let facility = self.entities.facility(&name, self.now);
@@ -882,25 +929,47 @@ impl<'p> Simulation<'p> {
                 self.leave(xact, block_index, target);
             }
             BlockKind::MultiTransfer(spec) => {
-                let weights: Vec<f64> = {
-                    let mut ctx = CtxView {
-                        sim: self,
-                        xact,
-                        depth: 0,
-                    };
-                    spec.weights.iter().map(|weight| weight.eval(&mut ctx)).collect()
-                };
-                let total: f64 = weights.iter().sum();
-                let draw = self.streams.uniform(block.stream) * total;
-                let mut acc = 0.0;
-                let mut chosen = block.next.len().saturating_sub(1);
-                for (index, weight) in weights.iter().enumerate() {
-                    acc += weight;
-                    if draw < acc {
-                        chosen = index;
-                        break;
+                let chosen = match &spec.selection {
+                    MultiTransferSelection::Weights => {
+                        let weights: Vec<f64> = {
+                            let mut ctx = CtxView {
+                                sim: self,
+                                xact,
+                                depth: 0,
+                            };
+                            spec.weights.iter().map(|weight| weight.eval(&mut ctx)).collect()
+                        };
+                        let total: f64 = weights.iter().sum();
+                        let draw = self.streams.uniform(block.stream) * total;
+                        let mut acc = 0.0;
+                        let mut chosen = block.next.len().saturating_sub(1);
+                        for (index, weight) in weights.iter().enumerate() {
+                            acc += weight;
+                            if draw < acc {
+                                chosen = index;
+                                break;
+                            }
+                        }
+                        chosen
                     }
-                }
+                    MultiTransferSelection::Parameter(parameter) => {
+                        // The branch is the value of the parameter: one is the
+                        // first branch. A value outside the branches takes the
+                        // first one.
+                        let value = self
+                            .xacts
+                            .get(&xact)
+                            .map(|transaction| transaction.parameter(parameter))
+                            .unwrap_or(0.0);
+                        let branches = block.next.len();
+                        let index = (value.round() as i64 - 1).clamp(0, branches as i64 - 1) as usize;
+                        // The branch writes its own number in the parameter.
+                        if let Some(transaction) = self.xacts.get_mut(&xact) {
+                            transaction.set_parameter(parameter, (index + 1) as f64);
+                        }
+                        index
+                    }
+                };
                 let target = block.next_port(chosen).or_else(|| block.next_default());
                 self.leave(xact, block_index, target);
             }
@@ -1332,17 +1401,23 @@ impl<'p> Simulation<'p> {
                 }
             }
             BlockKind::Alter(spec) => {
-                let (count, value) = {
+                let (count, altered_value, compared_value) = {
                     let mut ctx = CtxView {
                         sim: self,
                         xact,
                         depth: 0,
                     };
                     let count = spec.count.eval(&mut ctx).round().max(1.0) as usize;
-                    let value = spec.value.as_ref().map(|expr| expr.eval(&mut ctx));
-                    (count, value)
+                    let altered_value = spec.altered_value.as_ref().map(|expr| expr.eval(&mut ctx));
+                    let compared_value = spec.compared_value.as_ref().map(|expr| expr.eval(&mut ctx));
+                    (count, altered_value, compared_value)
                 };
-                let changed = self.alter_group(&spec.group, count, spec.parameter.as_deref(), value);
+                let changed = self.alter_group(
+                    &spec,
+                    count,
+                    altered_value,
+                    compared_value,
+                );
                 let target = if changed {
                     block.next_named("Salida1")
                 } else {
@@ -1533,12 +1608,22 @@ impl<'p> Simulation<'p> {
         }
     }
 
-    fn suspend_owner(&mut self, owner: XactId, remaining_parameter: Option<&str>) -> f64 {
+    /// Interrupt the owner of a facility.
+    ///
+    /// The owner's pending advance is cancelled and the time it had left is
+    /// saved in the parameter the class names. The owner stays in the block it
+    /// was in: what happens to it next is the caller's business.
+    fn interrupt_owner(
+        &mut self,
+        owner: XactId,
+        remaining_parameter: Option<&str>,
+    ) -> OwnerInterruption {
         let current = self
             .xacts
             .get(&owner)
             .and_then(|transaction| transaction.current_block);
         let mut remaining = 0.0;
+        let mut left_the_block = false;
         if let Some(block) = current
             && matches!(self.program.blocks[block].kind, BlockKind::Advance(_))
         {
@@ -1554,6 +1639,7 @@ impl<'p> Simulation<'p> {
                 if self.block_stats[block].current > 0 {
                     self.block_stats[block].current -= 1;
                 }
+                left_the_block = true;
             }
         }
         if let Some(transaction) = self.xacts.get_mut(&owner) {
@@ -1567,7 +1653,55 @@ impl<'p> Simulation<'p> {
         if let Some(transaction) = self.xacts.get_mut(&owner) {
             transaction.transition(XactState::Waiting);
         }
-        remaining
+        OwnerInterruption {
+            block: current,
+            left_the_block,
+            remaining,
+        }
+    }
+
+    /// Send the interrupted owner on to the interrupt output of the block.
+    ///
+    /// The original routes the owner of the interrupted facility to the
+    /// `SalidaAlt` output (`Propietaria`), with the time it had left saved in
+    /// the parameter the class names.
+    fn route_owner(&mut self, owner: XactId, interruption: OwnerInterruption, target: usize) {
+        if let Some(block) = interruption.block
+            && !interruption.left_the_block
+            && self.block_stats[block].current > 0
+        {
+            self.block_stats[block].current -= 1;
+        }
+        if self.config.trace {
+            self.record_trace(
+                owner,
+                interruption.block.unwrap_or(0),
+                "leave",
+                format!("-> {target}"),
+            );
+        }
+        self.enter_block(owner, target);
+    }
+
+    /// Wait for a facility that another transaction holds.
+    ///
+    /// The transaction queues with the facility's waiters, as a `SEIZE` that
+    /// finds the facility busy does.
+    fn wait_for_facility(&mut self, xact: XactId, block_index: usize, name: &str) {
+        let mut waiters = {
+            let facility = self.entities.facility(name, self.now);
+            facility.waiters.push(xact);
+            std::mem::take(&mut facility.waiters)
+        };
+        waiters.sort_by_key(|waiter| (std::cmp::Reverse(self.priority_of(*waiter)), *waiter));
+        self.entities.facility(name, self.now).waiters = waiters;
+        if let Some(transaction) = self.xacts.get_mut(&xact) {
+            transaction.transition(XactState::Waiting);
+        }
+        self.block_stats[block_index].retries += 1;
+        if self.config.trace {
+            self.record_trace(xact, block_index, "wait", name.to_string());
+        }
     }
 
     fn resume_preempted(&mut self, owner: XactId, remaining: f64) {
@@ -1749,24 +1883,46 @@ impl<'p> Simulation<'p> {
         best.map(|(from_value, _)| (from_value, spec.to_parameter.clone()))
     }
 
+    /// Alter the transactions of a group.
+    ///
+    /// The macro of the original says it in its own words: the transactions of
+    /// the group are **compared** first, and the ones that match are the ones
+    /// **altered**. The comparison is skipped when the model says nothing to
+    /// compare.
     fn alter_group(
         &mut self,
-        group: &str,
+        spec: &crate::program::AlterSpec,
         count: usize,
-        parameter: Option<&str>,
-        value: Option<f64>,
+        altered_value: Option<f64>,
+        compared_value: Option<f64>,
     ) -> bool {
-        let members = self.transaction_groups.get(group).cloned().unwrap_or_default();
-        let mut changed = false;
-        for id in members.into_iter().take(count) {
-            if let (Some(parameter), Some(value), Some(transaction)) =
-                (parameter, value, self.xacts.get_mut(&id))
+        let members = self.transaction_groups.get(&spec.group).cloned().unwrap_or_default();
+        let mut altered = 0usize;
+        for id in members {
+            if altered >= count {
+                break;
+            }
+            if let (Some(name), Some(expected)) =
+                (spec.compared_parameter.as_deref(), compared_value)
             {
+                let current = self.xacts.get(&id).map(|transaction| transaction.parameter(name));
+                let matches = current
+                    .map(|current| spec.comparison.test(current, expected))
+                    .unwrap_or(false);
+                if !matches {
+                    continue;
+                }
+            }
+            if let (Some(parameter), Some(value), Some(transaction)) = (
+                spec.altered_parameter.as_deref(),
+                altered_value,
+                self.xacts.get_mut(&id),
+            ) {
                 transaction.set_parameter(parameter, value);
-                changed = true;
+                altered += 1;
             }
         }
-        changed
+        altered > 0
     }
 
     fn record_queue_tables(&mut self, queue: &str, waited: f64, xact: XactId, block: usize) {

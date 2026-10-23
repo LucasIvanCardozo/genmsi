@@ -32,7 +32,7 @@ use genmsi_core::{Program, RunResult, SimConfig, Simulation};
 
 mod support;
 
-use support::{block, linear, module};
+use support::{block, linear, module, node, run, wired};
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -581,5 +581,355 @@ fn the_trace_does_not_change_the_run() {
         genmsi_core::render(&traced, &program),
         genmsi_core::render(&untraced, &program),
         "the report is the same with and without the trace"
+    );
+}
+
+// The `Preempt` and `Return` classes: the facility they interrupt and the
+// one they give back.
+//
+// The benches of the two classes (`scripts/wine-oracle/benches/Preempt.gmdl`
+// and `Return.gmdl`) are the models the wine oracle runs against the
+// original, so the report of the original says what the classes do.
+
+/// Compile the bench of a class: the model the oracle runs.
+fn bench(name: &str) -> Program {
+    let path = root().join(format!("scripts/wine-oracle/benches/{name}.gmdl"));
+    let model = genmsi_format::load(&path).expect("the bench loads");
+    genmsi_core::compile_model(&model).expect("the bench compiles")
+}
+
+/// Run a bench for the length of the original's run (a clock of one hour).
+fn run_bench(program: &Program) -> RunResult {
+    Simulation::new(
+        program,
+        SimConfig {
+            seed: 1,
+            stop_time: Some(3600.0),
+            trace: true,
+            ..SimConfig::default()
+        },
+    )
+    .run()
+    .expect("the bench runs")
+}
+
+/// The number of transactions that entered the block with that label.
+fn entries(program: &Program, result: &RunResult, label: &str) -> u64 {
+    let index = program
+        .blocks
+        .iter()
+        .position(|block| block.label.as_deref() == Some(label))
+        .unwrap_or_else(|| panic!("no block labelled {label}"));
+    result.blocks[index].entries
+}
+
+#[test]
+fn the_preempt_class_takes_the_facility_and_gives_it_back() {
+    // The report of the original for this bench:
+    //
+    //     1  60  GENERATE 60,30
+    //     2  59  A_Preempt   PREEMPT Recurso,PR,,Remanente
+    //     3  59  A_Return    RELEASE Recurso
+    //     4  59  A_Terminate TERMINATE
+    //     FACILITY RECURSO: 59 entries, 0,000 of utilization
+    //
+    // The generator draws its arrivals at random, so the number of
+    // transactions the run creates differs by one between the original and
+    // us; everything the class does must agree.
+    let program = bench("Preempt");
+    let result = run_bench(&program);
+
+    let preempted = entries(&program, &result, "A_Preempt");
+    assert!(preempted > 0, "the bench interrupts a facility");
+    assert_eq!(
+        entries(&program, &result, "A_Return"),
+        preempted,
+        "every transaction that interrupts the facility gives it back"
+    );
+    assert_eq!(
+        entries(&program, &result, "A_Terminate"),
+        preempted,
+        "every transaction that interrupts the facility goes on"
+    );
+
+    // The facility is taken and given back: one entry per transaction and no
+    // time busy, as the original's report says.
+    let facility = &result.entities.facilities["Recurso"];
+    assert_eq!(facility.entries, preempted, "the facility is taken once each");
+    assert_eq!(facility.busy_time, 0.0, "the facility is given back at once");
+    assert!(facility.available, "the facility is free at the end");
+
+    // The trace says which facility the block touches.
+    let detail = result
+        .trace
+        .iter()
+        .find(|event| event.event == "enter" && event.detail == "Recurso")
+        .expect("the trace publishes the facility of the block");
+    assert!(detail.detail.contains("Recurso"));
+}
+
+#[test]
+fn the_return_class_is_the_release_of_the_facility() {
+    // The report of the original for this bench:
+    //
+    //     2  60  A_Seize     SEIZE Recurso
+    //     3  60  A_Return    RELEASE Recurso
+    //     4  60  A_Terminate TERMINATE
+    //     FACILITY RECURSO: 60 entries, 0,000 of utilization
+    //
+    // and its GPSS: `A_Return RELEASE Recurso`. The macro code of the class
+    // is a release, not the GPSS `RETURN` of the `FacilityInt` class.
+    let program = bench("Return");
+    let release = program
+        .blocks
+        .iter()
+        .find(|block| block.class == "Release")
+        .expect("the Return class compiles to a release");
+    assert!(
+        matches!(release.kind, BlockKind::Release(_)),
+        "the Return class is a release"
+    );
+
+    let result = run_bench(&program);
+    let seized = entries(&program, &result, "A_Seize");
+    assert!(seized > 0, "the bench takes a facility");
+    assert_eq!(
+        entries(&program, &result, "A_Return"),
+        seized,
+        "every transaction that takes the facility gives it back"
+    );
+    assert_eq!(
+        entries(&program, &result, "A_Terminate"),
+        seized,
+        "every transaction that takes the facility goes on"
+    );
+    let facility = &result.entities.facilities["Recurso"];
+    assert_eq!(facility.entries, seized, "the facility is taken once each");
+    assert_eq!(facility.busy_time, 0.0, "the facility is given back at once");
+    assert!(facility.available, "the facility is free at the end");
+}
+
+/// A model where one transaction takes a facility and another tries to
+/// interrupt it: the priority of the newcomer says whether it may.
+fn preemption_model(newcomer_priority: &'static str) -> Program {
+    let nodes = [
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("A"))],
+            &[("Media", "1"), ("Modificador", "0"), ("Prioridad", "0")],
+        ),
+        node(
+            2,
+            "Seize",
+            Some("A"),
+            &[("Salida1", Some("B"))],
+            &[("Facility", "Maquina")],
+        ),
+        node(
+            3,
+            "Advance",
+            Some("B"),
+            &[("Salida1", Some("C"))],
+            &[("Media", "10"), ("Modificador", "0")],
+        ),
+        node(
+            4,
+            "Release",
+            Some("C"),
+            &[("Salida1", Some("D"))],
+            &[("Facility", "Maquina")],
+        ),
+        node(
+            5,
+            "Generate",
+            None,
+            &[("Salida1", Some("E"))],
+            &[("Media", "1"), ("Modificador", "0"), ("Prioridad", "0")],
+        ),
+        node(
+            6,
+            "Priority",
+            Some("E"),
+            &[("Salida1", Some("F"))],
+            &[("Prioridad", newcomer_priority)],
+        ),
+        node(
+            7,
+            "Preempt",
+            Some("F"),
+            &[("Salida1", Some("G"))],
+            &[("Facility", "Maquina"), ("Remanente", "Remanente")],
+        ),
+        node(8, "Terminate", Some("G"), &[], &[("Unidades", "0")]),
+    ];
+    let links = [
+        (1, 0, 2, 0),
+        (2, 0, 3, 0),
+        (3, 0, 4, 0),
+        (5, 0, 6, 0),
+        (6, 0, 7, 0),
+        (7, 0, 8, 0),
+    ];
+    wired(&nodes, &links, 3600.0)
+}
+
+#[test]
+fn the_preempt_class_gives_the_facility_to_the_transaction_that_outranks_the_owner() {
+    // The `PR` operand of the original: the preempting transaction's own
+    // priority decides whether it may take the facility.
+    let program = preemption_model("1");
+    let result = run(&program, 100.0, 1);
+    let facility = &result.entities.facilities["Maquina"];
+    assert!(
+        facility.inter > 0,
+        "the transaction with the higher priority interrupts the owner"
+    );
+    assert!(
+        facility.entries > 1,
+        "the facility is taken again by every transaction that interrupts it"
+    );
+}
+
+#[test]
+fn the_preempt_class_leaves_the_facility_to_the_owner_that_outranks_the_newcomer() {
+    // The owner keeps the facility when it has the priority: the newcomer
+    // waits for it, as a `SEIZE` that finds the facility busy does.
+    let program = preemption_model("0");
+    let result = run(&program, 100.0, 1);
+    let facility = &result.entities.facilities["Maquina"];
+    assert_eq!(
+        facility.inter, 0,
+        "the transaction with the same priority does not interrupt the owner"
+    );
+    let index = program
+        .blocks
+        .iter()
+        .position(|block| block.class == "Preempt")
+        .expect("the preempt block is in the program");
+    assert!(
+        result.blocks[index].retries > 0,
+        "the newcomer waits for the facility"
+    );
+}
+
+/// A model where a transaction takes a facility and another interrupts it:
+/// the owner goes on to the interrupt output of the `Preempt` block, unless
+/// the class says the owner is removed.
+fn interrupted_owner_model(remove_owner: bool) -> Program {
+    let nodes = [
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("A"))],
+            &[("Media", "10"), ("Modificador", "0"), ("Prioridad", "0")],
+        ),
+        node(
+            2,
+            "Seize",
+            Some("A"),
+            &[("Salida1", Some("B"))],
+            &[("Facility", "Maquina")],
+        ),
+        node(
+            3,
+            "Advance",
+            Some("B"),
+            &[("Salida1", Some("C"))],
+            &[("Media", "10"), ("Modificador", "0")],
+        ),
+        node(
+            4,
+            "Release",
+            Some("C"),
+            &[("Salida1", Some("D"))],
+            &[("Facility", "Maquina")],
+        ),
+        node(
+            5,
+            "Generate",
+            None,
+            &[("Salida1", Some("E"))],
+            &[("Media", "10"), ("Modificador", "0"), ("Prioridad", "0")],
+        ),
+        node(
+            6,
+            "Priority",
+            Some("E"),
+            &[("Salida1", Some("F"))],
+            &[("Prioridad", "1")],
+        ),
+        node(
+            7,
+            "Preempt",
+            Some("F"),
+            &[("Salida1", Some("G")), ("SalidaAlt", Some("ALT"))],
+            &[
+                ("Facility", "Maquina"),
+                ("Remanente", "Remanente"),
+                ("ModoArrebato", if remove_owner { "Remover" } else { "NoRemover" }),
+            ],
+        ),
+        node(
+            8,
+            "Release",
+            Some("G"),
+            &[("Salida1", Some("H"))],
+            &[("Facility", "Maquina")],
+        ),
+        node(9, "Terminate", Some("H"), &[], &[("Unidades", "0")]),
+        node(10, "Terminate", Some("ALT"), &[], &[("Unidades", "0")]),
+    ];
+    let links = [
+        (1, 0, 2, 0),
+        (2, 0, 3, 0),
+        (3, 0, 4, 0),
+        (5, 0, 6, 0),
+        (6, 0, 7, 0),
+        (7, 0, 8, 0),
+        (7, 1, 10, 0),
+    ];
+    wired(&nodes, &links, 3600.0)
+}
+
+#[test]
+fn the_preempt_class_sends_the_owner_it_interrupts_to_its_own_output() {
+    // The macro code of the original routes the owner of the interrupted
+    // facility to the `SalidaAlt` output (`Propietaria`).
+    let program = interrupted_owner_model(false);
+    let result = run(&program, 100.0, 1);
+    let facility = &result.entities.facilities["Maquina"];
+    assert!(facility.inter > 0, "the owner is interrupted");
+    assert_eq!(
+        entries(&program, &result, "ALT"),
+        facility.inter,
+        "every interrupted owner goes on to the interrupt output"
+    );
+    assert_eq!(
+        entries(&program, &result, "C"),
+        0,
+        "the interrupted owner does not carry on with its own work"
+    );
+}
+
+#[test]
+fn the_preempt_class_removes_the_owner_it_interrupts_when_the_class_says_so() {
+    // The `ModoArrebato` of the original: `Remover` takes the owner out of
+    // the model instead of routing it.
+    let program = interrupted_owner_model(true);
+    let result = run(&program, 100.0, 1);
+    let facility = &result.entities.facilities["Maquina"];
+    assert!(facility.inter > 0, "the owner is interrupted");
+    assert_eq!(
+        entries(&program, &result, "ALT"),
+        0,
+        "the removed owner goes nowhere"
+    );
+    assert_eq!(
+        entries(&program, &result, "C"),
+        0,
+        "the removed owner does not carry on with its own work"
     );
 }

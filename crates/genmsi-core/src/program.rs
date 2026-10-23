@@ -201,15 +201,32 @@ pub struct FacilitySpec {
     pub facility: EntityName,
 }
 
-/// `PREEMPT` specification (from `FacilityInt`).
+/// `PREEMPT` specification (from `FacilityInt` and from the `Preempt` class).
 #[derive(Debug, Clone)]
 pub struct PreemptSpec {
     /// Facility name.
     pub facility: EntityName,
+    /// How the preemption is decided when the facility is busy.
+    pub priority: PreemptPriority,
     /// Parameter receiving the preempted owner's remaining time.
     pub remaining: Option<String>,
     /// Whether the owner is routed to the interrupt output.
     pub route_owner: bool,
+    /// Whether the preempted owner is removed instead of going on.
+    pub remove_owner: bool,
+}
+
+/// How a `PREEMPT` decides whether it may take the facility.
+///
+/// The original's macro code gives the mode as a `Listed` property: `Prioridad`
+/// (the GPSS operand `PR`, the preempting transaction's own priority decides)
+/// or `Incondicional` (the preemption happens whatever the priorities are).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreemptPriority {
+    /// The preempting transaction's priority decides.
+    Preempting,
+    /// The preemption happens whatever the priorities are.
+    Unconditional,
 }
 
 /// Storage operand of `ENTER` / `LEAVE`.
@@ -246,6 +263,23 @@ pub struct TransferSpec {
 pub struct MultiTransferSpec {
     /// Branch weights, one per output.
     pub weights: Vec<ProgramExpr>,
+    /// How the branch is chosen.
+    pub selection: MultiTransferSelection,
+    /// The distribution function the original creates to choose the branch
+    /// (`MultifurcacionCH`); `None` when the class creates none.
+    pub branch_function: Option<String>,
+    /// The function that maps the chosen branch to its destination
+    /// (`MultifurcacionGO`).
+    pub destination_function: Option<String>,
+}
+
+/// How a `MULTITRANSFER` chooses the branch the transaction takes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MultiTransferSelection {
+    /// By the weights the model stores (`Multifurcacion`).
+    Weights,
+    /// By the value of a parameter of the transaction (`MultifurcacionP`).
+    Parameter(String),
 }
 
 /// Logic switch operation.
@@ -441,14 +475,24 @@ pub struct ScanSpec {
 }
 
 /// `ALTER` specification.
+///
+/// The macro of the original says it in its own words: the transactions of a
+/// group are **compared** (`CompOp`, `CompParam`, `CompValue`) and the ones
+/// that match are **altered** (`AltParam`, `AltValor`).
 #[derive(Debug, Clone)]
 pub struct AlterSpec {
     /// Transaction group name.
     pub group: String,
-    /// Parameter modified in the member.
-    pub parameter: Option<String>,
+    /// Parameter altered in the member.
+    pub altered_parameter: Option<String>,
     /// New value.
-    pub value: Option<ProgramExpr>,
+    pub altered_value: Option<ProgramExpr>,
+    /// Parameter compared in the member.
+    pub compared_parameter: Option<String>,
+    /// Value the parameter is compared against.
+    pub compared_value: Option<ProgramExpr>,
+    /// How the two are compared.
+    pub comparison: RelOp,
     /// Number of members altered.
     pub count: ProgramExpr,
 }
@@ -765,12 +809,15 @@ pub fn known_classes() -> &'static [&'static str] {
         "Loop",
         "Match",
         "Multifurcacion",
+        "MultifurcacionP",
         "Note",
+        "Preempt",
         "Priority",
         "QTable",
         "Queue",
         "Release",
         "RemoveTrans",
+        "Return",
         "SaveValue",
         "Scan",
         "Seize",
@@ -1134,6 +1181,40 @@ impl Compiler<'_> {
                     class,
                 )))
             }
+            // The `Preempt` class interrupts a facility: one statement, the
+            // `PREEMPT` of the original (`PREEMPT Recurso,PR,,Remanente`).
+            "Preempt" => {
+                let facility = self.entity(module, "Facility")?;
+                let remaining = self.name(module, "Remanente");
+                let priority = self.preempt_priority(module);
+                let remove_owner = self.remove_owner(module);
+                let route_owner = module
+                    .outputs
+                    .iter()
+                    .any(|port| port.name == "SalidaAlt" && port.label().is_some());
+                Ok(Some(push!(
+                    BlockKind::Preempt(PreemptSpec {
+                        facility,
+                        priority,
+                        remaining,
+                        route_owner,
+                        remove_owner,
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            // The `Return` class gives the facility back: the original's macro
+            // code is a `RELEASE`, not the GPSS `RETURN` of the `FacilityInt`
+            // class.
+            "Return" => {
+                let facility = self.entity(module, "Facility")?;
+                Ok(Some(push!(
+                    BlockKind::Release(FacilitySpec { facility }),
+                    label,
+                    "Release",
+                )))
+            }
             "FacilityInt" => {
                 let facility = self.entity(module, "Facility")?;
                 let mean = self.sna(module, "Media")?.ok_or_else(|| {
@@ -1142,6 +1223,8 @@ impl Compiler<'_> {
                 let modifier = self.sna(module, "Modificador")?;
                 let queue = self.optional_entity(module, "Queue")?;
                 let remaining = self.name(module, "Remanente");
+                let priority = self.preempt_priority(module);
+                let remove_owner = self.remove_owner(module);
                 let route_owner = module
                     .outputs
                     .iter()
@@ -1163,8 +1246,10 @@ impl Compiler<'_> {
                         label: None,
                         kind: BlockKind::Preempt(PreemptSpec {
                             facility: facility.clone(),
+                            priority,
                             remaining: remaining.clone(),
                             route_owner,
+                            remove_owner,
                         }),
                         next: Vec::new(),
                         port_names: Vec::new(),
@@ -1187,8 +1272,10 @@ impl Compiler<'_> {
                     first = Some(push!(
                         BlockKind::Preempt(PreemptSpec {
                             facility: facility.clone(),
+                            priority,
                             remaining: remaining.clone(),
                             route_owner,
+                            remove_owner,
                         }),
                         label.clone(),
                         "Preempt",
@@ -1346,7 +1433,7 @@ impl Compiler<'_> {
                     class,
                 )))
             }
-            "Multifurcacion" => {
+            "Multifurcacion" | "MultifurcacionP" => {
                 let mut weights = Vec::new();
                 for index in 1..=module.outputs.len().max(1) {
                     let name = format!("Prob{index}");
@@ -1354,15 +1441,31 @@ impl Compiler<'_> {
                         weights.push(self.number_expr(self.percent_to_fraction(&value)?));
                     }
                 }
-                if weights.is_empty() {
-                    return Err(EngineError::invalid_block(
-                        node,
-                        class,
-                        "no probabilities defined",
-                    ));
-                }
+                // The `Multifurcacion` class splits the traffic with the
+                // probabilities it stores; the `MultifurcacionP` class routes
+                // by the value of a parameter of the transaction.
+                let selection = if class == "MultifurcacionP" {
+                    let parameter = self.name(module, "Parametro").ok_or_else(|| {
+                        EngineError::invalid_block(node, class, "Parametro is required")
+                    })?;
+                    MultiTransferSelection::Parameter(parameter)
+                } else {
+                    if weights.is_empty() {
+                        return Err(EngineError::invalid_block(
+                            node,
+                            class,
+                            "no probabilities defined",
+                        ));
+                    }
+                    MultiTransferSelection::Weights
+                };
                 Ok(Some(push!(
-                    BlockKind::MultiTransfer(MultiTransferSpec { weights }),
+                    BlockKind::MultiTransfer(MultiTransferSpec {
+                        weights,
+                        selection,
+                        branch_function: self.name(module, "MultifurcacionCH"),
+                        destination_function: self.name(module, "MultifurcacionGO"),
+                    }),
                     label,
                     class,
                 )))
@@ -1627,11 +1730,19 @@ impl Compiler<'_> {
             }
             "Alter" => {
                 let group = self.require_name(module, "Grupo")?;
+                let comparison = RelOp::parse(
+                    &module.prop_value("CompOp").unwrap_or_default(),
+                    node,
+                    class,
+                )?;
                 Ok(Some(push!(
                     BlockKind::Alter(AlterSpec {
                         group,
-                        parameter: self.name(module, "CompParam"),
-                        value: self.sna(module, "CompValue")?,
+                        altered_parameter: self.name(module, "AltParam"),
+                        altered_value: self.sna(module, "AltValor")?,
+                        compared_parameter: self.name(module, "CompParam"),
+                        compared_value: self.sna(module, "CompValue")?,
+                        comparison,
                         count: self
                             .sna(module, "Cantidad")?
                             .unwrap_or_else(|| self.number_expr(1.0)),
@@ -1967,6 +2078,31 @@ impl Compiler<'_> {
         Ok((expr, true))
     }
 
+    /// How the `PREEMPT` of a class decides whether it may take the facility.
+    ///
+    /// The original's macro code gives the mode as a `Listed` property: the
+    /// `Prioridad` mode writes the GPSS operand `PR` (the preempting
+    /// transaction's own priority decides) and the `Incondicional` mode
+    /// writes nothing (the preemption happens whatever the priorities are).
+    fn preempt_priority(&self, module: &Block) -> PreemptPriority {
+        match module.prop_value("ModoInterrupcion") {
+            Some(mode) if mode.trim().eq_ignore_ascii_case("incondicional") => {
+                PreemptPriority::Unconditional
+            }
+            _ => PreemptPriority::Preempting,
+        }
+    }
+
+    /// Whether the preempted owner is removed instead of going on.
+    ///
+    /// The original's `ModoArrebato` says whether the owner of the
+    /// interrupted facility is removed (`Remover`) or kept (`NoRemover`).
+    fn remove_owner(&self, module: &Block) -> bool {
+        module
+            .prop_value("ModoArrebato")
+            .is_some_and(|mode| mode.trim().eq_ignore_ascii_case("remover"))
+    }
+
     fn percent_to_fraction(&self, text: &str) -> Result<f64, EngineError> {
         let trimmed = text.trim();
         let value = trimmed.trim_end_matches('%').trim();
@@ -2285,7 +2421,8 @@ fn block_expressions(kind: &BlockKind) -> Vec<&ProgramExpr> {
         BlockKind::Scan(spec) => spec.compare_value.iter().collect(),
         BlockKind::Alter(spec) => {
             let mut out = vec![&spec.count];
-            out.extend(spec.value.iter());
+            out.extend(spec.altered_value.iter());
+            out.extend(spec.compared_value.iter());
             out
         }
         _ => Vec::new(),

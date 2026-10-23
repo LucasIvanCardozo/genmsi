@@ -1,10 +1,12 @@
 //! The block catalogue: the classes a block can be created from.
 //!
-//! The data is the shape the 25 reference models in `fixtures/models` use:
-//! for every class the ports (with the `ioid` and `name` the models declare)
-//! and the visible properties (with the declared `type` and `subType`). The
-//! original editor's own class definitions are not available in machine form,
-//! so this catalogue is pinned to the reference models by
+//! The shape of every class comes from the original editor's own class
+//! library (`Genmsi_20230711.backup/gClasses.xml`): the ports it declares
+//! (with the `ioid` and `name` the file uses) and the properties it declares
+//! (with the hint and the default value the macro code carries). The
+//! property *types* come from the original's macro configuration
+//! (`gmacroconfig.gmcfg`), and the classes the reference models in
+//! `fixtures/models` use are pinned by
 //! `tests/catalogue_matches_the_reference_models.rs`.
 //!
 //! `title` is what the interface shows (neutral Spanish); the `class` name is
@@ -58,9 +60,10 @@ pub struct ClassSpec {
 pub static CLASSES: &[ClassSpec] = &[
     ADVANCE, ALTER, ASSEMBLE, ASSIGN, BUFFER, CLOCK, COUNTER, DEPART, ENTER, EXAMINENUMBER,
     FACILITYINT, FACILITYUSE, FUNCTION, FUNCTIONDIST, FUNCTIONEXPON, GATEF, GATEL, GATES, GATHER,
-    GENERATE, INITIASV, INITIALLS, JOINME, JOINNUMBER, LEAVE, LINK, LOGIC, LOOP, MATCH, NOTE,
-    PRIORITY, QTABLE, QUEUE, RELEASE, REMOVETRANS, SAVEVALUE, SCAN, SEIZE, SELECT, SELECTF, SPLIT,
-    STORAGEDEF, STORAGEUSE, TABLE, TABULATE, TERMINATE, TEST, TRANSFER, UNLINK, VARIABLE, VARIABLEA,
+    GENERATE, INITIASV, INITIALLS, JOINME, JOINNUMBER, LEAVE, LINK, LOGIC, LOOP, MATCH,
+    MULTIFURCACION, MULTIFURCACIONP, NOTE, PREEMPT, PRIORITY, QTABLE, QUEUE, RELEASE, REMOVETRANS,
+    RETURN, SAVEVALUE, SCAN, SEIZE, SELECT, SELECTF, SPLIT, STORAGEDEF, STORAGEUSE, TABLE, TABULATE,
+    TERMINATE, TEST, TRANSFER, UNLINK, VARIABLE, VARIABLEA,
 ];
 
 /// The value a new block of a class comes with, per property.
@@ -72,6 +75,33 @@ pub static CLASSES: &[ClassSpec] = &[
 pub static DEFAULTS: &[(&str, &str, &str)] = &[
     // The clock counts in units of time: the original gives it a whole hour.
     ("Clock", "Frecuencia", "3600"),
+    // The `Preempt` class interrupts a facility: the original's macro code
+    // gives the facility, the mode, the parameter and the way the owner goes
+    // on these defaults.
+    ("Preempt", "Facility", "Recurso"),
+    ("Preempt", "ModoArrebato", "NoRemover"),
+    ("Preempt", "ModoInterrupcion", "Prioridad"),
+    ("Preempt", "Remanente", "Remanente"),
+    // The `Return` class gives the facility back: it is a release.
+    ("Return", "Facility", "Recurso"),
+    // The `Multifurcacion` class creates the two functions it needs and
+    // splits the traffic in five equal shares.
+    ("Multifurcacion", "MultifurcacionCH", "MultifurcacionCH"),
+    ("Multifurcacion", "MultifurcacionGO", "MultifurcacionGO"),
+    ("Multifurcacion", "Prob1", "20%25"),
+    ("Multifurcacion", "Prob2", "20%25"),
+    ("Multifurcacion", "Prob3", "20%25"),
+    ("Multifurcacion", "Prob4", "20%25"),
+    ("Multifurcacion", "Prob5", "20%25"),
+    // The `MultifurcacionP` class routes by a parameter: it creates one
+    // function and splits the traffic in five equal shares.
+    ("MultifurcacionP", "MultifurcacionGO", "MultifurcacionGO"),
+    ("MultifurcacionP", "Parametro", "Param"),
+    ("MultifurcacionP", "Prob1", "20%25"),
+    ("MultifurcacionP", "Prob2", "20%25"),
+    ("MultifurcacionP", "Prob3", "20%25"),
+    ("MultifurcacionP", "Prob4", "20%25"),
+    ("MultifurcacionP", "Prob5", "20%25"),
 ];
 
 /// The default value a new block of `class` comes with for `property`, when
@@ -100,8 +130,12 @@ static LISTED_OPTIONS: &[(&str, &[&str])] = &[
     ("LinkMode", &["FIFO"]),
     ("OperationMode", &["Algunos", "Todos"]),
     ("PriorityOption", &["Parametro"]),
-    ("PriorityMode", &["Prioridad"]),
-    ("RemoveMode", &["NoRemover"]),
+    // The original's macro configuration (`gmacroconfig.gmcfg`) gives every
+    // listed subtype its options: the priority mode is `PR` (the preempting
+    // transaction's priority decides) or unconditional, and the way the
+    // preempted owner goes on is to remove it or to keep it.
+    ("PriorityMode", &["Prioridad", "Incondicional"]),
+    ("RemoveMode", &["Remover", "NoRemover"]),
     ("entitySNAclass", &["Q", "S", "R"]),
 ];
 
@@ -202,14 +236,14 @@ pub fn build_block(class: &str, owner: u32, layout: Option<Layout>) -> Result<Bl
 // ---------------------------------------------------------------------------
 // Class data
 //
-// Generated from the 25 reference models in `fixtures/models` (one ClassSpec
-// per class the editor offers; `Multifurcacion` is a custom macro and is not
-// offered). Port captions that the reference models vary per instance are
-// left empty.
+// The shape of every class comes from the original editor's class library
+// (`Genmsi_20230711.backup/gClasses.xml`): the ports its graph declares and
+// the properties its macro code declares, with the default value the macro
+// code carries. The types come from the original's macro configuration
+// (`gmacroconfig.gmcfg`).
 // ---------------------------------------------------------------------------
 
-// Generated from the 25 reference models in fixtures/models (do not edit by hand;
-// regenerate from the models). One ClassSpec per block class the editor offers.
+// One ClassSpec per block class the editor offers.
 pub static ADVANCE: ClassSpec = ClassSpec {
     class: "Advance",
     title: "Avanzar",
@@ -644,12 +678,78 @@ pub static MATCH: ClassSpec = ClassSpec {
     ],
 };
 
+pub static MULTIFURCACION: ClassSpec = ClassSpec {
+    class: "Multifurcacion",
+    title: "Multifurcación",
+    inputs: &[
+        PortSpec { ioid: 1, name: "Entrada", caption: "Multifurcacion" },
+    ],
+    outputs: &[
+        PortSpec { ioid: 2, name: "Salida1", caption: "%5BProb1%5D" },
+        PortSpec { ioid: 3, name: "SalidaProb2", caption: "%5BProb2%5D" },
+        PortSpec { ioid: 4, name: "SalidaProb3", caption: "%5BProb3%5D" },
+        PortSpec { ioid: 5, name: "SalidaProb4", caption: "%5BProb4%5D" },
+        PortSpec { ioid: 6, name: "SalidaProb5", caption: "%5BProb5%5D" },
+    ],
+    properties: &[
+        PropertySpec { name: "MultifurcacionCH", hint: "", ty: "EntityDef", subtype: "Function", unique: true },
+        PropertySpec { name: "MultifurcacionGO", hint: "", ty: "EntityDef", subtype: "Function", unique: true },
+        PropertySpec { name: "Prob1", hint: "", ty: "FloatPercent", subtype: "", unique: false },
+        PropertySpec { name: "Prob2", hint: "", ty: "FloatPercent", subtype: "", unique: false },
+        PropertySpec { name: "Prob3", hint: "", ty: "FloatPercent", subtype: "", unique: false },
+        PropertySpec { name: "Prob4", hint: "", ty: "FloatPercent", subtype: "", unique: false },
+        PropertySpec { name: "Prob5", hint: "", ty: "FloatPercent", subtype: "", unique: false },
+    ],
+};
+
+pub static MULTIFURCACIONP: ClassSpec = ClassSpec {
+    class: "MultifurcacionP",
+    title: "Multifurcación por parámetro",
+    inputs: &[
+        PortSpec { ioid: 1, name: "Entrada", caption: "Multifurcacion" },
+    ],
+    outputs: &[
+        PortSpec { ioid: 2, name: "Salida1", caption: "%5BParametro%5D%3D1" },
+        PortSpec { ioid: 3, name: "SalidaProb2", caption: "%5BParametro%5D%3D2" },
+        PortSpec { ioid: 4, name: "SalidaProb3", caption: "%5BParametro%5D%3D3" },
+        PortSpec { ioid: 5, name: "SalidaProb4", caption: "%5BParametro%5D%3D4" },
+        PortSpec { ioid: 6, name: "SalidaProb5", caption: "%5BParametro%5D%3D5" },
+    ],
+    properties: &[
+        PropertySpec { name: "MultifurcacionGO", hint: "", ty: "EntityDef", subtype: "Function", unique: true },
+        PropertySpec { name: "Parametro", hint: "", ty: "EntityUse", subtype: "Parameter", unique: false },
+        PropertySpec { name: "Prob1", hint: "", ty: "FloatPercent", subtype: "", unique: false },
+        PropertySpec { name: "Prob2", hint: "", ty: "FloatPercent", subtype: "", unique: false },
+        PropertySpec { name: "Prob3", hint: "", ty: "FloatPercent", subtype: "", unique: false },
+        PropertySpec { name: "Prob4", hint: "", ty: "FloatPercent", subtype: "", unique: false },
+        PropertySpec { name: "Prob5", hint: "", ty: "FloatPercent", subtype: "", unique: false },
+    ],
+};
+
 pub static NOTE: ClassSpec = ClassSpec {
     class: "Note",
     title: "Nota",
     inputs: &[],
     outputs: &[],
     properties: &[],
+};
+
+pub static PREEMPT: ClassSpec = ClassSpec {
+    class: "Preempt",
+    title: "Interrumpir recurso",
+    inputs: &[
+        PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
+    ],
+    outputs: &[
+        PortSpec { ioid: 2, name: "Salida1", caption: "" },
+        PortSpec { ioid: 3, name: "SalidaAlt", caption: "Propietaria" },
+    ],
+    properties: &[
+        PropertySpec { name: "Facility", hint: "Facility%20a%20interrumpir%20por%20la%20transacci%F3n%20activa.", ty: "EntityUse", subtype: "Facility", unique: false },
+        PropertySpec { name: "ModoArrebato", hint: "Modo%20de%20arrebato%20temporal%20o%20permanete.", ty: "Listed", subtype: "RemoveMode", unique: false },
+        PropertySpec { name: "ModoInterrupcion", hint: "Modo%20de%20interrupci%F3n%20o%20por%20prioridad", ty: "Listed", subtype: "PriorityMode", unique: false },
+        PropertySpec { name: "Remanente", hint: "Par%E1metro%20de%20la%20transacci%F3n%20propietaria%20donde%20se%20guarda%20el%20remanete", ty: "EntityUse", subtype: "Parameter", unique: false },
+    ],
 };
 
 pub static PRIORITY: ClassSpec = ClassSpec {
@@ -727,6 +827,20 @@ pub static REMOVETRANS: ClassSpec = ClassSpec {
         PropertySpec { name: "CompValue", hint: "Valor%20a%20comparar", ty: "TSNA", subtype: "SNA", unique: false },
         PropertySpec { name: "Grupo", hint: "Grupo%20num%E9rico%20al%20que%20se%20agrega%20un%20n%FAmero", ty: "EntityUse", subtype: "TransacGroup", unique: false },
         PropertySpec { name: "Modo", hint: "Cuantas%20se%20remueven", ty: "Listed", subtype: "OperationMode", unique: false },
+    ],
+};
+
+pub static RETURN: ClassSpec = ClassSpec {
+    class: "Return",
+    title: "Devolver recurso",
+    inputs: &[
+        PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
+    ],
+    outputs: &[
+        PortSpec { ioid: 2, name: "Salida1", caption: "" },
+    ],
+    properties: &[
+        PropertySpec { name: "Facility", hint: "Facility%20a%20liberar", ty: "EntityUse", subtype: "Facility", unique: false },
     ],
 };
 

@@ -154,7 +154,7 @@ fn the_initial_values_are_written_without_a_name() {
 #[test]
 fn the_blocks_write_the_operands_of_their_class() {
     for (class, expected) in [
-        ("Alter", "A_Alter ALTER E ungrupo,1,,,otro,1"),
+        ("Alter", "A_Alter ALTER E ungrupo,1,param,0,otro,1"),
         ("Assemble", "A_Assemble ASSEMBLE 1"),
         ("Gather", "A_Gather GATHER 1"),
         ("ExamineNumber", "A_ExamineNumber EXAMINE UnGrupo,0,"),

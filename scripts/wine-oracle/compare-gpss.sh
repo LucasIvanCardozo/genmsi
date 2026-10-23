@@ -138,8 +138,8 @@ split "$THEIRS" > "$WORK/theirs"
 problems=0
 
 # The definitions, sorted: their order is not part of the model.
-grep '^D' "$WORK/ours" | sort > "$WORK/ours.def"
-grep '^D' "$WORK/theirs" | sort > "$WORK/theirs.def"
+grep '^D' "$WORK/ours" | sort > "$WORK/ours.def" || true
+grep '^D' "$WORK/theirs" | sort > "$WORK/theirs.def" || true
 
 # The blocks, keyed by their label.
 awk -F'\t' '$1 == "B" { print $2 "\t" $3 }' "$WORK/ours" | sort > "$WORK/ours.blocks"

@@ -21,3 +21,6 @@ dist/
 /Genmsi_20230711.backup/
 /scripts/wine-oracle/wineprefix/
 /scripts/wine-oracle/out/
+
+# Phase 6 bench models: generated artefacts of scripts/wine-oracle/make-benches.py
+/scripts/wine-oracle/benches/

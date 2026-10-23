@@ -8,6 +8,9 @@ text, so the original interface can be read instead of photographed.
 
 Nothing here needs Wine, and nothing here modifies the repository.
 
+(The two tools of the last section, `make-benches.py` and `run-benches.sh`, do
+need Wine: they run the original.)
+
 ## `dfm.py` — extract the forms
 
 ```
@@ -84,3 +87,82 @@ TFormReplaceClass            FormReplaceClass               Reemplazo de clase
 
 The parser is checked against the PE resource table: for every form, the
 bytes it reads end exactly where the resource ends.
+
+## `make-benches.py` — one bench per class
+
+```
+python3 scripts/wine-oracle/make-benches.py [outdir]
+```
+
+The original declares its classes in `Genmsi_20230711.backup/gClasses.xml`:
+the graph section gives the ports of every class, the macro code gives its
+properties and their default values. This tool reads that file and writes one
+`.gmdl` **bench** per class — the smallest model that exercises exactly one
+class:
+
+```
+Generate  ->  [the class under test]  ->  Terminate
+```
+
+The class under test keeps its own ports: the one input is connected to the
+`Generate`, the `Salida1` output to the `Terminate`, and the other outputs
+stay unconnected (the caption of the block says which ones). A `Clock` closes
+the run, because the original only stops when the start counter reaches zero.
+
+The output is deterministic: the same XML always gives the same bytes. The
+benches are generated artefacts and live in `scripts/wine-oracle/benches/`,
+which is in `.gitignore`.
+
+Some classes need something the XML does not give, and the tool says so on
+stdout:
+
+* `Variable` — the default equation is empty and the original refuses to
+  simulate it; the bench uses `0`.
+* `Match` — the default label to match (`BBB`) is one no block defines; the
+  bench matches the label the class itself defines (`AAA`).
+* `GateM` — the gate waits for a label, and only a `Match` block can create
+  one; the bench carries a `Match` in front and the gate waits for its label.
+* `Transfer` — the default probability is empty and the original refuses to
+  run an unconditional transfer without it; the bench uses `100%`.
+* `Seize`, `Release`, `Return` and `Preempt` — the original refuses to end a
+  transaction that owns a facility, and refuses a release of a facility
+  nobody owns, so these benches carry the block that completes the pair
+  (`Seize`/`Release`, `Seize`/`Return`, `Preempt`/`Return`).
+
+Fifteen classes declare no ports at all (`Clock`, `Note`, the definitions,
+the functions). Their bench is the `Generate`/`Terminate` chain with the class
+in the model, unconnected.
+
+Two properties the XML does not describe are derived from the original's own
+configuration (`Genmsi_20230711.backup/gmacroconfig.gmcfg`): the `Listed`
+subtypes and their options (`op_Logic_Faci`, `op_Logic_Tran`, ...) and the
+type of a list of entity definitions (`EntityDefList`, `TSNAMatrix`,
+`FloatPercentMatrix`). A `Listed` value that the original does not accept
+makes it refuse the model with "el archivo presenta errores estructurales".
+
+## `run-benches.sh` — run the original over the benches
+
+```
+bash scripts/wine-oracle/run-benches.sh [benches-dir] [results-dir]
+```
+
+It runs the harness (`run_oracle.sh`) over every bench and leaves the
+original's own files next to it:
+
+```
+<results>/Advance.report.txt    what the class does
+<results>/Advance.gpss.txt       how the class compiles
+```
+
+The run does not stop at the first bench that fails: every bench is tried and
+the summary at the end says how many ran and how many did not. After every
+bench the Wine session is killed: when the harness fails it leaves the
+original alive, and its window would be found by the next bench, which would
+then drive the wrong window.
+
+Four benches do not run: `MFunction`, `MFunctionDist`, `MultifurcacionP` and
+`RemoveNumber`. The original opens the model, shows its "Información" dialog
+("uno o mas de los modulos ... fueron adaptados a las definiciones de clases
+existentes en este sistema") and never shows its own window, so the harness
+has nothing to click. The models are accepted by the original; what is missing
+is a way to drive it.

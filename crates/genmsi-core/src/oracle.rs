@@ -540,7 +540,7 @@ pub fn render_markdown(comparisons: &[ModelComparison], note: &str) -> String {
         out.push_str(&format!(
             "| {} | {} | {} | {}/{} | {:.0}% | {} |\n",
             comparison.model,
-            crate::report::number(comparison.horizon),
+            crate::report::plain(comparison.horizon),
             comparison.runs,
             comparison.matched(),
             comparison.metrics.len(),
@@ -556,7 +556,7 @@ pub fn render_markdown(comparisons: &[ModelComparison], note: &str) -> String {
         }
         out.push_str(&format!(
             "Horizon {} (baseline end time), {} replications, seed base 7.\n\n",
-            crate::report::number(comparison.horizon),
+            crate::report::plain(comparison.horizon),
             comparison.runs
         ));
         out.push_str("| Section | Entity | Metric | Baseline | Ours (mean) | 95% CI | Rel. error | Match |\n");
@@ -567,10 +567,10 @@ pub fn render_markdown(comparisons: &[ModelComparison], note: &str) -> String {
                 metric.section,
                 metric.entity,
                 metric.metric,
-                crate::report::number(metric.baseline),
-                crate::report::number(metric.ours),
-                crate::report::number(metric.ci_low),
-                crate::report::number(metric.ci_high),
+                crate::report::plain(metric.baseline),
+                crate::report::plain(metric.ours),
+                crate::report::plain(metric.ci_low),
+                crate::report::plain(metric.ci_high),
                 if metric.relative_error.is_finite() {
                     format!("{:.0}%", metric.relative_error * 100.0)
                 } else {

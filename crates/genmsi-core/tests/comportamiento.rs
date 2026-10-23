@@ -143,7 +143,10 @@ fn the_match_is_two_statements_and_the_entries_are_in_the_transfer() {
     assert_eq!(result.blocks[matching].current, 2);
 
     let report = render(&result, &program);
-    let transfer_row = row(&report, "A");
+    // The `LOC` column holds the name of the statement, the way the listing
+    // names it: the transfer takes the name of its class and the match the
+    // label it defines.
+    let transfer_row = row(&report, "A_Match");
     let match_row = row(&report, "AAA");
     assert!(transfer_row.contains(&"TRANSFER".to_string()), "{transfer_row:?}");
     assert!(match_row.contains(&"MATCH".to_string()), "{match_row:?}");

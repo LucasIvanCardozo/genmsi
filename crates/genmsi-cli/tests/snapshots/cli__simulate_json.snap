@@ -58,9 +58,9 @@ expression: stdout(&output)
       "class": "GateL",
       "label": "GateL",
       "operands": "LS Puerta",
-      "entries": 9,
-      "current": 9,
-      "retries": 9
+      "entries": 0,
+      "current": 0,
+      "retries": 0
     },
     {
       "line": 6,

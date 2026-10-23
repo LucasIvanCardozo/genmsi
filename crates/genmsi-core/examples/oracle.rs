@@ -54,7 +54,7 @@ fn main() {
                             println!(
                                 "{:<45} {:>7} {:>6}/{} {:>6.0}%  {}",
                                 stem,
-                                genmsi_core::report::number(comparison.horizon),
+                                genmsi_core::report::plain(comparison.horizon),
                                 comparison.matched(),
                                 comparison.metrics.len(),
                                 comparison.match_ratio() * 100.0,

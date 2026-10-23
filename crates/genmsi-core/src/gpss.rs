@@ -87,7 +87,11 @@ impl Names {
                 taken.insert(go.clone());
             }
         }
-        for (index, block) in program.blocks.iter().enumerate() {
+        // The original names the statements in the order the listing writes
+        // them, so the number a repeated name takes is the number of the
+        // statement in the program (`Entrada1`, `Entrada11`, ...).
+        for index in flow_order(program) {
+            let block = &program.blocks[index];
             if block.label.is_none() {
                 // A block with no input port is the start of the flow: the
                 // original writes it without a name of its own.
@@ -111,6 +115,49 @@ impl Names {
     fn get(&self, index: usize) -> &str {
         self.names.get(index).map(String::as_str).unwrap_or("")
     }
+}
+
+/// The name the listing gives to every block of the program.
+///
+/// The name is empty when the block's statement carries none: the report
+/// writes the number of the statement in the `LOC` column instead.
+pub fn block_names(program: &Program) -> Vec<String> {
+    let names = Names::new(program);
+    (0..program.blocks.len())
+        .map(|index| names.get(index).to_string())
+        .collect()
+}
+
+/// The blocks in the order the listing writes them.
+///
+/// The original writes the blocks in the order the transaction walks them,
+/// and its report lists them in that same order.
+pub fn listing_order(program: &Program) -> Vec<usize> {
+    flow_order(program)
+}
+
+/// The line of the listing where each block's first statement stands.
+///
+/// The line counts every line of the listing: the definitions come first,
+/// the blocks follow, and the connections that break the flow are lines of
+/// their own. The report writes this number in its `LINE` column.
+pub fn listing_lines(program: &Program) -> Vec<usize> {
+    let names = Names::new(program);
+    let mut out = String::new();
+    definitions(&mut out, &program.definitions);
+    destination_functions(&mut out, program, &names);
+    let order = flow_order(program);
+    let mut lines = vec![0usize; program.blocks.len()];
+    let mut written = out.lines().count();
+    for (position, index) in order.iter().enumerate() {
+        let mut block = String::new();
+        block_statements(&mut block, *index, program, &names);
+        let following = order.get(position + 1).copied();
+        connection(&mut block, *index, following, program, &names);
+        lines[*index] = written + 1;
+        written += block.lines().count();
+    }
+    lines
 }
 
 /// The name a class gives to its statement.
@@ -450,7 +497,7 @@ fn random_variable(variable: &RandomVariable) -> String {
 /// An expression as the original writes it.
 ///
 /// A typed reference is written with a `$` where the model writes a `:`.
-fn sna(expr: &ProgramExpr) -> String {
+pub fn sna(expr: &ProgramExpr) -> String {
     expr.source().replace(':', "$")
 }
 

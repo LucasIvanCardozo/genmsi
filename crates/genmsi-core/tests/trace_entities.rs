@@ -485,7 +485,7 @@ fn value_trace_carries_the_name_and_the_value() {
         };
         assert_eq!(
             split_detail(&last.detail).1,
-            genmsi_core::report::number(*value),
+            genmsi_core::report::plain(*value),
             "the last event of {name} carries the value of the report"
         );
     }

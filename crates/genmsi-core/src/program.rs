@@ -1085,6 +1085,7 @@ impl Compiler<'_> {
         self.check_match_targets(&blocks, &label_map)?;
         self.check_references(&blocks, &definitions)?;
         self.report_undeclared_storages(&blocks, &definitions);
+        self.report_examine_without_destination(&blocks);
 
         Ok(Program {
             title,
@@ -2212,6 +2213,39 @@ impl Compiler<'_> {
             self.diagnostics.push(format!(
                 "{finding} The storage has no capacity: the run stops when a transaction \
                  reaches it."
+            ));
+        }
+    }
+
+    /// Report the examinations that have no destination of their own.
+    ///
+    /// The third operand of the `EXAMINE` is the block the transaction goes
+    /// to when the group does not hold it, and the manual of the original
+    /// says of it: "Número de bloque. Destino alternativo para la
+    /// transacción activa si no es encontrado ningún miembro. Requerido"
+    /// (`VISUALSIS.HLP`).  The engine of the original refuses a model whose
+    /// `EXAMINE` has no such operand ("Error en linea 1 -> Faltan
+    /// parámetros"), so the engine of this repository says it out loud
+    /// instead of compiling a model the original would not run.
+    fn report_examine_without_destination(&mut self, blocks: &[ExecBlock]) {
+        for block in blocks {
+            if !matches!(block.kind, BlockKind::Examine(_)) {
+                continue;
+            }
+            let destination = block
+                .port_names
+                .iter()
+                .position(|name| name == "Salida2")
+                .and_then(|index| block.next.get(index).copied().flatten());
+            if destination.is_some() {
+                continue;
+            }
+            self.diagnostics.push(format!(
+                "the model examines a group in the {} block {} without a destination of \
+                 its own: the original refuses the model (\"Faltan parámetros\"). The \
+                 third operand of the EXAMINE is the block the transaction goes to when \
+                 the group does not hold it.",
+                block.class, block.module_id
             ));
         }
     }

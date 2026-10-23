@@ -186,3 +186,56 @@ fn the_test_writes_the_destination_of_its_failure_output() {
     assert_eq!(named(&model(None), "A_Test"), "A_Test TEST E 1,2");
 }
 
+#[test]
+fn the_examination_without_a_destination_is_reported() {
+    // The manual of the original says of the third operand of the `EXAMINE`:
+    // "Número de bloque. Destino alternativo para la transacción activa si
+    // no es encontrado ningún miembro. Requerido" (`VISUALSIS.HLP`), and the
+    // engine of the original refuses a model whose `EXAMINE` has no such
+    // operand: "Error en linea 1 -> Faltan parámetros".
+    //
+    // This repository compiles the model anyway, so it says the finding out
+    // loud.
+    let model = |failure: Option<&'static str>| {
+        let nodes = vec![
+            node(
+                1,
+                "Generate",
+                None,
+                &[("Salida1", Some("A"))],
+                &[("Media", "60"), ("Modificador", "30")],
+            ),
+            node(
+                2,
+                "Examine",
+                Some("A"),
+                &[("Salida1", Some("B")), ("Salida2", failure)],
+                &[("Grupo", "UnGrupo")],
+            ),
+            node(3, "Terminate", Some("B"), &[], &[]),
+            node(4, "Terminate", Some("C"), &[], &[]),
+        ];
+        let mut links = vec![(1, 0, 2, 0), (2, 0, 3, 0)];
+        if failure.is_some() {
+            links.push((2, 1, 4, 0));
+        }
+        wired(&nodes, &links, 3600.0)
+    };
+    let without = model(None);
+    let diagnostic = without
+        .diagnostics
+        .iter()
+        .find(|message| message.contains("Faltan parámetros"))
+        .expect("the compiler names the examination");
+    assert!(diagnostic.contains("Examine"), "{diagnostic}");
+    // With the destination there is nothing to say.
+    let with = model(Some("C"));
+    assert!(
+        !with
+            .diagnostics
+            .iter()
+            .any(|message| message.contains("Faltan parámetros")),
+        "{:?}",
+        with.diagnostics
+    );
+}

@@ -211,6 +211,71 @@ test("the live figures of the run are the ones the engine publishes", { timeout:
   assert.ok(fidelity.figures, "the live figures are not the engine's");
 });
 
+test("the samples of a table, the switches and the values are read from the trace", () => {
+  // The engine publishes what the report counts and the trace did not
+  // carry: the samples of a table, the state of a switch and the value of a
+  // savevalue.
+  const tableReport: ReportDocumentLike = {
+    blocks: smallReport.blocks,
+    entities: {
+      ...smallReport.entities,
+      tables: { T: { name: "T", first: 0, width: 10, intervals: 4 } },
+    },
+  };
+  const trace: TraceDocumentLike = {
+    start_time: 0,
+    end_time: 10,
+    limit: 100,
+    records: 5,
+    truncated: false,
+    events: [
+      event(0, 1, 0, "Queue", "enter"),
+      event(1, 1, 4, "Tabulate", "table", "T 5"),
+      event(2, 1, 5, "Tabulate", "table", "T 25"),
+      event(3, 1, 6, "Logic", "logic", "S1 1"),
+      event(4, 1, 7, "Assign", "value", "V1 42"),
+    ],
+  };
+  const index = buildIndex(trace, tableReport, smallModel);
+  const state = stateAt(index, index.frames.length - 1);
+  // The first value falls in the second interval and the second one in the
+  // fourth: the engine's own arithmetic.
+  assert.deepEqual(state.figures.tables["T"]?.frequencies, [0, 1, 0, 1]);
+  assert.equal(state.figures.tables["T"]?.samples, 2);
+  assert.equal(state.figures.tables["T"]?.maxValue, 25);
+  assert.equal(state.figures.logic["S1"], true);
+  assert.equal(state.figures.values["V1"], 42);
+});
+
+test("the members that leave a chain are read from the trace", () => {
+  // The engine says which transactions left the chain, so the chain's time
+  // and its content are the engine's own.
+  const chainReport: ReportDocumentLike = {
+    blocks: smallReport.blocks,
+    entities: { ...smallReport.entities },
+  };
+  const trace: TraceDocumentLike = {
+    start_time: 0,
+    end_time: 10,
+    limit: 100,
+    records: 4,
+    truncated: false,
+    events: [
+      event(0, 1, 8, "Link", "enter", "C"),
+      event(1, 2, 8, "Link", "enter", "C"),
+      event(6, 1, 9, "Unlink", "enter", "C"),
+      event(6, 1, 9, "Unlink", "unlink", "1,2"),
+    ],
+  };
+  const index = buildIndex(trace, chainReport, smallModel);
+  const state = stateAt(index, index.frames.length - 1);
+  const chain = state.figures.chains["C"];
+  assert.equal(chain?.content, 0, "both members left");
+  assert.equal(chain?.entries, 2);
+  // The first was linked at 0 and the second at 1, and they left at 6.
+  assert.equal(chain?.totalTime, 6 + 5);
+});
+
 test("the replay of a big trace is faithful and is built once", { timeout: 600_000 }, () => {
   const documentsOf = documents(bigModel, 200_000);
   assert.equal(documentsOf.trace.truncated, false, "the trace of the big model fits");

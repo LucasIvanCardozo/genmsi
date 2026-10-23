@@ -138,7 +138,35 @@ export interface ReportDocumentLike {
         area: number;
       }
     >;
+    /** The tables of the run, with the intervals they count. */
+    tables?: Record<string, TableDefinitionLike>;
+    /** The queue tables of the run, with the intervals they count. */
+    qtables?: Record<string, TableDefinitionLike>;
+    /** The logic switches of the run: whether they are set. */
+    logic?: Record<string, boolean>;
+    /** The savevalues of the run: what they hold. */
+    savevalues?: Record<string, number>;
   };
+}
+
+/** How a table counts its values: the intervals of its histogram. */
+export interface TableDefinitionLike {
+  /** The name of the table. */
+  name?: string;
+  /** The first value of the first interval. */
+  first: number;
+  /** The width of every interval. */
+  width: number;
+  /** How many intervals the table has. */
+  intervals: number;
+  /** How many values were tabulated, as the report publishes them. */
+  samples?: number;
+  /** The largest value tabulated, as the report publishes it. */
+  max_value?: number;
+  /** The values that fell beyond the last interval. */
+  overflow?: number;
+  /** How many values fell in each interval, as the report publishes them. */
+  frequencies?: number[];
 }
 
 /** One block of the model, as the replay reads it. */
@@ -386,13 +414,22 @@ export function buildIndex(
   // When every transaction entered each queue, to know how long it waited
   // when it left it: the engine keeps the same map (`Queue::enqueued_at`).
   const enqueuedAt = new Map<string, Map<number, number>>();
-  // And when every transaction joined each chain, in the order they joined:
-  // the engine takes the members out from the oldest, and the trace does not
-  // say which one it took out.
-  const chainMembers = new Map<string, number[]>();
+  // And when every transaction joined each chain, by transaction: the engine
+  // says which members leave the chain, and the time each of them was
+  // linked is the time the chain held it.
+  const linkedAt = new Map<string, Map<number, number>>();
   // Who holds each facility right now, to know whether a preemption
   // interrupts somebody.
   const holders = new Map<string, number | null>();
+  // The tables of the run, with the intervals their histogram counts, so a
+  // sample can be placed in the interval the engine would put it in.
+  const tables = new Map<string, TableDefinitionLike>();
+  for (const [name, table] of Object.entries(report.entities.tables ?? {})) {
+    tables.set(name, table);
+  }
+  for (const [name, table] of Object.entries(report.entities.qtables ?? {})) {
+    tables.set(name, table);
+  }
   // The name of the entity every transaction is in, by block: a name that
   // comes from a parameter is not the same for every transaction, so it is
   // remembered per transaction.
@@ -590,24 +627,63 @@ export function buildIndex(
             time: event.time,
             xact: event.xact,
           };
-          joined(chainMembers, entity, event.time);
-        }
-        break;
-      case "Unlink":
-        // A transaction that enters an unlink block leaves the chain.
-        if (event.event === "enter" && entity !== null) {
-          const linked = left(chainMembers, entity, event.time);
-          change.figure = {
-            kind: "chain-leave",
-            name: entity,
-            time: event.time,
-            xact: event.xact,
-            linked,
-          };
+          joined(linkedAt, entity, event.xact, event.time);
         }
         break;
       default:
         break;
+    }
+
+    // The events the engine publishes about the things the report counts and
+    // the trace did not carry: the members that leave a chain, the samples
+    // of a table, the state of a switch and the value of a savevalue.
+    if (event.event === "unlink" && entity !== null) {
+      const linked: number[] = [];
+      for (const member of event.detail.split(",")) {
+        const xact = Number(member);
+        if (!Number.isFinite(xact)) {
+          continue;
+        }
+        linked.push(left(linkedAt, entity, xact, event.time));
+        forget(linkedAt, entity, xact);
+      }
+      if (linked.length > 0) {
+        change.figure = { kind: "chain-leave", name: entity, time: event.time, linked };
+      }
+    } else if (event.event === "table") {
+      const sample = splitDetail(event.detail);
+      if (sample !== null) {
+        const definition = tables.get(sample.name);
+        if (definition !== undefined) {
+          const width = definition.width <= 0 ? 1 : definition.width;
+          // The interval the value falls in, the engine's own arithmetic.
+          const index =
+            sample.value <= definition.first
+              ? 0
+              : Math.min(
+                  Math.ceil((sample.value - definition.first) / width),
+                  definition.intervals - 1,
+                );
+          change.figure = {
+            kind: "table-sample",
+            name: sample.name,
+            time: event.time,
+            value: sample.value,
+            index: Math.max(0, index),
+            intervals: definition.intervals,
+          };
+        }
+      }
+    } else if (event.event === "logic") {
+      const switched = splitDetail(event.detail);
+      if (switched !== null) {
+        change.figure = { kind: "logic-set", name: switched.name, set: switched.value !== 0 };
+      }
+    } else if (event.event === "value") {
+      const assigned = splitDetail(event.detail);
+      if (assigned !== null) {
+        change.figure = { kind: "value-set", name: assigned.name, value: assigned.value };
+      }
     }
 
     // The transactions inside the blocks: the engine counts an entry and a
@@ -769,19 +845,36 @@ function forget<K, V>(map: Map<K, Map<number, V>>, key: K, xact: number): void {
 }
 
 /**
+ * Split a detail of the form "{name} {value}".
+ *
+ * The name of an entity may hold spaces and a number does not, so the two
+ * are separated by the last space.
+ */
+function splitDetail(detail: string): { name: string; value: number } | null {
+  const cut = detail.lastIndexOf(" ");
+  if (cut <= 0) {
+    return null;
+  }
+  const value = Number(detail.slice(cut + 1));
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  return { name: detail.slice(0, cut), value };
+}
+
+/**
  * Remember that a transaction joined a chain.
  *
- * The engine keeps the members of a chain in the order they joined, and
- * takes them out from the oldest: the trace says that a member left, and
- * not which one, so the oldest is the one that leaves.
+ * The engine keeps the members of a chain and the time each of them joined,
+ * and so does the replay.
  */
-function joined(map: Map<string, number[]>, entity: string, time: number): void {
+function joined(map: Map<string, Map<number, number>>, entity: string, xact: number, time: number): void {
   const members = map.get(entity);
   if (members === undefined) {
-    map.set(entity, [time]);
+    map.set(entity, new Map([[xact, time]]));
     return;
   }
-  members.push(time);
+  members.set(xact, time);
 }
 
 /**
@@ -790,12 +883,8 @@ function joined(map: Map<string, number[]>, entity: string, time: number): void 
  * When the chain is not known, the instant itself is returned: the member
  * was there for no time at all.
  */
-function left(map: Map<string, number[]>, entity: string, fallback: number): number {
-  const members = map.get(entity);
-  if (members === undefined || members.length === 0) {
-    return fallback;
-  }
-  return members.shift() ?? fallback;
+function left(map: Map<string, Map<number, number>>, entity: string, xact: number, fallback: number): number {
+  return map.get(entity)?.get(xact) ?? fallback;
 }
 
 export function stateAt(index: ReplayIndex, upTo: number): ReplayState {
@@ -1040,11 +1129,14 @@ function collectPoints(
 export function mergeSeries(
   entities: string[],
   points: Map<string, SeriesPoint[]>,
+  until = Number.POSITIVE_INFINITY,
 ): SeriesRow[] {
   const times = new Set<number>();
   for (const name of entities) {
     for (const point of points.get(name) ?? []) {
-      times.add(point.time);
+      if (point.time <= until) {
+        times.add(point.time);
+      }
     }
   }
   const sorted = [...times].sort((a, b) => a - b);
@@ -1094,6 +1186,14 @@ export interface Fidelity {
   figures: boolean;
   /** The entities whose live figures differ from the report's. */
   figureMismatches: string[];
+  /** Whether the live samples of every table are the ones the report publishes. */
+  tables: boolean;
+  /** The tables whose live samples differ from the report's. */
+  tableMismatches: string[];
+  /** Whether the live switches and values are the ones the report publishes. */
+  switches: boolean;
+  /** The switches and values that differ from the report's. */
+  switchMismatches: string[];
 }
 
 /**
@@ -1109,6 +1209,26 @@ function sameNumber(derived: number, published: number | undefined): boolean {
   }
   const scale = Math.max(1, Math.abs(published));
   return Math.abs(derived - published) <= scale * 1e-9;
+}
+
+/**
+ * Whether two histograms are the same.
+ *
+ * The live histogram is rebuilt from the samples the trace carries, with the
+ * engine's own arithmetic: the two must be the same numbers, interval by
+ * interval.
+ */
+function sameFrequencies(
+  derived: number[] | undefined,
+  published: number[] | undefined,
+): boolean {
+  if (derived === undefined || published === undefined) {
+    return true;
+  }
+  if (derived.length !== published.length) {
+    return false;
+  }
+  return derived.every((count, index) => count === published[index]);
 }
 
 /**
@@ -1224,6 +1344,54 @@ export function checkFidelity(index: ReplayIndex, report: ReportDocumentLike): F
       figureMismatches.push(`cadena ${name}`);
     }
   }
+  // The samples of the tables, the histogram they make, the state of the
+  // switches and the value of the savevalues.
+  const tableMismatches: string[] = [];
+  for (const [name, table] of Object.entries(report.entities.tables ?? {})) {
+    const derived = closed.tables[name];
+    if (derived === undefined) {
+      if ((table.samples ?? 0) > 0) {
+        tableMismatches.push(`tabla ${name}`);
+      }
+      continue;
+    }
+    if (
+      derived.samples !== table.samples ||
+      !sameNumber(derived.maxValue, table.max_value) ||
+      !sameFrequencies(derived.frequencies, table.frequencies)
+    ) {
+      tableMismatches.push(`tabla ${name}`);
+    }
+  }
+  for (const [name, table] of Object.entries(report.entities.qtables ?? {})) {
+    const derived = closed.tables[name];
+    if (derived === undefined) {
+      if ((table.samples ?? 0) > 0) {
+        tableMismatches.push(`qtabla ${name}`);
+      }
+      continue;
+    }
+    if (
+      derived.samples !== table.samples ||
+      !sameNumber(derived.maxValue, table.max_value) ||
+      !sameFrequencies(derived.frequencies, table.frequencies)
+    ) {
+      tableMismatches.push(`qtabla ${name}`);
+    }
+  }
+  const switchMismatches: string[] = [];
+  for (const [name, state] of Object.entries(report.entities.logic ?? {})) {
+    const derived = closed.logic[name];
+    if (derived !== undefined && derived !== state) {
+      switchMismatches.push(`interruptor ${name}`);
+    }
+  }
+  for (const [name, value] of Object.entries(report.entities.savevalues ?? {})) {
+    const derived = closed.values[name];
+    if (derived !== undefined && !sameNumber(derived, value)) {
+      switchMismatches.push(`valor ${name}`);
+    }
+  }
   return {
     queues: queueMismatches.length === 0,
     blocks: blockMismatches.length === 0,
@@ -1232,6 +1400,10 @@ export function checkFidelity(index: ReplayIndex, report: ReportDocumentLike): F
     blockMismatches,
     entryMismatches,
     figures: figureMismatches.length === 0,
-    figureMismatches,    generators,
+    figureMismatches,
+    tables: tableMismatches.length === 0,
+    tableMismatches,
+    switches: switchMismatches.length === 0,
+    switchMismatches,    generators,
   };
 }

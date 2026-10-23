@@ -94,6 +94,18 @@ export interface ChainFigure {
   lastChange: number;
 }
 
+/** What a table has tabulated since the run started. */
+export interface TableFigure {
+  /** How many values were tabulated. */
+  samples: number;
+  /** The largest value tabulated. */
+  maxValue: number;
+  /** The values that fell beyond the last interval. */
+  overflow: number;
+  /** How many values fell in each interval. */
+  frequencies: number[];
+}
+
 /** The figures of every entity of the run. */
 export interface Figures {
   /** The queues, by name. */
@@ -104,6 +116,12 @@ export interface Figures {
   storages: Record<string, StorageFigure>;
   /** The chains, by name. */
   chains: Record<string, ChainFigure>;
+  /** The tables, by name. */
+  tables: Record<string, TableFigure>;
+  /** The logic switches, by name: whether they are set. */
+  logic: Record<string, boolean>;
+  /** The savevalues, by name: what they hold. */
+  values: Record<string, number>;
 }
 
 /**
@@ -132,7 +150,26 @@ export type FigureChange =
   | { kind: "storage-leave"; name: string; time: number; units: number }
   | { kind: "storage-retry"; name: string }
   | { kind: "chain-enter"; name: string; time: number; xact: number }
-  | { kind: "chain-leave"; name: string; time: number; xact: number; linked: number };
+  | {
+      kind: "chain-leave";
+      name: string;
+      time: number;
+      /** When each member that left the chain joined it. */
+      linked: number[];
+    }
+  | {
+      kind: "table-sample";
+      name: string;
+      time: number;
+      /** The value that was tabulated. */
+      value: number;
+      /** The interval the value fell in. */
+      index: number;
+      /** How many intervals the table has. */
+      intervals: number;
+    }
+  | { kind: "logic-set"; name: string; set: boolean }
+  | { kind: "value-set"; name: string; value: number };
 
 /** A queue that nothing has happened to yet. */
 function emptyQueue(now: number): QueueFigure {
@@ -198,6 +235,9 @@ export function emptyFigures(): Figures {
     facilities: {},
     storages: {},
     chains: {},
+    tables: {},
+    logic: {},
+    values: {},
   };
 }
 
@@ -329,14 +369,43 @@ export function applyChange(figures: Figures, change: FigureChange): Figures {
     }
     case "chain-leave": {
       const before = figures.chains[change.name] ?? emptyChain(change.time);
+      // The members that left the chain: the engine took them out and said
+      // which ones, and the time each of them was linked is the time the
+      // chain held it.
+      const left = change.linked.length;
+      const waited = change.linked.reduce(
+        (sum, linked) => sum + elapsed(linked, change.time),
+        0,
+      );
       const chain: ChainFigure = {
         ...before,
         area: before.area + before.content * elapsed(before.lastChange, change.time),
         lastChange: change.time,
-        content: Math.max(0, before.content - 1),
-        totalTime: before.totalTime + elapsed(change.linked, change.time),
+        content: Math.max(0, before.content - left),
+        totalTime: before.totalTime + waited,
       };
       return { ...figures, chains: { ...figures.chains, [change.name]: chain } };
+    }
+    case "table-sample": {
+      const before = figures.tables[change.name];
+      const frequencies = before === undefined ? [] : before.frequencies.slice();
+      while (frequencies.length < change.intervals) {
+        frequencies.push(0);
+      }
+      frequencies[change.index] = (frequencies[change.index] ?? 0) + 1;
+      const table: TableFigure = {
+        samples: (before?.samples ?? 0) + 1,
+        maxValue: Math.max(before?.maxValue ?? 0, change.value),
+        overflow: before?.overflow ?? 0,
+        frequencies,
+      };
+      return { ...figures, tables: { ...figures.tables, [change.name]: table } };
+    }
+    case "logic-set": {
+      return { ...figures, logic: { ...figures.logic, [change.name]: change.set } };
+    }
+    case "value-set": {
+      return { ...figures, values: { ...figures.values, [change.name]: change.value } };
     }
     default:
       return figures;
@@ -382,5 +451,5 @@ export function closeFigures(figures: Figures, now: number): Figures {
       ? { ...facility, busyTime: facility.busyTime + elapsed(facility.seizedAt, now) }
       : facility;
   }
-  return { queues, facilities, storages, chains };
+  return { queues, facilities, storages, chains, tables: figures.tables, logic: figures.logic, values: figures.values };
 }

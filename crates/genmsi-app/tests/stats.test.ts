@@ -131,8 +131,7 @@ test("a chain that a transaction joins and leaves", () => {
     kind: "chain-leave",
     name: "cadena",
     time: 8,
-    xact: 3,
-    linked: 0,
+    linked: [0],
   });
   const chain = figures.chains["cadena"];
   assert.equal(chain.content, 0);
@@ -140,6 +139,59 @@ test("a chain that a transaction joins and leaves", () => {
   assert.equal(chain.entries, 1);
   assert.equal(chain.totalTime, 8);
   assert.equal(chain.area, 8);
+});
+
+test("a chain that loses several members at once", () => {
+  // The engine takes the members out and says which ones: the chain holds
+  // two of them and the time of each is added up.
+  let figures = emptyFigures();
+  figures = applyChange(figures, { kind: "chain-enter", name: "cadena", time: 0, xact: 3 });
+  figures = applyChange(figures, { kind: "chain-enter", name: "cadena", time: 2, xact: 4 });
+  figures = applyChange(figures, {
+    kind: "chain-leave",
+    name: "cadena",
+    time: 6,
+    linked: [0, 2],
+  });
+  const chain = figures.chains["cadena"];
+  assert.equal(chain.content, 0, "both members left");
+  assert.equal(chain.entries, 2);
+  assert.equal(chain.totalTime, 10, "six seconds and four seconds");
+});
+
+test("a table that tabulates values", () => {
+  // The values fall in the intervals the engine's own arithmetic says: the
+  // first value is in the first interval, and the next one is in the
+  // second.
+  let figures = emptyFigures();
+  figures = applyChange(figures, {
+    kind: "table-sample",
+    name: "tabla",
+    time: 0,
+    value: 3,
+    index: 1,
+    intervals: 4,
+  });
+  figures = applyChange(figures, {
+    kind: "table-sample",
+    name: "tabla",
+    time: 1,
+    value: 9,
+    index: 3,
+    intervals: 4,
+  });
+  const table = figures.tables["tabla"];
+  assert.equal(table.samples, 2);
+  assert.equal(table.maxValue, 9);
+  assert.deepEqual(table.frequencies, [0, 1, 0, 1]);
+});
+
+test("a switch that is set and a value that is assigned", () => {
+  let figures = emptyFigures();
+  figures = applyChange(figures, { kind: "logic-set", name: "S1", set: true });
+  figures = applyChange(figures, { kind: "value-set", name: "V1", value: 42 });
+  assert.equal(figures.logic["S1"], true);
+  assert.equal(figures.values["V1"], 42);
 });
 
 test("closing the figures closes the integrals that are open", () => {

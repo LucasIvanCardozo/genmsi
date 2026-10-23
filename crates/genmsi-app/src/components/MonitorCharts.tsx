@@ -13,6 +13,8 @@ import {
 } from "recharts";
 import { number } from "../format";
 import { mergeSeries, type ReplayIndex } from "../monitor/replay";
+import { useLive } from "../monitor/live";
+import type { Figures } from "../monitor/stats";
 import type { ReportDocument, Table } from "../types";
 
 /** How many bars a histogram has at most. */
@@ -50,17 +52,26 @@ export interface Histogram {
  * their running total: no metric the engine computes is derived here. A
  * table with more intervals than the chart has bars is grouped, and the
  * label says how many intervals each bar covers.
+ *
+ * The frequencies of the instant can be given instead, so the histogram
+ * grows while the run is replayed: they are the engine's own arithmetic,
+ * rebuilt from the samples the trace carries.
  */
-export function histogramOf(table: Table): Histogram {
+export function histogramOf(table: Table, frequencies?: number[]): Histogram {
+  const counts = frequencies ?? table.frequencies;
+  const total =
+    frequencies === undefined
+      ? table.samples
+      : counts.reduce((sum, count) => sum + count, 0);
   const group = Math.max(1, Math.ceil(table.intervals / MAX_BARS));
-  const samples = Math.max(table.samples, 1);
+  const samples = Math.max(total, 1);
   const bars: HistogramBar[] = [];
   let cumulative = 0;
-  for (let index = 0; index < table.frequencies.length; index += group) {
+  for (let index = 0; index < counts.length; index += group) {
     let frequency = 0;
-    const last = Math.min(index + group, table.frequencies.length);
+    const last = Math.min(index + group, counts.length);
     for (let step = index; step < last; step += 1) {
-      frequency += table.frequencies[step];
+      frequency += counts[step];
     }
     cumulative += frequency;
     const low = index === 0 ? 0 : table.first + (index - 1) * table.width + 1;
@@ -71,7 +82,7 @@ export function histogramOf(table: Table): Histogram {
       accumulated: (cumulative / samples) * 100,
     });
   }
-  return { name: table.name, bars, group, samples: table.samples };
+  return { name: table.name, bars, group, samples: total };
 }
 
 /** The tables of the model: the ones of `TABULATE` and the ones of the queues. */
@@ -107,14 +118,20 @@ function axisTime(value: number): string {
 export default function MonitorCharts({
   report,
   monitor,
+  figures,
 }: {
   report: ReportDocument | null;
   monitor: ReplayIndex;
+  /** The figures of the run at the instant the replay is at. */
+  figures?: Figures | null;
 }) {
   const tables = useMemo(() => tablesOf(report), [report]);
   const [selectedQueues, setSelectedQueues] = useState<string[]>([]);
   const [selectedFacilities, setSelectedFacilities] = useState<string[]>([]);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  // The clock of the replay: the charts show the run as it is now, not the
+  // run as it will be.
+  const clock = useLive((state) => state.clock);
 
   // A new run has its own entities: the selection follows the run.
   useEffect(() => {
@@ -124,19 +141,25 @@ export default function MonitorCharts({
   }, [monitor, tables]);
 
   const queueData = useMemo(
-    () => mergeSeries(selectedQueues, monitor.queuePoints),
-    [monitor, selectedQueues],
+    () => mergeSeries(selectedQueues, monitor.queuePoints, clock),
+    [monitor, selectedQueues, clock],
   );
 
   const facilityData = useMemo(
-    () => mergeSeries(selectedFacilities, monitor.facilityPoints),
-    [monitor, selectedFacilities],
+    () => mergeSeries(selectedFacilities, monitor.facilityPoints, clock),
+    [monitor, selectedFacilities, clock],
   );
 
   const histogram = useMemo(() => {
     const found = tables.find((candidate) => candidate.name === selectedTable);
-    return found === undefined ? null : histogramOf(found.table);
-  }, [tables, selectedTable]);
+    if (found === undefined) {
+      return null;
+    }
+    // The frequencies of the instant, when the replay knows the table's
+    // samples.
+    const live = figures?.tables[found.table.name]?.frequencies;
+    return histogramOf(found.table, live);
+  }, [tables, selectedTable, figures]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto">

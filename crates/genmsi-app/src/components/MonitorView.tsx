@@ -448,7 +448,7 @@ export default function MonitorView({
             Ejecuta la simulación para ver sus gráficos.
           </p>
         ) : (
-          <MonitorCharts report={report} monitor={monitor} />
+          <MonitorCharts report={report} monitor={monitor} figures={state?.figures ?? null} />
         ))}
       {panel === "reporte" &&
         (report === null ? (

@@ -351,7 +351,7 @@ export default function ReportView({
               { label: "Interruptor", value: (row) => text(row.name) },
               {
                 label: "Estado",
-                value: (row) => yes(row.state),
+                value: (row) => either(closed?.logic[row.name], row.state),
               },
             ]}
           />
@@ -363,7 +363,7 @@ export default function ReportView({
               { label: "Valor", value: (row) => text(row.name) },
               {
                 label: "Cantidad",
-                value: (row) => published(row.value),
+                value: (row) => at(closed?.values[row.name], row.value),
               },
             ]}
           />
@@ -376,8 +376,14 @@ export default function ReportView({
               { label: "Primer valor", value: (row) => published(row.first) },
               { label: "Ancho", value: (row) => published(row.width) },
               { label: "Intervalos", value: (row) => published(row.intervals) },
-              { label: "Muestras", value: (row) => published(row.samples) },
-              { label: "Máximo", value: (row) => published(row.max_value) },
+              {
+                label: "Muestras",
+                value: (row) => at(closed?.tables[row.name]?.samples, row.samples),
+              },
+              {
+                label: "Máximo",
+                value: (row) => at(closed?.tables[row.name]?.maxValue, row.max_value),
+              },
               { label: "Desbordes", value: (row) => published(row.overflow) },
             ]}
           />
@@ -390,7 +396,10 @@ export default function ReportView({
               { label: "Primer valor", value: (row) => published(row.first) },
               { label: "Ancho", value: (row) => published(row.width) },
               { label: "Intervalos", value: (row) => published(row.intervals) },
-              { label: "Muestras", value: (row) => published(row.samples) },
+              {
+                label: "Muestras",
+                value: (row) => at(closed?.tables[row.name]?.samples, row.samples),
+              },
             ]}
           />
         )}

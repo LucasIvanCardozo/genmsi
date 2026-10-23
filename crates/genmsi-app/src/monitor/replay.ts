@@ -169,6 +169,8 @@ export interface ReplayState {
   blocks: Record<number, number>;
   /** The entries every program block has had, since the run started. */
   totals: Record<number, number>;
+  /** The times every program block could not be entered, since the run started. */
+  retries: Record<number, number>;
   /** The figures of the entities of the run, as the engine counts them. */
   figures: Figures;
 }
@@ -191,6 +193,8 @@ export interface StateChange {
   left?: number;
   /** The program block that counts an entry. */
   entered_count?: number;
+  /** The program block that could not be entered. */
+  retried?: number;
   /** What the change does to the figures of the entity it touches. */
   figure?: FigureChange;
 }
@@ -282,6 +286,7 @@ export function emptyState(): ReplayState {
     storages: {},
     blocks: {},
     totals: {},
+    retries: {},
     figures: emptyFigures(),
   };
 }
@@ -388,6 +393,10 @@ export function buildIndex(
   // Who holds each facility right now, to know whether a preemption
   // interrupts somebody.
   const holders = new Map<string, number | null>();
+  // The name of the entity every transaction is in, by block: a name that
+  // comes from a parameter is not the same for every transaction, so it is
+  // remembered per transaction.
+  const names = new Map<number, Map<number, string>>();
   const seen = {
     queue: new Set<string>(),
     facility: new Set<string>(),
@@ -402,16 +411,40 @@ export function buildIndex(
     const node = block?.node ?? null;
     const change: StateChange = {};
 
-    // The name of the entity: what the model declares, or what the engine
-    // resolved when the transaction waited for it.
-    let entity = entities.get(index) ?? null;
-    if (entity === null && event.event === "wait" && !NOT_A_NAME.has(event.detail)) {
-      entity = event.detail;
-      learned.set(index, entity);
-      entities.set(index, entity);
+    // The name of the entity: what the engine published in the detail of
+    // the event, or what the model declares.
+    //
+    // The engine resolves the name of an entity that a parameter points at
+    // when the transaction arrives, and publishes it in the event: the
+    // trace is the only thing that knows it, and the model cannot say it.
+    const published =
+      (event.event === "enter" || event.event === "wait") &&
+      event.detail !== "" &&
+      !NOT_A_NAME.has(event.detail)
+        ? event.detail
+        : null;
+    let entity = published;
+    if (entity === null && event.event === "leave") {
+      // The name the transaction had when it entered the block.
+      entity = recall(names, index, event.xact, null);
+    }
+    if (entity === null) {
+      entity = entities.get(index) ?? null;
     }
     if (entity === null) {
       entity = learned.get(index) ?? null;
+    }
+    if (published !== null) {
+      remember(names, index, event.xact, published);
+      if (!learned.has(index)) {
+        learned.set(index, published);
+        entities.set(index, published);
+      }
+    }
+    if (event.event === "leave") {
+      // The transaction left the block: the name it had there is of no use
+      // any more.
+      forget(names, index, event.xact);
     }
 
     switch (className) {
@@ -596,6 +629,10 @@ export function buildIndex(
         seen.block.add(index);
         blocks.push(index);
       }
+    } else if (event.event === "wait") {
+      // A transaction that could not enter the block: the engine counts it
+      // as a retry of the block.
+      change.retried = index;
     }
 
     frames.push({
@@ -649,6 +686,7 @@ export function applyFrame(state: ReplayState, frame: Frame): ReplayState {
   let storages = state.storages;
   let blocks = state.blocks;
   let totals = state.totals;
+  let retries = state.retries;
   if (change.queue !== undefined) {
     const content = Math.max(0, (queues[change.queue.name] ?? 0) + change.queue.delta);
     queues = { ...queues, [change.queue.name]: content };
@@ -669,13 +707,16 @@ export function applyFrame(state: ReplayState, frame: Frame): ReplayState {
   if (change.entered_count !== undefined) {
     totals = { ...totals, [change.entered_count]: (totals[change.entered_count] ?? 0) + 1 };
   }
+  if (change.retried !== undefined) {
+    retries = { ...retries, [change.retried]: (retries[change.retried] ?? 0) + 1 };
+  }
   // The figures of the entities: the engine's own arithmetic, applied to the
   // change the frame carries.
   let figures = state.figures;
   if (change.figure !== undefined) {
     figures = applyChange(figures, change.figure);
   }
-  return { time: frame.time, queues, facilities, storages, blocks, totals, figures };
+  return { time: frame.time, queues, facilities, storages, blocks, totals, retries, figures };
 }
 
 /**
@@ -686,49 +727,45 @@ export function applyFrame(state: ReplayState, frame: Frame): ReplayState {
  * always gives the same state.
  */
 /**
- * Remember when a transaction entered an entity.
+ * Remember something about a transaction in an entity.
  *
  * The engine keeps a map per entity — `Queue::enqueued_at` and
  * `Chain::linked_at` — and so does the replay: the wait of a transaction is
  * the time between its entry and its departure.
  */
-function remember(
-  map: Map<string, Map<number, number>>,
-  entity: string,
+function remember<K, V>(
+  map: Map<K, Map<number, V>>,
+  key: K,
   xact: number,
-  time: number,
+  value: V,
 ): void {
-  const entries = map.get(entity);
+  const entries = map.get(key);
   if (entries === undefined) {
-    map.set(entity, new Map([[xact, time]]));
+    map.set(key, new Map([[xact, value]]));
     return;
   }
-  entries.set(xact, time);
+  entries.set(xact, value);
 }
 
 /**
- * When a transaction entered an entity.
+ * What is known about a transaction in an entity.
  *
- * When the entry is not known, the instant itself is returned: the wait is
- * then no time at all, which is what the engine counts when a transaction
- * leaves something it never entered.
+ * When it is not known, the instant itself is returned: the wait is then no
+ * time at all, which is what the engine counts when a transaction leaves
+ * something it never entered.
  */
-function recall(
-  map: Map<string, Map<number, number>>,
-  entity: string,
+function recall<K, V>(
+  map: Map<K, Map<number, V>>,
+  key: K,
   xact: number,
-  fallback: number,
-): number {
-  return map.get(entity)?.get(xact) ?? fallback;
+  fallback: V,
+): V {
+  return map.get(key)?.get(xact) ?? fallback;
 }
 
 /** Forget that a transaction entered an entity: it left it. */
-function forget(
-  map: Map<string, Map<number, number>>,
-  entity: string,
-  xact: number,
-): void {
-  map.get(entity)?.delete(xact);
+function forget<K, V>(map: Map<K, Map<number, V>>, key: K, xact: number): void {
+  map.get(key)?.delete(xact);
 }
 
 /**

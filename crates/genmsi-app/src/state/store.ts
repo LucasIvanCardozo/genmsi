@@ -21,9 +21,6 @@ import type { EditCommand } from "../types/generated/EditCommand";
 /** What the app is doing right now. */
 export type Status = "idle" | "loading" | "ready" | "running";
 
-/** The view the body shows. */
-export type View = "grafo" | "reporte" | "monitor";
-
 /**
  * How many trace records the monitor asks the engine for.
  *
@@ -68,8 +65,6 @@ export interface AppState {
   until: number | null;
   /** What the app is doing. */
   status: Status;
-  /** The view the body shows. */
-  view: View;
   /** The message of the last failure, if any. */
   error: string | null;
   /** Whether the model has changes that were not saved. */
@@ -122,8 +117,6 @@ export interface AppState {
   paste: () => Promise<void>;
   /** Reorder the graph in layers. */
   relayout: () => Promise<void>;
-  /** Show one of the views. */
-  setView: (view: View) => void;
   /** Set the seed of the next run. */
   setSeed: (seed: number) => void;
   /** Set the horizon of the next run. */
@@ -212,7 +205,6 @@ export const useApp = create<AppState>((set, get) => ({
   seed: 1,
   until: null,
   status: "idle",
-  view: "grafo",
   error: null,
   dirty: false,
   canUndo: false,
@@ -240,7 +232,7 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   openModel: async (path: string) => {
-    set({ status: "loading", error: null, currentPath: path, view: "grafo" });
+    set({ status: "loading", error: null, currentPath: path });
     try {
       const state = await engine().openModel(path);
       set({
@@ -274,7 +266,7 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   newModel: async () => {
-    set({ status: "loading", error: null, view: "grafo" });
+    set({ status: "loading", error: null });
     try {
       const state = await engine().newModel();
       set({
@@ -421,7 +413,6 @@ export const useApp = create<AppState>((set, get) => ({
         playhead: 0,
         playing: false,
         status: "ready",
-        view: "reporte",
       });
     } catch (error) {
       set({ status: "ready", error: `No se pudo simular el modelo: ${messageOf(error)}` });
@@ -463,7 +454,6 @@ export const useApp = create<AppState>((set, get) => ({
         // it is: the reader always knows the scale.
         speed: fittingSpeed(monitor.endTime - monitor.startTime),
         status: "ready",
-        view: "monitor",
       });
     } catch (error) {
       set({
@@ -559,8 +549,6 @@ export const useApp = create<AppState>((set, get) => ({
       })),
     });
   },
-
-  setView: (view: View) => set({ view }),
 
   setSeed: (seed: number) => set({ seed }),
 

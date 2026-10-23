@@ -158,3 +158,9 @@ export function useEdgeBalls(id: string): LiveBall[] {
 
 /** The empty list, so the links without balls share one. */
 const EMPTY_BALLS: LiveBall[] = [];
+
+// The store is visible from the browser's console while the app is being
+// developed: the picture it carries is the one the reader sees.
+if (import.meta.env?.DEV) {
+  (globalThis as { __live?: typeof useLive }).__live = useLive;
+}

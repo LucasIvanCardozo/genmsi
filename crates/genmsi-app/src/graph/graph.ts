@@ -151,6 +151,58 @@ export function edgeBetween(edges: Edge[], from: number, to: number): Edge | und
 }
 
 /**
+ * The id of the link a ball travels over.
+ *
+ * When the two blocks are joined by a link, that is the one. When the
+ * model's link goes through a container, the container is a frame and not a
+ * step the reader sees: the ball crosses the frame, and the link it travels
+ * is the direct one between the two blocks.
+ */
+export function routeOf(edges: Edge[], from: number, to: number): string {
+  const edge = edgeBetween(edges, from, to);
+  return edge === undefined ? visibleLinkId(from, to) : edge.id;
+}
+
+/** The id of the direct link between two blocks that the model does not join. */
+export function visibleLinkId(from: number, to: number): string {
+  return `visible:${from}->${to}`;
+}
+
+/**
+ * The links the model does not draw but the reader must see the ball cross.
+ *
+ * A container gathers the blocks of a part of the model, and the model's
+ * links go in and out of it. The transaction does not go through the
+ * container: it goes from one block to the next. The ball follows the
+ * visible way, which is a link of its own, drawn only where the ball is.
+ */
+export function visibleLinks(
+  moves: { from: number; to: number }[],
+  edges: Edge[],
+): Edge[] {
+  const links: Edge[] = [];
+  const seen = new Set<string>();
+  for (const move of moves) {
+    const id = routeOf(edges, move.from, move.to);
+    if (seen.has(id) || edgeBetween(edges, move.from, move.to) !== undefined) {
+      continue;
+    }
+    seen.add(id);
+    links.push({
+      id,
+      source: String(move.from),
+      target: String(move.to),
+      type: "bloque",
+      // The link is not drawn: the model does not have it, and the ball is
+      // the only thing that travels over it.
+      style: { stroke: "transparent", strokeWidth: 0 },
+      data: { visible: true },
+    });
+  }
+  return links;
+}
+
+/**
  * Where a port sits along the side of its block, as a fraction of its width.
  *
  * The ports of a block are spread along its side, the first one a quarter in,

@@ -16,42 +16,34 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { ModelBody, ModelBlock } from "../types";
+import { graphOf, type BlockData } from "../graph/graph";
+import { useBlockCounts } from "../monitor/live";
+import type { ModelBody } from "../types";
+import GraphEdge from "./GraphEdge";
 
-/** One port of a block, as the node draws it. */
-interface PortData {
-  /** Port id, unique inside the block. */
-  ioid: number;
-  /** Port name (`Entrada1`, `Salida1`, ...). */
-  name: string;
-}
-
-/** What a block of the graph shows. */
-interface BlockData extends Record<string, unknown> {
-  /** The block's class (`Generate`, `Queue`, ...). */
-  title: string;
-  /** The block's caption, or its label when it has no caption. */
-  subtitle: string;
-  /** `A` for an activity block, `C` for a container. */
-  kind: string;
-  /** The block's input ports. */
-  inputs: PortData[];
-  /** The block's output ports. */
-  outputs: PortData[];
-}
+/**
+ * What a block of the graph shows.
+ *
+ * The counts of the run are not here: a block asks the live layer for its
+ * own, so that a block the run did not reach is not redrawn when the clock
+ * ticks.
+ */
 
 /** One block of the model, drawn as a node of the graph. */
-function BlockNode({ data, selected }: NodeProps<Node<BlockData>>) {
+function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
   const container = data.kind === "C";
   const note = data.title === "Note";
   const spread = (count: number, index: number): string =>
     `${((index + 1) / (count + 1)) * 100}%`;
+  // How many transactions the block holds now, and how many have gone
+  // through it: the live layer answers for this block alone.
+  const counts = useBlockCounts(Number(id));
   return (
     <div
       className={[
-        "flex h-full w-full flex-col justify-center rounded-md border px-2 text-left shadow-sm",
+        "relative flex h-full w-full flex-col justify-center rounded-md border px-2 text-left shadow-sm",
         container
-          ? "border-slate-300 border-dashed bg-slate-50/80"
+          ? "border-slate-300 border-dashed bg-transparent"
           : "border-slate-400 bg-white",
         note ? "opacity-70" : "",
         selected ? "ring-2 ring-indigo-500" : "",
@@ -119,81 +111,28 @@ function BlockNode({ data, selected }: NodeProps<Node<BlockData>>) {
             className="!size-2.5 !border-0 !bg-transparent"
           />
         ))}
+      {/* The two numbers of the block: how many transactions are inside it
+          now, and how many have gone through it since the run started. */}
+      {counts !== undefined && counts.ever > 0 && (
+        <span className="pointer-events-none absolute right-1.5 top-1 font-mono text-[10px] leading-none text-indigo-600">
+          {counts.now}
+          <span className="text-slate-400">/{counts.ever}</span>
+        </span>
+      )}
     </div>
   );
 }
 
 const nodeTypes = { bloque: BlockNode };
 
-/** The title a block shows: its class, or the word for a plain container. */
-function titleOf(block: ModelBlock): string {
-  if (block.kind === "C") {
-    return block.class === "" ? "Contenedor" : block.class;
-  }
-  return block.class === "" ? "Bloque" : block.class;
-}
-
-/** The subtitle a block shows: its caption, or its label. */
-function subtitleOf(block: ModelBlock): string {
-  if (block.caption !== "") {
-    return block.caption;
-  }
-  return block.label ?? "";
-}
+/** The links are drawn by the component that knows the balls that travel. */
+const edgeTypes = { bloque: GraphEdge };
 
 /** The nodes and the edges of the model's graph. */
-function graphOf(model: ModelBody): { nodes: Node<BlockData>[]; edges: Edge[] } {
-  const placed = new Map<number, ModelBlock>();
-  for (const block of model.blocks) {
-    if (block.layout !== null) {
-      placed.set(block.id, block);
-    }
-  }
-
-  const nodes: Node<BlockData>[] = model.blocks
-    .filter((block) => block.layout !== null)
-    .map((block) => ({
-      id: String(block.id),
-      type: "bloque",
-      position: { x: block.layout?.x ?? 0, y: block.layout?.y ?? 0 },
-      data: {
-        title: titleOf(block),
-        subtitle: subtitleOf(block),
-        kind: block.kind,
-        inputs: block.inputs.map((port) => ({ ioid: port.ioid, name: port.name })),
-        outputs: block.outputs.map((port) => ({ ioid: port.ioid, name: port.name })),
-      },
-      style: {
-        width: Math.max(block.layout?.width ?? 100, 72),
-        height: Math.max(block.layout?.height ?? 40, 32),
-      },
-      zIndex: block.kind === "C" ? 0 : 2,
-    }));
-
-  const edges: Edge[] = model.edges
-    .filter((edge) => placed.has(edge.from_module) && placed.has(edge.to_module))
-    .map((edge) => ({
-      id: edge.id,
-      source: String(edge.from_module),
-      sourceHandle:
-        edge.from_module === edge.container ? `in-${edge.from_ioid}` : String(edge.from_ioid),
-      target: String(edge.to_module),
-      targetHandle:
-        edge.to_module === edge.container ? `out-${edge.to_ioid}` : String(edge.to_ioid),
-      label: edge.label ?? undefined,
-      animated: false,
-      style: { stroke: "#94a3b8", strokeWidth: 1.75 },
-      labelStyle: { fontSize: 10, fill: "#64748b" },
-      labelBgStyle: { fill: "#f8fafc", fillOpacity: 0.9 },
-      data: {
-        container: edge.container,
-        from: edge.from_module,
-        fromIoid: edge.from_ioid,
-      },
-    }));
-
-  return { nodes, edges };
+function graphOfUnused(): void {
+  void graphOf;
 }
+void graphOfUnused;
 
 /** What the graph asks the app to do. */
 export interface GraphActions {
@@ -222,11 +161,17 @@ export default function GraphView({
   model,
   actions,
   fitSignal,
+  extraEdges = [],
 }: {
   model: ModelBody;
   actions: GraphActions;
   /** A counter that asks the graph to frame the model again. */
   fitSignal: number;
+  /**
+   * The links the model does not draw but a ball travels over: the direct
+   * way between two blocks that the model joins through a container.
+   */
+  extraEdges?: Edge[];
 }) {
   const [nodes, setNodes] = useState<Node<BlockData>[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -244,7 +189,11 @@ export default function GraphView({
     setNodes(
       graph.nodes.map((node) => ({ ...node, selected: selected.current.has(node.id) })),
     );
-    setEdges(graph.edges);
+    // The links are drawn by the component that carries the balls.
+    setEdges([
+      ...graph.edges.map((edge) => ({ ...edge, type: "bloque" })),
+      ...extraEdges,
+    ]);
     // The first view frames the flow of the model: the blocks that simulate.
     // The containers are the frames around them, and framing them too would
     // shrink the picture until nothing could be read.
@@ -253,7 +202,7 @@ export default function GraphView({
       framed.current = key;
       fitFlow(instance.current, graph.nodes);
     }
-  }, [model]);
+  }, [model, extraEdges]);
 
   // The user asks for the picture to be framed again.
   useEffect(() => {
@@ -262,7 +211,6 @@ export default function GraphView({
     }
     fitFlow(instance.current, graphOf(model).nodes);
   }, [fitSignal, model]);
-
   const onNodesChange = useCallback((changes: NodeChange<Node<BlockData>>[]) => {
     setNodes((current) => applyNodeChanges(changes, current));
   }, []);
@@ -327,6 +275,7 @@ export default function GraphView({
         nodes={projected.nodes}
         edges={projected.edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onInit={(flow) => {
           instance.current = flow;
         }}

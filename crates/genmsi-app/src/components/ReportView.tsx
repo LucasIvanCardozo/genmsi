@@ -1,13 +1,62 @@
 import { useState } from "react";
 import { number } from "../format";
+import { closeFigures, type Figures } from "../monitor/stats";
+import { useLive } from "../monitor/live";
+import type { ReplayState } from "../monitor/replay";
 import type { ReportDocument } from "../types";
+
+/**
+ * One number of the report.
+ *
+ * The live number is the one the replay knows at this instant; the published
+ * one is the engine's, for the run that finished. Which one is on the screen
+ * is said out loud: the reader must not mistake the end of a run for the
+ * state of the run.
+ */
+interface Cell {
+  /** The text of the number. */
+  text: string;
+  /** Whether it is the live one. */
+  live: boolean;
+}
+
+/** A number the engine published, which the replay cannot say. */
+function published(value: number): Cell {
+  return { text: number(value), live: false };
+}
+
+/** A word: the name of a thing, which does not change during the run. */
+function text(value: string): Cell {
+  return { text: value, live: false };
+}
+
+/** A yes or no, the one the engine published. */
+function yes(value: boolean): Cell {
+  return { text: value ? "sí" : "no", live: false };
+}
+
+/** A yes or no the replay knows, and the engine's. */
+function either(live: boolean | undefined, value: boolean): Cell {
+  if (live === undefined) {
+    return yes(value);
+  }
+  return { text: live ? "sí" : "no", live: true };
+}
+
+/** A number the replay knows, and the engine's, for the same thing. */
+function at(live: number | undefined, value: number): Cell {
+  if (live === undefined) {
+    return published(value);
+  }
+  return { text: number(live), live: true };
+}
 
 /** A table of the report. */
 function DataTable<T>({
   columns,
   rows,
 }: {
-  columns: { label: string; value: (row: T) => string }[];
+  columns: { label: string; value: (row: T) => Cell }[];
   rows: T[];
 }) {
   if (rows.length === 0) {
@@ -27,11 +76,20 @@ function DataTable<T>({
       <tbody>
         {rows.map((row, index) => (
           <tr key={index} className="border-b border-slate-100">
-            {columns.map((column) => (
-              <td key={column.label} className="py-1.5 pr-4 font-mono whitespace-nowrap text-slate-800">
-                {column.value(row)}
-              </td>
-            ))}
+            {columns.map((column) => {
+              const cell = column.value(row);
+              return (
+                <td
+                  key={column.label}
+                  className={[
+                    "py-1.5 pr-4 font-mono whitespace-nowrap",
+                    cell.live ? "text-indigo-700" : "text-slate-800",
+                  ].join(" ")}
+                >
+                  {cell.text}
+                </td>
+              );
+            })}
           </tr>
         ))}
       </tbody>
@@ -50,9 +108,22 @@ interface Tab {
  * The report of the last run.
  *
  * Every table comes from the engine's `genmsi.report/1` document; the app
- * renders it and computes nothing.
+ * renders it and computes nothing. The numbers the replay knows are shown as
+ * they are at this instant, and the ones the replay cannot say keep the
+ * engine's value: the trace does not carry the samples of a table, nor the
+ * state of a switch, nor the value of a savevalue.
  */
-export default function ReportView({ report }: { report: ReportDocument }) {
+export default function ReportView({
+  report,
+  state,
+  figures,
+}: {
+  report: ReportDocument;
+  /** The state of the replay at the instant the reader is looking at. */
+  state: ReplayState | null;
+  /** The figures of the entities at that instant. */
+  figures: Figures | null;
+}) {
   const entities = report.entities;
   const tabs: Tab[] = [
     { id: "bloques", label: "Bloques", count: report.blocks.length },
@@ -67,13 +138,20 @@ export default function ReportView({ report }: { report: ReportDocument }) {
   ];
   const [tab, setTab] = useState("bloques");
   const active = tabs.find((candidate) => candidate.id === tab) ?? tabs[0];
+  // The state of the replay at the instant: the numbers it knows are the
+  // live ones.
+  const atBlock = (line: number) => (state === null ? undefined : line - 1);
+  // The clock of the replay: the integrals that are still open are closed at
+  // this instant, so the area of a queue is the area it covered so far.
+  const clock = useLive((live) => live.clock);
+  const closed = figures === null ? null : closeFigures(figures, clock);
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden">
       <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs">
         <span className="text-sm font-semibold text-slate-800">{report.title}</span>
         <span className="text-slate-500">
-          Semilla <span className="font-mono text-slate-800">{report.seed}</span>
+          Semilla <span className="font-mono text-slate-800">{report.seed ?? 1}</span>
         </span>
         <span className="text-slate-500">
           Tiempos{" "}
@@ -117,14 +195,35 @@ export default function ReportView({ report }: { report: ReportDocument }) {
           <DataTable
             rows={report.blocks}
             columns={[
-              { label: "Línea", value: (row) => String(row.line) },
-              { label: "Nodo", value: (row) => String(row.node) },
-              { label: "Clase", value: (row) => row.class },
-              { label: "Etiqueta", value: (row) => row.label ?? "—" },
-              { label: "Operandos", value: (row) => row.operands },
-              { label: "Entry", value: (row) => number(row.entries) },
-              { label: "Current", value: (row) => number(row.current) },
-              { label: "Retry", value: (row) => number(row.retries) },
+              { label: "Línea", value: (row) => published(row.line) },
+              { label: "Nodo", value: (row) => published(row.node) },
+              { label: "Clase", value: (row) => text(row.class) },
+              { label: "Etiqueta", value: (row) => text(row.label ?? "—") },
+              { label: "Operandos", value: (row) => text(row.operands) },
+              {
+                label: "Entry",
+                value: (row) =>
+                  at(
+                    state === null ? undefined : state.totals[atBlock(row.line) ?? -1],
+                    row.entries,
+                  ),
+              },
+              {
+                label: "Current",
+                value: (row) =>
+                  at(
+                    state === null ? undefined : state.blocks[atBlock(row.line) ?? -1],
+                    row.current,
+                  ),
+              },
+              {
+                label: "Retry",
+                value: (row) =>
+                  at(
+                    state === null ? undefined : state.retries[atBlock(row.line) ?? -1],
+                    row.retries,
+                  ),
+              },
             ]}
           />
         )}
@@ -132,13 +231,28 @@ export default function ReportView({ report }: { report: ReportDocument }) {
           <DataTable
             rows={Object.values(entities.facilities)}
             columns={[
-              { label: "Facilidad", value: (row) => row.name },
-              { label: "Entries", value: (row) => number(row.entries) },
-              { label: "Ocupado", value: (row) => number(row.busy_time) },
-              { label: "Ocupada", value: (row) => (row.busy ? "sí" : "no") },
-              { label: "Disponible", value: (row) => (row.available ? "sí" : "no") },
-              { label: "Retry", value: (row) => number(row.retry) },
-              { label: "Inter", value: (row) => number(row.inter) },
+              { label: "Facilidad", value: (row) => text(row.name) },
+              {
+                label: "Entries",
+                value: (row) => at(closed?.facilities[row.name]?.entries, row.entries),
+              },
+              {
+                label: "Ocupado",
+                value: (row) =>
+                  at(closed?.facilities[row.name]?.busyTime, row.busy_time),
+              },
+              {
+                label: "Ocupada",
+                value: (row) => either(closed?.facilities[row.name]?.busy, row.busy),
+              },
+              {
+                label: "Disponible",
+                value: (row) => yes(row.available),
+              },
+              {
+                label: "Inter",
+                value: (row) => at(closed?.facilities[row.name]?.inter, row.inter),
+              },
             ]}
           />
         )}
@@ -146,14 +260,31 @@ export default function ReportView({ report }: { report: ReportDocument }) {
           <DataTable
             rows={Object.values(entities.queues)}
             columns={[
-              { label: "Cola", value: (row) => row.name },
-              { label: "Máx", value: (row) => number(row.max) },
-              { label: "Contenido", value: (row) => number(row.content) },
-              { label: "Entries", value: (row) => number(row.entries) },
-              { label: "Entries(0)", value: (row) => number(row.zero_entries) },
-              { label: "Tiempo total", value: (row) => number(row.total_time) },
-              { label: "Área", value: (row) => number(row.area) },
-              { label: "Retry", value: (row) => number(row.retry) },
+              { label: "Cola", value: (row) => text(row.name) },
+              {
+                label: "Máx",
+                value: (row) => at(closed?.queues[row.name]?.max, row.max),
+              },
+              {
+                label: "Contenido",
+                value: (row) => at(closed?.queues[row.name]?.content, row.content),
+              },
+              {
+                label: "Entries",
+                value: (row) => at(closed?.queues[row.name]?.entries, row.entries),
+              },
+              {
+                label: "Entries(0)",
+                value: (row) => at(closed?.queues[row.name]?.zeroEntries, row.zero_entries),
+              },
+              {
+                label: "Tiempo total",
+                value: (row) => at(closed?.queues[row.name]?.totalTime, row.total_time),
+              },
+              {
+                label: "Área",
+                value: (row) => at(closed?.queues[row.name]?.area, row.area),
+              },
             ]}
           />
         )}
@@ -161,15 +292,27 @@ export default function ReportView({ report }: { report: ReportDocument }) {
           <DataTable
             rows={Object.values(entities.storages)}
             columns={[
-              { label: "Almacén", value: (row) => row.name },
-              { label: "Cap.", value: (row) => number(row.capacity) },
-              { label: "En uso", value: (row) => number(row.in_use) },
-              { label: "Mín", value: (row) => number(row.min_use) },
-              { label: "Máx", value: (row) => number(row.max_use) },
-              { label: "Entries", value: (row) => number(row.entries) },
-              { label: "Área", value: (row) => number(row.area) },
-              { label: "Retry", value: (row) => number(row.retry) },
-              { label: "Delay", value: (row) => number(row.delay) },
+              { label: "Almacén", value: (row) => text(row.name) },
+              {
+                label: "En uso",
+                value: (row) => at(closed?.storages[row.name]?.inUse, row.in_use),
+              },
+              {
+                label: "Mín",
+                value: (row) => at(closed?.storages[row.name]?.minUse, row.min_use),
+              },
+              {
+                label: "Máx",
+                value: (row) => at(closed?.storages[row.name]?.maxUse, row.max_use),
+              },
+              {
+                label: "Entries",
+                value: (row) => at(closed?.storages[row.name]?.entries, row.entries),
+              },
+              {
+                label: "Área",
+                value: (row) => at(closed?.storages[row.name]?.area, row.area),
+              },
             ]}
           />
         )}
@@ -177,12 +320,27 @@ export default function ReportView({ report }: { report: ReportDocument }) {
           <DataTable
             rows={Object.values(entities.chains)}
             columns={[
-              { label: "Cadena", value: (row) => row.name },
-              { label: "Tamaño", value: (row) => number(row.content) },
-              { label: "Máx", value: (row) => number(row.max) },
-              { label: "Entries", value: (row) => number(row.entries) },
-              { label: "Tiempo total", value: (row) => number(row.total_time) },
-              { label: "Área", value: (row) => number(row.area) },
+              { label: "Cadena", value: (row) => text(row.name) },
+              {
+                label: "Tamaño",
+                value: (row) => at(closed?.chains[row.name]?.content, row.content),
+              },
+              {
+                label: "Máx",
+                value: (row) => at(closed?.chains[row.name]?.max, row.max),
+              },
+              {
+                label: "Entries",
+                value: (row) => at(closed?.chains[row.name]?.entries, row.entries),
+              },
+              {
+                label: "Tiempo total",
+                value: (row) => at(closed?.chains[row.name]?.totalTime, row.total_time),
+              },
+              {
+                label: "Área",
+                value: (row) => at(closed?.chains[row.name]?.area, row.area),
+              },
             ]}
           />
         )}
@@ -190,8 +348,11 @@ export default function ReportView({ report }: { report: ReportDocument }) {
           <DataTable
             rows={Object.entries(entities.logic).map(([name, state]) => ({ name, state }))}
             columns={[
-              { label: "Interruptor", value: (row) => row.name },
-              { label: "Estado", value: (row) => (row.state ? "activado" : "desactivado") },
+              { label: "Interruptor", value: (row) => text(row.name) },
+              {
+                label: "Estado",
+                value: (row) => yes(row.state),
+              },
             ]}
           />
         )}
@@ -199,8 +360,11 @@ export default function ReportView({ report }: { report: ReportDocument }) {
           <DataTable
             rows={Object.entries(entities.savevalues).map(([name, value]) => ({ name, value }))}
             columns={[
-              { label: "Valor", value: (row) => row.name },
-              { label: "Cantidad", value: (row) => number(row.value) },
+              { label: "Valor", value: (row) => text(row.name) },
+              {
+                label: "Cantidad",
+                value: (row) => published(row.value),
+              },
             ]}
           />
         )}
@@ -208,13 +372,13 @@ export default function ReportView({ report }: { report: ReportDocument }) {
           <DataTable
             rows={Object.values(entities.tables)}
             columns={[
-              { label: "Tabla", value: (row) => row.name },
-              { label: "Primer valor", value: (row) => number(row.first) },
-              { label: "Ancho", value: (row) => number(row.width) },
-              { label: "Intervalos", value: (row) => number(row.intervals) },
-              { label: "Muestras", value: (row) => number(row.samples) },
-              { label: "Máximo", value: (row) => number(row.max_value) },
-              { label: "Desbordes", value: (row) => number(row.overflow) },
+              { label: "Tabla", value: (row) => text(row.name) },
+              { label: "Primer valor", value: (row) => published(row.first) },
+              { label: "Ancho", value: (row) => published(row.width) },
+              { label: "Intervalos", value: (row) => published(row.intervals) },
+              { label: "Muestras", value: (row) => published(row.samples) },
+              { label: "Máximo", value: (row) => published(row.max_value) },
+              { label: "Desbordes", value: (row) => published(row.overflow) },
             ]}
           />
         )}
@@ -222,11 +386,11 @@ export default function ReportView({ report }: { report: ReportDocument }) {
           <DataTable
             rows={Object.values(entities.qtables)}
             columns={[
-              { label: "QTabla", value: (row) => row.name },
-              { label: "Primer valor", value: (row) => number(row.first) },
-              { label: "Ancho", value: (row) => number(row.width) },
-              { label: "Intervalos", value: (row) => number(row.intervals) },
-              { label: "Muestras", value: (row) => number(row.samples) },
+              { label: "QTabla", value: (row) => text(row.name) },
+              { label: "Primer valor", value: (row) => published(row.first) },
+              { label: "Ancho", value: (row) => published(row.width) },
+              { label: "Intervalos", value: (row) => published(row.intervals) },
+              { label: "Muestras", value: (row) => published(row.samples) },
             ]}
           />
         )}

@@ -1,13 +1,12 @@
-//! The balls that cross the monitor's links: the moves of the run and the ones
-//! on screen at a given instant.
+//! The balls that cross the links of the model.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildTransitions, type TraceDocumentLike } from "../src/monitor/replay.ts";
 import {
   FLIGHT_SECONDS,
-  ballsAt,
   firstMoveAfter,
+  travellersAt,
   type Move,
 } from "../src/monitor/balls.ts";
 
@@ -75,39 +74,30 @@ test("the search finds where the moves of an instant begin", () => {
 test("the ball lands exactly when the instance reaches its destination", () => {
   // The move happened at the instant the instance arrived: the ball is
   // already there, at the end of its flight.
-  const moves: Move[] = [{ from: 1, to: 2, time: 10 }];
-  const place = (block: number) => ({ x: block * 10, y: 0 });
+  const moves: Move[] = [{ from: 1, to: 2, time: 10, xact: 7 }];
 
-  const atArrival = ballsAt(moves, [10], 10, 1, place);
+  const atArrival = travellersAt(moves, [10], 10, 1);
   assert.equal(atArrival.length, 1);
   assert.equal(atArrival[0].progress, 1, "the ball is at its destination");
-  assert.equal(atArrival[0].to.x, 20);
+  assert.equal(atArrival[0].to, 2);
+  assert.equal(atArrival[0].xact, 7, "the ball says which transaction it is");
 
   // Before that, the ball is on its way: it left a flight before the arrival.
-  const onTheWay = ballsAt(moves, [10], 9.5, 1, place);
+  const onTheWay = travellersAt(moves, [10], 9.5, 1);
   assert.equal(onTheWay.length, 1);
   assert.equal(onTheWay[0].progress, 0.5, "half way between the two blocks");
-  assert.equal(onTheWay[0].from.x, 10);
-  assert.equal(onTheWay[0].to.x, 20);
+  assert.equal(onTheWay[0].from, 1);
+  assert.equal(onTheWay[0].to, 2);
 });
 
 test("a ball that has not left yet is not on screen", () => {
-  const moves: Move[] = [{ from: 1, to: 2, time: 10 }];
-  const place = () => ({ x: 0, y: 0 });
+  const moves: Move[] = [{ from: 1, to: 2, time: 10, xact: 7 }];
   // The flight is one second: the ball leaves at 9.
-  assert.equal(ballsAt(moves, [10], 8.5, 1, place).length, 0);
-  assert.equal(ballsAt(moves, [10], 9, 1, place).length, 1, "it just left");
+  assert.equal(travellersAt(moves, [10], 8.5, 1).length, 0);
+  assert.equal(travellersAt(moves, [10], 9, 1).length, 1, "it just left");
 });
 
-test("a move to a block that is not on the canvas is skipped", () => {
-  const moves: Move[] = [{ from: 1, to: 99, time: 0 }];
-  const balls = ballsAt(moves, [0], 0, 1, (block) =>
-    block === 99 ? undefined : { x: 0, y: 0 },
-  );
-  assert.equal(balls.length, 0);
-});
-
-test("the moves of a big run are found without walking them all", () => {
+test("a move of a big run is found without walking them all", () => {
   // The cost of a frame is the number of balls, not the number of moves: the
   // search finds where to start.
   const count = 30_000;
@@ -115,14 +105,14 @@ test("the moves of a big run are found without walking them all", () => {
   const moves: Move[] = [];
   for (let i = 0; i < count; i += 1) {
     times.push(i);
-    moves.push({ from: 1, to: 2, time: i });
+    moves.push({ from: 1, to: 2, time: i, xact: i });
   }
   const started = performance.now();
-  const balls = ballsAt(moves, times, 29_999.1, 2, () => ({ x: 0, y: 0 }));
+  const travellers = travellersAt(moves, times, 29_999.1, 2);
   const elapsed = performance.now() - started;
-  // The moves of the last instants are the only ones on screen: the mark of
-  // the one that just landed, and the one that is about to.
-  assert.ok(balls.length <= 2, `${balls.length} balls on screen`);
+  // The moves of the last instants are the only ones on screen: the one that
+  // just landed, and the one that is about to.
+  assert.ok(travellers.length <= 2, `${travellers.length} balls on screen`);
   assert.ok(elapsed < 50, `the frame took ${elapsed} ms`);
 });
 
@@ -130,16 +120,12 @@ test("the flight is a fixed stretch of the run at every speed", () => {
   // The ball crosses in 0.2 s of the run, so the faster the reader runs the
   // reproduction, the quicker the ball crosses: 200 ms of screen at 1x, 100 ms
   // at 2x.
-  const moves: Move[] = [{ from: 1, to: 2, time: 10 }];
-  const place = () => ({ x: 0, y: 0 });
-  const at1x = ballsAt(moves, [10], 10 - FLIGHT_SECONDS / 2, FLIGHT_SECONDS, place);
-  assert.equal(at1x.length, 1);
+  const moves: Move[] = [{ from: 1, to: 2, time: 10, xact: 7 }];
+  const half = travellersAt(moves, [10], 10 - FLIGHT_SECONDS / 2, FLIGHT_SECONDS);
+  assert.equal(half.length, 1);
   // The progress is a fraction of the flight: half the flight, half way.
   assert.ok(
-    Math.abs(at1x[0].progress - 0.5) < 1e-9,
-    `half way at half the flight, got ${at1x[0].progress}`,
+    Math.abs(half[0].progress - 0.5) < 1e-9,
+    `half way at half the flight, got ${half[0].progress}`,
   );
-  // The same stretch of the run passes twice as fast at 2x.
-  const at2x = ballsAt(moves, [10], 10 - FLIGHT_SECONDS / 2, FLIGHT_SECONDS, place);
-  assert.ok(Math.abs(at2x[0].progress - 0.5) < 1e-9, `${at2x[0].progress}`);
 });

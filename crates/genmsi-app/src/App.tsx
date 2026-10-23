@@ -1,14 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Play } from "lucide-react";
 import BlockPalette from "./components/BlockPalette";
-import DiagnosticsPanel from "./components/DiagnosticsPanel";
 import ErrorNotice from "./components/ErrorNotice";
-import GraphView from "./components/GraphView";
 import ModelPicker from "./components/ModelPicker";
-import ModelSummary from "./components/ModelSummary";
 import MonitorView from "./components/MonitorView";
-import PropertiesPanel from "./components/PropertiesPanel";
-import ReportView from "./components/ReportView";
 import Toolbar from "./components/Toolbar";
 import { useApp } from "./state/store";
 
@@ -16,8 +11,8 @@ import { useApp } from "./state/store";
  * The app's shell.
  *
  * The header opens a model and runs it; the toolbar holds the editing
- * actions; the body shows the model's graph, the properties of the selected
- * block and the report of the last run.
+ * actions; the body is the window of the simulation: the graph of the model,
+ * the reproduction of the run and its report, all in one place.
  */
 export default function App() {
   const {
@@ -27,10 +22,6 @@ export default function App() {
     error,
     seed,
     until,
-    selectedBlockIds,
-    report,
-    view,
-    diagnostics,
     dirty,
     canUndo,
     canRedo,
@@ -53,7 +44,6 @@ export default function App() {
     deleteSelection,
     setSeed,
     setUntil,
-    setView,
     confirmSave,
     dismissSave,
   } = useApp();
@@ -104,8 +94,6 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [undo, redo, copy, paste]);
 
-  const selectedBlock =
-    model?.blocks.find((block) => block.id === selectedBlockIds[0]) ?? null;
   // The counter that asks the graph to frame the model again.
   const [fitSignal, setFitSignal] = useState(0);
 
@@ -213,63 +201,7 @@ export default function App() {
           <BlockPalette catalogue={catalogue} onAdd={(className) => void addBlock(className)} />
         </div>
 
-        <div className="flex gap-1 border-b border-slate-200">
-          {(
-            [
-              { id: "grafo", label: "Grafo" },
-              { id: "monitor", label: "Monitor" },
-              { id: "reporte", label: "Reporte" },
-            ] as const
-          ).map((candidate) => (
-            <button
-              key={candidate.id}
-              type="button"
-              onClick={() => setView(candidate.id)}
-              className={[
-                "-mb-px rounded-t-md border-b-2 px-4 py-1.5 text-sm font-medium transition",
-                view === candidate.id
-                  ? "border-indigo-500 text-indigo-700"
-                  : "border-transparent text-slate-500 hover:text-slate-800",
-              ].join(" ")}
-            >
-              {candidate.label}
-            </button>
-          ))}
-        </div>
-
-        {model === null ? (
-          <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 text-sm text-slate-500">
-            Selecciona un modelo para ver su grafo.
-          </div>
-        ) : view === "grafo" ? (
-          <div className="flex min-h-0 flex-1 flex-col gap-3">
-            <ModelSummary diagnostics={diagnostics} />
-            <DiagnosticsPanel diagnostics={diagnostics} />
-            <div className="flex min-h-0 flex-1 gap-3">
-              <div className="min-w-0 flex-1">
-                <GraphView model={model} actions={actions} fitSignal={fitSignal} />
-              </div>
-              <aside className="w-80 shrink-0 overflow-auto rounded-lg border border-slate-200 bg-white p-4">
-                <PropertiesPanel
-                  block={selectedBlock}
-                  catalogue={catalogue}
-                  onSetProperty={(id, property, value) =>
-                    void apply({ op: "setProperty", id, property, value })
-                  }
-                  onSetCaption={(id, caption) => void apply({ op: "setCaption", id, caption })}
-                />
-              </aside>
-            </div>
-          </div>
-        ) : view === "monitor" ? (
-          <MonitorView />
-        ) : report === null ? (
-          <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 text-sm text-slate-500">
-            Ejecuta la simulación para ver su reporte.
-          </div>
-        ) : (
-          <ReportView report={report} />
-        )}
+        <MonitorView actions={actions} fitSignal={fitSignal} />
       </main>
     </div>
   );

@@ -1,11 +1,13 @@
 /**
- * The balls that cross the links of the monitor's canvas.
+ * The balls that cross the links of the model.
  *
  * A ball is one transaction moving from one block of the model to another.
- * The component is deliberately dumb: it receives the moves, the clock and the
- * place of every block, and it draws the ones that are on screen. It holds no
- * animation state of its own, so the reader can scrub the clock and the
- * picture is always the picture of that instant.
+ * The link that joins the two blocks is the one that draws it: the ball
+ * travels over the very curve the reader sees, and the graph knows where
+ * that curve is.
+ *
+ * This module only says *which* balls are on the way and *how far* along
+ * they are. Where they are drawn is the link's business.
  *
  * ## The life of a ball
  *
@@ -25,14 +27,6 @@ export const FLIGHT_SECONDS = 2;
 /** The radius of a ball, in the canvas' own units. */
 export const BALL_RADIUS = 5;
 
-/** The place of a block of the model, in the canvas' units. */
-export interface Place {
-  /** The middle of the block. */
-  x: number;
-  /** The middle of the block. */
-  y: number;
-}
-
 /** One move of a transaction between two blocks of the model. */
 export interface Move {
   /** The block the instance came from. */
@@ -41,14 +35,18 @@ export interface Move {
   to: number;
   /** The time of the run at which the instance reached its destination. */
   time: number;
+  /** The transaction that moved. */
+  xact: number;
 }
 
-/** One ball on its way. */
-export interface Ball {
-  /** The middle of the block it comes from. */
-  from: Place;
-  /** The middle of the block it goes to. */
-  to: Place;
+/** One transaction on its way from one block to another. */
+export interface Traveller {
+  /** The block the transaction comes from. */
+  from: number;
+  /** The block the transaction goes to. */
+  to: number;
+  /** The transaction that travels. */
+  xact: number;
   /** How far along it is, from 0 to 1. */
   progress: number;
 }
@@ -75,7 +73,7 @@ export function firstMoveAfter(times: number[], time: number): number {
 }
 
 /**
- * The balls that are on screen at `time`.
+ * The transactions that are on their way at `time`.
  *
  * A ball is on screen while it flies: it left `flight` before the instance
  * reached its destination, so the moves that matter are the ones of the last
@@ -83,16 +81,15 @@ export function firstMoveAfter(times: number[], time: number): number {
  * goes backwards from there, so the cost is the number of balls and not the
  * number of moves.
  */
-export function ballsAt(
+export function travellersAt(
   moves: Move[],
   times: number[],
   time: number,
   flight: number,
-  placeOf: (block: number) => Place | undefined,
-): Ball[] {
-  const balls: Ball[] = [];
+): Traveller[] {
+  const travellers: Traveller[] = [];
   if (moves.length === 0) {
-    return balls;
+    return travellers;
   }
   // The moves whose ball is on screen: the ball of a move that happens at `t`
   // flies while the clock is between `t - flight` and `t`, so the moves of
@@ -104,17 +101,13 @@ export function ballsAt(
     if (move.time < oldest) {
       break;
     }
-    const from = placeOf(move.from);
-    const to = placeOf(move.to);
-    if (from === undefined || to === undefined) {
-      continue;
-    }
     const progress = flight <= 0 ? 1 : (time - (move.time - flight)) / flight;
-    balls.push({
-      from,
-      to,
+    travellers.push({
+      from: move.from,
+      to: move.to,
+      xact: move.xact,
       progress: progress < 0 ? 0 : progress > 1 ? 1 : progress,
     });
   }
-  return balls;
+  return travellers;
 }

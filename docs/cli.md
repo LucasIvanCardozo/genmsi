@@ -107,6 +107,32 @@ how many records the engine keeps; when the bound was reached the output ends wi
 the note shown above, so a truncated trace is never mistaken for a complete one.
 There are no filters by transaction, block or time range.
 
+### `gpss`
+
+Prints the GPSS program the model compiles to, without running it:
+
+```
+$ genmsi gpss fixtures/models/TP2__problema1.gmdl
+Exit            STORAGE         3
+SalaEspera      STORAGE         44
+QTabla          QTABLE          centro,0,600,8
+                GENERATE        60,30
+A_Queue         QUEUE           centro
+A_Advance       ADVANCE         10,5
+Entrada1        TRANSFER        850,A_Advance1,A_Advance12
+```
+
+One statement per line: the block's name, the verb, and the operands. A
+statement that continues a block leaves the name column empty. The definitions
+come first, and the blocks follow in the order a transaction walks them, so a
+transaction goes to the next block by itself; the connections that break that
+walk are written as a `TRANSFER` with no name of its own.
+
+This is the text the original editor writes in its **Código GPSS** tab, and the
+harness in `scripts/wine-oracle/` compares the two for the same model: it is
+the original's own statement of what each block does, and the closest thing to
+a specification the original publishes. See `docs/format-and-engine.md`.
+
 ### `run-all`
 
 Runs every `.gmdl` file of one directory level (not recursive), sorted by file
@@ -251,6 +277,13 @@ number does not):
 | `logic` | the name of the switch and its state (`1` or `0`) | the run sets a switch |
 | `value` | the name of the savevalue and its value | the run assigns a savevalue |
 | `unlink` | the transactions that left the chain, separated by commas | the run empties a chain |
+
+### `genmsi.gpss/1`
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema` | string | `genmsi.gpss/1` |
+| `gpss` | string | The GPSS program, as the text form prints it |
 
 ### `genmsi.run-all/1`
 

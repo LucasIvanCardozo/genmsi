@@ -190,3 +190,41 @@ matches when its relative error is within 20% (counts) or 35% (times and
 occupancies), or when the baseline value falls inside the 95% interval of our
 replication mean. Baselines are single samples, so the rule is generous by
 design (D6).
+
+## 9. The GPSS as a second oracle
+
+The numbers say whether a model behaves like the original; they do not say
+whether it behaves like the original *for the right reasons*. The original
+publishes its own answer to that question: it compiles a model into GPSS and
+shows it in its **Código GPSS** tab.
+
+`genmsi gpss <model>` writes the same text: one statement per line, the
+block's name, the verb and the operands, the definitions first, and the blocks
+in the order a transaction walks them. The order matters — a transaction goes
+to the next block by itself, so only the connections that break the walk are
+written as a `TRANSFER` with no name.
+
+`scripts/wine-oracle/compare-gpss.sh` compares our text with the original's
+for the same model. It compares two things apart from each other:
+
+- **what each block does**: the verb and the operands of every statement,
+  matched by the block's name;
+- **where the transaction goes**: the connections, as a set of pairs.
+
+The two are compared apart because the order of the blocks is a matter of the
+walk and not of the model: the same connection is a fall-through in one program
+and a `TRANSFER` in the other, and that is not a difference of behaviour.
+
+The tools in `scripts/wine-oracle/` read the original without running it:
+
+| Tool | What it does |
+|---|---|
+| `dfm.py` | Writes the original's 55 forms as text, so its interface can be read instead of photographed |
+| `make-benches.py` | Writes a model per class of the original's class library, with the ports and the defaults that library declares |
+| `run-benches.sh` | Runs every bench against the original and keeps its GPSS and its report |
+| `compare-gpss.sh` | Compares our GPSS with the original's, block by block and connection by connection |
+
+A bench is the unit of verification: the original's GPSS for it says how a
+class compiles, and the original's report for it says what the class does.
+Together they are the specification of that class, and the model under test is
+one class with nothing else in it.

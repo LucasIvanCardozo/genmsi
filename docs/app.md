@@ -141,22 +141,27 @@ The script turns on the optional `ts` feature of `genmsi-core` and of
 The design is the app's own (the phase's decision `S2`): clarity over
 similarity with the original.
 
-- **Header**: the app's name, the model picker, the seed and the horizon,
-  and the button that runs the model. One row, always visible.
+- **Header**: the app's name, the model picker, the seed and the horizon, and
+  the **console of the run**: *Simular* (the model, and with it the report),
+  *Ejecutar* (the model and the trace, with the replay), the pause and play of
+  the replay, the speed, the clock and the slider of the replay. One row,
+  always visible: the controls are there before a run, disabled, and the
+  reader never has to start a run to find them.
 - **Toolbar**: the editing actions — `Nuevo`, `Guardar`, `Guardar como…`,
-  `Deshacer`, `Rehacer`, `Encuadrar`, `Borrar` and `Reacomodar` — and the
-  palette that creates a block (`Añadir bloque`).
+  `Deshacer`, `Rehacer`, `Encuadrar`, `Borrar` and `Reacomodar`.
 - **One window, three panels**: *Reproducción*, *Gráficos* and *Reporte*. The
   reproduction is the graph of the model — with the geometry the model
   carries — with the run on it: the blocks the run is filling are marked,
   and the transactions that are on their way travel over the links. The
   charts are the time series and the histograms of the run; the report is
   the engine's tables, with the numbers of the instant the replay is at.
-- **Lateral panel**: two tabs, *Bloque* (the selected block's identity and
-  its declared properties, one editor per declared type) and *Estado* (the
-  queues, the facilities and the storages of the run).
+- **Lateral panel**: three tabs, *Bloque* (the selected block's identity and
+  its declared properties, one editor per declared type), *Estado* (the
+  queues, the facilities and the storages of the run) and *Bloques* (the
+  classes that can be created, with what each one does and the ports and
+  properties it declares).
 - **Diagnostics**: what the model compiles to, recomputed after every
-  change.
+  change, at the foot of the window.
 - **Numbers**: the original's comma decimals, so a report read in the app
   and a report read in the CLI say the same thing.
 - **Text**: Spanish, neutral. The code, the file names and the documents

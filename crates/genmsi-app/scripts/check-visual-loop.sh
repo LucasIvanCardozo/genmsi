@@ -181,8 +181,9 @@ agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length >
 agent-browser select '[aria-label="Modelo"]' "$EDITED"
 agent-browser wait --text "Puerta Banco"
 
-# A new node, created from the catalogue.
-agent-browser click '[aria-label="Añadir bloque"]'
+# A new node, created from the catalogue. The classes live in the lateral
+# panel, in the tab "Bloques".
+agent-browser click '[data-monitor-aside="bloques"]'
 agent-browser wait --text "Generar"
 # The list of classes scrolls: the class has to be on the picture before it
 # can be clicked.
@@ -193,8 +194,6 @@ agent-browser screenshot "$SHOTS/04-nodo-nuevo.png"
 
 # A second node, and the connection between the two: the new Generate feeds
 # the new Terminate, so the link does not replace any other one.
-agent-browser click '[aria-label="Añadir bloque"]'
-agent-browser wait --text "Terminar"
 agent-browser scrollintoview '[data-block-class="Terminate"]'
 agent-browser click '[data-block-class="Terminate"]'
 agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > $((NODE_COUNT + 1))"
@@ -251,8 +250,11 @@ agent-browser screenshot "$SHOTS/11-error.png"
 # the charts need a model that has all of them.
 agent-browser select '[aria-label="Modelo"]' "$MONITOR_MODEL"
 agent-browser wait --text "supermercado"
-agent-browser wait --text "Ejecutar y reproducir"
-agent-browser find role button click --name "Ejecutar y reproducir"
+# The model has to be in memory before the run: the button waits for it, and
+# the run of a model that is still loading would have nothing to run.
+agent-browser wait --fn '!document.body.innerText.includes("Cargando")'
+agent-browser wait --text "Ejecutar"
+agent-browser find role button click --name "Ejecutar"
 # The header of the monitor says how many records the trace kept.
 agent-browser wait --text "Registros"
 agent-browser screenshot "$SHOTS/12-monitor.png"
@@ -260,7 +262,7 @@ agent-browser screenshot "$SHOTS/12-monitor.png"
 # The replay is paused and put at the middle of the run, so the picture is
 # the same on every run: the blocks that hold transactions are marked and the
 # clock says where the replay is.
-agent-browser find role button click --name "Pausar"
+agent-browser find role button click --name "Pausar la reproducción"
 set_range_middle '[aria-label="Posición de la reproducción"]'
 agent-browser wait --fn 'document.querySelector("input[aria-label=\"Posición de la reproducción\"]").value === String(Math.floor(Number(document.querySelector("input[aria-label=\"Posición de la reproducción\"]").max) / 2))'
 agent-browser screenshot "$SHOTS/13-monitor-reproduccion.png"

@@ -7,9 +7,11 @@
 //!
 //! The classes the original declares and our catalogue does not offer are
 //! pinned here too: the ports and the defaults come from the original's own
-//! class library (`Genmsi_20230711.backup/gClasses.xml`).
+//! class library (`Genmsi_20230711.backup/gClasses.xml`). The macro code of a
+//! class (its `MAKE` line) declares the properties of the class with the
+//! default value it carries, and every one of them is pinned below.
 
-use genmsi_format::catalogue::{build_block, class_spec, CLASSES, DEFAULTS};
+use genmsi_format::catalogue::{build_block, class_spec, listed_options, CLASSES, DEFAULTS};
 use genmsi_format::{parse_str, to_string, validate, EditCommand, EditSession, Link};
 
 /// The default the table gives to a property of a class, if it gives one.
@@ -60,7 +62,9 @@ fn a_new_clock_block_comes_with_its_default_frequency() {
 
 #[test]
 fn a_new_block_of_a_class_without_defaults_is_born_empty() {
-    let block = build_block("Advance", 0, None).expect("Advance is in the catalogue");
+    // The `Terminate` class declares its units without a value: the original
+    // leaves them empty, and so does the catalogue.
+    let block = build_block("Terminate", 0, None).expect("Terminate is in the catalogue");
     assert!(!block.props.is_empty(), "the class declares properties");
     for prop in &block.props {
         assert_eq!(
@@ -575,8 +579,21 @@ fn a_new_block_of_the_eight_classes_comes_with_the_defaults_of_the_original() {
     assert_eq!(value("Param"), "param");
     assert_eq!(value("minimo"), "1");
     assert_eq!(value("maximo"), "10");
-    assert_eq!(value("op"), "=");
-    assert_eq!(value("valorComp"), "*1");
+    // The values the file carries are the ones the original writes: a `=`
+    // is `%3D` and a `*` is `%2A`.
+    assert_eq!(value("op"), "%3D");
+    assert_eq!(value("valorComp"), "%2A1");
+    // The editor shows them as the original writes them.
+    let shown = |name: &str| {
+        block
+            .props
+            .iter()
+            .find(|prop| prop.name == name)
+            .unwrap_or_else(|| panic!("the class declares {name}"))
+            .value()
+    };
+    assert_eq!(shown("op"), "=");
+    assert_eq!(shown("valorComp"), "*1");
 
     // The normal variable: the function it creates and the variable itself.
     let block = build_block("VariableN", 0, None).expect("VariableN is in the catalogue");
@@ -594,4 +611,290 @@ fn a_new_block_of_the_eight_classes_comes_with_the_defaults_of_the_original() {
     assert_eq!(value("NombreFunc"), "NORMAL");
     assert_eq!(value("NombreVar"), "Normal");
     assert_eq!(value("Seed"), "90");
+}
+
+// Every default the original's class library declares.
+//
+// The macro code of a class (its `MAKE` line) declares the properties of the
+// class with the default value it carries. The value is the one the file
+// carries: percent-encoded, the way the original writes it.
+const CLASS_LIBRARY_DEFAULTS: &[(&str, &str, &str)] = &[
+    ("Advance", "Media", "10"),
+    ("Advance", "Modificador", "5"),
+    ("Alter", "AltOpcion", "Parametro"),
+    ("Alter", "AltParam", "param"),
+    ("Alter", "AltValor", "0"),
+    ("Alter", "Cantidad", "1"),
+    ("Alter", "CompOp", "%3D"),
+    ("Alter", "CompOpcion", "Parametro"),
+    ("Alter", "CompParam", "otro"),
+    ("Alter", "CompValue", "1"),
+    ("Alter", "Grupo", "ungrupo"),
+    ("Alter", "Modo", "Algunos"),
+    ("Assemble", "Cantidad", "1"),
+    ("Assign", "Operador", "%3D"),
+    ("Assign", "Parametro", "Param"),
+    ("Assign", "Valor", "0"),
+    ("Clock", "Frecuencia", "3600"),
+    ("Counter", "Incremento", "1"),
+    ("Counter", "Param", "Nro"),
+    ("Counter", "SaveValue", "Count"),
+    ("Depart", "Queue", "Qrecurso"),
+    ("Enter", "Cantidad", "1"),
+    ("Enter", "Storage", "AStorage"),
+    ("Examine", "Grupo", "UnGrupo"),
+    ("ExamineNumber", "Grupo", "UnGrupo"),
+    ("ExamineNumber", "Numero", "0"),
+    ("FacilityInt", "Facility", "Recurso"),
+    ("FacilityInt", "Media", "10"),
+    ("FacilityInt", "Modificador", "5"),
+    ("FacilityInt", "ModoArrebato", "NoRemover"),
+    ("FacilityInt", "ModoInterrupcion", "Prioridad"),
+    ("FacilityInt", "Queue", "ColaInt"),
+    ("FacilityInt", "Remanente", "Remanente"),
+    ("FacilityUse", "Facility", "Recurso"),
+    ("FacilityUse", "Media", "10"),
+    ("FacilityUse", "Modificador", "5"),
+    ("FacilityUse", "Queue", "Cola"),
+    ("Function", "Atributo", "P%3AParam"),
+    ("Function", "NombreFunc", "Func"),
+    ("Function", "Tabla", "%7B1%7C1%3B2%7C2%7D"),
+    ("Function", "Tipo", "Discreta"),
+    ("FunctionDist", "Distribucion", "%7B50%25%3B50%25%7D"),
+    ("FunctionDist", "NombreDist", "FuncDist"),
+    ("FunctionDist", "Semilla", "3"),
+    ("FunctionExpon", "NombreFunc", "Expon"),
+    ("FunctionExpon", "Seed", "2"),
+    ("GateF", "Facility", "Recurso"),
+    ("GateF", "op", "Libre"),
+    ("GateL", "LogicSwich", "1"),
+    ("GateL", "op", "Set"),
+    ("GateM", "Rotulo", "Rotulo"),
+    ("GateM", "op", "Maching"),
+    ("GateS", "Storage", "Almacen"),
+    ("GateS", "op", "NoLleno"),
+    ("Gather", "Cantidad", "1"),
+    ("Generate", "Media", "60"),
+    ("Generate", "Modificador", "30"),
+    ("InitiaSV", "SaveValue", "1"),
+    ("InitiaSV", "Valor", "0"),
+    ("InitialLS", "LogicSwich", "1"),
+    ("InitialLS", "Valor", "Set"),
+    ("JoinMe", "Grupo", "UnGrupo"),
+    ("JoinNumber", "Grupo", "UnGrupo"),
+    ("JoinNumber", "Numero", "0"),
+    ("Leave", "Cantidad", "1"),
+    ("Leave", "Storage", "AStorage"),
+    ("Link", "Cadena", "Cadena"),
+    ("Link", "Modo", "FIFO"),
+    ("Logic", "LogicSwich", "1"),
+    ("Logic", "Op", "Set"),
+    ("Loop", "Parametro", "Param"),
+    ("Mark", "Parametro", "Param"),
+    ("Match", "RotuloMatch", "BBB"),
+    ("Match", "RotuloPropio", "AAA"),
+    ("Preempt", "Facility", "Recurso"),
+    ("Preempt", "ModoArrebato", "NoRemover"),
+    ("Preempt", "ModoInterrupcion", "Prioridad"),
+    ("Preempt", "Remanente", "Remanente"),
+    ("Priority", "Prioridad", "0"),
+    ("QTable", "Cantidad", "60"),
+    ("QTable", "NombreTabla", "QTabla"),
+    ("QTable", "PrimerIntervalo", "0"),
+    ("QTable", "Queue", "qRecurso"),
+    ("QTable", "TamFrecuencia", "600"),
+    ("Queue", "Queue", "QRecurso"),
+    ("Release", "Facility", "Recurso"),
+    ("RemoveMe", "Grupo", "UnGrupo"),
+    ("RemoveTrans", "Cantidad", "1"),
+    ("RemoveTrans", "CompOp", "%3D"),
+    ("RemoveTrans", "CompOpcion", "Parametro"),
+    ("RemoveTrans", "CompParam", "otro"),
+    ("RemoveTrans", "CompValue", "1"),
+    ("RemoveTrans", "Grupo", "UnGrupo"),
+    ("RemoveTrans", "Modo", "Algunos"),
+    ("Return", "Facility", "Recurso"),
+    ("SaveValue", "Op", "%3D"),
+    ("SaveValue", "SaveValue", "1"),
+    ("SaveValue", "Valor", "0"),
+    ("Scan", "CompOp", "%3D"),
+    ("Scan", "CompOpcion", "Parametro"),
+    ("Scan", "CompParam", "otro"),
+    ("Scan", "CompValue", "1"),
+    ("Scan", "DeOpción", "Parametro"),
+    ("Scan", "DeParam", "Param"),
+    ("Scan", "EnOpcion", "Parametro"),
+    ("Scan", "EnParam", "Param"),
+    ("Scan", "Grupo", "UnGrupo"),
+    ("Seize", "Facility", "Recurso"),
+    ("Select", "ClaseSNA", "Q"),
+    ("Select", "Param", "param"),
+    ("Select", "maximo", "10"),
+    ("Select", "minimo", "1"),
+    ("Select", "op", "Minimo"),
+    ("SelectF", "Param", "param"),
+    ("SelectF", "maximo", "10"),
+    ("SelectF", "minimo", "1"),
+    ("SelectF", "op", "Libre"),
+    ("SelectL", "Param", "param"),
+    ("SelectL", "maximo", "10"),
+    ("SelectL", "minimo", "1"),
+    ("SelectL", "op", "Set"),
+    ("SelectS", "Param", "param"),
+    ("SelectS", "maximo", "10"),
+    ("SelectS", "minimo", "1"),
+    ("SelectS", "op", "NoLleno"),
+    ("SelectSNA", "ClaseSNA", "Q"),
+    ("SelectSNA", "Param", "param"),
+    ("SelectSNA", "maximo", "10"),
+    ("SelectSNA", "minimo", "1"),
+    ("SelectSNA", "valorComp", "%2A1"),
+    ("Split", "Cantidad", "1"),
+    ("StorageDef", "Storage", "Almacen"),
+    ("StorageDef", "Tamaño", "10"),
+    ("StorageUse", "Media", "10"),
+    ("StorageUse", "Modificador", "5"),
+    ("StorageUse", "Queue", "qAlmacen"),
+    ("StorageUse", "Storage", "Almacen"),
+    ("Table", "Atributo", "P%3AAtrib"),
+    ("Table", "Cantidad", "10"),
+    ("Table", "NombreTabla", "Tabla"),
+    ("Table", "PrimerIntervalo", "0"),
+    ("Table", "TamFrecuencia", "10"),
+    ("Tabulate", "NombreTabla", "Tabla"),
+    ("Test", "1_Valor", "1"),
+    ("Test", "2_OP", "%3D"),
+    ("Test", "3_Valor", "1"),
+    ("Unlink", "Cadena", "Cadena"),
+    ("Unlink", "Cantidad", "1"),
+    ("Unlink", "CompOp", "%3D"),
+    ("Unlink", "CompOpcion", "Parametro"),
+    ("Unlink", "CompParam", "Otro"),
+    ("Unlink", "CompValue", "0"),
+    ("Unlink", "Modo", "Algunos"),
+    ("Variable", "NombreVar", "vari"),
+    ("VariableA", "Maximo", "10"),
+    ("VariableA", "Minimo", "1"),
+    ("VariableA", "NombreVar", "Azar"),
+    ("VariableA", "Seed", "80"),
+    ("VariableN", "Desvio", "1"),
+    ("VariableN", "Media", "60"),
+    ("VariableN", "NombreFunc", "NORMAL"),
+    ("VariableN", "NombreVar", "Normal"),
+    ("VariableN", "Seed", "90"),
+];
+
+/// The rows the class library does not declare, and where they come from.
+const EXTRAS: &[(&str, &str, &str)] = &[
+    // The random seed the macro code names (`RN:2`): the seed number is the
+    // value of the property that carries it.
+    ("FunctionExpon", "2", "2"),
+    // The macro code of the two multifurcations names these properties
+    // without declaring them: the values come from the model the original
+    // ships, the one that exercises the class.
+    ("Multifurcacion", "MultifurcacionCH", "MultifurcacionCH"),
+    ("Multifurcacion", "MultifurcacionGO", "MultifurcacionGO"),
+    ("Multifurcacion", "Prob1", "20%25"),
+    ("Multifurcacion", "Prob2", "20%25"),
+    ("Multifurcacion", "Prob3", "20%25"),
+    ("Multifurcacion", "Prob4", "20%25"),
+    ("Multifurcacion", "Prob5", "20%25"),
+    ("MultifurcacionP", "MultifurcacionGO", "MultifurcacionGO"),
+    ("MultifurcacionP", "Parametro", "Param"),
+    ("MultifurcacionP", "Prob1", "20%25"),
+    ("MultifurcacionP", "Prob2", "20%25"),
+    ("MultifurcacionP", "Prob3", "20%25"),
+    ("MultifurcacionP", "Prob4", "20%25"),
+    ("MultifurcacionP", "Prob5", "20%25"),
+    // The `SelectSNA` class declares no operator: the original falls back to
+    // the first option of the list.
+    ("SelectSNA", "op", "%3D"),
+];
+
+#[test]
+fn every_default_of_the_class_library_is_the_one_the_catalogue_gives() {
+    for (class, property, value) in CLASS_LIBRARY_DEFAULTS {
+        assert_eq!(
+            default_of(class, property),
+            Some(*value),
+            "{class}.{property}: the original's class library gives it {value}"
+        );
+        let spec =
+            class_spec(class).unwrap_or_else(|| panic!("the catalogue offers the class {class}"));
+        assert!(
+            spec.properties.iter().any(|p| p.name == *property),
+            "{class}: the catalogue declares the property {property}"
+        );
+    }
+}
+
+#[test]
+fn the_catalogue_gives_no_default_the_class_library_does_not_declare() {
+    for (class, property, value) in DEFAULTS {
+        let declared = CLASS_LIBRARY_DEFAULTS.contains(&(*class, *property, *value))
+            || EXTRAS.contains(&(*class, *property, *value));
+        assert!(
+            declared,
+            "{class}.{property}: the catalogue gives {value}, and the original's \
+             class library declares no such default"
+        );
+    }
+}
+
+#[test]
+fn the_defaults_are_written_the_way_the_original_writes_them() {
+    // A value that the file has to encode is stored encoded: the original
+    // writes `%3A` for a colon and `%7B1%7C1%3B2%7C2%7D` for the table of a
+    // function.
+    let block = build_block("Function", 0, None).expect("Function is in the catalogue");
+    let raw = |name: &str| {
+        block
+            .props
+            .iter()
+            .find(|prop| prop.name == name)
+            .unwrap_or_else(|| panic!("the class declares {name}"))
+            .raw_value
+            .clone()
+    };
+    let shown = |name: &str| {
+        block
+            .props
+            .iter()
+            .find(|prop| prop.name == name)
+            .unwrap_or_else(|| panic!("the class declares {name}"))
+            .value()
+    };
+    assert_eq!(raw("Atributo"), "P%3AParam");
+    assert_eq!(raw("Tabla"), "%7B1%7C1%3B2%7C2%7D");
+    // And the editor reads them back as the original writes them.
+    assert_eq!(shown("Atributo"), "P:Param");
+    assert_eq!(shown("Tabla"), "{1|1;2|2}");
+}
+
+#[test]
+fn every_listed_default_is_one_of_the_options_of_its_subtype() {
+    for (class, property, _) in DEFAULTS {
+        let spec =
+            class_spec(class).unwrap_or_else(|| panic!("the catalogue offers the class {class}"));
+        let declared = spec
+            .properties
+            .iter()
+            .find(|p| p.name == *property)
+            .unwrap_or_else(|| panic!("{class} declares the property {property}"));
+        if declared.ty != "Listed" {
+            continue;
+        }
+        let block = build_block(class, 0, None).expect("the class is in the catalogue");
+        let prop = block
+            .props
+            .iter()
+            .find(|prop| prop.name == *property)
+            .unwrap_or_else(|| panic!("the class declares {property}"));
+        let options = listed_options(declared.subtype);
+        assert!(
+            options.contains(&prop.value().as_str()),
+            "{class}.{property}: the default {:?} is not one of {options:?}",
+            prop.value()
+        );
+    }
 }

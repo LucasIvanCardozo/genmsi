@@ -209,3 +209,26 @@ fn build_block_produces_the_reference_shape() {
     let err = build_block("MacroPropio", 0, None).expect_err("custom macro");
     assert!(err.to_string().contains("MacroPropio"), "{err}");
 }
+
+// The three classes the original declares and the catalogue does not offer
+// yet: `MFunction`, `MFunctionDist` and `RemoveNumber`.
+//
+// Their defaults come from the original's class library, and they wait for
+// the day the catalogue shapes these classes:
+//
+// - `MFunction`: `NombresFunc` `{FuncA;FuncB}`, `Atributo` `P:Param` and
+//   `Matriz` `{{11;12;13};{21;22;23}}`;
+// - `MFunctionDist`: `NombresDist` `{Func1;Func2}`, `Semilla` `4` and
+//   `Resultados` `{{20%;30%;50%};{25%;35%;40%}}`;
+// - `RemoveNumber`: `Op` `=`, `Grupo` `UnGrupo` and `Numero` `0`.
+
+#[test]
+fn the_three_classes_the_original_declares_and_the_catalogue_does_not_offer() {
+    for class in ["MFunction", "MFunctionDist", "RemoveNumber"] {
+        assert!(
+            class_spec(class).is_none(),
+            "{class}: the catalogue offers the class now: give it the defaults \
+             of the original's class library"
+        );
+    }
+}

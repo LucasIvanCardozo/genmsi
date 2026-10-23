@@ -69,30 +69,146 @@ pub static CLASSES: &[ClassSpec] = &[
 
 /// The value a new block of a class comes with, per property.
 ///
-/// The row is `(class, property, value)`: the value is the raw one, the
-/// text the file carries (the digits of a number). The original editor hands
-/// a new block these defaults; the classes whose defaults are known are
-/// added here, one row at a time.
+/// The row is `(class, property, value)`. The value is the raw one: the
+/// text the file carries, percent-encoded the way the original writes it
+/// (a `=` is `%3D`, an accented letter is its CP1252 byte, a `%` is
+/// `%25`). A property the original leaves empty has no row: an empty
+/// default is a default too, and writing it changes nothing.
+///
+/// Every row comes from the original's own class library
+/// (`Genmsi_20230711.backup/gClasses.xml`): the macro code of a class
+/// (its `MAKE` line) declares its properties with the default value the
+/// class carries. The rows that come from somewhere else say so:
+///
+/// - the `FunctionExpon` class names its random seed by number (`RN:2`),
+///   and the property that carries it holds that number;
+/// - the two multifurcations name their properties in the macro code
+///   without declaring them, so their values come from the model the
+///   original ships, the one that exercises the class;
+/// - the `SelectSNA` class declares no operator, and the original falls
+///   back to the first option of the list.
+///
+/// The `PriorityOption` properties are the one place where the table does
+/// not repeat the original's spelling: the original writes `Parámetro`
+/// and the list of options of the catalogue is ASCII-only, so the default
+/// is the same option written `Parametro`.
 pub static DEFAULTS: &[(&str, &str, &str)] = &[
+    // The `Advance` class waits a mean of ten units, with a spread of five.
+    ("Advance", "Media", "10"),
+    ("Advance", "Modificador", "5"),
+    // The `Alter` class alters the transactions of a group.
+    ("Alter", "AltOpcion", "Parametro"),
+    ("Alter", "AltParam", "param"),
+    ("Alter", "AltValor", "0"),
+    ("Alter", "Cantidad", "1"),
+    ("Alter", "CompOp", "%3D"),
+    ("Alter", "CompOpcion", "Parametro"),
+    ("Alter", "CompParam", "otro"),
+    ("Alter", "CompValue", "1"),
+    ("Alter", "Grupo", "ungrupo"),
+    ("Alter", "Modo", "Algunos"),
+    // The `Assemble` class joins one transaction of the group.
+    ("Assemble", "Cantidad", "1"),
+    // The `Assign` class assigns a value to a parameter.
+    ("Assign", "Operador", "%3D"),
+    ("Assign", "Parametro", "Param"),
+    ("Assign", "Valor", "0"),
     // The clock counts in units of time: the original gives it a whole hour.
     ("Clock", "Frecuencia", "3600"),
+    // The `Counter` class counts and keeps the count in a save value.
+    ("Counter", "Incremento", "1"),
+    ("Counter", "Param", "Nro"),
+    ("Counter", "SaveValue", "Count"),
+    // The `Depart` class leaves a queue.
+    ("Depart", "Queue", "Qrecurso"),
+    // The `Enter` class enters a storage.
+    ("Enter", "Cantidad", "1"),
+    ("Enter", "Storage", "AStorage"),
+    // The `Examine` class asks whether the transaction belongs to a group.
+    ("Examine", "Grupo", "UnGrupo"),
+    // The `ExamineNumber` class asks whether a number belongs to a group.
+    ("ExamineNumber", "Grupo", "UnGrupo"),
+    ("ExamineNumber", "Numero", "0"),
+    // The `FacilityInt` class interrupts a facility.
+    ("FacilityInt", "Facility", "Recurso"),
+    ("FacilityInt", "Media", "10"),
+    ("FacilityInt", "Modificador", "5"),
+    ("FacilityInt", "ModoArrebato", "NoRemover"),
+    ("FacilityInt", "ModoInterrupcion", "Prioridad"),
+    ("FacilityInt", "Queue", "ColaInt"),
+    ("FacilityInt", "Remanente", "Remanente"),
+    // The `FacilityUse` class uses a facility.
+    ("FacilityUse", "Facility", "Recurso"),
+    ("FacilityUse", "Media", "10"),
+    ("FacilityUse", "Modificador", "5"),
+    ("FacilityUse", "Queue", "Cola"),
+    // The `Function` class defines a function of an attribute.
+    ("Function", "Atributo", "P%3AParam"),
+    ("Function", "NombreFunc", "Func"),
+    ("Function", "Tabla", "%7B1%7C1%3B2%7C2%7D"),
+    ("Function", "Tipo", "Discreta"),
+    // The `FunctionDist` class defines a function of distribution.
+    ("FunctionDist", "Distribucion", "%7B50%25%3B50%25%7D"),
+    ("FunctionDist", "NombreDist", "FuncDist"),
+    ("FunctionDist", "Semilla", "3"),
+    // The `FunctionExpon` class defines an exponential function.
+    // The random seed the macro code names (`RN:2`): the seed number is
+    // the value of the property that carries it.
+    ("FunctionExpon", "2", "2"),
+    ("FunctionExpon", "NombreFunc", "Expon"),
+    ("FunctionExpon", "Seed", "2"),
+    // The `GateF` class asks whether a facility is free.
+    ("GateF", "Facility", "Recurso"),
+    ("GateF", "op", "Libre"),
+    // The `GateL` class asks about the state of a logic switch.
+    ("GateL", "LogicSwich", "1"),
+    ("GateL", "op", "Set"),
+    // The `GateM` class asks whether the transaction matches a label.
+    ("GateM", "Rotulo", "Rotulo"),
+    ("GateM", "op", "Maching"),
+    // The `GateS` class asks about the state of a storage.
+    ("GateS", "Storage", "Almacen"),
+    ("GateS", "op", "NoLleno"),
+    // The `Gather` class gathers the transactions of a group.
+    ("Gather", "Cantidad", "1"),
     // The generator of the original has a mean of 60 and a spread of 30. The
     // spread is what makes it a random source: without it the interarrival is
     // constant, every copy of the generator produces the very same arrivals and
     // the seed has nothing to say.
     ("Generate", "Media", "60"),
     ("Generate", "Modificador", "30"),
-    // The `Preempt` class interrupts a facility: the original's macro code
-    // gives the facility, the mode, the parameter and the way the owner goes
-    // on these defaults.
-    ("Preempt", "Facility", "Recurso"),
-    ("Preempt", "ModoArrebato", "NoRemover"),
-    ("Preempt", "ModoInterrupcion", "Prioridad"),
-    ("Preempt", "Remanente", "Remanente"),
-    // The `Return` class gives the facility back: it is a release.
-    ("Return", "Facility", "Recurso"),
+    // The `InitiaSV` class initializes a save value.
+    ("InitiaSV", "SaveValue", "1"),
+    ("InitiaSV", "Valor", "0"),
+    // The `InitialLS` class initializes a logic switch.
+    ("InitialLS", "LogicSwich", "1"),
+    ("InitialLS", "Valor", "Set"),
+    // The `JoinMe` class joins a group.
+    ("JoinMe", "Grupo", "UnGrupo"),
+    // The `JoinNumber` class adds a number to a group.
+    ("JoinNumber", "Grupo", "UnGrupo"),
+    ("JoinNumber", "Numero", "0"),
+    // The `Leave` class leaves a storage.
+    ("Leave", "Cantidad", "1"),
+    ("Leave", "Storage", "AStorage"),
+    // The `Link` class chains the transaction.
+    ("Link", "Cadena", "Cadena"),
+    ("Link", "Modo", "FIFO"),
+    // The `Logic` class sets a logic switch.
+    ("Logic", "LogicSwich", "1"),
+    ("Logic", "Op", "Set"),
+    // The `Loop` class decrements a parameter on every iteration.
+    ("Loop", "Parametro", "Param"),
+    // The `Mark` class writes the hour in a parameter.
+    ("Mark", "Parametro", "Param"),
+    // The `Match` class synchronizes the transactions of a label.
+    ("Match", "RotuloMatch", "BBB"),
+    ("Match", "RotuloPropio", "AAA"),
     // The `Multifurcacion` class creates the two functions it needs and
     // splits the traffic in five equal shares.
+    // The macro code of the two multifurcations names these properties
+    // without declaring them: the values come from the model the original
+    // ships, the one that exercises the class.
     ("Multifurcacion", "MultifurcacionCH", "MultifurcacionCH"),
     ("Multifurcacion", "MultifurcacionGO", "MultifurcacionGO"),
     ("Multifurcacion", "Prob1", "20%25"),
@@ -109,15 +225,64 @@ pub static DEFAULTS: &[(&str, &str, &str)] = &[
     ("MultifurcacionP", "Prob3", "20%25"),
     ("MultifurcacionP", "Prob4", "20%25"),
     ("MultifurcacionP", "Prob5", "20%25"),
-    // The `Examine` class asks whether the transaction belongs to a group.
-    ("Examine", "Grupo", "UnGrupo"),
-    // The `GateM` class asks whether the transaction matches a label.
-    ("GateM", "Rotulo", "Rotulo"),
-    ("GateM", "op", "Maching"),
-    // The `Mark` class writes the hour in a parameter.
-    ("Mark", "Parametro", "Param"),
+    // The `Preempt` class interrupts a facility: the original's macro code
+    // gives the facility, the mode, the parameter and the way the owner goes
+    // on these defaults.
+    ("Preempt", "Facility", "Recurso"),
+    ("Preempt", "ModoArrebato", "NoRemover"),
+    ("Preempt", "ModoInterrupcion", "Prioridad"),
+    ("Preempt", "Remanente", "Remanente"),
+    // The `Priority` class gives the transaction a priority.
+    ("Priority", "Prioridad", "0"),
+    // The `QTable` class defines the frequency table of a queue.
+    ("QTable", "Cantidad", "60"),
+    ("QTable", "NombreTabla", "QTabla"),
+    ("QTable", "PrimerIntervalo", "0"),
+    ("QTable", "Queue", "qRecurso"),
+    ("QTable", "TamFrecuencia", "600"),
+    // The `Queue` class enters a queue.
+    ("Queue", "Queue", "QRecurso"),
+    // The `Release` class frees a facility.
+    ("Release", "Facility", "Recurso"),
     // The `RemoveMe` class takes the transaction out of its group.
     ("RemoveMe", "Grupo", "UnGrupo"),
+    // The `RemoveTrans` class removes the transactions of a group.
+    ("RemoveTrans", "Cantidad", "1"),
+    ("RemoveTrans", "CompOp", "%3D"),
+    ("RemoveTrans", "CompOpcion", "Parametro"),
+    ("RemoveTrans", "CompParam", "otro"),
+    ("RemoveTrans", "CompValue", "1"),
+    ("RemoveTrans", "Grupo", "UnGrupo"),
+    ("RemoveTrans", "Modo", "Algunos"),
+    // The `Return` class gives the facility back: it is a release.
+    ("Return", "Facility", "Recurso"),
+    // The `SaveValue` class gives a value to a save value.
+    ("SaveValue", "Op", "%3D"),
+    ("SaveValue", "SaveValue", "1"),
+    ("SaveValue", "Valor", "0"),
+    // The `Scan` class scans a group.
+    ("Scan", "CompOp", "%3D"),
+    ("Scan", "CompOpcion", "Parametro"),
+    ("Scan", "CompParam", "otro"),
+    ("Scan", "CompValue", "1"),
+    ("Scan", "DeOpción", "Parametro"),
+    ("Scan", "DeParam", "Param"),
+    ("Scan", "EnOpcion", "Parametro"),
+    ("Scan", "EnParam", "Param"),
+    ("Scan", "Grupo", "UnGrupo"),
+    // The `Seize` class takes a facility.
+    ("Seize", "Facility", "Recurso"),
+    // The `Select` class picks an entity of a class.
+    ("Select", "ClaseSNA", "Q"),
+    ("Select", "Param", "param"),
+    ("Select", "maximo", "10"),
+    ("Select", "minimo", "1"),
+    ("Select", "op", "Minimo"),
+    // The `SelectF` class picks a free facility.
+    ("SelectF", "Param", "param"),
+    ("SelectF", "maximo", "10"),
+    ("SelectF", "minimo", "1"),
+    ("SelectF", "op", "Libre"),
     // The three selections of the original: a logic switch, a storage and an
     // entity of a class.
     ("SelectL", "Param", "param"),
@@ -132,8 +297,47 @@ pub static DEFAULTS: &[(&str, &str, &str)] = &[
     ("SelectSNA", "Param", "param"),
     ("SelectSNA", "maximo", "10"),
     ("SelectSNA", "minimo", "1"),
-    ("SelectSNA", "op", "="),
-    ("SelectSNA", "valorComp", "*1"),
+    // The `SelectSNA` class declares no operator: the original falls back
+    // to the first option of the list.
+    ("SelectSNA", "op", "%3D"),
+    ("SelectSNA", "valorComp", "%2A1"),
+    // The `Split` class clones the transaction.
+    ("Split", "Cantidad", "1"),
+    // The `StorageDef` class declares a storage.
+    ("StorageDef", "Storage", "Almacen"),
+    ("StorageDef", "Tamaño", "10"),
+    // The `StorageUse` class uses a storage for a while.
+    ("StorageUse", "Media", "10"),
+    ("StorageUse", "Modificador", "5"),
+    ("StorageUse", "Queue", "qAlmacen"),
+    ("StorageUse", "Storage", "Almacen"),
+    // The `Table` class defines the frequency table of an attribute.
+    ("Table", "Atributo", "P%3AAtrib"),
+    ("Table", "Cantidad", "10"),
+    ("Table", "NombreTabla", "Tabla"),
+    ("Table", "PrimerIntervalo", "0"),
+    ("Table", "TamFrecuencia", "10"),
+    // The `Tabulate` class tabulates a table.
+    ("Tabulate", "NombreTabla", "Tabla"),
+    // The `Test` class compares two values.
+    ("Test", "1_Valor", "1"),
+    ("Test", "2_OP", "%3D"),
+    ("Test", "3_Valor", "1"),
+    // The `Unlink` class unchains the transactions of a chain.
+    ("Unlink", "Cadena", "Cadena"),
+    ("Unlink", "Cantidad", "1"),
+    ("Unlink", "CompOp", "%3D"),
+    ("Unlink", "CompOpcion", "Parametro"),
+    ("Unlink", "CompParam", "Otro"),
+    ("Unlink", "CompValue", "0"),
+    ("Unlink", "Modo", "Algunos"),
+    // The `Variable` class defines a variable.
+    ("Variable", "NombreVar", "vari"),
+    // The `VariableA` class defines a uniform random variable.
+    ("VariableA", "Maximo", "10"),
+    ("VariableA", "Minimo", "1"),
+    ("VariableA", "NombreVar", "Azar"),
+    ("VariableA", "Seed", "80"),
     // The `VariableN` class: a normal variable with its own function.
     ("VariableN", "Desvio", "1"),
     ("VariableN", "Media", "60"),

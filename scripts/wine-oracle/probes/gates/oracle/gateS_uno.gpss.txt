@@ -1,0 +1,23 @@
+Almacen         STORAGE         10  
+                GENERATE        10,0,,1  
+A_Enter         ENTER           Almacen,1  
+                GENERATE        60,0  
+GateLleno       GATE    SF      Almacen  
+A_Terminate     TERMINATE         
+                GENERATE        60,0  
+GateNoLleno     GATE    SNF     Almacen  
+A_Terminate1    TERMINATE         
+                GENERATE        60,0  
+GateVacio       GATE    SE      Almacen  
+A_Terminate2    TERMINATE         
+                GENERATE        60,0  
+GateNoVacio     GATE    SNE     Almacen  
+A_Terminate3    TERMINATE         
+                GENERATE        60,0  
+GateDisponible  GATE    SV      Almacen  
+A_Terminate4    TERMINATE         
+                GENERATE        60,0  
+GateNoDisponible GATE    SNV     Almacen  
+A_Terminate5    TERMINATE         
+                GENERATE        3600  
+                TERMINATE       1  

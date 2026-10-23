@@ -1,0 +1,5 @@
+                GENERATE        60,0  
+Gate            GATE    SF      Almacen  
+A_Terminate     TERMINATE         
+                GENERATE        3600  
+                TERMINATE       1  

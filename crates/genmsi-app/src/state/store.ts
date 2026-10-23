@@ -554,3 +554,8 @@ export const useApp = create<AppState>((set, get) => ({
 
   setUntil: (until: number | null) => set({ until }),
 }));
+
+// El store se ve desde la consola del navegador mientras se desarrolla.
+if (import.meta.env?.DEV) {
+  (globalThis as { __app?: typeof useApp }).__app = useApp;
+}

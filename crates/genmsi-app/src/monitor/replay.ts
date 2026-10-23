@@ -461,8 +461,9 @@ export function buildIndex(
         ? event.detail
         : null;
     let entity = published;
-    if (entity === null && event.event === "leave") {
-      // The name the transaction had when it entered the block.
+    if (entity === null && (event.event === "leave" || event.event === "unlink")) {
+      // The name the transaction had when it was in the block: a name that
+      // comes from a parameter is not the same for every transaction.
       entity = recall(names, index, event.xact, null);
     }
     if (entity === null) {
@@ -478,7 +479,7 @@ export function buildIndex(
         entities.set(index, published);
       }
     }
-    if (event.event === "leave") {
+    if (event.event === "leave" || event.event === "unlink") {
       // The transaction left the block: the name it had there is of no use
       // any more.
       forget(names, index, event.xact);
@@ -848,14 +849,16 @@ function forget<K, V>(map: Map<K, Map<number, V>>, key: K, xact: number): void {
  * Split a detail of the form "{name} {value}".
  *
  * The name of an entity may hold spaces and a number does not, so the two
- * are separated by the last space.
+ * are separated by the last space. The number may be written with the comma
+ * as its decimal point, which is how the report prints them.
  */
 function splitDetail(detail: string): { name: string; value: number } | null {
   const cut = detail.lastIndexOf(" ");
   if (cut <= 0) {
     return null;
   }
-  const value = Number(detail.slice(cut + 1));
+  const written = detail.slice(cut + 1);
+  const value = Number(written.replace(",", "."));
   if (!Number.isFinite(value)) {
     return null;
   }

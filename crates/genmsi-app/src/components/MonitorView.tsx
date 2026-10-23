@@ -201,11 +201,14 @@ export default function MonitorView({
         publish(clockRef.current);
       }
       const clock = advanceClock(clockRef.current, elapsed, rate);
-      clockRef.current = clock;
+      // The clock stops at the end of the run: a run that is over does not
+      // keep counting, and the picture is the picture of its last instant.
+      const reached = clock >= monitor.endTime;
+      clockRef.current = reached ? monitor.endTime : clock;
       // The clock the reader sees follows the animation, so it ticks instead
       // of jumping from one record to the next.
-      publish(clock);
-      if (clock >= monitor.endTime) {
+      publish(clockRef.current);
+      if (reached) {
         setPlayhead(monitor.frames.length - 1);
         setPlaying(false);
         return;

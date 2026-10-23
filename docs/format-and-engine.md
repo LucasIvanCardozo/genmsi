@@ -228,3 +228,55 @@ A bench is the unit of verification: the original's GPSS for it says how a
 class compiles, and the original's report for it says what the class does.
 Together they are the specification of that class, and the model under test is
 one class with nothing else in it.
+
+### 9.1 What the original writes
+
+The text of the original is not what the model says, and reading it is a
+matter of rules. These are the ones the benches show.
+
+**The name of a statement.** The original does not take the name of a
+statement from the model: it gives every block the name of its class
+(`A_Advance`, `A_Queue`), and when two blocks of the same class would take
+that name it numbers the second one (`A_Terminate`, `A_Terminate1`). The
+classes whose statements come from a macro of the original write a name of
+their own:
+
+| Class | The name it writes |
+|---|---|
+| `GateF`, `GateL`, `GateS`, `GateM` | the name of the module (`GateF`) |
+| `StorageUse` | the name of the module (`StorageUse`, `StorageUse1`) |
+| `Transfer` | the name of the input port of its macro (`Entrada1`, `Entrada11`) |
+| `Split` | what it does (`Clona`) |
+| the definitions | the name of the entity (`Func`, `Tabla`, `vari`, `Almacen`) |
+
+A block that has no input port — a generator, the clock — has no name at all.
+
+**The spelling of an expression.** A typed reference is written with a `$`
+where the model writes a `:` (`P:Param` becomes `P$Param`). The operands of
+a `TEST`, a `SELECT` or a `GATE` carry the operator of the original's own
+vocabulary (`E`, `NE`, `L`, `LE`, `G`, `GE`; `MIN`, `MAX`, `NU`; `LS`, `L`,
+`S`, `SNF`, `NU`, `U`).
+
+**The operands of a class.** Each class writes the operands its own macro
+writes, in the order of that macro: `ALTER E <grupo>,<cantidad>,<parámetro
+alterado>,<valor>,<parámetro comparado>,<valor>`; `REMOVE E <grupo>,<cantidad>
+,,<comparado>,<valor>`; `SCAN E <grupo>,<comparado>,<valor>,<origen>,<destino>`;
+`UNLINK E <cadena>,<bloque que recibe>,<cantidad>,<comparado>,<valor>`;
+`SELECT <modo> <parámetro>,<mínimo>,<máximo>,,<clase>`; `LINK <cadena>,<modo>
+,<bloque que sigue>`; `LOGIC <S|R> <interruptor>`; `GATE <condición> <entidad>`;
+`LOOP <parámetro>,`; `JOIN <grupo>[,<número>]`; `EXAMINE <grupo>,<número>,`;
+`ASSEMBLE`/`GATHER <cantidad>`; `SPLIT <total>`; `TABULATE <tabla>`;
+`TEST E <izquierda>,<derecha>`; `SAVEVALUE <nombre><operador>,<valor>`;
+`ASSIGN <parámetro><operador>,<valor>`.
+
+**The counter and the match write two statements.** The counter increments a
+savevalue and copies it to a parameter (`SAVEVALUE Count+,1` and
+`ASSIGN Nro,X$Count`). The match writes the transfer to its conjugate before
+the match itself (`A_Match TRANSFER ,AAA` and `AAA MATCH AAA`).
+
+**The definitions come first.** The storages, the queue tables, the tables,
+the functions, the variables and the initial values, and then the blocks. The
+function writes the table of its points on a line of its own, and the
+exponential function writes the standard table of the exponential
+distribution, which its class does not carry.
+

@@ -81,11 +81,13 @@ fn gate_logic_switch_rows_match_the_baseline() {
 #[test]
 fn gate_storage_not_empty_row_matches_the_baseline() {
     // Baseline: `HornoConComidas  GATE    SNE     Comidas` (entregaComida).
+    // The `LOC` column holds the name of the statement: the gates take the
+    // name of their module.
     let report = render_model("entregaComida__entregaComida");
     let line = report
         .lines()
         .filter_map(fields)
-        .find(|(loc, _, mode, _)| *loc == "A_GateS" && *mode == "SNE")
+        .find(|(loc, _, mode, _)| *loc == "HornoConComidas" && *mode == "SNE")
         .expect("the gate requiring a non-empty storage");
     assert_eq!(line.1, "GATE");
     assert_eq!(line.3, "Comidas");

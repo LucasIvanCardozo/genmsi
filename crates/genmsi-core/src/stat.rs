@@ -480,11 +480,18 @@ pub struct Table {
     /// Largest value recorded.
     pub max_value: f64,
     /// Frequency per interval.
+    ///
+    /// The last one is the class of the values that do not fit in any
+    /// other: the original keeps it apart (`>   a  80`).
     #[cfg_attr(feature = "ts", ts(as = "Vec<f64>"))]
     pub frequencies: Vec<u64>,
     /// Values beyond the last interval.
     #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub overflow: u64,
+    /// Sum of the values that did not fit.
+    pub overflow_sum: f64,
+    /// Sum of the squares of the values that did not fit.
+    pub overflow_sum_squares: f64,
 }
 
 impl Table {
@@ -501,6 +508,8 @@ impl Table {
             max_value: 0.0,
             frequencies: vec![0; intervals.max(1)],
             overflow: 0,
+            overflow_sum: 0.0,
+            overflow_sum_squares: 0.0,
         }
     }
 
@@ -515,7 +524,34 @@ impl Table {
         } else {
             (((value - self.first) / self.width).ceil() as usize).min(self.intervals - 1)
         };
+        if index == self.intervals - 1 && self.intervals > 1 {
+            // The last class is the one of the values that do not fit: the
+            // original keeps them apart and counts them in their own
+            // statistics (`MEDIA OVERFLOW`).
+            self.overflow += 1;
+            self.overflow_sum += value;
+            self.overflow_sum_squares += value * value;
+        }
         self.frequencies[index] += 1;
+    }
+
+    /// The mean of the values that did not fit in any class.
+    pub fn overflow_mean(&self) -> f64 {
+        if self.overflow == 0 {
+            0.0
+        } else {
+            self.overflow_sum / self.overflow as f64
+        }
+    }
+
+    /// The standard deviation of the values that did not fit in any class.
+    pub fn overflow_stddev(&self) -> f64 {
+        if self.overflow == 0 {
+            return 0.0;
+        }
+        let n = self.overflow as f64;
+        let variance = (self.overflow_sum_squares / n) - self.overflow_mean().powi(2);
+        variance.max(0.0).sqrt()
     }
 
     /// Mean of recorded values.

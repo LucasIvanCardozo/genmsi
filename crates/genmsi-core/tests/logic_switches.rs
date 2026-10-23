@@ -68,8 +68,19 @@ fn logic_switches_start_reset() {
     let result = run(&program);
     let gate = block(&program, "A");
     assert_eq!(result.blocks[gate].entries, 5, "generated");
+    assert_eq!(
+        result.blocks[gate].retries, 0,
+        "the gate does not count the attempts"
+    );
+    // The attempts are counted on the switch the gate tests, the way the
+    // original does it (`LOGICSWITCH  1  0  62`).
+    let switch = result
+        .logic_switches
+        .iter()
+        .find(|switch| switch.name == "S")
+        .expect("the switch of the gate");
     assert!(
-        result.blocks[gate].retries > 0,
+        switch.retry > 0,
         "a switch that nothing set must hold the transaction"
     );
     assert_eq!(result.blocks[gate].current, 0, "the later LOGIC S releases it");

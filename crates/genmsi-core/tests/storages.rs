@@ -407,7 +407,7 @@ fn the_clock_spends_one_unit_of_start_per_frequency() {
             .find(|line| line.trim_start().starts_with(|c: char| c.is_ascii_digit()))
             .expect("the report has a header line with the times");
         assert!(
-            end_time.contains(&genmsi_core::report::number(frequency)),
+            end_time.contains(&genmsi_core::report::whole(frequency)),
             "the report does not show the end time: {end_time}"
         );
     }

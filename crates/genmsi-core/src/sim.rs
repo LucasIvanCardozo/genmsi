@@ -16,7 +16,7 @@ use crate::program::{
     MultiTransferSelection, PreemptPriority, Program, SelectEntity, SelectMode, SelectSpec,
     SelectState, StorageOp, TerminateSpec, UnlinkSpec,
 };
-use crate::report::number;
+
 use crate::rng::Streams;
 use crate::stat::Entities;
 use crate::stat::Table;
@@ -139,6 +139,62 @@ pub struct TraceEvent {
     pub detail: String,
 }
 
+/// The statistics of a logic switch.
+///
+/// The original writes them in its `LOGICSWITCH` section: the value of the
+/// switch and the number of the attempts that failed its test.
+#[derive(Debug, Clone, Serialize)]
+pub struct LogicSwitchStat {
+    /// Name of the switch.
+    pub name: String,
+    /// Whether the switch is set.
+    pub value: bool,
+    /// Failed attempts.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
+    pub retry: u64,
+}
+
+/// The statistics of a group of transactions or of numbers.
+///
+/// The original writes the groups of transactions in its `XACT_GROUP` section
+/// and the groups of numbers in its `NUMERIC_GROUP` one.
+#[derive(Debug, Clone, Serialize)]
+pub struct GroupStat {
+    /// Name of the group.
+    pub name: String,
+    /// Whether the group holds numbers instead of transactions.
+    pub numeric: bool,
+    /// The members the group holds.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
+    pub size: u64,
+    /// Failed attempts.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
+    pub retry: u64,
+}
+
+/// One event still pending when the run ended.
+///
+/// The original writes them in its `FEC_XACT_NUMBER` section: the events of
+/// the transactions that have not happened yet.
+#[derive(Debug, Clone, Serialize)]
+pub struct PendingEvent {
+    /// The number of the transaction the event belongs to.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
+    pub xact: u64,
+    /// The priority of the transaction.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
+    pub priority: i64,
+    /// The time the event is scheduled for.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
+    pub time: f64,
+    /// The block the event happens in.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
+    pub block: usize,
+    /// The block the transaction goes to after the event.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
+    pub next: Option<usize>,
+}
+
 /// Outcome of one run.
 #[derive(Debug, Clone, Serialize)]
 pub struct RunResult {
@@ -168,6 +224,13 @@ pub struct RunResult {
     pub table_names: Vec<String>,
     /// Names of the queue tables defined by the model, in report order.
     pub qtable_names: Vec<String>,
+    /// The logic switches of the run, with their failed attempts.
+    pub logic_switches: Vec<LogicSwitchStat>,
+    /// The groups of the run, the ones of transactions and the ones of
+    /// numbers.
+    pub groups: Vec<GroupStat>,
+    /// The events still pending when the run ended.
+    pub pending: Vec<PendingEvent>,
 }
 
 impl RunResult {
@@ -257,6 +320,11 @@ pub struct Simulation<'p> {
     passed: HashMap<String, u64>,
     transaction_groups: BTreeMap<String, Vec<XactId>>,
     numeric_groups: BTreeMap<String, Vec<f64>>,
+    /// The failed attempts of every logic switch.
+    ///
+    /// The original counts the attempts that fail the test of a `GATE` on
+    /// the switch, and not on the block of the gate.
+    logic_retries: BTreeMap<String, u64>,
     /// The label a transaction carries after a `MATCH` block.
     ///
     /// The gate of the original that waits for a label (`GateM`) compares the
@@ -294,6 +362,7 @@ impl<'p> Simulation<'p> {
             passed: HashMap::new(),
             transaction_groups: BTreeMap::new(),
             numeric_groups: BTreeMap::new(),
+            logic_retries: BTreeMap::new(),
             transaction_labels: HashMap::new(),
             assemble_waiters: HashMap::new(),
             match_waiters: HashMap::new(),
@@ -499,6 +568,47 @@ impl<'p> Simulation<'p> {
         let mut qtable_names: Vec<String> =
             self.program.definitions.qtables.keys().cloned().collect();
         qtable_names.sort();
+        let logic_switches: Vec<LogicSwitchStat> = self
+            .entities
+            .logic
+            .iter()
+            .map(|(name, value)| LogicSwitchStat {
+                name: name.clone(),
+                value: *value,
+                retry: self.logic_retries.get(name).copied().unwrap_or(0),
+            })
+            .collect();
+        let mut groups: Vec<GroupStat> = Vec::new();
+        for (name, members) in &self.transaction_groups {
+            // The group holds the transactions that are still in it: the ones
+            // that ended are not in it any more.
+            let alive = members
+                .iter()
+                .filter(|id| self.xacts.contains_key(id))
+                .count() as u64;
+            groups.push(GroupStat {
+                name: name.clone(),
+                numeric: false,
+                size: alive,
+                retry: 0,
+            });
+        }
+        for (name, numbers) in &self.numeric_groups {
+            // A numeric group holds the numbers, and the original counts the
+            // different ones: a group of sixty transactions that join it
+            // with the same number has one member (`UNGRUPO  1  0`).
+            let mut different: std::collections::BTreeSet<u64> = std::collections::BTreeSet::new();
+            for number in numbers {
+                different.insert(number.to_bits());
+            }
+            groups.push(GroupStat {
+                name: name.clone(),
+                numeric: true,
+                size: different.len() as u64,
+                retry: 0,
+            });
+        }
+        let pending = self.pending_events();
         Ok(RunResult {
             title: self.program.title.clone(),
             seed: self.config.seed,
@@ -513,7 +623,60 @@ impl<'p> Simulation<'p> {
             diagnostics,
             table_names,
             qtable_names,
+            logic_switches,
+            groups,
+            pending,
         })
+    }
+
+    /// The events still pending when the run ended.
+    ///
+    /// The original writes them in its `FEC_XACT_NUMBER` section. The
+    /// transactions that have not been born yet take the numbers that come
+    /// after the ones that were born, in the order of their arrival.
+    fn pending_events(&mut self) -> Vec<PendingEvent> {
+        let mut events: Vec<Event> = Vec::new();
+        while let Some(std::cmp::Reverse(event)) = self.heap.pop() {
+            if matches!(event.kind, EventKind::Enter) {
+                // The transaction that moves between blocks is not a
+                // scheduled event: the original does not write it.
+                continue;
+            }
+            events.push(event);
+        }
+        let mut pending: Vec<PendingEvent> = Vec::with_capacity(events.len());
+        for event in &events {
+            let next = match event.kind {
+                // The transaction is born in the generator: it is in the
+                // block of the generator and nowhere else.
+                EventKind::Tick => Some(event.block),
+                _ => self.program.blocks[event.block].next_default(),
+            };
+            pending.push(PendingEvent {
+                xact: event.xact.unwrap_or(0),
+                priority: event.priority,
+                time: event.time,
+                block: event.block,
+                next,
+            });
+        }
+        // The transactions that have not been born yet take the numbers that
+        // come after the ones that were born, in the order they will be
+        // born: the original processes the events of the same hour the other
+        // way round, so the last one scheduled is the first one born.
+        let mut by_birth: Vec<usize> = (0..pending.len())
+            .filter(|index| pending[*index].xact == 0)
+            .collect();
+        by_birth.sort_by(|left, right| {
+            pending[*left]
+                .time
+                .total_cmp(&pending[*right].time)
+                .then_with(|| right.cmp(left))
+        });
+        for (number, index) in ((self.next_xact + 1)..).zip(by_birth) {
+            pending[index].xact = number;
+        }
+        pending
     }
 
     fn finish(&mut self, reason: EndReason) {
@@ -703,12 +866,17 @@ impl<'p> Simulation<'p> {
             // attempts, and the transaction that waits is counted in the
             // block it came from. The `MATCH` row holds the matches that
             // were made, not the transactions that arrived.
+            //
+            // The `GATE` row holds the transactions that entered the gate:
+            // the ones that wait for the test are not in the block, neither
+            // the ones that wait for it to open nor the ones that wait
+            // (`GateL  GATE  LS  1` with `0 0 0`).
             if matches!(
                 block.kind,
                 BlockKind::Enter(_) | BlockKind::Seize(_) | BlockKind::Match(_)
             ) {
                 self.block_stats[block_index].current += 1;
-            } else {
+            } else if !matches!(block.kind, BlockKind::Gate(_)) {
                 self.block_stats[block_index].entries += 1;
                 self.block_stats[block_index].current += 1;
             }
@@ -789,7 +957,7 @@ impl<'p> Simulation<'p> {
                 *cell = spec.op.apply(*cell, value);
                 let assigned = *cell;
                 if self.config.trace {
-                    let detail = name_and_value(&spec.savevalue, &number(assigned));
+                    let detail = name_and_value(&spec.savevalue, &crate::report::plain(assigned));
                     self.record_trace(xact, block_index, "value", detail);
                 }
                 self.leave(xact, block_index, block.next_default());
@@ -812,7 +980,7 @@ impl<'p> Simulation<'p> {
                     transaction.set_parameter(parameter, new_value);
                 }
                 if self.config.trace {
-                    let detail = name_and_value(&spec.savevalue, &number(new_value));
+                    let detail = name_and_value(&spec.savevalue, &crate::report::plain(new_value));
                     self.record_trace(xact, block_index, "value", detail);
                 }
                 self.leave(xact, block_index, block.next_default());
@@ -1133,11 +1301,25 @@ impl<'p> Simulation<'p> {
                     _ => self.gate_condition(&spec.condition, xact),
                 };
                 if pass {
+                    // The transaction passes the test: it enters the block
+                    // and the block counts it.
+                    self.block_stats[block_index].entries += 1;
+                    self.block_stats[block_index].current += 1;
                     self.leave(xact, block_index, block.next_named("Salida1"));
                 } else if block.has_failure_port() {
+                    // The transaction fails the test and leaves by the
+                    // failure output: it enters the block and the block
+                    // counts it.
+                    self.block_stats[block_index].entries += 1;
+                    self.block_stats[block_index].current += 1;
                     self.leave(xact, block_index, block.next_named("Salida2"));
                 } else {
-                    self.block_stats[block_index].retries += 1;
+                    // The gate does not open and the transaction waits. The
+                    // original counts the attempt on the entity the gate
+                    // tests and not on the block: the row of the gate stays
+                    // at zero (`GateL  GATE  LS  1` with `0 0 0`) and the
+                    // switch counts the attempts in its `RETRY`.
+                    self.count_gate_retry(&spec.condition, xact);
                     self.gate_waiters.entry(block_index).or_default().push(xact);
                     if let Some(transaction) = self.xacts.get_mut(&xact) {
                         transaction.transition(XactState::Waiting);
@@ -1583,7 +1765,10 @@ impl<'p> Simulation<'p> {
             BlockKind::Remove(spec) => {
                 if spec.me {
                     // The `RemoveMe` class of the original takes the
-                    // transaction out of its group and lets it go on.
+                    // transaction out of its group and lets it go on. The
+                    // group exists even when nobody is in it: the original
+                    // writes it in its `XACT_GROUP` section.
+                    self.transaction_groups.entry(spec.group.clone()).or_default();
                     if let Some(members) = self.transaction_groups.get_mut(&spec.group) {
                         members.retain(|member| *member != xact);
                     }
@@ -1802,6 +1987,30 @@ impl<'p> Simulation<'p> {
                 let name = self.resolve_name(facility, xact);
                 let facility = self.entities.facility(&name, self.now);
                 (facility.available && !facility.busy) == *available
+            }
+        }
+    }
+
+    /// Count a failed attempt of a gate on the entity the gate tests.
+    ///
+    /// The original counts the attempts that fail the test of a `GATE` on
+    /// the entity the gate looks at: the logic switch, the storage or the
+    /// facility. The row of the gate keeps its zeros.
+    fn count_gate_retry(&mut self, condition: &GateCondition, xact: XactId) {
+        match condition {
+            GateCondition::Logic { switch, .. } => {
+                let name = self.resolve_name(switch, xact);
+                *self.logic_retries.entry(name).or_insert(0) += 1;
+            }
+            GateCondition::Storage { storage, .. } => {
+                let name = self.resolve_name(storage, xact);
+                if let Some(capacity) = self.storage_capacity(&name) {
+                    self.entities.storage(&name, capacity, self.now).retry += 1;
+                }
+            }
+            GateCondition::Facility { facility, .. } => {
+                let name = self.resolve_name(facility, xact);
+                self.entities.facility(&name, self.now).retry += 1;
             }
         }
     }

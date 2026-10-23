@@ -63,8 +63,8 @@ function documents(
 } {
   ensureBinaries();
   const modelDocument = JSON.parse(facadeBytes(["model", path]).toString("utf8"));
-  const report = JSON.parse(cliBytes(["simulate", path, "--json"]).toString("utf8"));
-  const trace = JSON.parse(cliBytes(["trace", path, "--json", "--limit", String(limit)]).toString("utf8"));
+  const report = JSON.parse(cliBytes(["simulate", path, "--json", "--seed", "1"]).toString("utf8"));
+  const trace = JSON.parse(cliBytes(["trace", path, "--json", "--limit", String(limit), "--seed", "1"]).toString("utf8"));
   return { model: modelDocument, report, trace };
 }
 

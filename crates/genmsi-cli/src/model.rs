@@ -31,9 +31,12 @@ pub fn load(path: &Path) -> Result<Loaded, CliError> {
 }
 
 /// Engine configuration for one CLI run.
-pub fn config(seed: u64, until: Option<f64>) -> SimConfig {
+///
+/// The seed is random when the caller does not choose one, and the run says
+/// which it used: the reader can repeat it with the same number.
+pub fn config(seed: Option<u64>, until: Option<f64>) -> SimConfig {
     SimConfig {
-        seed,
+        seed: seed.unwrap_or_else(genmsi_core::random_seed),
         stop_time: until,
         ..SimConfig::default()
     }
@@ -71,7 +74,7 @@ mod tests {
 
     #[test]
     fn configuration_carries_seed_and_horizon() {
-        let config = config(7, Some(120.0));
+        let config = config(Some(7), Some(120.0));
         assert_eq!(config.seed, 7);
         assert_eq!(config.stop_time, Some(120.0));
         assert!(!config.trace);

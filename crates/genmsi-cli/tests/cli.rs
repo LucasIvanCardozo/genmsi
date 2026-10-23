@@ -107,14 +107,14 @@ fn lint_refuses_a_model_the_original_refuses() {
 
 #[test]
 fn simulate_prints_the_gpss_report() {
-    let output = genmsi(&["simulate", SMALL]);
+    let output = genmsi(&["simulate", SMALL, "--seed", "1"]);
     assert_eq!(code(&output), 0, "{}", stderr(&output));
     insta::assert_snapshot!("simulate_report", stdout(&output));
 }
 
 #[test]
 fn simulate_json_carries_the_engine_document() {
-    let output = genmsi(&["simulate", SMALL, "--json"]);
+    let output = genmsi(&["simulate", SMALL, "--json", "--seed", "1"]);
     assert_eq!(code(&output), 0, "{}", stderr(&output));
     let document = json(&output);
     assert_eq!(document["schema"], "genmsi.report/1");
@@ -135,7 +135,10 @@ fn simulate_honours_the_seed_and_the_horizon() {
         "--seed",
         "99",
     ]));
-    assert_eq!(default["seed"], 1);
+    // Without a seed the run draws one, and the document says which: the
+    // reader can repeat the run with that number.
+    let drawn = default["seed"].as_u64().expect("the seed of the run");
+    assert!(drawn > 0, "the run says the seed it used: {drawn}");
     assert_eq!(other["seed"], 99);
     assert_ne!(default["blocks"], other["blocks"], "a new seed must change the run");
 
@@ -154,23 +157,34 @@ fn simulate_honours_the_seed_and_the_horizon() {
 }
 
 #[test]
-fn the_same_seed_reproduces_the_same_bytes() {
+fn two_runs_without_a_seed_are_not_the_same_run() {
     let first = genmsi(&["simulate", "fixtures/models/TP3__aeropuerto.gmdl"]);
     let second = genmsi(&["simulate", "fixtures/models/TP3__aeropuerto.gmdl"]);
+    assert_ne!(
+        str::from_utf8(&first.stdout),
+        str::from_utf8(&second.stdout),
+        "two runs that draw their own seed are two different runs"
+    );
+}
+
+#[test]
+fn the_same_seed_reproduces_the_same_bytes() {
+    let first = genmsi(&["simulate", "fixtures/models/TP3__aeropuerto.gmdl", "--seed", "1"]);
+    let second = genmsi(&["simulate", "fixtures/models/TP3__aeropuerto.gmdl", "--seed", "1"]);
     assert_eq!(first.status, second.status);
     assert_eq!(str::from_utf8(&first.stdout), str::from_utf8(&second.stdout));
 }
 
 #[test]
 fn trace_prints_events_and_reports_the_limit() {
-    let output = genmsi(&["trace", SMALL, "--limit", "8"]);
+    let output = genmsi(&["trace", SMALL, "--limit", "8", "--seed", "1"]);
     assert_eq!(code(&output), 0, "{}", stderr(&output));
     insta::assert_snapshot!("trace_events", stdout(&output));
 }
 
 #[test]
 fn trace_json_is_versioned() {
-    let output = genmsi(&["trace", SMALL, "--limit", "3", "--json"]);
+    let output = genmsi(&["trace", SMALL, "--limit", "3", "--json", "--seed", "1"]);
     assert_eq!(code(&output), 0, "{}", stderr(&output));
     let document = json(&output);
     assert_eq!(document["schema"], "genmsi.trace/1");
@@ -182,7 +196,7 @@ fn trace_json_is_versioned() {
 
 #[test]
 fn run_all_sweeps_the_whole_fixture_set() {
-    let output = genmsi(&["run-all", "fixtures/models"]);
+    let output = genmsi(&["run-all", "fixtures/models", "--seed", "1"]);
     assert_eq!(code(&output), 1, "five models are refused: {}", stdout(&output));
     assert!(
         stdout(&output).ends_with("25 models: 20 ok, 5 failed\n"),
@@ -194,7 +208,7 @@ fn run_all_sweeps_the_whole_fixture_set() {
 
 #[test]
 fn run_all_json_marks_every_refused_model() {
-    let output = genmsi(&["run-all", "fixtures/models", "--json"]);
+    let output = genmsi(&["run-all", "fixtures/models", "--json", "--seed", "1"]);
     assert_eq!(code(&output), 1);
     let document = json(&output);
     assert_eq!(document["schema"], "genmsi.run-all/1");

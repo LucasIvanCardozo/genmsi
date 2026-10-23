@@ -76,6 +76,12 @@ pub static CLASSES: &[ClassSpec] = &[
 pub static DEFAULTS: &[(&str, &str, &str)] = &[
     // The clock counts in units of time: the original gives it a whole hour.
     ("Clock", "Frecuencia", "3600"),
+    // The generator of the original has a mean of 60 and a spread of 30. The
+    // spread is what makes it a random source: without it the interarrival is
+    // constant, every copy of the generator produces the very same arrivals and
+    // the seed has nothing to say.
+    ("Generate", "Media", "60"),
+    ("Generate", "Modificador", "30"),
     // The `Preempt` class interrupts a facility: the original's macro code
     // gives the facility, the mode, the parameter and the way the owner goes
     // on these defaults.

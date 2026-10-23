@@ -31,6 +31,18 @@ export const TRACE_LIMIT = 200_000;
 /** How far a pasted copy is moved, so it does not sit on the original. */
 const PASTE_OFFSET = { dx: 180, dy: 90 };
 
+/**
+ * A seed for a run.
+ *
+ * A run is entirely determined by its seed, so a run that does not take one
+ * draws it and says which it used: the reader repeats the run with that
+ * number. The number stays inside the safe range of a JavaScript number, so
+ * the engine receives it exactly.
+ */
+export function randomSeed(): number {
+  return 1 + Math.floor(Math.random() * 0xffffffff);
+}
+
 export interface AppState {
   /** The models the app offers. */
   models: ModelRef[];
@@ -60,6 +72,10 @@ export interface AppState {
   clipboard: number[];
   /** The seed the next run uses. */
   seed: number;
+  /** Whether the seed is the one the app drew, rather than one the reader
+   * chose. A run that draws its own seed is a different run every time; one
+   * the reader chose is the same run every time. */
+  seedIsAuto: boolean;
   /** The horizon the next run uses, in simulated time. */
   until: number | null;
   /** The commands that were applied, so the app knows whether the change it
@@ -215,7 +231,8 @@ export const useApp = create<AppState>((set, get) => ({
   speed: 1,
   selectedBlockIds: [],
   clipboard: [],
-  seed: 1,
+  seed: randomSeed(),
+  seedIsAuto: true,
   until: null,
   status: "idle",
   history: [],
@@ -443,12 +460,16 @@ export const useApp = create<AppState>((set, get) => ({
 
   simulate: async () => {
     set({ status: "running", error: null });
+    // A run that draws its own seed is a new experiment every time; a run
+    // with the reader's seed is the same one, so it can be repeated.
+    const seed = get().seedIsAuto ? randomSeed() : get().seed;
     try {
       const report = await engine().simulateCurrent({
-        seed: get().seed,
+        seed,
         until: get().until ?? undefined,
       });
       set({
+        seed,
         report,
         // The run is not the one the monitor replays: the replay needs the
         // trace, and the monitor asks for it when it runs the model.
@@ -471,9 +492,10 @@ export const useApp = create<AppState>((set, get) => ({
       return;
     }
     set({ status: "running", error: null });
+    const seed = get().seedIsAuto ? randomSeed() : get().seed;
     try {
       const options = {
-        seed: get().seed,
+        seed,
         until: get().until ?? undefined,
         limit: TRACE_LIMIT,
       };
@@ -492,6 +514,7 @@ export const useApp = create<AppState>((set, get) => ({
         trace,
         monitor,
         transitions,
+        seed,
         playhead: 0,
         playing: monitor.frames.length > 0,
         // The speed is a multiple of the real time, and the run starts at
@@ -595,7 +618,7 @@ export const useApp = create<AppState>((set, get) => ({
     });
   },
 
-  setSeed: (seed: number) => set({ seed }),
+  setSeed: (seed: number) => set({ seed, seedIsAuto: false }),
 
   setUntil: (until: number | null) => set({ until }),
 }));

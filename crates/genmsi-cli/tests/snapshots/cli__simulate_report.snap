@@ -7,6 +7,8 @@ expression: stdout(&output)
  START_TIME    END_TIME     BLOCKS    FACILITIES    STORAGES
          0        3600          18             0           0
 
+ SEMILLA    1
+
  LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE
          COUNT   COUNT
     1        9       1     0              1  GENERATE        90,30,2700

@@ -53,9 +53,10 @@ pub struct ModelArgs {
 /// Options shared by the subcommands that run a simulation.
 #[derive(Debug, Args)]
 pub struct RunArgs {
-    /// Seed of every random stream; the same seed reproduces the same run.
-    #[arg(long, value_name = "SEED", default_value_t = 1)]
-    pub seed: u64,
+    /// Seed of every random stream; a random one when it is not given, and
+    /// the run says which it used. The same seed reproduces the same run.
+    #[arg(long, value_name = "SEED")]
+    pub seed: Option<u64>,
     /// Stop once the simulated clock passes this time, instead of running to
     /// the model's own termination.
     #[arg(long, value_name = "TIME")]

@@ -65,10 +65,11 @@ fn the_cli_lint_document_is_the_engine_document() {
 
 #[test]
 fn the_cli_trace_document_is_the_engine_document() {
-    let output = genmsi(&["trace", MODEL, "--json", "--limit", "3"]);
+    let output = genmsi(&["trace", MODEL, "--json", "--limit", "3", "--seed", "1"]);
     assert_eq!(code(&output), 0, "{}", stderr(&output));
     let cli_bytes = stdout(&output);
-    // The CLI's default knobs (`--seed 1`, no `--until`) with the trace on.
+    // The same knobs the CLI was given (`--seed 1`, no `--until`) with the
+    // trace on.
     let config = genmsi_core::SimConfig {
         seed: 1,
         trace: true,

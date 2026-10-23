@@ -50,6 +50,8 @@ pub fn render(result: &RunResult, program: &Program) -> String {
         result.entities.storages.len()
     );
     let _ = writeln!(out);
+    let _ = writeln!(out, " SEMILLA    {}", result.seed);
+    let _ = writeln!(out);
     let _ = writeln!(
         out,
         " LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE"

@@ -151,7 +151,7 @@ export default function ReportView({
       <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs">
         <span className="text-sm font-semibold text-slate-800">{report.title}</span>
         <span className="text-slate-500">
-          Semilla <span className="font-mono text-slate-800">{report.seed ?? 1}</span>
+          Semilla <span className="font-mono text-slate-800">{report.seed}</span>
         </span>
         <span className="text-slate-500">
           Tiempos{" "}

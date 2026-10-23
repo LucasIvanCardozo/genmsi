@@ -76,3 +76,11 @@ pub fn compile_model(model: &GmdlModel) -> Result<Program, EngineError> {
         .unwrap_or_else(|| "model".to_string());
     compile(model, title)
 }
+
+/// A random seed for a run.
+///
+/// A run is entirely determined by its seed, so a run that does not take one
+/// says which it used: the reader can repeat it by passing the same number.
+pub fn random_seed() -> u64 {
+    rand::random()
+}

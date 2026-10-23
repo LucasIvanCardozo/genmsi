@@ -78,10 +78,10 @@ test(
     ensureBinaries();
     const server = await devServer();
     try {
-      const response = await fetch(`${server.url}api/simulate?path=${encodeURIComponent(model)}`);
+      const response = await fetch(`${server.url}api/simulate?path=${encodeURIComponent(model)}&seed=1`);
       assert.equal(response.status, 200);
       const body = Buffer.from(await response.arrayBuffer());
-      assert.ok(body.equals(cliBytes(["simulate", model, "--json"])), "the report bytes differ");
+      assert.ok(body.equals(cliBytes(["simulate", model, "--json", "--seed", "1"])), "the report bytes differ");
     } finally {
       await server.close();
     }
@@ -94,7 +94,7 @@ test(
   () => {
     ensureBinaries();
     const bytes = facadeBytes(["simulate", model]);
-    assert.ok(bytes.equals(cliBytes(["simulate", model, "--json"])), "the facade bytes differ");
+    assert.ok(bytes.equals(cliBytes(["simulate", model, "--json", "--seed", "1"])), "the facade bytes differ");
   },
 );
 
@@ -106,12 +106,12 @@ test(
     const server = await devServer();
     try {
       const response = await fetch(
-        `${server.url}api/trace?path=${encodeURIComponent(model)}&limit=50`,
+        `${server.url}api/trace?path=${encodeURIComponent(model)}&limit=50&seed=1`,
       );
       assert.equal(response.status, 200);
       const body = Buffer.from(await response.arrayBuffer());
       assert.ok(
-        body.equals(cliBytes(["trace", model, "--json", "--limit", "50"])),
+        body.equals(cliBytes(["trace", model, "--json", "--limit", "50", "--seed", "1"])),
         "the trace bytes differ",
       );
     } finally {
@@ -127,7 +127,7 @@ test(
     ensureBinaries();
     const bytes = facadeBytes(["trace", model, "--limit", "50"]);
     assert.ok(
-      bytes.equals(cliBytes(["trace", model, "--json", "--limit", "50"])),
+      bytes.equals(cliBytes(["trace", model, "--json", "--limit", "50", "--seed", "1"])),
       "the facade's trace bytes differ",
     );
   },
@@ -207,7 +207,7 @@ test(
     ensureBinaries();
     const runs: string[][] = [
       ["--seed", "7"],
-      ["--until", "50"],
+      ["--seed", "7", "--until", "50"],
     ];
     for (const knobs of runs) {
       const bytes = facadeBytes(["simulate", model, ...knobs]);

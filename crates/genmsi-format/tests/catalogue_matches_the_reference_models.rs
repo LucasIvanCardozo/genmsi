@@ -183,7 +183,19 @@ fn build_block_produces_the_reference_shape() {
     assert_eq!(block.outputs[0].ioid, 1);
     assert_eq!(block.outputs[0].mylabel, "");
     assert_eq!(block.props.len(), 5);
-    assert!(block.props.iter().all(|p| p.raw_value.is_empty()));
+    // A new generator comes with the original's own defaults: a mean of 60 and
+    // a spread of 30. The spread is what makes it a random source.
+    let value = |name: &str| {
+        block
+            .props
+            .iter()
+            .find(|property| property.name == name)
+            .map(|property| property.raw_value.clone())
+            .unwrap_or_default()
+    };
+    assert_eq!(value("Media"), "60");
+    assert_eq!(value("Modificador"), "30");
+    assert_eq!(value("Cantidad"), "");
     assert_eq!(block.header, None);
     assert_eq!(block.source, None);
     assert_eq!(

@@ -143,6 +143,20 @@ text in entity-name positions.
 - **Termination**: the run ends when the start counter reaches zero. A model is
   runnable only if it has a `Clock` or a `TERMINATE` with a positive `A`
   operand — exactly the oracle's refusal rule.
+- **`Clock` and the `START`**: the `Clock` spends one unit of the `START` every
+  `Frecuencia` time units ("Descuenta 1 unidad del START de la simulación cada
+  un cierto tiempo indicado"), so a run with `Frecuencia` 3600 ends at time
+  3600 and the report says so in `END_TIME`. The original compiles the `Clock`
+  into `GENERATE Frecuencia` + `TERMINATE 1`, and the engine does the same.
+- **Storages (`ENTER`/`LEAVE`)**: a storage exists only when a `StorageDef`
+  declares it, and the declaration gives its capacity in units (`Tamaño`,
+  "Capacidad del Storage"). The `Cantidad` of an `ENTER`/`LEAVE` is the units
+  one transaction takes and gives back ("Cantidad de ingresos"), so a storage
+  of `Tamaño` 1 with a `Cantidad` of 1 holds one transaction at a time and the
+  others wait (the original reports `MAX` 1 and the refusals in the storage's
+  own `RETRY`). A storage the model does not declare has no capacity: the
+  original stops the run with "Referencia a una entidad storage inexistente",
+  and the compiler refuses the model before it runs.
 
 ## 6. Validation inferred from the five error outputs
 

@@ -24,7 +24,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::expr::{ProgramExpr, RefKind};
+use crate::expr::ProgramExpr;
 use crate::program::{
     AssignOp, BlockKind, Definitions, ExecBlock, FunctionDef, GateCondition, LogicOp,
     MultiTransferSelection, Program, RandomVariable, RelOp, SelectMode, SelectState,
@@ -539,10 +539,15 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
         BlockKind::Examine(spec) => {
             // The `Examine` class examines the transaction itself: the number
             // of the `ExamineNumber` class is not part of it.
+            //
+            // The third operand is the destination of the failure output: the
+            // original writes it (`EXAMINE UnGrupo,,A_Terminate1`) and refuses
+            // to compile the model without it ("Faltan parámetros").
+            let destination = port_destination(block, names, "Salida2");
             let operands = if spec.transaction {
-                format!("{},,", spec.group)
+                format!("{},,{}", spec.group, destination)
             } else {
-                format!("{},{},", spec.group, sna(&spec.number))
+                format!("{},{},{}", spec.group, sna(&spec.number), destination)
             };
             statement(out, "EXAMINE", &operands);
         }
@@ -712,7 +717,10 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
                         // and `NM` when it must not.
                         format!("{} {switch}", if *state { "M" } else { "NM" })
                     } else {
-                        format!("{} {switch}", if *state { "LS" } else { "L" })
+                        // The two operators of a logic switch are `LS` (set)
+                        // and `LR` (reset): `GateL  GATE  LR  *Cuadra`
+                        // (fixtures/outputs/Problema_1__semaforo-1.gpss.txt).
+                        format!("{} {switch}", if *state { "LS" } else { "LR" })
                     }
                 }
                 GateCondition::Storage { storage, op } => {
@@ -772,13 +780,9 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
             statement(out, "LOOP", &format!("{},", spec.parameter));
         }
         BlockKind::Select(spec) => {
-            let class = match spec.kind {
-                RefKind::Queue => "Q",
-                RefKind::Storage => "S",
-                RefKind::Facility => "R",
-                RefKind::LogicSwitch => "LS",
-                _ => "",
-            };
+            // The class of the entity the selection walks is the last
+            // operand of the statement: `SELECT MIN param,1,10,,Q`.
+            let class = spec.class.clone();
             let operands = match spec.state {
                 // The logic switches: `LS` picks one that is set and `LR` one
                 // that is not.
@@ -794,7 +798,8 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
                     sna(&spec.low),
                     sna(&spec.high)
                 ),
-                // The storages: `SF` a full one and `SNF` one that is not.
+                // The storages: `SF` a full one, `SNF` one that is not,
+                // `SE` an empty one and `SNE` one that is not empty.
                 Some(SelectState::StorageFull) => format!(
                     "SF {},{},{}",
                     spec.parameter,
@@ -803,6 +808,18 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
                 ),
                 Some(SelectState::StorageNotFull) => format!(
                     "SNF {},{},{}",
+                    spec.parameter,
+                    sna(&spec.low),
+                    sna(&spec.high)
+                ),
+                Some(SelectState::StorageEmpty) => format!(
+                    "SE {},{},{}",
+                    spec.parameter,
+                    sna(&spec.low),
+                    sna(&spec.high)
+                ),
+                Some(SelectState::StorageNotEmpty) => format!(
+                    "SNE {},{},{}",
                     spec.parameter,
                     sna(&spec.low),
                     sna(&spec.high)
@@ -896,6 +913,18 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
         }
         BlockKind::NoOp => {}
     }
+}
+
+/// The name of the statement the block sends its transactions to through the
+/// output port `port`, empty when the port is not connected.
+fn port_destination(block: &ExecBlock, names: &Names, port: &str) -> String {
+    block
+        .port_names
+        .iter()
+        .position(|name| name == port)
+        .and_then(|index| block.next.get(index).copied().flatten())
+        .map(|target| names.get(target).to_string())
+        .unwrap_or_default()
 }
 
 /// The name of the block that receives the transactions an alternate output

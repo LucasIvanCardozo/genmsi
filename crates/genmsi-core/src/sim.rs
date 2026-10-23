@@ -13,8 +13,8 @@ use crate::error::EngineError;
 use crate::expr::{Ctx, ProgramExpr, RefKind};
 use crate::program::{
     BlockKind, EntityName, ExecBlock, FunctionDef, GateCondition, GenerateSpec, LogicOp,
-    MultiTransferSelection, PreemptPriority, Program, SelectMode, SelectSpec, SelectState,
-    StorageOp, TerminateSpec, UnlinkSpec,
+    MultiTransferSelection, PreemptPriority, Program, SelectEntity, SelectMode, SelectSpec,
+    SelectState, StorageOp, TerminateSpec, UnlinkSpec,
 };
 use crate::report::number;
 use crate::rng::Streams;
@@ -2075,7 +2075,7 @@ impl<'p> Simulation<'p> {
         high: i64,
         xact: XactId,
     ) -> Option<i64> {
-        let kind = &spec.kind;
+        let kind = spec.entity;
         let mode = spec.mode;
         let wanted = spec.compare_value.as_ref().map(|expr| {
             let mut ctx = CtxView {
@@ -2107,20 +2107,37 @@ impl<'p> Simulation<'p> {
                         }
                         None => true,
                     },
+                    // An empty storage is one with no units in it; a storage
+                    // the model does not declare holds nothing, so it is
+                    // empty and it is not full.
+                    SelectState::StorageEmpty => match capacity {
+                        Some(capacity) => {
+                            self.entities.storage(&name, capacity, self.now).in_use == 0
+                        }
+                        None => true,
+                    },
+                    SelectState::StorageNotEmpty => match capacity {
+                        Some(capacity) => {
+                            self.entities.storage(&name, capacity, self.now).in_use > 0
+                        }
+                        None => false,
+                    },
                     SelectState::EntityEqual => {
                         let wanted = wanted.unwrap_or(0.0);
                         let value = match kind {
-                            RefKind::Queue => {
+                            SelectEntity::Queue => {
                                 self.entities.queue(&name, self.now).content as f64
                             }
-                            RefKind::Storage => match capacity {
-                                Some(capacity) => self
-                                    .entities
-                                    .storage(&name, capacity, self.now)
-                                    .in_use as f64,
-                                None => 0.0,
-                            },
-                            RefKind::Facility => {
+                            SelectEntity::Storage | SelectEntity::StorageRemaining => {
+                                match capacity {
+                                    Some(capacity) => self
+                                        .entities
+                                        .storage(&name, capacity, self.now)
+                                        .in_use as f64,
+                                    None => 0.0,
+                                }
+                            }
+                            SelectEntity::Facility => {
                                 let facility = self.entities.facility(&name, self.now);
                                 (facility.busy as i64) as f64
                             }
@@ -2139,11 +2156,11 @@ impl<'p> Simulation<'p> {
         for number in low..=high {
             let name = crate::error::numeric_name(number as f64);
             let (metric, free) = match kind {
-                RefKind::Queue => {
+                SelectEntity::Queue => {
                     let queue = self.entities.queue(&name, self.now);
                     (queue.content as f64, queue.content == 0)
                 }
-                RefKind::Storage => match self.storage_capacity(&name) {
+                SelectEntity::Storage => match self.storage_capacity(&name) {
                     Some(capacity) => {
                         let storage = self.entities.storage(&name, capacity, self.now);
                         (storage.in_use as f64, storage.remaining() > 0)
@@ -2151,11 +2168,25 @@ impl<'p> Simulation<'p> {
                     // A storage the model does not declare holds nothing.
                     None => (0.0, true),
                 },
-                RefKind::Facility => {
+                // The units left in the storage.
+                SelectEntity::StorageRemaining => match self.storage_capacity(&name) {
+                    Some(capacity) => {
+                        let storage = self.entities.storage(&name, capacity, self.now);
+                        (storage.remaining() as f64, storage.remaining() > 0)
+                    }
+                    None => (0.0, true),
+                },
+                SelectEntity::Facility => {
                     let facility = self.entities.facility(&name, self.now);
                     ((facility.busy as i64) as f64, facility.available && !facility.busy)
                 }
-                _ => (0.0, true),
+                // A family the engine does not walk: there is nothing to
+                // select.
+                SelectEntity::Other => return None,
+                SelectEntity::LogicSwitch => {
+                    let logic = *self.entities.logic(&name);
+                    (logic as i64 as f64, !logic)
+                }
             };
             match mode {
                 // GPSS SELECT with the "not in use" mode: the first entity that is

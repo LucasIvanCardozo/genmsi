@@ -161,11 +161,11 @@ const GLOSSARY: &[(&str, &str)] = &[
     ),
     (
         "Select",
-        "Selects an entity of the class ClaseSNA (Q queue, S storage, R facility) between minimo and maximo and stores its name in Param.",
+        "Selects an entity of the class ClaseSNA between minimo and maximo and stores its name in Param. The class is one of the 38 of the original's list (Q queue, S storage, R storage left, F facility, LS logic switch...).",
     ),
     (
         "SelectF",
-        "Selects the first free entity of the class ClaseSNA between minimo and maximo.",
+        "Selects the first free facility between minimo and maximo.",
     ),
     (
         "Split",

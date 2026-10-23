@@ -609,7 +609,7 @@ fn operand_parts(block: &ExecBlock, program: &Program) -> (Option<&'static str>,
                 }
             } else {
                 refs.push(String::new());
-                refs.push(spec.kind.to_string());
+                refs.push(spec.class.clone());
             }
             mode = Some(letter);
             refs

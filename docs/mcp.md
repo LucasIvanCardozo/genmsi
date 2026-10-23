@@ -54,7 +54,7 @@ described in [`docs/cli.md`](cli.md#genmsilint1).
 |---|---|---|---|
 | `path` | string or null | — | Path of the `.gmdl` model file. |
 | `model` | string or null | — | The `.gmdl` document as text. |
-| `seed` | number | `1` | Seed of every random stream; the same seed reproduces the same run. |
+| `seed` | number | drawn at random | Seed of every random stream; the run says which it used, and the same seed reproduces the same run. |
 | `until` | number or null | — | Stop once the simulated clock passes this time. |
 
 Returns the `genmsi.report/1` document, the same document
@@ -66,7 +66,7 @@ Returns the `genmsi.report/1` document, the same document
 |---|---|---|---|
 | `path` | string or null | — | Path of the `.gmdl` model file. |
 | `model` | string or null | — | The `.gmdl` document as text. |
-| `seed` | number | `1` | Seed of every random stream. |
+| `seed` | number | drawn at random | Seed of every random stream; the run says which it used. |
 | `until` | number or null | — | Stop once the simulated clock passes this time. |
 | `limit` | number | `100` | Maximum number of trace records to keep. |
 

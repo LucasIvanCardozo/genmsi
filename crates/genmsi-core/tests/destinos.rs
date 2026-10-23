@@ -1,0 +1,145 @@
+//! The destinations the original writes in the listing: the block a
+//! transaction goes to when the test fails.
+//!
+//! Every assertion here is pinned to the original's own answer: the listing
+//! the original wrote for the probes of `scripts/wine-oracle/probes/select/`
+//! and for the model of the original in `fixtures/outputs/`.
+
+mod support;
+
+use genmsi_core::Program;
+use genmsi_core::gpss::render;
+use support::{node, wired};
+
+/// The statements of a program, with their padding removed.
+fn statements(program: &Program) -> Vec<String> {
+    render(program)
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|line| !line.is_empty())
+        .collect()
+}
+
+/// The statement that carries the name `name`.
+fn named(program: &Program, name: &str) -> String {
+    statements(program)
+        .into_iter()
+        .find(|line| line.split_whitespace().next().is_some_and(|first| first == name))
+        .unwrap_or_else(|| panic!("no statement carries the name {name}"))
+}
+
+/// A model with one selection whose failure output ("No selec") is
+/// connected, and one that is not.
+fn selection(class: &'static str, props: &[(&'static str, &'static str)]) -> (Program, Program) {
+    let model = |failure: Option<&'static str>| {
+        let nodes = vec![
+            node(
+                1,
+                "Generate",
+                None,
+                &[("Salida1", Some("A"))],
+                &[("Media", "60"), ("Modificador", "0")],
+            ),
+            node(
+                2,
+                class,
+                Some("A"),
+                &[("Salida1", Some("B")), ("Salida2", failure)],
+                props,
+            ),
+            node(3, "Terminate", Some("B"), &[], &[]),
+            node(4, "Terminate", Some("C"), &[], &[]),
+        ];
+        let mut links = vec![(1, 0, 2, 0), (2, 0, 3, 0)];
+        if failure.is_some() {
+            links.push((2, 1, 4, 0));
+        }
+        wired(&nodes, &links, 3600.0)
+    };
+    (model(Some("C")), model(None))
+}
+
+#[test]
+fn the_selection_writes_the_destination_of_its_failure_output() {
+    // The original writes the block the transaction goes to when the
+    // selection finds nothing, as the last operand of the statement and
+    // after two empty ones:
+    //
+    //     A_SelectS   SELECT  SE  param,1,10,,,A_Terminate1
+    //
+    // (the probe `sels_SE` of `scripts/wine-oracle/probes/select/`, and the
+    // model of the original `fixtures/outputs/TP5__burgerShop.gpss.txt`:
+    // "A_SelectF  SELECT  NU  caja,1,V$cantCajas,,,A_Select").
+    let (connected, free) = selection(
+        "SelectS",
+        &[("Param", "param"), ("minimo", "1"), ("maximo", "10"), ("op", "Vacio")],
+    );
+    assert_eq!(
+        named(&connected, "A_SelectS"),
+        "A_SelectS SELECT SE param,1,10,,,A_Terminate1"
+    );
+    // Without the failure output the original writes no destination at all.
+    assert_eq!(named(&free, "A_SelectS"), "A_SelectS SELECT SE param,1,10");
+
+    let (connected, free) = selection(
+        "SelectF",
+        &[("Param", "param"), ("minimo", "1"), ("maximo", "10"), ("op", "Libre")],
+    );
+    assert_eq!(
+        named(&connected, "A_SelectF"),
+        "A_SelectF SELECT NU param,1,10,,,A_Terminate1"
+    );
+    assert_eq!(named(&free, "A_SelectF"), "A_SelectF SELECT NU param,1,10");
+
+    let (connected, free) = selection(
+        "SelectL",
+        &[("Param", "param"), ("minimo", "1"), ("maximo", "10"), ("op", "Set")],
+    );
+    assert_eq!(
+        named(&connected, "A_SelectL"),
+        "A_SelectL SELECT LS param,1,10,,,A_Terminate1"
+    );
+    assert_eq!(named(&free, "A_SelectL"), "A_SelectL SELECT LS param,1,10");
+
+    // The class that compares a value has a field of its own for the
+    // destination, and it writes it even when it is empty
+    // (`SELECT E param,1,10,*1,Q,`).
+    let (connected, free) = selection(
+        "SelectSNA",
+        &[
+            ("Param", "param"),
+            ("minimo", "1"),
+            ("maximo", "10"),
+            ("op", "="),
+            ("valorComp", "*1"),
+            ("ClaseSNA", "Q"),
+        ],
+    );
+    assert_eq!(
+        named(&connected, "A_SelectSNA"),
+        "A_SelectSNA SELECT E param,1,10,*1,Q,A_Terminate1"
+    );
+    assert_eq!(
+        named(&free, "A_SelectSNA"),
+        "A_SelectSNA SELECT E param,1,10,*1,Q,"
+    );
+
+    // The `Select` class has no failure output: its statement names the
+    // class of the entity and nothing else.
+    let (connected, free) = selection(
+        "Select",
+        &[
+            ("Param", "param"),
+            ("minimo", "1"),
+            ("maximo", "10"),
+            ("op", "Minimo"),
+            ("ClaseSNA", "Q"),
+        ],
+    );
+    assert_eq!(
+        named(&connected, "A_Select"),
+        "A_Select SELECT MIN param,1,10,,Q"
+    );
+    assert_eq!(named(&free, "A_Select"), "A_Select SELECT MIN param,1,10,,Q");
+}
+

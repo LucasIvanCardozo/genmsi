@@ -497,6 +497,21 @@ fn connection(
     line(out, "", "TRANSFER", &operands);
 }
 
+/// How the statement of a selection carries the destination of its failure
+/// output ("No selec").
+///
+/// The classes that pick an entity of a kind write the destination as the
+/// last operand, after two empty ones (`SELECT SE param,1,10,,,A_Terminate1`);
+/// the class that compares a value has a field of its own for it, which it
+/// writes even when it is empty (`SELECT E param,1,10,*1,Q,`); and the class
+/// that picks the smallest or the largest entity has no failure output at
+/// all, so its statement does not name one.
+enum Failure {
+    None,
+    AfterTwoEmpties,
+    OwnField,
+}
+
 /// The statements of one block: the first carries the name, the rest do not.
 fn block_statements(out: &mut String, index: usize, program: &Program, names: &Names) {
     let block = &program.blocks[index];
@@ -783,78 +798,89 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
             // The class of the entity the selection walks is the last
             // operand of the statement: `SELECT MIN param,1,10,,Q`.
             let class = spec.class.clone();
-            let operands = match spec.state {
+            // The destination of the failure output ("No selec"): the
+            // original writes it as the last operand of the statement.
+            let destination = port_destination(block, names, "Salida2");
+            let (head, failure) = match spec.state {
                 // The logic switches: `LS` picks one that is set and `LR` one
                 // that is not.
-                Some(SelectState::LogicSet) => format!(
-                    "LS {},{},{}",
-                    spec.parameter,
-                    sna(&spec.low),
-                    sna(&spec.high)
+                Some(SelectState::LogicSet) => (
+                    format!("LS {},{},{}", spec.parameter, sna(&spec.low), sna(&spec.high)),
+                    Failure::AfterTwoEmpties,
                 ),
-                Some(SelectState::LogicReset) => format!(
-                    "LR {},{},{}",
-                    spec.parameter,
-                    sna(&spec.low),
-                    sna(&spec.high)
+                Some(SelectState::LogicReset) => (
+                    format!("LR {},{},{}", spec.parameter, sna(&spec.low), sna(&spec.high)),
+                    Failure::AfterTwoEmpties,
                 ),
                 // The storages: `SF` a full one, `SNF` one that is not,
                 // `SE` an empty one and `SNE` one that is not empty.
-                Some(SelectState::StorageFull) => format!(
-                    "SF {},{},{}",
-                    spec.parameter,
-                    sna(&spec.low),
-                    sna(&spec.high)
+                Some(SelectState::StorageFull) => (
+                    format!("SF {},{},{}", spec.parameter, sna(&spec.low), sna(&spec.high)),
+                    Failure::AfterTwoEmpties,
                 ),
-                Some(SelectState::StorageNotFull) => format!(
-                    "SNF {},{},{}",
-                    spec.parameter,
-                    sna(&spec.low),
-                    sna(&spec.high)
+                Some(SelectState::StorageNotFull) => (
+                    format!("SNF {},{},{}", spec.parameter, sna(&spec.low), sna(&spec.high)),
+                    Failure::AfterTwoEmpties,
                 ),
-                Some(SelectState::StorageEmpty) => format!(
-                    "SE {},{},{}",
-                    spec.parameter,
-                    sna(&spec.low),
-                    sna(&spec.high)
+                Some(SelectState::StorageEmpty) => (
+                    format!("SE {},{},{}", spec.parameter, sna(&spec.low), sna(&spec.high)),
+                    Failure::AfterTwoEmpties,
                 ),
-                Some(SelectState::StorageNotEmpty) => format!(
-                    "SNE {},{},{}",
-                    spec.parameter,
-                    sna(&spec.low),
-                    sna(&spec.high)
+                Some(SelectState::StorageNotEmpty) => (
+                    format!("SNE {},{},{}", spec.parameter, sna(&spec.low), sna(&spec.high)),
+                    Failure::AfterTwoEmpties,
                 ),
                 // The entity of a class whose value equals the compared one.
-                Some(SelectState::EntityEqual) => format!(
-                    "E {},{},{},{},{},",
-                    spec.parameter,
-                    sna(&spec.low),
-                    sna(&spec.high),
-                    spec.compare_value.as_ref().map(sna).unwrap_or_default(),
-                    class
+                Some(SelectState::EntityEqual) => (
+                    format!(
+                        "E {},{},{},{},{}",
+                        spec.parameter,
+                        sna(&spec.low),
+                        sna(&spec.high),
+                        spec.compare_value.as_ref().map(sna).unwrap_or_default(),
+                        class
+                    ),
+                    Failure::OwnField,
                 ),
                 None => match spec.mode {
-                    SelectMode::FirstFree => format!(
-                        "NU {},{},{}",
-                        spec.parameter,
-                        sna(&spec.low),
-                        sna(&spec.high)
+                    SelectMode::FirstFree => (
+                        format!("NU {},{},{}", spec.parameter, sna(&spec.low), sna(&spec.high)),
+                        Failure::AfterTwoEmpties,
                     ),
-                    SelectMode::Max => format!(
-                        "MAX {},{},{},,{}",
-                        spec.parameter,
-                        sna(&spec.low),
-                        sna(&spec.high),
-                        class
+                    // The `Select` class has no failure output: its statement
+                    // names the class of the entity and nothing else.
+                    SelectMode::Max => (
+                        format!(
+                            "MAX {},{},{},,{}",
+                            spec.parameter,
+                            sna(&spec.low),
+                            sna(&spec.high),
+                            class
+                        ),
+                        Failure::None,
                     ),
-                    SelectMode::Min => format!(
-                        "MIN {},{},{},,{}",
-                        spec.parameter,
-                        sna(&spec.low),
-                        sna(&spec.high),
-                        class
+                    SelectMode::Min => (
+                        format!(
+                            "MIN {},{},{},,{}",
+                            spec.parameter,
+                            sna(&spec.low),
+                            sna(&spec.high),
+                            class
+                        ),
+                        Failure::None,
                     ),
                 },
+            };
+            let operands = match failure {
+                Failure::None => head,
+                Failure::AfterTwoEmpties => {
+                    if destination.is_empty() {
+                        head
+                    } else {
+                        format!("{head},,,{destination}")
+                    }
+                }
+                Failure::OwnField => format!("{head},{destination}"),
             };
             statement(out, "SELECT", &operands);
         }

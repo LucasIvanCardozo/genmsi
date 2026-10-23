@@ -166,3 +166,34 @@ Four benches do not run: `MFunction`, `MFunctionDist`, `MultifurcacionP` and
 existentes en este sistema") and never shows its own window, so the harness
 has nothing to click. The models are accepted by the original; what is missing
 is a way to drive it.
+
+## `probes/` — experiments that settle a question
+
+A bench shows what one class does. A **probe** is an experiment: a model built
+so that the question cannot be answered by reading the text, run in the
+original and in our engine, and the numbers of the two reports compared.
+
+```
+bash scripts/wine-oracle/probes/run-probe.sh
+```
+
+Each probe directory holds the models, what the original produced
+(`oracle/`) and what our engine produced (`ours/`), plus a note with the
+question, the numbers and the verdict.
+
+### `TransferProbOrder` — which order does the original's engine follow for a `Transfer`?
+
+The original writes the destinations of a `TRANSFER` in the reverse of the
+port order, and in GPSS that order is the meaning of the probability, so the
+text of the original contradicts the property hint of its own block
+("Probabilidad de continuar por la Salida1"). The probe gives `Salida1` a long
+`Advance` (1000) and `Salida2` a short one (10), with `Prob` at 85% and at
+15%, and compares the entry counts of the two advances.
+
+The verdict: the original's **engine follows the port order** — the probability
+goes to `Salida1` (53 of 360 transactions at `Prob` 15%, 300 of 360 at 85%) —
+and only the **text** it writes is reversed. Our engine already behaves that
+way; our GPSS rendering is the part that has to follow the original's order.
+
+The details and the numbers are in
+[`probes/TransferProbOrder.md`](probes/TransferProbOrder.md).

@@ -1,0 +1,4 @@
+GenMSI window: 10485766 on :99
+extracted 36 lines -> /home/lucas/Documentos/Workspace/Genmsi/scripts/wine-oracle/probes/oracle/TransferProbOrder15.report.txt
+extracted 8 lines -> /home/lucas/Documentos/Workspace/Genmsi/scripts/wine-oracle/probes/oracle/TransferProbOrder15.gpss.txt
+done: /home/lucas/Documentos/Workspace/Genmsi/scripts/wine-oracle/probes/oracle/TransferProbOrder15.{report,gpss}.txt

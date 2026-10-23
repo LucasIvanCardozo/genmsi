@@ -117,6 +117,52 @@ información:
    siguiente. El grafo es el mismo; la diferencia es de orden, y por eso la
    comparación debe mirar el grafo y no el texto.
 
+### L6 — El experimento zanja el orden de la probabilidad
+
+Un `Transfer` con un `Advance` de 1000 y otro de 10, con el 15 % de probabilidad,
+decide la pregunta: los números del original son **53 de 360** transacciones por
+la rama de `Salida1` (la que su texto lista *segunda*) y 307 por la otra. El
+motor del original sigue, entonces, **el orden de los puertos** —la propiedad se
+llama "Probabilidad de continuar por la Salida1"— y sólo su *texto* está
+invertido. Nuestro motor acertaba ✓.
+
+Nuestro render del GPSS, no: escribía los destinos en el orden de los puertos.
+Ahora los escribe como el original (invertidos ✓, con el campo vacío para el
+puerto sin enlace ✓). El reporte ya lo hacía bien ✓.
+
+De paso, el experimento muestra dos cosas más:
+
+- El original rotula la sentencia `TRANSFER` con el nombre literal del puerto de
+  la macro (`Entrada1`), no con la etiqueta del módulo (`A_Transfer`).
+- El orden de nuestros bloques difiere del original en un caso: el bloque
+  `Generate` de media 1800, que en el modelo es el primer hijo del contenedor
+  "Telefono", aparece en el grupo del `A_Terminate` y en el original en el del
+  `A_Advance11`. Los números coinciden ✓, así que es una diferencia de
+  *posición* en el texto, no de comportamiento; la comparación de los 66 bancos
+  dirá si es un caso aislado.
+
+El render ahora ordena los bloques como el original — por el recorrido de la
+transacción, no por el orden del modelo — y escribe las conexiones que rompen
+ese recorrido como un `TRANSFER` sin nombre, como hace el original. La
+comparación del TP2 queda con **cuatro diferencias**, y las cuatro son
+información:
+
+1. El original escribe los destinos de un `TRANSFER` en el orden inverso al de
+   nuestros puertos. En el modelo, `Entrada1` tiene Salida1→A_Advance12 y
+   Salida2→A_Advance1, y el original escribe `850,A_Advance1,A_Advance12`. Como
+   en GPSS el orden de los destinos *es* la semántica de la probabilidad, esto
+   hay que resolverlo con un banco (T3), no con el texto: el oráculo de
+   números dice que el comportamiento coincide, pero el texto dice lo
+   contrario.
+2. Al `PREEMPT` le falta un operando: la prioridad de la transacción que
+   preempta (`PR` en el original). Nuestro modelo no la tiene (T2).
+3. Al `LEAVE` del original le sobran las unidades (`SalaEspera,1`): las
+   escribimos cuando el bloque las tiene puestas y él las omite. Es
+   cosmético: la comparación las normaliza.
+4. El original escribe una conexión donde el nuestro cae solo al bloque
+   siguiente. El grafo es el mismo; la diferencia es de orden, y por eso la
+   comparación debe mirar el grafo y no el texto.
+
 `genmsi gpss <model>` imprime el programa tal como lo escribe el original
 (`genmsi.gpss/1`). Las sentencias coinciden casi una a una con las del TP2 del
 original, y las diferencias que quedan son hallazgos, no ruido:

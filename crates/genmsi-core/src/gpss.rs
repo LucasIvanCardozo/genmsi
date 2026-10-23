@@ -295,12 +295,16 @@ fn block_statements(out: &mut String, block: &ExecBlock, program: &Program) {
             statement(out, "PRIORITY", &value.to_string());
         }
         BlockKind::Transfer(spec) => {
+            // The original writes the destinations in the reverse of the port
+            // order, and leaves an empty field for a port with no link. The
+            // order of the text is not the order the engine follows: the
+            // probability goes to the first port (see
+            // `scripts/wine-oracle/probes/`).
             let mut operands = probability(spec);
-            for index in block.next.iter().flatten() {
-                let name = destination(program, *index);
-                if !name.is_empty() {
-                    operands.push(',');
-                    operands.push_str(&name);
+            for target in block.next.iter().rev() {
+                operands.push(',');
+                if let Some(index) = target {
+                    operands.push_str(&destination(program, *index));
                 }
             }
             statement(out, "TRANSFER", &operands);

@@ -1,0 +1,33 @@
+                             Reporte MicroVisualSIS
+
+ START_TIME    END_TIME     BLOCKS    FACILITIES    STORAGES
+        0         3600         8           0            0
+
+ LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE                                 
+         COUNT   COUNT   
+    1       61       1     0              1  GENERATE        60,30                      
+    2       60       0     0       Entrada1  TRANSFER        850,A_AdvanceCorto,A_AdvanceLargo
+    3       47      14     0 A_AdvanceLargo  ADVANCE         1000,0                     
+    4       33       0     0A_TerminateLargo  TERMINATE                                  
+    5       13       0     0 A_AdvanceCorto  ADVANCE         10,0                       
+    6       13       0     0A_TerminateCorto  TERMINATE                                  
+    7        2       1     0              7  GENERATE        3600                       
+    8        1       0     0              8  TERMINATE       1                          
+
+FEC_XACT_NUMBER    PRI      BDT    CURRENT   NEXT   PARAMETER   VALUE
+            62      0       3633        1       1
+            45      0       3649        3       4
+            46      0       3736        3       4
+            47      0       3770        3       4
+            48      0       3811        3       4
+            49      0       3841        3       4
+            52      0       4027        3       4
+            53      0       4113        3       4
+            54      0       4152        3       4
+            56      0       4288        3       4
+            57      0       4357        3       4
+            58      0       4417        3       4
+            59      0       4471        3       4
+            60      0       4530        3       4
+            61      0       4571        3       4
+            63      0       7200        7       7

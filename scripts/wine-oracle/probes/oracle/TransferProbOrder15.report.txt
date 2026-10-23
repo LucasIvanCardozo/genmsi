@@ -1,0 +1,36 @@
+                             Reporte MicroVisualSIS
+
+ START_TIME    END_TIME     BLOCKS    FACILITIES    STORAGES
+        0         3600         8           0            0
+
+ LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE                                 
+         COUNT   COUNT   
+    1      361       1     0              1  GENERATE        10,0                       
+    2      360       0     0       Entrada1  TRANSFER        150,A_AdvanceCorto,A_AdvanceLargo
+    3       53      16     0 A_AdvanceLargo  ADVANCE         1000,0                     
+    4       37       0     0A_TerminateLargo  TERMINATE                                  
+    5      307       1     0 A_AdvanceCorto  ADVANCE         10,0                       
+    6      306       0     0A_TerminateCorto  TERMINATE                                  
+    7        2       1     0              7  GENERATE        3600                       
+    8        1       0     0              8  TERMINATE       1                          
+
+FEC_XACT_NUMBER    PRI      BDT    CURRENT   NEXT   PARAMETER   VALUE
+           361      0       3610        5       6
+           362      0       3610        1       1
+           262      0       3610        3       4
+           263      0       3620        3       4
+           266      0       3650        3       4
+           283      0       3820        3       4
+           287      0       3860        3       4
+           290      0       3890        3       4
+           300      0       3990        3       4
+           302      0       4010        3       4
+           303      0       4020        3       4
+           320      0       4190        3       4
+           322      0       4210        3       4
+           331      0       4300        3       4
+           332      0       4310        3       4
+           333      0       4320        3       4
+           341      0       4400        3       4
+           348      0       4470        3       4
+           363      0       7200        7       7

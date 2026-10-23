@@ -77,7 +77,11 @@ Definitions (`Function`, `Variable`, `VariableA`, `Table`, `QTable`,
 `genmsi-core/src/expr/grammar.pest` is grammar and documentation at once
 (D4). Supported forms:
 
-- numbers, `+ - * /`, integer division `#`, modulo `@`, parentheses, unary minus;
+- numbers, `+ - * /`, modulo `@`, parentheses, unary minus;
+- `#` is the **multiplication**, not a division: the original's expression
+  editor (`FormOIExpresion`, read out of the executable) has no `*` key — it
+  offers `/`, `%`, `#` and `@` — and its models read that way ("15#paraLlevar"
+  is a surcharge per delivery, and "160+(P:Tipo-1)#30" is a price);
 - typed references with `:` or `$`: `P:` parameter, `X:` savevalue, `V:`
   variable, `FN:`/`F:` function, `Q:` queue content, `S:` storage units in use,
   `R:` facility free flag, `CH:` user-chain size, `LS:`/`L:` logic switch,

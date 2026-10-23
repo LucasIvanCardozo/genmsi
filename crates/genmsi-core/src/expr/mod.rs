@@ -23,8 +23,6 @@ pub enum BinOp {
     Mul,
     /// `/`
     Div,
-    /// `#` integer division
-    IntDiv,
     /// `@` modulo
     Mod,
 }
@@ -40,13 +38,6 @@ impl BinOp {
                     0.0
                 } else {
                     left / right
-                }
-            }
-            Self::IntDiv => {
-                if right == 0.0 {
-                    0.0
-                } else {
-                    (left / right).trunc()
                 }
             }
             Self::Mod => {
@@ -348,7 +339,9 @@ mod tests {
     fn arithmetic_follows_gpss_operators() {
         assert_eq!(eval("1+2*3"), 7.0);
         assert_eq!(eval("(1+2)*3"), 9.0);
-        assert_eq!(eval("7#2"), 3.0);
+        // The original's expression editor has no `*` key: its `#` is the
+        // multiplication, and its models read that way.
+        assert_eq!(eval("7#2"), 14.0);
         assert_eq!(eval("7@2"), 1.0);
         assert_eq!(eval("1.5+0.5"), 2.0);
         assert_eq!(eval("-3+1"), -2.0);

@@ -107,7 +107,11 @@ fn build_product(pair: Pair<'_, Rule>) -> Result<Expr, String> {
         let bin = match op.as_str() {
             "*" => BinOp::Mul,
             "/" => BinOp::Div,
-            "#" => BinOp::IntDiv,
+            // The original's expression editor has no `*` key: it offers `/`,
+            // `%`, `#` and `@`. Its `#` is the multiplication, and its models
+            // read that way ("15#paraLlevar" is a surcharge per delivery, not
+            // a fraction).
+            "#" => BinOp::Mul,
             "@" => BinOp::Mod,
             other => return Err(format!("unexpected multiplicative operator {other:?}")),
         };

@@ -2225,9 +2225,8 @@ impl Compiler<'_> {
     /// the `#` is the multiplication of the original's language (its
     /// expression editor offers no `*` key) and the table of the function
     /// holds ten times the quantile, so that the deviation of the variable
-    /// is the one the class declares. Our expression language reads `#` as an
-    /// integer division, so the tree is built with the multiplication and the
-    /// text keeps the spelling of the original.
+    /// is the one the class declares. The text keeps the spelling of the
+    /// original, whose `#` is the multiplication.
     fn normal_variable(&self, module: &Block, function: &str) -> Result<ProgramExpr, EngineError> {
         let media = self
             .sna(module, "Media")?

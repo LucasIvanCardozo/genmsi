@@ -305,6 +305,9 @@ pub enum MultiTransferSelection {
 }
 
 /// Logic switch operation.
+///
+/// The original has a third operator, the inversion, and it is carried by
+/// [`LogicSpec::invert`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogicOp {
     /// Set the switch.
@@ -318,8 +321,18 @@ pub enum LogicOp {
 pub struct LogicSpec {
     /// Switch name.
     pub switch: EntityName,
-    /// Operation.
+    /// Operation: the switch is set or reset.
     pub op: LogicOp,
+    /// Whether the block inverts the switch instead of setting or resetting
+    /// it.
+    ///
+    /// The original's `op_Swich` list has three operators — `S` (set), `R`
+    /// (reset) and `I` (invert) — and the manual says of the third one that
+    /// "el estado de la llave lógica especificada por el operando A es
+    /// invertido". The inversion is a field of its own and not a third
+    /// variant of [`LogicOp`], because the report matches `LogicOp`
+    /// exhaustively and the two have to keep compiling together.
+    pub invert: bool,
 }
 
 /// The state of a storage a `GATE` or a `SELECT` tests.
@@ -1728,16 +1741,20 @@ impl Compiler<'_> {
             }
             "Logic" => {
                 let switch = self.entity(module, "LogicSwich")?;
-                let op = if module
-                    .prop_value("Op")
-                    .is_some_and(|op| op.eq_ignore_ascii_case("set"))
-                {
+                // The original's `op_Swich` list has three operators: `Set`,
+                // `Reset` and `Invertir`. The third one inverts the state of
+                // the switch, and it used to be read as a reset, because the
+                // compiler only knew about the first two.
+                let operator = module.prop_value("Op").unwrap_or_default();
+                let operator = operator.trim();
+                let invert = operator.eq_ignore_ascii_case("invertir");
+                let op = if !invert && operator.eq_ignore_ascii_case("set") {
                     LogicOp::Set
                 } else {
                     LogicOp::Reset
                 };
                 Ok(Some(push!(
-                    BlockKind::Logic(LogicSpec { switch, op }),
+                    BlockKind::Logic(LogicSpec { switch, op, invert }),
                     label,
                     class,
                 )))

@@ -77,6 +77,12 @@ if [ "${#missing[@]}" -gt 0 ]; then
     printf '  %s\n' "${missing[@]}"
 fi
 
+# The other half of the oracle: the numbers, against the original's report.
+echo
+echo "=== los números ==="
+cargo run --quiet --release --manifest-path "$ROOT/Cargo.toml" -p genmsi-core \
+    --example compare-benches -- "$BENCHES" "$RESULTS" --runs 3 || true
+
 if [ "${#differing[@]}" -gt 0 ]; then
     exit 1
 fi

@@ -233,6 +233,44 @@ class compiles, and the original's report for it says what the class does.
 Together they are the specification of that class, and the model under test is
 one class with nothing else in it.
 
+### What the phase measured
+
+Against the original's own answer, class by class:
+
+| | Before the phase | Now |
+|---|---|---|
+| The GPSS of the bench is the original's | 17 of 62 | **62 of 62** |
+| The numbers of the bench are the original's | — | **50 of 55** |
+
+The four benches the original refuses to run are not a failure of the tool: it
+shows a dialog ("the modules were adapted") and never shows its own window, so
+there is no answer to compare with. The five that cannot be compared by the
+numbers are the benches whose original report has no header to read — a bench
+with a single `Depart` measures nothing.
+
+One command asks both questions:
+
+```
+python3 scripts/wine-oracle/make-benches.py
+bash scripts/wine-oracle/run-benches.sh scripts/wine-oracle/benches /tmp/bench-out
+bash scripts/wine-oracle/compare-benches.sh scripts/wine-oracle/benches /tmp/bench-out
+```
+
+### What the oracle found that no one was looking for
+
+- The `ALTER` read `CompParam` and `CompValue` as the pair to **assign**, and
+  altered the parameter it was supposed to **compare**, without comparing
+  anything. The macro of the original says it in its own words, and the block
+  has a second output called "No alteró" for the transactions that do not
+  match.
+- The `#` of an expression is the **multiplication**, not an integer division:
+  the original's expression editor has no `*` key (it offers `/`, `%`, `#` and
+  `@`), and its models read that way.
+- A transfer's destinations are written in the **reverse** of the port order,
+  and the original's own property hint says the opposite ("probabilidad de
+  continuar por la Salida1"). The text is reversed; the engine is not — a
+  probe in `scripts/wine-oracle/probes/` settles it with the numbers.
+
 ### 9.1 What the original writes
 
 The text of the original is not what the model says, and reading it is a

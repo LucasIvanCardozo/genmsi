@@ -117,6 +117,19 @@ información:
    siguiente. El grafo es el mismo; la diferencia es de orden, y por eso la
    comparación debe mirar el grafo y no el texto.
 
+### L7 — La fase cierra: 62 de 62 en el GPSS y el `#` del original
+
+El último lote de clases (Examine, GateM, Mark, RemoveMe, SelectL, SelectS,
+SelectSNA, VariableN) entró con su semántica, y las dos mitades del oráculo
+dieron su veredicto: **62 de 62** bancos coinciden en el GPSS con el original
+(eran 17 al empezar la fase) y **50 de 55** coinciden en todas sus métricas.
+
+De paso salió el último hallazgo: el `#` de una expresión **es la
+multiplicación**, no la división entera ✗. Lo dice el editor de expresiones del
+original, que no tiene tecla `*` (tiene `/`, `%`, `#` y `@` ✓), y lo dicen sus
+propios modelos ✓. El oráculo no empeora ✓ y los 20 modelos de la comparación
+siguen coincidiendo ✓.
+
 ### L6 — El experimento zanja el orden de la probabilidad
 
 Un `Transfer` con un `Advance` de 1000 y otro de 10, con el 15 % de probabilidad,

@@ -86,19 +86,21 @@ pub struct LintDocument<'a> {
     pub blocks: usize,
     /// Definitions the model declares.
     pub definitions: DefinitionCounts,
-    /// Non-fatal observations made while compiling.
-    pub diagnostics: &'a [String],
+    /// Non-fatal findings: the compiler's observations and the format's
+    /// warnings.
+    pub diagnostics: Vec<String>,
 }
 
 /// Build the `genmsi.lint/1` body for a compiled model.
 ///
 /// `path` is the model as the caller named it; a model that never touched the
 /// disk is named `<memory>`.
-pub fn lint_document<'a>(program: &'a Program, path: &str) -> LintDocument<'a> {
+pub fn lint_document<'a>(program: &'a Program, model: &GmdlModel, path: &str) -> LintDocument<'a> {
     let definitions = &program.definitions;
+    let diagnostics = lint_diagnostics(program, model);
     LintDocument {
         path: path.to_string(),
-        status: if program.diagnostics.is_empty() {
+        status: if diagnostics.is_empty() {
             "ok"
         } else {
             "diagnostics"
@@ -113,8 +115,30 @@ pub fn lint_document<'a>(program: &'a Program, path: &str) -> LintDocument<'a> {
             tables: definitions.tables.len(),
             qtables: definitions.qtables.len(),
         },
-        diagnostics: &program.diagnostics,
+        diagnostics,
     }
+}
+
+/// The findings of a model: what the compiler said and what the format says.
+///
+/// The format reads the model too: a block that uses an entity the model does
+/// not declare (a storage nobody declares, for instance) is a warning, and a
+/// model with one is not silent about it any more.
+///
+/// The compiler reports some of those findings on its own, with its own
+/// wording: a storage nobody declares has no capacity, so the run stops when
+/// a transaction reaches it, and the compiler says so. A warning the compiler
+/// already said is not said twice: its wording wins, because it carries what
+/// the run does about the finding.
+pub fn lint_diagnostics(program: &Program, model: &GmdlModel) -> Vec<String> {
+    let mut diagnostics = program.diagnostics.clone();
+    for warning in genmsi_format::declaration_warnings(model) {
+        if diagnostics.iter().any(|said| said.contains(&warning)) {
+            continue;
+        }
+        diagnostics.push(warning);
+    }
+    diagnostics
 }
 
 /// Canvas geometry of a block, in the model's own canvas units.
@@ -582,11 +606,76 @@ mod tests {
     #[test]
     fn the_lint_document_names_the_schema_and_the_model() {
         let program = program();
-        let text = to_pretty_json(LINT_SCHEMA, &lint_document(&program, "model.gmdl"));
+        let model = parse_str(MINI).expect("the model parses");
+        let text = to_pretty_json(LINT_SCHEMA, &lint_document(&program, &model, "model.gmdl"));
         assert!(text.starts_with("{\n  \"schema\": \"genmsi.lint/1\",\n"), "{text}");
         assert!(text.contains("\"path\": \"model.gmdl\""), "{text}");
         assert!(text.contains("\"status\": \"ok\""), "{text}");
         assert!(text.contains("\"blocks\": 2"), "{text}");
+    }
+
+    /// A model that uses a storage no block declares.
+    ///
+    /// The `StorageUse` compiles to an `ENTER` of a storage the model does not
+    /// declare, so the compiler reports it too: the finding must be said once.
+    fn model_with_an_undeclared_storage() -> GmdlModel {
+        let xml = "<gmodel versioncode=\"1\"><gclasses/><modules>\
+            <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"m\" name=\"m\" kind=\"C\">\
+            <links/><inputs/><outputs/></module>\
+            <module moduleid=\"1\" moduleclass=\"StorageUse\" owner=\"0\" caption=\"c\" name=\"n\" kind=\"A\">\
+            <props>\
+            <property name=\"Media\" hint=\"\" value=\"10\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/>\
+            <property name=\"Storage\" hint=\"\" value=\"Almacen\" type=\"EntityUse\" subType=\"Storage\" visible=\"1\" unique=\"0\"/>\
+            </props></module>\
+            <module moduleid=\"2\" moduleclass=\"Terminate\" owner=\"0\" caption=\"c\" name=\"n\" kind=\"A\">\
+            <props>\
+            <property name=\"Unidades\" hint=\"\" value=\"1\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/>\
+            </props></module>\
+            </modules></gmodel>";
+        parse_str(xml).expect("the model parses")
+    }
+
+    #[test]
+    fn the_lint_document_says_the_warning_of_the_format() {
+        let model = model_with_an_undeclared_storage();
+        let program = compile(&model, "m").expect("the model compiles");
+        let document = lint_document(&program, &model, "model.gmdl");
+        assert_eq!(document.status, "diagnostics");
+        let warning = document
+            .diagnostics
+            .iter()
+            .find(|message| message.contains("Almacen"))
+            .expect("the warning names the storage");
+        assert!(warning.contains("StorageDef"), "{warning}");
+    }
+
+    #[test]
+    fn the_lint_document_says_the_warning_once() {
+        let model = model_with_an_undeclared_storage();
+        let program = compile(&model, "m").expect("the model compiles");
+        let document = lint_document(&program, &model, "model.gmdl");
+        // The compiler reports the storage on its own, with the format's
+        // wording and what the run does about it: the format's warning is
+        // not said a second time.
+        assert_eq!(
+            document.diagnostics.len(),
+            1,
+            "the finding is said twice: {:#?}",
+            document.diagnostics
+        );
+        assert!(
+            document.diagnostics[0].contains("no capacity"),
+            "the compiler's wording is the one that stays: {:#?}",
+            document.diagnostics
+        );
+    }
+
+    #[test]
+    fn a_clean_model_has_no_findings() {
+        let model = parse_str(MINI).expect("the model parses");
+        let program = compile(&model, "m").expect("the model compiles");
+        let diagnostics = lint_diagnostics(&program, &model);
+        assert!(diagnostics.is_empty(), "{diagnostics:#?}");
     }
 
     #[test]

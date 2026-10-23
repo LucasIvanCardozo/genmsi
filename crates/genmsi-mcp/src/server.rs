@@ -149,7 +149,7 @@ impl GenmsiServer {
     /// a tool error that names the block and its position in the source.
     #[tool(
         name = "lint",
-        description = "Validate a GenMSI model: it loads, validates and compiles. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text) and returns the genmsi.lint/1 document."
+        description = "Validate a GenMSI model: it loads, validates and compiles, and reports what it found (the compiler's observations and the warnings of the format, such as an entity the model uses without declaring it). Takes `path` (a .gmdl file) or `model` (the .gmdl document as text) and returns the genmsi.lint/1 document."
     )]
     pub fn lint(&self, Parameters(input): Parameters<ModelInput>) -> CallToolResult {
         finish(lint_document(&input))
@@ -217,7 +217,7 @@ fn explain_document(input: &ModelInput) -> Result<String, ToolError> {
 /// The lint document of a model.
 fn lint_document(input: &ModelInput) -> Result<String, ToolError> {
     let loaded = engine::load(&input.source()?)?;
-    let document = genmsi_core::lint_document(&loaded.program, &loaded.name);
+    let document = genmsi_core::lint_document(&loaded.program, &loaded.model, &loaded.name);
     Ok(genmsi_core::to_pretty_json(
         genmsi_core::LINT_SCHEMA,
         &document,

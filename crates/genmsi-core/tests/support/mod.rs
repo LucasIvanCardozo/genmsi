@@ -6,6 +6,7 @@
 #![allow(dead_code)]
 
 use genmsi_core::{Program, RunResult, SimConfig, Simulation, program::compile};
+use genmsi_core::error::EngineError;
 use genmsi_format::parse_str;
 
 /// One block of a test model.
@@ -83,7 +84,24 @@ pub fn node(
 
 /// Compile a hand-wired model: nodes plus explicit links
 /// `(from module, from port index, to module, to port index)`.
+///
+/// The compiler's verdict is returned instead of a panic, so a test can pin
+/// the refusal of a model the original also refuses.
+pub fn try_wired(
+    nodes: &[Node],
+    links: &[(u32, usize, u32, usize)],
+    clock: f64,
+) -> Result<Program, EngineError> {
+    let xml = model_xml(nodes, links, clock);
+    compile(&parse_str(&xml).expect("test model parses"), "wired")
+}
+
+/// Compile a hand-wired model and panic when the compiler refuses it.
 pub fn wired(nodes: &[Node], links: &[(u32, usize, u32, usize)], clock: f64) -> Program {
+    try_wired(nodes, links, clock).expect("test model compiles")
+}
+
+fn model_xml(nodes: &[Node], links: &[(u32, usize, u32, usize)], clock: f64) -> String {
     let mut xml = String::from(r#"<gmodel versioncode="1"><gclasses/><modules>"#);
     xml.push_str(
         r#"<module moduleid="0" moduleclass="main" owner="0" caption="m" name="m" kind="C"><links>"#,
@@ -130,7 +148,7 @@ pub fn wired(nodes: &[Node], links: &[(u32, usize, u32, usize)], clock: f64) -> 
     let clock_id = nodes.iter().map(|node| node.id).max().unwrap_or(0) as usize + 1;
     xml.push_str(&clock_xml(clock_id, clock));
     xml.push_str("</modules></gmodel>");
-    compile(&parse_str(&xml).expect("test model parses"), "wired").expect("test model compiles")
+    xml
 }
 
 fn clock_xml(id: usize, clock: f64) -> String {

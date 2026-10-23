@@ -237,7 +237,7 @@ impl Queue {
 pub struct Storage {
     /// Entity name.
     pub name: String,
-    /// Declared capacity.
+    /// Declared capacity, in units.
     #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub capacity: i64,
     /// Units currently in use.

@@ -6,7 +6,7 @@
 //! `QUEUE`/`SEIZE`/`DEPART`/`ADVANCE`/`RELEASE`, and so on), flattens container
 //! links into a block graph, and pre-parses every expression.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use genmsi_format::{Block, GmdlModel};
 
@@ -248,6 +248,11 @@ pub struct StorageUnitsSpec {
     /// Storage name.
     pub storage: EntityName,
     /// Units to take or release.
+    ///
+    /// This is the `Cantidad` operand: the units one transaction takes on
+    /// entry and gives back on exit. The capacity of the storage is the
+    /// `Tamaño` its `StorageDef` declares, also in units, so a storage of
+    /// `Tamaño` 1 and a `Cantidad` of 1 holds one transaction at a time.
     pub units: ProgramExpr,
 }
 
@@ -775,7 +780,7 @@ pub struct Definitions {
     pub variables: HashMap<String, ProgramExpr>,
     /// `VariableA` definitions.
     pub random_variables: HashMap<String, RandomVariable>,
-    /// `StorageDef` capacities.
+    /// `StorageDef` capacities, in units.
     pub storages: HashMap<String, i64>,
     /// `Table` definitions.
     pub tables: HashMap<String, TableDef>,
@@ -981,6 +986,7 @@ impl Compiler<'_> {
             .collect();
         self.check_match_targets(&blocks, &label_map)?;
         self.check_references(&blocks, &definitions)?;
+        self.report_undeclared_storages(&blocks, &definitions);
 
         Ok(Program {
             title,
@@ -2021,6 +2027,70 @@ impl Compiler<'_> {
         Ok(())
     }
 
+    /// Report the storages the model uses that nothing declares.
+    ///
+    /// The original's `StorageUse` says it plainly: "El Storage debe estar
+    /// declarado (esta clase no lo declara)", and it adds "Se debe utilizar
+    /// otro módulo que defina la capacidad del Storage". A storage without a
+    /// declaration has no capacity to offer, so the engine never invents one:
+    /// the run stops when a transaction reaches it, exactly as the original
+    /// does ("Referencia a una entidad storage inexistente").
+    ///
+    /// The model still compiles: the original opens a model that uses an
+    /// undeclared storage, and the simulation is what stops.
+    ///
+    /// The format reads the same finding from the model; the engine takes its
+    /// wording when it has one, so the two do not say the same thing twice.
+    fn report_undeclared_storages(&mut self, blocks: &[ExecBlock], definitions: &Definitions) {
+        let findings = genmsi_format::undeclared_entities(self.model);
+        let mut reported: HashSet<(u32, String)> = HashSet::new();
+        for block in blocks {
+            let storage = match &block.kind {
+                BlockKind::Enter(spec) | BlockKind::Leave(spec) => Some(&spec.storage),
+                BlockKind::Gate(spec) => match &spec.condition {
+                    GateCondition::Storage { storage, .. } => Some(storage),
+                    _ => None,
+                },
+                _ => None,
+            };
+            let Some(storage) = storage else {
+                continue;
+            };
+            // An indirect name (`*Param`) is resolved while the model runs,
+            // and the engine refuses it then.
+            let NameSource::Literal(name) = &storage.source else {
+                continue;
+            };
+            if definitions.storages.contains_key(name) {
+                continue;
+            }
+            // One finding per module: a `StorageUse` becomes an `ENTER` and a
+            // `LEAVE` of the same module.
+            if !reported.insert((block.module_id, name.clone())) {
+                continue;
+            }
+            let finding = findings
+                .iter()
+                .find(|entity| {
+                    entity.kind.eq_ignore_ascii_case("Storage")
+                        && entity.block == block.module_id
+                        && entity.name == *name
+                })
+                .map(|entity| entity.message())
+                .unwrap_or_else(|| {
+                    format!(
+                        "the model uses the storage '{name}' in the {} block {}, and no \
+                         StorageDef declares it",
+                        block.class, block.module_id
+                    )
+                });
+            self.diagnostics.push(format!(
+                "{finding} The storage has no capacity: the run stops when a transaction \
+                 reaches it."
+            ));
+        }
+    }
+
     fn collect_definitions(&mut self) -> Result<Definitions, EngineError> {
         let mut definitions = Definitions::default();
         for module in self.model.activity_blocks() {
@@ -2029,6 +2099,8 @@ impl Compiler<'_> {
             match class {
                 "StorageDef" => {
                     let name = self.require_name(module, "Storage")?;
+                    // The `Tamaño` is the capacity of the storage, in units:
+                    // how many units it holds at a time.
                     let capacity = self.number(module, "Tamaño").unwrap_or(0.0) as i64;
                     definitions.storages.insert(name, capacity.max(0));
                 }

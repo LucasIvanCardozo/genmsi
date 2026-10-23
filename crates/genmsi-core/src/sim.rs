@@ -22,9 +22,6 @@ use crate::stat::Entities;
 use crate::stat::Table;
 use crate::xact::{Transaction, XactId, XactState};
 
-/// Capacity used for storages referenced without a `StorageDef`.
-const UNDECLARED_STORAGE_CAPACITY: i64 = 1_000_000;
-
 /// What the interruption of a facility's owner left behind.
 struct OwnerInterruption {
     /// The block the owner was in.
@@ -110,7 +107,7 @@ pub struct BlockStats {
     pub entries: u64,
     /// Transactions currently in the statement.
     pub current: u64,
-    /// Failed attempts (gate retries, refused admissions).
+    /// Failed attempts (gate retries).
     pub retries: u64,
 }
 
@@ -352,6 +349,19 @@ impl<'p> Simulation<'p> {
             self.block_stats[index].current = 1;
             self.push_event(first.max(0.0), 0, index, None, EventKind::Tick);
         }
+    }
+
+    /// The capacity a `StorageDef` declares for `name`, when the model declares it.
+    ///
+    /// A storage only exists when the model declares it: the original's
+    /// `StorageUse` says "El Storage debe estar declarado (esta clase no lo
+    /// declara)" and asks for "otro módulo que defina la capacidad del
+    /// Storage". A storage without a declaration has no capacity to offer, so
+    /// the engine never invents one: the original stops the run with
+    /// "Referencia a una entidad storage inexistente", and this engine
+    /// refuses the same way.
+    fn storage_capacity(&self, name: &str) -> Option<i64> {
+        self.program.definitions.storages.get(name).copied()
     }
 
     fn push_event(
@@ -857,9 +867,14 @@ impl<'p> Simulation<'p> {
             BlockKind::Enter(spec) => {
                 let name = self.resolve_name(&spec.storage, xact);
                 let units = self.eval_units(&spec.units, xact);
+                let capacity = self.storage_capacity(&name).ok_or_else(|| {
+                    EngineError::Runtime(format!(
+                        "the storage '{name}' is used but no StorageDef declares it"
+                    ))
+                })?;
                 let admitted = self
                     .entities
-                    .storage(&name, UNDECLARED_STORAGE_CAPACITY, self.now)
+                    .storage(&name, capacity, self.now)
                     .try_enter(units, self.now);
                 if admitted {
                     self.release_storage_waiters(&name);
@@ -867,22 +882,17 @@ impl<'p> Simulation<'p> {
                     self.leave(xact, block_index, block.next_default());
                 } else {
                     let mut waiters = {
-                        let storage = self.entities.storage(
-                            &name,
-                            UNDECLARED_STORAGE_CAPACITY,
-                            self.now,
-                        );
+                        let storage = self.entities.storage(&name, capacity, self.now);
                         storage.waiters.push(xact);
                         std::mem::take(&mut storage.waiters)
                     };
                     waiters.sort_by_key(|waiter| (std::cmp::Reverse(self.priority_of(*waiter)), *waiter));
-                    self.entities
-                        .storage(&name, UNDECLARED_STORAGE_CAPACITY, self.now)
-                        .waiters = waiters;
+                    self.entities.storage(&name, capacity, self.now).waiters = waiters;
                     if let Some(transaction) = self.xacts.get_mut(&xact) {
                         transaction.transition(XactState::Waiting);
                     }
-                    self.block_stats[block_index].retries += 1;
+                    // The original counts the refusal in the storage, not in
+                    // the block: its `ENTER` row keeps `RETRY` at zero.
                     if self.config.trace {
                         self.record_trace(xact, block_index, "wait", name);
                     }
@@ -891,8 +901,13 @@ impl<'p> Simulation<'p> {
             BlockKind::Leave(spec) => {
                 let name = self.resolve_name(&spec.storage, xact);
                 let units = self.eval_units(&spec.units, xact);
+                let capacity = self.storage_capacity(&name).ok_or_else(|| {
+                    EngineError::Runtime(format!(
+                        "the storage '{name}' is used but no StorageDef declares it"
+                    ))
+                })?;
                 self.entities
-                    .storage(&name, UNDECLARED_STORAGE_CAPACITY, self.now)
+                    .storage(&name, capacity, self.now)
                     .leave(units, self.now);
                 self.release_storage_waiters(&name);
                 self.retry_gates();
@@ -1579,10 +1594,13 @@ impl<'p> Simulation<'p> {
             }
             GateCondition::Storage { storage, empty } => {
                 let name = self.resolve_name(storage, xact);
-                self.entities
-                    .storage(&name, UNDECLARED_STORAGE_CAPACITY, self.now)
-                    .is_empty()
-                    == *empty
+                // A storage the model does not declare holds nothing: the
+                // gate reads it as empty.
+                let is_empty = match self.storage_capacity(&name) {
+                    Some(capacity) => self.entities.storage(&name, capacity, self.now).is_empty(),
+                    None => true,
+                };
+                is_empty == *empty
             }
             GateCondition::Facility {
                 facility,
@@ -1657,9 +1675,12 @@ impl<'p> Simulation<'p> {
 
     fn release_storage_waiters(&mut self, name: &str) {
         let waiters = {
-            let storage = self
-                .entities
-                .storage(name, UNDECLARED_STORAGE_CAPACITY, self.now);
+            // A storage the model does not declare has no waiters: the run
+            // stops at the first use of it.
+            let Some(capacity) = self.storage_capacity(name) else {
+                return;
+            };
+            let storage = self.entities.storage(name, capacity, self.now);
             std::mem::take(&mut storage.waiters)
         };
         for xact in waiters {
@@ -1874,31 +1895,38 @@ impl<'p> Simulation<'p> {
         if let Some(state) = spec.state {
             for number in low..=high {
                 let name = crate::error::numeric_name(number as f64);
+                // A storage the model does not declare holds nothing: it is
+                // empty and it is not full. The original reads it that way and
+                // creates no storage either.
+                let capacity = self.storage_capacity(&name);
                 let matches = match state {
                     SelectState::LogicSet => *self.entities.logic(&name),
                     SelectState::LogicReset => !*self.entities.logic(&name),
-                    SelectState::StorageFull => {
-                        let storage =
-                            self.entities
-                                .storage(&name, UNDECLARED_STORAGE_CAPACITY, self.now);
-                        storage.remaining() <= 0
-                    }
-                    SelectState::StorageNotFull => {
-                        let storage =
-                            self.entities
-                                .storage(&name, UNDECLARED_STORAGE_CAPACITY, self.now);
-                        storage.remaining() > 0
-                    }
+                    SelectState::StorageFull => match capacity {
+                        Some(capacity) => {
+                            self.entities.storage(&name, capacity, self.now).remaining() <= 0
+                        }
+                        None => false,
+                    },
+                    SelectState::StorageNotFull => match capacity {
+                        Some(capacity) => {
+                            self.entities.storage(&name, capacity, self.now).remaining() > 0
+                        }
+                        None => true,
+                    },
                     SelectState::EntityEqual => {
                         let wanted = wanted.unwrap_or(0.0);
                         let value = match kind {
                             RefKind::Queue => {
                                 self.entities.queue(&name, self.now).content as f64
                             }
-                            RefKind::Storage => self
-                                .entities
-                                .storage(&name, UNDECLARED_STORAGE_CAPACITY, self.now)
-                                .in_use as f64,
+                            RefKind::Storage => match capacity {
+                                Some(capacity) => self
+                                    .entities
+                                    .storage(&name, capacity, self.now)
+                                    .in_use as f64,
+                                None => 0.0,
+                            },
                             RefKind::Facility => {
                                 let facility = self.entities.facility(&name, self.now);
                                 (facility.busy as i64) as f64
@@ -1922,12 +1950,14 @@ impl<'p> Simulation<'p> {
                     let queue = self.entities.queue(&name, self.now);
                     (queue.content as f64, queue.content == 0)
                 }
-                RefKind::Storage => {
-                    let storage =
-                        self.entities
-                            .storage(&name, UNDECLARED_STORAGE_CAPACITY, self.now);
-                    (storage.in_use as f64, storage.remaining() > 0)
-                }
+                RefKind::Storage => match self.storage_capacity(&name) {
+                    Some(capacity) => {
+                        let storage = self.entities.storage(&name, capacity, self.now);
+                        (storage.in_use as f64, storage.remaining() > 0)
+                    }
+                    // A storage the model does not declare holds nothing.
+                    None => (0.0, true),
+                },
                 RefKind::Facility => {
                     let facility = self.entities.facility(&name, self.now);
                     ((facility.busy as i64) as f64, facility.available && !facility.busy)
@@ -2167,10 +2197,15 @@ impl Ctx for CtxView<'_, '_> {
             RefKind::SaveValue => *self.sim.entities.savevalue(name),
             RefKind::Queue => self.sim.entities.queue(name, self.sim.now).content as f64,
             RefKind::Storage => {
-                self.sim
-                    .entities
-                    .storage(name, UNDECLARED_STORAGE_CAPACITY, self.sim.now)
-                    .in_use as f64
+                // A storage the model does not declare holds nothing.
+                match self.sim.storage_capacity(name) {
+                    Some(capacity) => self
+                        .sim
+                        .entities
+                        .storage(name, capacity, self.sim.now)
+                        .in_use as f64,
+                    None => 0.0,
+                }
             }
             RefKind::Facility => {
                 let facility = self.sim.entities.facility(name, self.sim.now);

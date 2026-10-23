@@ -298,3 +298,79 @@ con el `#[ignore]` quitado y el `Cantidad` de uno, los cinco tests de
   Los seis nuevos de `crates/genmsi-core/tests/puerta_y_logica.rs` en verde.
 - **Clippy**: `cargo clippy --workspace --all-targets -- -D warnings` en
   verde.
+
+## 5. Lo que queda: la traza no sigue la misma regla que el reporte
+
+La regla del original que este trabajo unit aplica al **reporte** ("la
+transacción que espera en la puerta que no abre sigue contando en el bloque
+del que vino") **no está en la traza**. Y el reproductor de la app, que
+reconstruye el estado de la corrida a partir de la traza, la nota.
+
+### El síntoma
+
+El test del front `crates/genmsi-app/tests/replay.test.ts` ("the replay of the
+reference model ends in the state the report publishes") falla con:
+
+```text
+AssertionError: the blocks differ
+  actual:   [ 4, 13 ]
+  expected: []
+```
+
+Los bloques 4 y 13 son la puerta (`GateL`) y la cola (`A_Queue`) del modelo de
+referencia `fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl`.
+
+### La causa, medida
+
+El reporte y la traza cuentan la misma transacción bloqueada en dos sitios
+distintos:
+
+| | reporte (fila de la cola) | reporte (fila de la puerta) | traza |
+|---|---|---|---|
+| el original | `13 13 0` | `0 0 0` | — |
+| el nuestro | `9 9 0` | `0 0 0` | 9 transacciones esperando en la puerta (bloque 4), 0 en la cola |
+
+El reporte cuenta la transacción en la cola (que es lo que dice el original) y
+la traza la cuenta en la puerta. La traza emite, para la transacción
+bloqueada: `cola: enter`, `cola: leave -> 4`, `puerta: enter`, `puerta: wait`.
+El reproductor cuenta occupancy por `enter`/`leave`, así que la transacción le
+queda en la puerta.
+
+El motor ya sabe la regla: la rama de la puerta que no abre hace
+`self.block_stats[previous].current += 1` (`crates/genmsi-core/src/sim.rs`,
+`BlockKind::Gate`), y el `SEIZE` que no toma la facilidad hace lo mismo
+(`BlockKind::Seize`). Lo que no hace ninguna de las dos es la contraparte en
+la traza.
+
+### No es una regresión de este trabajo
+
+Control diferencial, con el mismo front y los binarios de antes y después del
+cambio del orden del listado (`1b6f283`):
+
+| binarios | resultado |
+|---|---|
+| de `d07f92b` (antes del cambio del listado) | `actual: [4, 13]`, `expected: []` |
+| de `4bdca5d` (después) | `actual: [4, 13]`, `expected: []` |
+
+El fallo es anterior al cierre de la fase 7 y no depende del orden del
+listado. Lo detecta el propio test de la app, que compara el estado final del
+reproductor con el reporte del motor.
+
+### Lo que hay que decidir
+
+Arreglarlo toca el significado de los eventos `enter`/`leave` de la traza para
+los bloques que retroceden (`Gate`, `Seize`), y el contrato `genmsi.trace/1`
+promete que "los campos existentes conservan su nombre, tipo y significado". Las
+dos salidas posibles:
+
+1. **El motor**: en la rama de espera, emitir los eventos que expresen el
+   retroceso (la transacción sale del bloque de la puerta y vuelve al bloque
+   del que vino). Rompe los dos snapshots de la CLI que este trabajo unit ya
+   sabía que se rompían, y cambia lo que la reproducción muestra.
+2. **La app**: que el reproductor interprete el `wait` de un bloque que
+   retrocede como "la transacción sigue en el bloque anterior". No toca el
+   contrato de la traza, pero cambia la proyección de la app.
+
+Ninguna de las dos se aplica aquí: la primera cambia un contrato publicado y la
+segunda cambia lo que la reproducción enseña. La decisión es de quien
+coordina.

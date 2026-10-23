@@ -145,6 +145,19 @@ fn block_statements(out: &mut String, block: &ExecBlock, program: &Program) {
             };
             statement(out, "LEAVE", &operands);
         }
+        BlockKind::Preempt(spec) => {
+            // The original writes four operands: the facility, the priority
+            // of the preempting transaction, whether the owner is routed to
+            // the interrupt output, and the parameter that receives the
+            // owner's remaining time.
+            let mut parts = vec![spec.facility.to_string(), String::new()];
+            parts.push(if spec.route_owner { "1".into() } else { String::new() });
+            parts.push(spec.remaining.clone().unwrap_or_default());
+            statement(out, "PREEMPT", &parts.join(","));
+        }
+        BlockKind::Return(spec) => {
+            statement(out, "RETURN", &spec.facility.to_string());
+        }
         BlockKind::Priority(value) => {
             statement(out, "PRIORITY", &value.to_string());
         }

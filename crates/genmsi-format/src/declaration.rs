@@ -78,11 +78,9 @@ const KINDS: &[EntityKind] = &[
             "MultifurcacionP",
         ],
     },
-    EntityKind {
-        name: "SaveValue",
-        policy: Policy::WhenDeclared,
-        declarers: &["InitiaSV"],
-    },
+    // A save value is not checked: the original creates one where it is used,
+    // and its own report for TP10 creates COUNTESPERA by use, with no
+    // InitiaSV anywhere.
     EntityKind {
         name: "LogicSwich",
         policy: Policy::WhenDeclared,

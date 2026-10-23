@@ -40,7 +40,7 @@ The frontend knows one interface (`src/engine/adapter.ts`):
 |---|---|---|
 | `listModels()` | `genmsi.models/1` | The `.gmdl` files the app offers. |
 | `loadModel(path)` | `genmsi.model/1` | The model's blocks, geometry and links. |
-| `lint(path)` | `genmsi.lint/1` | What the model compiles to. |
+| `lint(path)` | `genmsi.lint/1` | What the model compiles to, and what it found. |
 | `simulate(path, options)` | `genmsi.report/1` | The run's report. |
 | `trace(path, options)` | `genmsi.trace/1` | The run's trace: every event of the run. |
 | `openModel(path)` / `newModel()` | the session state | The model in memory, ready to edit. |

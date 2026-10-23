@@ -143,7 +143,7 @@ pub fn lint_document_bytes(path: &Path) -> Result<String, AppError> {
     let model = genmsi_format::load(path).map_err(|error| model_error(path, error))?;
     let program =
         genmsi_core::compile_model(&model).map_err(|error| model_error(path, error))?;
-    let body = genmsi_core::documents::lint_document(&program, &path.display().to_string());
+    let body = genmsi_core::documents::lint_document(&program, &model, &path.display().to_string());
     Ok(document_bytes(genmsi_core::documents::LINT_SCHEMA, &body))
 }
 
@@ -299,7 +299,7 @@ mod tests {
             "{}\n",
             genmsi_core::documents::to_pretty_json(
                 genmsi_core::documents::LINT_SCHEMA,
-                &genmsi_core::documents::lint_document(&program, &path_text),
+                &genmsi_core::documents::lint_document(&program, &model, &path_text),
             )
         );
         assert_eq!(lint_document_bytes(&path).expect("lints"), expected);

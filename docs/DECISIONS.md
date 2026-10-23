@@ -140,3 +140,27 @@ the workspace's only client-to-client dependency, and it is allowed because that
 carries no simulation logic (D2): it adapts the engine's documents into tools, and the
 CLI adds one dispatch arm and nothing else. The standalone `genmsi-mcp` binary stays for
 hosts that pin a command path.
+
+## D16 — The lint document says what the format found, in `genmsi.lint/1`
+
+The three clients said different things about the same model: the editor showed
+the warning of the format (a block that uses an entity the model does not
+declare), and the CLI and the MCP said `ok`, because `genmsi.lint/1` was built
+from the compiler's observations alone. Resolution: the lint document keeps its
+version, its fields and their types; `diagnostics` carries the compiler's
+observations **and** the warnings of the format, and `status` is `diagnostics`
+when there is any of them. Exit code `3` keeps its meaning (the model is
+runnable and something was found), so a warning is never a refusal.
+
+D13 says that within a major version the fields keep their name, type and
+meaning. The meaning of `diagnostics` widens here, deliberately: the field was
+already "the findings that do not stop the model", the value domain of `status`
+does not change (`ok` or `diagnostics`), and the messages are the same kind of
+string, so no consumer can tell a finding apart from the text alone. What a
+consumer can see is that more models report `diagnostics` and exit `3`, and
+that is the point of the change. A `/2` version would leave every consumer of
+`/1` behind for a wording that did not change.
+
+A finding the compiler already reported is not said twice: the compiler's
+wording wins, because it carries what the run does about it (a storage nobody
+declares has no capacity, and the run stops when a transaction reaches it).

@@ -105,6 +105,79 @@ fn lint_refuses_a_model_the_original_refuses() {
     assert!(message.starts_with("error: fixtures/models/TP9__tp9.gmdl: "), "{message}");
 }
 
+/// A model that uses a storage no block declares.
+///
+/// The original opens a model like this (its `StorageUse` says the storage has
+/// to be declared, and the editor's picker only offers the declared ones), so
+/// the lint does not refuse it: it says what it found.
+const UNDECLARED_STORAGE: &str = "<gmodel versioncode=\"1\"><gclasses/><modules>
+  <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"m\" name=\"m\" kind=\"C\">
+    <links/><inputs/><outputs/>
+  </module>
+  <module moduleid=\"1\" moduleclass=\"StorageUse\" owner=\"0\" caption=\"c\" name=\"n\" kind=\"A\">
+    <props>
+      <property name=\"Media\" hint=\"\" value=\"10\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/>
+      <property name=\"Storage\" hint=\"\" value=\"Almacen\" type=\"EntityUse\" subType=\"Storage\" visible=\"1\" unique=\"0\"/>
+    </props>
+  </module>
+  <module moduleid=\"2\" moduleclass=\"Terminate\" owner=\"0\" caption=\"c\" name=\"n\" kind=\"A\">
+    <props>
+      <property name=\"Unidades\" hint=\"\" value=\"1\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/>
+    </props>
+  </module>
+</modules></gmodel>";
+
+/// Write a model to a file of its own, so the CLI can read it from the disk.
+fn write_model(name: &str, text: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("genmsi-cli-{name}-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("the temporary directory");
+    let path = dir.join(format!("{name}.gmdl"));
+    std::fs::write(&path, text).expect("the model is written");
+    path
+}
+
+#[test]
+fn lint_says_the_warning_of_the_format() {
+    let path = write_model("undeclared-storage", UNDECLARED_STORAGE);
+    let output = genmsi(&["lint", path.to_str().expect("a path")]);
+    // A warning is not a failure: the model loads, and the lint says what it
+    // found with the code it uses for that.
+    assert_eq!(code(&output), 3, "{}", stderr(&output));
+    assert!(stderr(&output).is_empty());
+    let text = stdout(&output);
+    assert!(text.contains("status: diagnostics"), "{text}");
+    let findings: Vec<&str> = text
+        .lines()
+        .filter(|line| line.starts_with("  - "))
+        .collect();
+    // One finding, one text: the compiler reports the storage on its own, and
+    // the format's warning about the same storage is not said again.
+    assert_eq!(findings.len(), 1, "{text}");
+    assert!(findings[0].contains("Almacen"), "{text}");
+    assert!(findings[0].contains("no capacity"), "{text}");
+}
+
+#[test]
+fn lint_json_carries_the_warning_of_the_format() {
+    let path = write_model("undeclared-storage-json", UNDECLARED_STORAGE);
+    let output = genmsi(&["lint", path.to_str().expect("a path"), "--json"]);
+    assert_eq!(code(&output), 3, "{}", stderr(&output));
+    let document = json(&output);
+    assert_eq!(document["schema"], "genmsi.lint/1");
+    assert_eq!(document["status"], "diagnostics");
+    let diagnostics = document["diagnostics"]
+        .as_array()
+        .expect("an array of diagnostics");
+    assert_eq!(diagnostics.len(), 1, "{document}");
+    assert!(
+        diagnostics[0]
+            .as_str()
+            .expect("a message")
+            .contains("Almacen"),
+        "{document}"
+    );
+}
+
 #[test]
 fn simulate_prints_the_gpss_report() {
     let output = genmsi(&["simulate", SMALL, "--seed", "1"]);

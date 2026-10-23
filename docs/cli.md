@@ -39,7 +39,7 @@ original refuses never start (see [Reference models](#reference-models)).
 | `0` | Success: the command produced its document. |
 | `1` | The model does not load, does not validate, does not compile or does not run. `run-all` uses it when at least one model of the directory failed. |
 | `2` | Usage error: `clap` rejected the arguments, or the argument cannot be used (a `run-all` target that is not a directory). |
-| `3` | `lint` only: the model is runnable but the compiler reported diagnostics. |
+| `3` | `lint` only: the model is runnable but something was found: a compiler observation or a warning of the format. |
 
 Nothing else is produced. `--help` and `--version` exit `0`.
 
@@ -53,9 +53,11 @@ $ echo $?
 1
 ```
 
-Exit code `3` is reachable only when `Program::diagnostics` is non-empty, which is
-the engine's channel for non-fatal compile observations. **No reference model
-produces one.** The only diagnostic the engine emits today is the runtime
+Exit code `3` is reachable only when the lint document carries a diagnostic, which
+is the channel for the findings that do not stop the model: the compiler's
+observations (`Program::diagnostics`) and the warnings of the format (a block
+that uses an entity the model does not declare). **No reference model produces
+one.** The only diagnostic the engine emits today is the runtime
 `TABULATE <name> has no TABLE definition`, which shows up in the `simulate`
 document under `diagnostics` and does not change the exit code.
 
@@ -79,6 +81,21 @@ diagnostics: none
 
 `blocks` counts the executable GPSS statements the model compiles to. `status` is
 `ok`, or `diagnostics` with the messages listed under `diagnostics:`.
+
+A diagnostic is a finding, not a failure: the model loaded, validated and
+compiled, and the lint says what it found. Two kinds of finding live there:
+
+- the compiler's observations, such as a storage the model uses and declares
+  nowhere: the storage has no capacity, so the run stops when a transaction
+  reaches it, and the message says so;
+- the warnings of the format, such as an entity the model uses without
+  declaring it (a storage, a table or a function). The original's own classes
+  ask for that declaration (`StorageUse` says "El Storage debe estar declarado
+  (esta clase no lo declara)"), and the original still opens such a model, so
+  the lint reports it instead of refusing the model.
+
+A finding the compiler already reported is not said twice: the compiler's
+wording is the one that stays, because it carries what the run does about it.
 
 ### `simulate`
 
@@ -200,7 +217,7 @@ appear exactly as the user wrote them on the command line.
 | `title` | string | Model root name |
 | `blocks` | number | Executable statements the model compiles to |
 | `definitions` | object | `functions`, `variables`, `random_variables`, `storages`, `tables`, `qtables`, each a count |
-| `diagnostics` | array of string | Non-fatal compiler observations |
+| `diagnostics` | array of string | Non-fatal findings: the compiler's observations and the warnings of the format |
 
 ### `genmsi.report/1`
 

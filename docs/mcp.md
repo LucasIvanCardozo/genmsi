@@ -19,7 +19,7 @@ with `1`.
 
 | Tool | What it does | Returns |
 |---|---|---|
-| `lint` | Loads the model, validates it and compiles it. It does not simulate. | `genmsi.lint/1` |
+| `lint` | Loads the model, validates it and compiles it. It does not simulate. It reports what it found. | `genmsi.lint/1` |
 | `simulate` | Runs the model once and returns its GPSS report. | `genmsi.report/1` |
 | `get_trace` | Runs the model with the event trace enabled and returns the records. | `genmsi.trace/1` |
 | `explain_model` | Describes the model: its blocks, its operands and what each statement does. | `genmsi.explain/1` |
@@ -42,8 +42,11 @@ Exactly one of them is required; giving both, or neither, is an
 
 Returns the `genmsi.lint/1` document: the model path (`<memory>` for an inline
 document), the status (`ok` or `diagnostics`), the title, the number of
-executable statements, the counts of the definitions and the compiler
-diagnostics. The fields are described in [`docs/cli.md`](cli.md#genmsilint1).
+executable statements, the counts of the definitions and the findings: the
+compiler's observations and the warnings of the format (an entity the model
+uses without declaring it). A finding is not a failure: the model loads,
+validates and compiles, and the document says what it found. The fields are
+described in [`docs/cli.md`](cli.md#genmsilint1).
 
 ### `simulate`
 

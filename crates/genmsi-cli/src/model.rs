@@ -15,6 +15,9 @@ use crate::error::CliError;
 pub struct Loaded {
     /// Compiled program.
     pub program: Program,
+    /// The model, kept to read what the format says about it (the entities it
+    /// uses without declaring them).
+    pub model: GmdlModel,
 }
 
 /// Load, validate and compile one model file.
@@ -27,7 +30,7 @@ pub fn load(path: &Path) -> Result<Loaded, CliError> {
         genmsi_format::load(path).map_err(|error| CliError::model(path, error))?;
     let program =
         genmsi_core::compile_model(&model).map_err(|error| CliError::model(path, error))?;
-    Ok(Loaded { program })
+    Ok(Loaded { program, model })
 }
 
 /// Engine configuration for one CLI run.

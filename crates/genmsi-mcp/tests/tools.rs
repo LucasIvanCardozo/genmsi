@@ -205,6 +205,40 @@ async fn an_inline_model_needs_no_file() {
 }
 
 #[tokio::test]
+async fn the_lint_says_the_warning_of_the_format() {
+    let (client, _server) = pair().await;
+    // A model that uses a storage no block declares: the original opens it, so
+    // the lint says what it found instead of refusing the model.
+    let document = "<gmodel versioncode=\"1\"><gclasses/><modules>\
+        <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"m\" name=\"m\" kind=\"C\"><links/><inputs/><outputs/></module>\
+        <module moduleid=\"1\" moduleclass=\"StorageUse\" owner=\"0\" caption=\"c\" name=\"n\" kind=\"A\">\
+        <props>\
+        <property name=\"Media\" hint=\"\" value=\"10\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/>\
+        <property name=\"Storage\" hint=\"\" value=\"Almacen\" type=\"EntityUse\" subType=\"Storage\" visible=\"1\" unique=\"0\"/>\
+        </props></module>\
+        <module moduleid=\"2\" moduleclass=\"Terminate\" owner=\"0\" caption=\"t\" name=\"t\" kind=\"A\">\
+        <props><property name=\"Unidades\" hint=\"\" value=\"1\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/></props></module>\
+        </modules></gmodel>";
+
+    let linted = call(&client, "lint", json!({ "model": document })).await;
+    assert_eq!(linted["schema"], "genmsi.lint/1");
+    assert_eq!(linted["status"], "diagnostics", "{linted}");
+    let diagnostics = linted["diagnostics"]
+        .as_array()
+        .expect("an array of diagnostics");
+    // One finding, one text: the compiler reports the storage on its own, and
+    // the format's warning about the same storage is not said again.
+    assert_eq!(diagnostics.len(), 1, "{linted}");
+    assert!(
+        diagnostics[0]
+            .as_str()
+            .expect("a message")
+            .contains("Almacen"),
+        "{linted}"
+    );
+}
+
+#[tokio::test]
 async fn a_refused_model_points_at_the_block_to_fix() {
     let (client, _server) = pair().await;
     let linted = call(

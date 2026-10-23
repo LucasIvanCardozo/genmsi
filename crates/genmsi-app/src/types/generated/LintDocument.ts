@@ -26,6 +26,7 @@ blocks: number,
  */
 definitions: DefinitionCounts, 
 /**
- * Non-fatal observations made while compiling.
+ * Non-fatal findings: the compiler's observations and the format's
+ * warnings.
  */
 diagnostics: Array<string>, };

@@ -235,25 +235,17 @@ impl Session {
 /// has no capacity and the run stops when a transaction reaches it. The app
 /// shows that finding and does not repeat the format's warning about the same
 /// storage.
+///
+/// The findings are the ones the engine's lint document carries, so the app
+/// and the CLI say the same thing about the same model.
 pub fn diagnostics_of(model: &GmdlModel) -> Diagnostics {
     let warnings = genmsi_format::declaration_warnings(model);
     match genmsi_core::compile_model(model) {
         Ok(program) => {
-            let lint = lint_document(&program, "");
-            let mut diagnostics = lint.diagnostics.to_vec();
-            // A warning the engine already reported is not repeated.
-            diagnostics.extend(
-                warnings
-                    .into_iter()
-                    .filter(|warning| !lint.diagnostics.iter().any(|said| said.contains(warning))),
-            );
+            let lint = lint_document(&program, model, "");
             Diagnostics {
-                status: if diagnostics.is_empty() {
-                    "ok"
-                } else {
-                    "diagnostics"
-                },
-                diagnostics,
+                status: lint.status,
+                diagnostics: lint.diagnostics,
                 message: None,
                 blocks: Some(lint.blocks),
                 definitions: Some(lint.definitions.clone()),

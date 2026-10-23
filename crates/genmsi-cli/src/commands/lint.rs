@@ -1,9 +1,10 @@
 //! `genmsi lint <model>`: can this model load, validate, compile and run?
 //!
 //! Lint stops before the simulation. It reports what the model compiles to and
-//! any non-fatal compiler observation; a model that cannot be compiled is a
-//! failure (exit 1), and a model that compiles with diagnostics exits 3 so a
-//! script can tell "broken" from "usable, with remarks".
+//! any non-fatal finding: a compiler observation, or a warning of the format
+//! (a block that uses an entity the model does not declare). A model that
+//! cannot be compiled is a failure (exit 1), and a model that compiles with
+//! findings exits 3 so a script can tell "broken" from "usable, with remarks".
 
 use genmsi_core::documents::{LintDocument, lint_document};
 
@@ -43,7 +44,7 @@ fn render(document: &LintDocument<'_>) -> String {
         out.push_str("diagnostics: none\n");
     } else {
         out.push_str("diagnostics:\n");
-        for message in document.diagnostics {
+        for message in &document.diagnostics {
             out.push_str(&format!("  - {message}\n"));
         }
     }
@@ -53,7 +54,11 @@ fn render(document: &LintDocument<'_>) -> String {
 /// Run `genmsi lint`.
 pub fn run(args: LintArgs) -> Result<ExitCode, CliError> {
     let loaded = model::load(&args.model.path)?;
-    let document = lint_document(&loaded.program, &args.model.path.display().to_string());
+    let document = lint_document(
+        &loaded.program,
+        &loaded.model,
+        &args.model.path.display().to_string(),
+    );
     if args.output.json {
         output::print_json(LINT_SCHEMA, &document)?;
     } else {
@@ -84,7 +89,7 @@ mod tests {
                 tables: 0,
                 qtables: 0,
             },
-            diagnostics,
+            diagnostics: diagnostics.to_vec(),
         }
     }
 

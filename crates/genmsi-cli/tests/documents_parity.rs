@@ -42,10 +42,11 @@ fn code(output: &Output) -> i32 {
 }
 
 /// Load and compile the fixture the way the CLI does.
-fn program() -> genmsi_core::Program {
+fn program() -> (genmsi_core::Program, genmsi_format::GmdlModel) {
     let path = repo_root().join(MODEL);
     let model = genmsi_format::load(&path).expect("the fixture parses");
-    genmsi_core::compile_model(&model).expect("the fixture compiles")
+    let program = genmsi_core::compile_model(&model).expect("the fixture compiles");
+    (program, model)
 }
 
 #[test]
@@ -53,8 +54,8 @@ fn the_cli_lint_document_is_the_engine_document() {
     let output = genmsi(&["lint", MODEL, "--json"]);
     assert_eq!(code(&output), 0, "{}", stderr(&output));
     let cli_bytes = stdout(&output);
-    let compiled = program();
-    let document = lint_document(&compiled, MODEL);
+    let (compiled, model) = program();
+    let document = lint_document(&compiled, &model, MODEL);
     // The CLI adds the trailing newline its stdout helper appends.
     let engine_bytes = format!("{}\n", to_pretty_json(LINT_SCHEMA, &document));
     assert_eq!(
@@ -76,7 +77,7 @@ fn the_cli_trace_document_is_the_engine_document() {
         trace_limit: 3,
         ..genmsi_core::SimConfig::default()
     };
-    let compiled = program();
+    let compiled = program().0;
     let result = genmsi_core::Simulation::new(&compiled, config)
         .run()
         .expect("the fixture runs");

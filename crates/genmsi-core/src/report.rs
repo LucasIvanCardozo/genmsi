@@ -45,7 +45,7 @@ pub fn render(result: &RunResult, program: &Program) -> String {
         "{:>10}  {:>10}  {:>10}  {:>12}  {:>10}",
         number(result.start_time),
         number(result.end_time),
-        program.blocks.len(),
+        block_rows(program).len(),
         result.entities.facilities.len(),
         result.entities.storages.len()
     );
@@ -57,25 +57,17 @@ pub fn render(result: &RunResult, program: &Program) -> String {
         " LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE"
     );
     let _ = writeln!(out, "         COUNT   COUNT");
-    let mut numeric_label = 0;
-    for (index, block) in program.blocks.iter().enumerate() {
-        let stats = result.blocks.get(index).cloned().unwrap_or_default();
-        let loc = match &block.label {
-            Some(label) => label.clone(),
-            None => {
-                numeric_label += 1;
-                numeric_label.to_string()
-            }
-        };
+    for (line, row) in block_rows(program).iter().enumerate() {
+        let stats = result.blocks.get(row.block).cloned().unwrap_or_default();
         let _ = writeln!(
             out,
             "{:>5} {:>8} {:>7} {:>5} {:>14}  {}",
-            index + 1,
+            line + 1,
             stats.entries,
             stats.current,
             stats.retries,
-            loc,
-            type_and_operands(block, program)
+            row.loc,
+            row.text
         );
     }
 
@@ -264,6 +256,53 @@ pub fn render(result: &RunResult, program: &Program) -> String {
     }
 
     out
+}
+
+/// One row of the block table.
+struct BlockRow {
+    /// The block the row counts.
+    block: usize,
+    /// The `LOC` of the row.
+    loc: String,
+    /// The `BLOCK_TYPE` cell and the operand column.
+    text: String,
+}
+
+/// The rows of the block table.
+///
+/// The original lists one row per statement of the program, and the `Counter`
+/// class writes two of them (its macro code is a `SV` and an `ASSI`): the
+/// `SAVEVALUE` that counts and the `ASSIGN` that copies the counter into the
+/// parameter. The counter takes two rows, and the header counts the rows.
+fn block_rows(program: &Program) -> Vec<BlockRow> {
+    let mut rows = Vec::with_capacity(program.blocks.len());
+    let mut numeric_label = 0;
+    for (index, block) in program.blocks.iter().enumerate() {
+        let loc = match &block.label {
+            Some(label) => label.clone(),
+            None => {
+                numeric_label += 1;
+                numeric_label.to_string()
+            }
+        };
+        rows.push(BlockRow {
+            block: index,
+            loc,
+            text: type_and_operands(block, program),
+        });
+        if let BlockKind::Counter(spec) = &block.kind
+            && let Some(parameter) = &spec.parameter
+        {
+            // The second statement of the counter has no name of its own.
+            numeric_label += 1;
+            rows.push(BlockRow {
+                block: index,
+                loc: numeric_label.to_string(),
+                text: format!("{:<16}{},X${}", "ASSIGN", parameter, spec.savevalue),
+            });
+        }
+    }
+    rows
 }
 
 /// GPSS block type shown in the report's `BLOCK_TYPE` column.

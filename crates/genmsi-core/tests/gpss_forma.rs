@@ -151,6 +151,51 @@ fn the_selection_by_the_state_of_a_storage_writes_its_letter() {
 }
 
 #[test]
+fn the_counter_takes_two_rows_in_the_block_table() {
+    // The `Counter` class of the original writes two statements (a `SV` and
+    // an `ASSI` in its macro code) and the block table lists the two:
+    //
+    //     2       62       0     0      A_Counter  SAVEVALUE       Count+,1
+    //     3       62       0     0              3  ASSIGN          Nro,X$Count
+    //
+    // (scripts/wine-oracle/out/Counter.report.txt: the header says six
+    // blocks where the model has five).
+    let nodes = vec![
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("A"))],
+            &[("Media", "60"), ("Modificador", "0")],
+        ),
+        node(
+            2,
+            "Counter",
+            Some("A"),
+            &[("Salida1", Some("B"))],
+            &[("SaveValue", "Count"), ("Incremento", "1"), ("Param", "Nro")],
+        ),
+        node(3, "Terminate", Some("B"), &[], &[]),
+    ];
+    let links = vec![(1, 0, 2, 0), (2, 0, 3, 0)];
+    let program = wired(&nodes, &links, 3600.0);
+    let report = render_report(&support::run(&program, 3600.0, 1), &program);
+    let rows = block_rows(&report);
+    let savevalue = rows
+        .iter()
+        .find(|row| row.contains("SAVEVALUE"))
+        .expect("the row of the counter");
+    assert!(savevalue.ends_with("SAVEVALUE Count+,1"), "{savevalue}");
+    let assign = rows
+        .iter()
+        .find(|row| row.contains("ASSIGN"))
+        .expect("the row of the assignment the counter writes");
+    assert!(assign.ends_with("ASSIGN Nro,X$Count"), "{assign}");
+    // The header counts the rows of the table: the counter takes two.
+    assert_eq!(header(&report).split_whitespace().nth(2), Some("6"));
+}
+
+#[test]
 fn the_select_writes_the_class_of_the_entity() {
     // The `entitySNAclass` list of the original has 38 classes, and the
     // `SELECT` statement carries the class as its last operand. The class `F`

@@ -161,12 +161,20 @@ Fifteen classes declare no ports at all (`Clock`, `Note`, the definitions,
 the functions). Their bench is the `Generate`/`Terminate` chain with the class
 in the model, unconnected.
 
-Two properties the XML does not describe are derived from the original's own
-configuration (`Genmsi_20230711.backup/gmacroconfig.gmcfg`): the `Listed`
-subtypes and their options (`op_Logic_Faci`, `op_Logic_Tran`, ...) and the
-type of a list of entity definitions (`EntityDefList`, `TSNAMatrix`,
-`FloatPercentMatrix`). A `Listed` value that the original does not accept
-makes it refuse the model with "el archivo presenta errores estructurales".
+Two properties the XML does not describe are read from the original itself:
+the `Listed` subtypes and their options (`op_Logic_Faci`, `op_Logic_Tran`, ...)
+come from the original's own configuration
+(`Genmsi_20230711.backup/gmacroconfig.gmcfg`), and the type of a property
+comes from what the original writes in the model file.  The types of the
+three classes the XML declares but no model of the original carries are
+`TEntityDefList` (a list of names), `TSNAMATRIX` (a matrix of numbers) and
+`FloatPercentMatrix` (a matrix of percentages): they are the types the
+original itself writes when it saves a model that carries those modules, and
+they are the ones the generator writes.  A type the original does not know
+makes it open the model by "adapting" the module, and the window that says so
+stops the oracle from reading the answer.  A `Listed` value that the original
+does not accept makes it refuse the model with "el archivo presenta errores
+estructurales".
 
 The generator has its own tests, `test_make_benches.py`. They build a little
 catalogue of their own, so they run without the backup of the original:
@@ -195,12 +203,23 @@ bench the Wine session is killed: when the harness fails it leaves the
 original alive, and its window would be found by the next bench, which would
 then drive the wrong window.
 
-Four benches do not run: `MFunction`, `MFunctionDist`, `MultifurcacionP` and
-`RemoveNumber`. The original opens the model, shows its "Información" dialog
-("uno o mas de los modulos ... fueron adaptados a las definiciones de clases
-existentes en este sistema") and never shows its own window, so the harness
-has nothing to click. The models are accepted by the original; what is missing
-is a way to drive it.
+Every bench runs.  Three of them used not to: `MFunction`, `MFunctionDist` and
+`RemoveNumber`.  The original opened those models, showed its "Información"
+dialog ("uno o mas de los modulos ... fueron adaptados a las definiciones de
+clases existentes en este sistema") and never showed its own window, so the
+harness had nothing to click.  The models were accepted by the original, but
+adapted: the properties of those modules carried a type the original does not
+know (`EntityDefList` instead of `TEntityDefList`, `TSNAMatrix` instead of
+`TSNAMATRIX`, and a `Listed` subtype the class does not declare).  With the
+types the original itself writes, the notice does not appear and the three
+benches answer like the rest.
+
+Two things can still keep the harness from reading an answer: a window of the
+adaptation notice (the original opens the model anyway, but the notice has to
+be accepted with its "Aceptar" button before the simulator can be driven), and
+a second session running the original under the same Wine prefix (the
+`wineserver -k` that ends a run kills the other session's simulation too).
+`GENMSI_WINEPREFIX` points the harness at a prefix of its own.
 
 ## `first_arrival_evidence.py` — when the first transaction of a generator arrives
 

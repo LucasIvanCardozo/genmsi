@@ -69,7 +69,7 @@ PROP_TYPES: dict[str, tuple[str, str]] = {
     "Grupo": ("EntityUse", "TransacGroup"),
     "Incremento": ("TSNA", "SNA"),
     "LogicSwich": ("EntityUse", "LogicSwich"),
-    "Matriz": ("Table", ""),
+    "Matriz": ("TSNAMATRIX", ""),
     "Maximo": ("Expresion", "Expresion"),
     "Media": ("TSNA", "SNA"),
     "Minimo": ("Expresion", "Expresion"),
@@ -79,8 +79,8 @@ PROP_TYPES: dict[str, tuple[str, str]] = {
     "ModoInterrupcion": ("Listed", "PriorityMode"),
     "MultifurcacionCH": ("EntityDef", "Function"),
     "MultifurcacionGO": ("EntityDef", "Function"),
-    "NombresDist": ("EntityDef", "Function"),
-    "NombresFunc": ("EntityDef", "Function"),
+    "NombresDist": ("TEntityDefList", "Function"),
+    "NombresFunc": ("TEntityDefList", "Function"),
     "NombreDist": ("EntityDef", "Function"),
     "NombreFunc": ("EntityDef", "Function"),
     "NombreTabla": ("EntityDef", "Table"),
@@ -132,13 +132,17 @@ CLASS_PROP_TYPES: dict[tuple[str, str], tuple[str, str]] = {
     ("ExamineNumber", "Grupo"): ("EntityUse", "NumericGroup"),
     ("JoinNumber", "Grupo"): ("EntityUse", "NumericGroup"),
     ("RemoveNumber", "Grupo"): ("EntityUse", "NumericGroup"),
+    # The original's own `RemoveNumber` declares its relational operator with
+    # the list that also carries `Minimo` and `Maximo` (the same one the
+    # `RemoveTrans` uses for its `CompOp`): a model that carries another
+    # list is "adapted" by the original when it opens it.
+    ("RemoveNumber", "Op"): ("Listed", "op_RelacMaxMin"),
     ("InitialLS", "LogicSwich"): ("EntityDef", "LogicSwich"),
     ("InitialLS", "Valor"): ("Listed", "op_Swich"),
     ("InitiaSV", "SaveValue"): ("EntityDef", "SaveValue"),
     ("InitiaSV", "Valor"): ("PosInteger", ""),
     ("Link", "Modo"): ("Listed", "LinkMode"),
     ("SaveValue", "Op"): ("Listed", "op_AddSub"),
-    ("RemoveNumber", "Op"): ("Listed", "op_Relac"),
     ("SelectSNA", "op"): ("Listed", "op_Relac"),
     ("SelectS", "op"): ("Listed", "op_Logic_Stor"),
     ("SelectL", "op"): ("Listed", "op_Logic_Swich"),
@@ -151,9 +155,14 @@ CLASS_PROP_TYPES: dict[tuple[str, str], tuple[str, str]] = {
     ("StorageDef", "Storage"): ("EntityDef", "Storage"),
     ("VariableN", "Media"): ("Expresion", "Expresion"),
     ("VariableN", "Desvio"): ("Expresion", "Expresion"),
-    ("MFunction", "NombresFunc"): ("EntityDefList", "Function"),
-    ("MFunction", "Matriz"): ("TSNAMatrix", ""),
-    ("MFunctionDist", "NombresDist"): ("EntityDefList", "Function"),
+    # The types of these three properties are the ones the original itself
+    # writes when it saves a model that carries them (measured: the original
+    # opens a model that declares them with any other type by "adapting" the
+    # module, and the window that says so stops the oracle from reading the
+    # answer).
+    ("MFunction", "NombresFunc"): ("TEntityDefList", "Function"),
+    ("MFunction", "Matriz"): ("TSNAMATRIX", ""),
+    ("MFunctionDist", "NombresDist"): ("TEntityDefList", "Function"),
     ("MFunctionDist", "Resultados"): ("FloatPercentMatrix", ""),
 }
 
@@ -217,6 +226,11 @@ DECLARATIONS: dict[str, list[str]] = {
     "StorageUse": ["StorageDef"],
     "Enter": ["StorageDef"],
     "Leave": ["StorageDef"],
+    # The original stops the run with "Se intentó actualizar el valor de una
+    # tabla inexistente" when a transaction tabulates a table that nobody
+    # declared, so the bench of the `Tabulate` carries the `Table` that
+    # declares it.
+    "Tabulate": ["Table"],
 }
 
 # The original refuses to end a transaction that owns a facility, and refuses
@@ -437,7 +451,7 @@ def parse_class(element: ET.Element) -> ClassDef:
         prop.subtype = subtype
         if (name, prop_name) in PROP_VALUES:
             prop.value = PROP_VALUES[(name, prop_name)]
-        prop.unique = "1" if ty in ("EntityDef", "EntityDefList") else "0"
+        prop.unique = "1" if ty in ("EntityDef", "TEntityDefList") else "0"
         if name == "QTable" and prop_name == "Queue":
             # The original writes this one as a definition but does not mark
             # it as unique.

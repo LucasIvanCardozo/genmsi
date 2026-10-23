@@ -16,7 +16,10 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 EXE="$REPO/Genmsi_20230711.backup/genmsi.exe"   # always the backup copy
-WINEPREFIX="$REPO/scripts/wine-oracle/wineprefix"
+# The prefix the original runs under.  `GENMSI_WINEPREFIX` lets a second
+# session run the original at the same time without sharing the prefix (the
+# `wineserver -k` of one run would kill the other's simulation).
+WINEPREFIX="${GENMSI_WINEPREFIX:-$REPO/scripts/wine-oracle/wineprefix}"
 OUT="${2:-$REPO/scripts/wine-oracle/out}"
 XDISPLAY="${XDISPLAY:-:99}"
 

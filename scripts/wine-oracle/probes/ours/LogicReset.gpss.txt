@@ -1,0 +1,6 @@
+                INITIAL         LS1  
+                GENERATE        60,30  
+A_Logic         LOGIC           R 1  
+A_Terminate     TERMINATE        
+                GENERATE        3600  
+                TERMINATE       1  

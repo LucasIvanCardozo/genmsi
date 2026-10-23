@@ -213,6 +213,58 @@ class Declarations(unittest.TestCase):
         self.assertEqual(labels["StorageUse"], "StorageUse")
 
 
+class PropertyTypes(unittest.TestCase):
+    """The types of the properties are the ones the original itself writes.
+
+    The XML of the original's class library says the name, the hint and the
+    default of every property, but not its type: the type is what the
+    original writes in the model file.  When it does not find the type it
+    expects, it opens the model "adapting" the module, and the window that
+    says so stops the oracle from reading the answer.
+
+    The types below are the ones the original writes when it saves a model
+    that carries those modules (measured: the original opens the model
+    without the notice, and its own `Guardar` writes the same types).
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        if not mb.CLASSES_XML.is_file():
+            raise unittest.SkipTest("the backup of the original is not here")
+        cls.classes = mb.load_classes(mb.CLASSES_XML)
+
+    def bench(self, name: str) -> str:
+        by_name = {cls.name: cls for cls in self.classes}
+        text, _ = mb.build_bench(by_name[name], by_name)
+        return text
+
+    def prop(self, text: str, name: str) -> str:
+        found = re.search(r'<property name="%s"[^>]*>' % name, text)
+        self.assertIsNotNone(found, name)
+        return found.group(0)
+
+    def test_the_list_of_function_names_is_a_tentitydeflist(self) -> None:
+        self.assertIn('type="TEntityDefList"', self.prop(self.bench("MFunction"), "NombresFunc"))
+        self.assertIn('type="TEntityDefList"', self.prop(self.bench("MFunctionDist"), "NombresDist"))
+
+    def test_the_matrix_of_the_multiple_function_is_a_tsnamatrix(self) -> None:
+        self.assertIn('type="TSNAMATRIX"', self.prop(self.bench("MFunction"), "Matriz"))
+
+    def test_the_operator_of_the_remove_number_is_the_one_with_min_and_max(self) -> None:
+        # The original's own `RemoveNumber` declares its relational operator
+        # with the list that also carries `Minimo` and `Maximo`.
+        self.assertIn('subType="op_RelacMaxMin"', self.prop(self.bench("RemoveNumber"), "Op"))
+
+    def test_the_table_of_the_tabulate_is_declared(self) -> None:
+        # The original stops the run with "Se intentó actualizar el valor de
+        # una tabla inexistente" when a transaction tabulates a table that
+        # nobody declared.
+        text = self.bench("Tabulate")
+        self.assertIn('moduleclass="Table"', text)
+        tables = re.findall(r'<property name="NombreTabla"[^>]*value="([^"]*)"', text)
+        self.assertEqual(set(tables), {"Tabla"})
+
+
 class FailureOutput(unittest.TestCase):
     """A class whose statement needs a destination carries it."""
 

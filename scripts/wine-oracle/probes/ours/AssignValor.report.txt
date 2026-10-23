@@ -1,0 +1,20 @@
+                             Reporte MicroVisualSIS
+
+ START_TIME    END_TIME     BLOCKS    FACILITIES    STORAGES
+         0        3600           8             0           0
+
+ SEMILLA    13378085965581488535
+
+ LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE
+         COUNT   COUNT
+    1       58       1     0              1  GENERATE        60,30
+    2       57       0     0       A_Assign  ASSIGN          Param,7
+    3       57       0     0    A_SaveValue  SAVEVALUE       1,5
+    4       57       0     0         A_Test  TEST    E       P:Param,7,A_Terminate1
+    5       57       0     0    A_Terminate  TERMINATE       
+    6        0       0     0   A_Terminate1  TERMINATE       
+    7        2       1     0              2  GENERATE        3600
+    8        1       0     0              3  TERMINATE       1
+
+SAVEVALUE                 VALUE
+  1                           5

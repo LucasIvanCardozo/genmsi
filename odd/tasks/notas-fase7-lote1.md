@@ -1,6 +1,6 @@
 # Notas: el lote 1 de la fase 7, clase por clase
 
-Inventario de las 24 clases más tocadas del original: en qué se parece y en
+Inventario de las 26 clases más tocadas del original: en qué se parece y en
 qué no nuestro motor. No se arregla nada aquí: el mapa de lo que hay que
 arreglar, con su archivo y su prueba, y nada más.
 
@@ -17,7 +17,7 @@ arreglar, con su archivo y su prueba, y nada más.
 
 ## Resumen
 
-Las 24 clases del lote, en el orden que pedía el encargo. `GPSS` es la
+Las 26 clases del lote, en el orden que pedía el encargo. `GPSS` es la
 comparación de `scripts/wine-oracle/compare-gpss.sh` (verbo, operandos y nombre
 de cada sentencia) y `Cifras` es la de las métricas del reporte del oráculo
 (20% en conteos, 35% en tiempos).
@@ -51,13 +51,22 @@ de cada sentencia) y `Cifras` es la de las métricas del reporte del oráculo
 | 25 | Counter | `SAVEVALUE`+`ASSIGN` | coincide | 2/2 | con diferencias | al reporte le falta la línea del `ASSIGN` y el `RETRY` del savevalue |
 | 26 | Table | `TABLE` | coincide | 0/0 | con diferencias | las clases de la tabla: el original termina en un desborde `> a 80` |
 
-**Del total:** 24 clases, **24 de 24** con el GPSS igual al del original;
-**17** con todas las cifras dentro de las tolerancias; **15** con diferencias,
-**7** verificadas y **2** pendientes (las dos porque el original no dejó un
-reporte con el que comparar). De las 15 con diferencias, **cuatro son de
-comportamiento** (la condición de la `GateS`, el "indicador link" del `LINK`, el
-`CURRENT` del `ASSEMBLE` y el `TRANSFER` que el `Match` no expande) y las otras
-once son de la forma del reporte o del nombre de los bloques.
+**Del total:** 26 clases (las de la tabla de arriba), **26 de 26** con el GPSS
+igual al del original; **17** con todas las cifras dentro de las tolerancias;
+**16** con diferencias, **8** verificadas y **2** pendientes (las dos porque el
+original no dejó un reporte con el que comparar). De las 16 con diferencias,
+**cuatro son de comportamiento** (la condición de la `GateS`, el "indicador
+link" del `LINK`, el `CURRENT` del `ASSEMBLE` y el `TRANSFER` que el `Match` no
+expande) y las otras doce son de la forma del reporte o del nombre de los
+bloques.
+
+> **Nota de las notas de este lote** (corregido en el lote 3): este resumen
+> decía "24 clases" y la tabla de arriba lista 26. Las cuentas correctas son
+> las de arriba: 26 clases, 26 con el GPSS igual, 17 con todas las cifras
+> dentro de las tolerancias, 16 con diferencias, 8 verificadas y 2 pendientes.
+> Y el estado de cada clase después de los arreglos de los bancos
+> (`odd/tasks/notas-bancos.md`) y del núcleo (el commit `47d0b8f`) está en la
+> tabla final de `odd/tasks/notas-fase7-lote3.md`.
 
 ### Sondas
 
@@ -2714,10 +2723,10 @@ sesión.
 - **L3** — El binario del CLI se llama `genmsi`, no `genmsi-cli`: el comando del
   enunciado (`cargo run --release -p genmsi-cli -- gpss`) deja el ejecutable en
   `target/release/genmsi`.
-- **L4** — Medición del lote: 24 de 24 bancos con el GPSS igual al del original
-  (`scripts/wine-oracle/compare-gpss.sh`, "el GPSS coincide" en los 24) y 17 de
+- **L4** — Medición del lote: 26 de 26 bancos con el GPSS igual al del original
+  (`scripts/wine-oracle/compare-gpss.sh`, "el GPSS coincide" en los 26) y 17 de
   24 con todas las cifras dentro de las tolerancias del oráculo (20% en
-  conteos, 35% en tiempos). Veredictos: 7 verificadas, 15 con diferencias, 2
+  conteos, 35% en tiempos). Veredictos: 8 verificadas, 16 con diferencias, 2
   pendientes. Las dos pendientes son las que el original no dejó comparar:
   `StorageUse` (el original se niega a simular un almacén sin declarar) y
   `Examine` (el original rechaza el modelo con "Faltan parámetros").

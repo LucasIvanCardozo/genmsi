@@ -927,29 +927,6 @@ export function advance(state: ReplayState, index: ReplayIndex, from: number, to
 export const SPEEDS = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1000] as const;
 
 /**
- * How many seconds of wall clock the whole run takes at the default speed.
- *
- * The default is not a round multiple of the real time: a run of an hour
- * would take an hour to watch at 1x. It is the multiple that fits the run in
- * this many seconds, and the monitor says which one it is, so the scale is
- * never a mystery.
- */
-export const DEFAULT_REPLAY_SECONDS = 12;
-
-/**
- * The multiple of the real time that plays a run of `span` seconds in
- * `seconds` of wall clock: the first round speed that is fast enough.
- */
-export function fittingSpeed(span: number, seconds: number = DEFAULT_REPLAY_SECONDS): number {
-  if (span <= 0) {
-    return 1;
-  }
-  const wanted = span / seconds;
-  const nice = SPEEDS.find((option) => option >= wanted);
-  return nice ?? SPEEDS[SPEEDS.length - 1];
-}
-
-/**
  * A transaction moving from one block of the model to another.
  *
  * The trace states the move itself: the `leave` record of a block carries the

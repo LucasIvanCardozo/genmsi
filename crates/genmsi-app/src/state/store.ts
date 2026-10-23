@@ -5,7 +5,6 @@ import { relayout } from "../edit/layout";
 import {
   buildIndex,
   buildTransitions,
-  fittingSpeed,
   type ReplayIndex,
   type TransitionIndex,
 } from "../monitor/replay";
@@ -449,10 +448,10 @@ export const useApp = create<AppState>((set, get) => ({
         transitions,
         playhead: 0,
         playing: monitor.frames.length > 0,
-        // The speed is a multiple of the real time. The default is the one
-        // that fits the run in a few seconds, and the monitor says which one
-        // it is: the reader always knows the scale.
-        speed: fittingSpeed(monitor.endTime - monitor.startTime),
+        // The speed is a multiple of the real time, and the run starts at
+        // x1: one second of model per second of screen. The reader who wants
+        // the run faster asks for it.
+        speed: 1,
         status: "ready",
       });
     } catch (error) {

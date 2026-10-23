@@ -142,6 +142,26 @@ test("the clock always moves, even when nothing else does", () => {
   assert.equal(useLive.getState().clock, 2);
 });
 
+test("the clock can be set on its own, without touching the rest of the picture", () => {
+  useLive.getState().reset();
+  useLive.getState().publish({
+    clock: 4,
+    counts: new Map([[1, counts(2, 20)]]),
+    balls: new Map([["e1", [ball(1, 0.25)]]]),
+  });
+  const before = useLive.getState();
+
+  // The header's slider moves the run by hand: it puts the clock where the
+  // reader asked, and the window is the one that publishes the numbers.
+  useLive.getState().setClock(9.5);
+
+  const after = useLive.getState();
+  assert.equal(after.clock, 9.5, "the clock moved");
+  assert.equal(after.counts, before.counts, "the counts are the same ones");
+  assert.equal(after.balls, before.balls, "the balls are the same ones");
+  assert.deepEqual(after.counts.get(1), { now: 2, ever: 20 });
+});
+
 test("a reset empties the picture", () => {
   useLive.getState().reset();
   useLive.getState().publish({

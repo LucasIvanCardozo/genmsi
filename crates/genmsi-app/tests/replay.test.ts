@@ -8,7 +8,6 @@ import {
   advanceClock,
   buildIndex,
   checkFidelity,
-  fittingSpeed,
   frameAt,
   mergeSeries,
   stateAt,
@@ -317,6 +316,11 @@ test("the clock of the replay accumulates instead of restarting at every frame",
   assert.equal(advanceClock(100, 0.5, 10), 105, "the clock moves by the wall time spent");
   assert.equal(advanceClock(105, 0.5, 10), 110, "and it keeps the distance it had");
 
+  // The clock of a replay at 1x is the real time: one second of wall clock
+  // moves the simulation one second.
+  assert.equal(advanceClock(0, 1, 1), 1, "at 1x a second is a second");
+  assert.equal(advanceClock(0, 1, 250), 250, "at 250x a second is 250 seconds");
+
   // A whole replay at 60 paints per second: with a clock that accumulates,
   // the run crosses every frame.
   const index = buildIndex(smallTrace, smallReport, smallModel);
@@ -357,23 +361,6 @@ test("the entries of every block are rebuilt from the trace and match the engine
   const fidelity = checkFidelity(index, smallReport);
   assert.deepEqual(fidelity.entryMismatches, [], "the entries differ from the report");
   assert.equal(fidelity.entries, true);
-});
-
-test("the speeds are absolute multiples of the real time", () => {
-  // 1x means one simulated second per second of wall clock, whatever the
-  // length of the run: the same label has to mean the same thing everywhere.
-  // 3600 / 12 = 300, and the first round speed that is fast enough is 500.
-  assert.equal(fittingSpeed(3600, 12), 500, "an hour fits in 12 s at 500x");
-  assert.equal(fittingSpeed(3600, 3600), 1, "an hour at 1x is an hour");
-  assert.equal(fittingSpeed(60, 12), 5, "a minute fits in 12 s at 5x");
-  assert.equal(fittingSpeed(28800, 12), 1000, "eight hours need the fastest");
-  assert.equal(fittingSpeed(120, 12), 10, "two minutes fit in 12 s at 10x");
-  assert.equal(fittingSpeed(0, 12), 1, "a run with no span plays at 1x");
-
-  // The clock of a replay at 1x is the real time: one second of wall clock
-  // moves the simulation one second.
-  assert.equal(advanceClock(0, 1, 1), 1, "at 1x a second is a second");
-  assert.equal(advanceClock(0, 1, 250), 250, "at 250x a second is 250 seconds");
 });
 
 test("the slider is a clock: a time selects the last record at or before it", () => {

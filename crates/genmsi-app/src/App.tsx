@@ -1,23 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { Play } from "lucide-react";
-import BlockPalette from "./components/BlockPalette";
 import ErrorNotice from "./components/ErrorNotice";
 import ModelPicker from "./components/ModelPicker";
 import MonitorView from "./components/MonitorView";
+import RunConsole from "./components/RunConsole";
 import Toolbar from "./components/Toolbar";
 import { useApp } from "./state/store";
 
 /**
  * The app's shell.
  *
- * The header opens a model and runs it; the toolbar holds the editing
- * actions; the body is the window of the simulation: the graph of the model,
- * the reproduction of the run and its report, all in one place.
+ * The header opens a model and carries the console of the run; the toolbar
+ * holds the editing actions; the body is the window of the simulation: the
+ * graph of the model, the reproduction of the run and its report, all in one
+ * place.
  */
 export default function App() {
   const {
     model,
-    currentPath,
     status,
     error,
     seed,
@@ -25,7 +24,6 @@ export default function App() {
     dirty,
     canUndo,
     canRedo,
-    catalogue,
     pendingSave,
     savedMessage,
     loadModels,
@@ -35,7 +33,6 @@ export default function App() {
     undo,
     redo,
     save,
-    simulate,
     select,
     copy,
     paste,
@@ -122,7 +119,7 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col bg-slate-100 text-slate-900">
-      <header className="flex items-center gap-5 border-b border-slate-200 bg-white px-5 py-2.5">
+      <header className="flex flex-wrap items-center gap-5 border-b border-slate-200 bg-white px-5 py-2.5">
         <div className="flex items-baseline gap-2">
           <span className="text-base font-semibold tracking-tight">GenMSI</span>
           <span className="text-[11px] text-slate-500">Simulación GPSS</span>
@@ -156,17 +153,13 @@ export default function App() {
           />
         </div>
 
-        <button
-          type="button"
-          onClick={() => void simulate()}
-          disabled={currentPath === null && model === null}
-          className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-        >
-          <Play className="size-3.5" aria-hidden />
-          {status === "running" ? "Simulando…" : "Simular"}
-        </button>
+        {/* The console of the run: it hugs the right side of the header, and
+            the title of the model follows it. */}
+        <div className="ml-auto">
+          <RunConsole />
+        </div>
 
-        <div className="ml-auto flex items-center gap-3 text-xs text-slate-500">
+        <div className="flex items-center gap-3 text-xs text-slate-500">
           {model !== null && <span className="font-medium text-slate-700">{model.title}</span>}
           {status === "loading" && <span>Cargando…</span>}
         </div>
@@ -198,7 +191,6 @@ export default function App() {
             onConfirmSave={() => void confirmSave()}
             onDismissSave={dismissSave}
           />
-          <BlockPalette catalogue={catalogue} onAdd={(className) => void addBlock(className)} />
         </div>
 
         <MonitorView actions={actions} fitSignal={fitSignal} />

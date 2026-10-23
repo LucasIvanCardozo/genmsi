@@ -49,6 +49,14 @@ export interface LivePicture {
 export interface LiveState extends LivePicture {
   /** Publish what the picture shows right now. */
   publish: (picture: LivePicture) => void;
+  /**
+   * Put the clock at an instant, without touching the rest of the picture.
+   *
+   * The header's slider moves the run by hand: it sets the clock to the
+   * instant the reader picked and leaves the counts and the balls as they
+   * are, because the window is the one that publishes them.
+   */
+  setClock: (clock: number) => void;
   /** Forget the picture: a new run, or a model that moved. */
   reset: () => void;
 }
@@ -68,6 +76,7 @@ export const useLive = create<LiveState>((set) => ({
       const balls = reuseBalls(state.balls, picture.balls);
       return { clock: picture.clock, counts, balls };
     }),
+  setClock: (clock) => set({ clock }),
   reset: () => set({ ...EMPTY, counts: new Map(), balls: new Map() }),
 }));
 

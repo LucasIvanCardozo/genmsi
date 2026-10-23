@@ -14,7 +14,7 @@ export default function ModelPicker() {
       </label>
       <select
         aria-label="Modelo"
-        className="min-w-64 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 shadow-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+        className="w-64 max-w-64 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-800 shadow-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
         value={currentPath ?? ""}
         onChange={(event) => void openModel(event.target.value)}
         disabled={status === "loading"}

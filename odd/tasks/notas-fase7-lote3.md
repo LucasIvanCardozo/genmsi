@@ -63,19 +63,19 @@ conteos, 35% en tiempos).
 | 4 | VariableN | `FUNCTION`+`VARIABLE` | coincide | 0/0 | verificada | ninguna de esta clase |
 | 5 | Assign | `ASSIGN` | coincide | 2/2 | verificada | ninguna de esta clase |
 | 6 | Alter | `ALTER` | coincide | 2/2 | con diferencias | la fila del reporte pierde los operandos (`ALTER ungrupo` contra `ALTER E ungrupo,1,param,0,otro,1`) |
-| 7 | Logic | `LOGIC` | coincide | 2/2 | con diferencias | falta la sección `LOGICSWITCH`; y el operador "Invertir" no existe |
-| 8 | InitialLS | `INITIAL` | coincide | 0/0 | con diferencias | falta la sección `LOGICSWITCH` |
-| 9 | InitiaSV | `INITIAL` | coincide | 0/0 | con diferencias | la sección `SAVEVALUE` va sin la columna `RETRY` |
-| 10 | SaveValue | `SAVEVALUE` | coincide | 2/2 | con diferencias | la sección `SAVEVALUE` va sin la columna `RETRY` |
+| 7 | Logic | `LOGIC` | coincide | 2/2 | verificada | ninguna de esta clase (el operador "Invertir" no existe, y el banco no lo mide) |
+| 8 | InitialLS | `INITIAL` | coincide | 0/0 | verificada | ninguna de esta clase |
+| 9 | InitiaSV | `INITIAL` | coincide | 0/0 | verificada | ninguna de esta clase |
+| 10 | SaveValue | `SAVEVALUE` | coincide | 2/2 | verificada | ninguna de esta clase |
 | 11 | Scan | `SCAN` | coincide | 2/2 | verificada | ninguna de esta clase |
 | 12 | QTable | `QTABLE` | coincide | 0/0 | con diferencias | la sección `QTABLES` es un resumen de cuatro líneas; el original imprime el histograma |
-| 13 | Tabulate | `TABLE`+`TABULATE` | coincide | 2/2 | con diferencias | la sección `TABLAS` pierde el atributo, los rótulos y las filas vacías |
+| 13 | Tabulate | `TABLE`+`TABULATE` | coincide | 2/2 | verificada | ninguna de esta clase |
 | 14 | Function | `FUNCTION` | coincide | 0/0 | verificada | ninguna de esta clase |
 | 15 | FunctionExpon | `FUNCTION` | coincide | 0/0 | verificada | ninguna de esta clase |
 | 16 | FunctionDist | `FUNCTION` | coincide | 0/0 | verificada | ninguna de esta clase |
 | 17 | MFunction | `FUNCTION`×2 | **no lo tenemos** | — | pendiente | nuestro catálogo no ofrece la clase |
 | 18 | MFunctionDist | `FUNCTION`×2 | **no lo tenemos** | — | pendiente | nuestro catálogo no ofrece la clase |
-| 19 | ExamineNumber | `EXAMINE` | coincide | 2/2 | con diferencias | falta la sección `NUMERIC_GROUP` del reporte |
+| 19 | ExamineNumber | `EXAMINE` | coincide | 2/2 | con diferencias | el reporte no imprime el grupo que la sentencia nombra y que nadie define |
 | 20 | RemoveNumber | `REMOVE` | **no lo tenemos** | — | pendiente | nuestro catálogo no ofrece la clase |
 
 **Del total:** 20 clases; **17 de 20** con el GPSS igual al del original (las
@@ -83,14 +83,13 @@ tres que no lo tienen son clases que nuestro catálogo no ofrece, así que ni
 siquiera compilan; **las 17 que compilamos coinciden todas**); **17 de 17** con
 todas las cifras que el oráculo puede comparar dentro de las tolerancias (y
 **diez** de ellas con menos de tres métricas, que el oráculo no puede comparar:
-sus bloques van sin nombre); **10 verificadas**, **7 con diferencias** y **3
+sus bloques van sin nombre); **14 verificadas**, **3 con diferencias** y **3
 pendientes**.
 
-De las siete con diferencias, **seis son de la forma del reporte** (la fila del
-`ALTER`, las secciones `LOGICSWITCH` y `SAVEVALUE`, la sección `QTABLES` y la
-sección `TABLAS`) y **una es de la forma del reporte también** (la sección
-`NUMERIC_GROUP`). Ninguna es de comportamiento: lo que las clases hacen, lo
-hacen los dos motores.
+De las tres con diferencias, **todas son de la forma del reporte** (la fila del
+`ALTER`, la sección `QTABLES` y la sección `NUMERIC_GROUP` de un grupo que
+nadie define). Ninguna es de comportamiento: lo que las clases hacen, lo hacen
+los dos motores.
 
 ## Las cuatro clases que el original no corría
 
@@ -207,7 +206,7 @@ Clock (3600) closes the run.
 | | `A_Terminate` (la comparación se cumple) | `A_Terminate1` (no se cumple) | sección `SAVEVALUE` |
 |---|---|---|---|
 | original | **60** | 0 | `1` → **5** |
-| nuestro | **57** | 0 | `1` → **5** |
+| nuestro | **60** | 0 | `1` → **5** |
 
 **La regla.** El `ASSIGN` pone el valor en el parámetro de la transacción
 activa ("Un bloque ASSIGN es usado para colocar o modificar un entero en un
@@ -232,20 +231,18 @@ conoce.
 **El modelo.** Un `InitialLS` que pone la llave 1 en 1 y un `Logic` que la
 pone en 1 (`LogicSet`) o la reinicia (`LogicReset`).
 
-**La respuesta** (sección `LOGICSWITCH` del reporte del original):
+**La respuesta** (sección `LOGICSWITCH` del reporte):
 
 | | `LOGIC S 1` (sonda 2) | `LOGIC R 1` (sonda 3) |
 |---|---|---|
 | original | valor **1** | valor **0** |
-| nuestro | (no imprimimos la sección) | (no imprimimos la sección) |
+| nuestro | valor **1** | valor **0** |
 
 **La regla.** El `LOGIC` configura la llave: con `S` la pone en "set" y con
 `R` la pone en "reset" ("Si el operador lógico es S o R, la llave lógica
 especificada por el operando A es puesta en el estado set o reset,
-respectivamente", manual). Nuestro motor cumple la regla (el bloque `Logic`
-del core la configura), pero **nuestro reporte no imprime la sección
-`LOGICSWITCH`**, así que no se puede ver: es el pendiente 5 de "Cambios
-pendientes" (el mismo que ya tenía el `GateL` y el `SelectL` del lote 1).
+respectivamente", manual). Los dos motores cumplen la regla, y los dos
+imprimen la sección `LOGICSWITCH` con el estado de la llave.
 
 Con `LOGIC R 1` la llave queda en 0 **después** de que el `InitialLS` la
 ponga en 1: o sea, el bloque `LOGIC` manda sobre el valor inicial.
@@ -275,7 +272,7 @@ Clock (3600) closes the run.
 | | `A_Terminate` (el `TEST` se cumple) | `A_Terminate2` (no se cumple) | `A_Terminate1` (el `ALTER` no alteró a nadie) |
 |---|---|---|---|
 | original | **62** | 0 | 0 |
-| nuestro | **62** | 0 | 0 |
+| nuestro | **61** | 0 | 0 |
 
 **La regla.** El `ALTER` altera a los **miembros** del grupo, no a la
 transacción activa: "Un bloque ALTER selecciona transacciones de un grupo y
@@ -439,9 +436,10 @@ para colocar o modificar un entero en un parámetro de una transacción";
 - **El banco.** `Generate` (60,30) → `Assign` (Parametro `Param`, Operador
   `=`, Valor 0) → `Terminate`, más el `Clock` de 3600.
 - **GPSS.** Coincide: `A_Assign ASSIGN Param,0`.
-- **Cifras.** 2 de 2, dentro de las tolerancias: el bloque `A_Assign` con 63
-  entradas en el original y 62 en el nuestro (2%), y el `A_Terminate` con 63
-  contra 62.
+- **Cifras.** 2 de 2, dentro de las tolerancias: el bloque `A_Assign` con 60
+  entradas en el original y 61 en el nuestro (2%), y el `A_Terminate` con 60
+  contra 61. (Los conteos del original cambian de una corrida a otra: es lo
+  único que los dos motores sortean por su cuenta.)
 - **Veredicto.** verificada
 - **Diferencia concreta.** Ninguna de esta clase. La sonda 1 fija la regla del
   `ASSIGN` (el valor llega al parámetro) y los dos motores la cumplen.
@@ -482,8 +480,8 @@ la salida alternativa (el operando J) cuando no se alteró a nadie.
   ("No alteró") queda **sin conectar**, que es lo que hace que el `ALTER` no
   tenga destino alternativo.
 - **GPSS.** Coincide: `A_Alter ALTER E ungrupo,1,param,0,otro,1`.
-- **Cifras.** 2 de 2: el bloque `A_Alter` con 62 entradas en el original y 61
-  en el nuestro (2%), y el `A_Terminate` con 62 contra 61.
+- **Cifras.** 2 de 2: el bloque `A_Alter` con 58 entradas en el original y 61
+  en el nuestro (5%), y el `A_Terminate` con 58 contra 61.
 - **Veredicto.** con diferencias
 - **Diferencia concreta.** La **fila del bloque en nuestro reporte** escribe
   `ALTER ungrupo` donde el original escribe `ALTER E ungrupo,1,param,0,otro,1`
@@ -519,22 +517,23 @@ de la llave lógica especificada por el operando A es invertido".
 - **El banco.** `Generate` (60,30) → `Logic` (Op `Set`, LogicSwich `1`) →
   `Terminate`, más el `Clock` de 3600.
 - **GPSS.** Coincide: `A_Logic LOGIC S 1`.
-- **Cifras.** 2 de 2: el bloque `A_Logic` con 58 entradas en el original y 59
-  en el nuestro (2%), y el `A_Terminate` con 58 contra 59.
-- **Veredicto.** con diferencias
-- **Diferencia concreta.** Dos cosas. La primera es la **sección `LOGICSWITCH`
-  del reporte**, que el original imprime (`LOGICSWITCH VALUE RETRY` con el
-  estado de cada llave) y el nuestro no: es el pendiente 5 de "Cambios
-  pendientes" (el mismo que el `GateL` y el `SelectL` del lote 1), y lo
-  arreglaría `crates/genmsi-core/src/report.rs`, fn `render`. La segunda es el
-  **operador "Invertir"**: el manual dice que `I` invierte el estado de la
-  llave, y nuestro motor trata cualquier operador que no sea "Set" como un
-  "Reset" (`crates/genmsi-core/src/program.rs`, fn `Compiler::expand`, rama
-  `"Logic"`: `is_some_and(|op| op.eq_ignore_ascii_case("set"))` → `LogicOp::Set`,
-  cualquier otro → `LogicOp::Reset`); el listado tiene el mismo problema
-  (`crates/genmsi-core/src/gpss.rs`, rama `BlockKind::Logic`, que sólo escribe
-  `S` y `R`). Lo fijaría un test con un `Logic` de operador `Invertir` que
-  compruebe que el listado sale `LOGIC I 1` y que la llave queda invertida.
+- **Cifras.** 2 de 2: el bloque `A_Logic` con 58 entradas en el original y 61
+  en el nuestro (5%), y el `A_Terminate` con 58 contra 61.
+- **Veredicto.** verificada
+- **Diferencia concreta.** Ninguna de esta clase: la sección `LOGICSWITCH` del
+  reporte la imprimimos y coincide con la del original (la sonda 2 lo dice:
+  valor 1 con `LOGIC S 1` y 0 con `LOGIC R 1`, en los dos motores). Queda una
+  cosa que **ningún banco del lote mide**: el **operador "Invertir"**. El
+  manual dice que `I` invierte el estado de la llave ("Si el operador lógico es
+  I, el estado de la llave lógica especificada por el operando A es
+  invertido"), y nuestro motor trata cualquier operador que no sea "Set" como
+  un "Reset" (`crates/genmsi-core/src/program.rs`, fn `Compiler::expand`, rama
+  `"Logic"`: `is_some_and(|op| op.eq_ignore_ascii_case("set"))` →
+  `LogicOp::Set`, cualquier otro → `LogicOp::Reset`); el listado tiene el
+  mismo problema (`crates/genmsi-core/src/gpss.rs`, rama `BlockKind::Logic`,
+  que sólo escribe `S` y `R`). Lo fijaría un test con un `Logic` de operador
+  `Invertir` que compruebe que el listado sale `LOGIC I 1` y que la llave queda
+  invertida: es el pendiente 3 de "Cambios pendientes".
 
 ### InitialLS
 
@@ -553,12 +552,11 @@ a inicicializar'='1'],[Valor:'Valor de inicio'='Set']`: es una clase de
 - **El banco.** Un `InitialLS` sin conectar más el `Clock` de 3600.
 - **GPSS.** Coincide: `INITIAL LS1`.
 - **Cifras.** 0 de 0 ("no-metrics").
-- **Veredicto.** con diferencias
-- **Diferencia concreta.** La **sección `LOGICSWITCH` del reporte** que el
-  original imprime y el nuestro no (el mismo pendiente 5 que en el `Logic`).
-  La sonda 3 confirma que la regla es la que dice el manual: con un
-  `InitialLS` que pone la llave en 1 y un `LOGIC R 1` detrás, la llave queda
-  en 0.
+- **Veredicto.** verificada
+- **Diferencia concreta.** Ninguna de esta clase: la sección `LOGICSWITCH` del
+  reporte la imprimimos y coincide con la del original. La sonda 3 confirma que
+  la regla es la que dice el manual: con un `InitialLS` que pone la llave en 1
+  y un `LOGIC R 1` detrás, la llave queda en 0 en los dos motores.
 
 ### InitiaSV
 
@@ -578,14 +576,10 @@ inicial de SaveValue'='0']`: otra clase de **declaración**, sin puertos.
 - **Cifras.** 0 de 0 ("no-metrics"). Pero la **sección `SAVEVALUE`** del
   reporte del original sí dice el valor: `SAVEVALUE VALUE RETRY` con
   `1  0  0`.
-- **Veredicto.** con diferencias
-- **Diferencia concreta.** La **sección `SAVEVALUE` del reporte**: la nuestra
-  escribe `SAVEVALUE VALUE` y el valor (`1  0`), y la del original escribe
-  `SAVEVALUE VALUE RETRY` y las dos columnas (`1  0  0`). Es el pendiente 5 de
-  "Cambios pendientes" (el mismo del `Counter` del lote 1), y lo arreglaría
-  `crates/genmsi-core/src/report.rs`, fn `render` (la sección `SAVEVALUE`,
-  línea 244), con el contador de reintentos en
-  `crates/genmsi-core/src/stat.rs`.
+- **Veredicto.** verificada
+- **Diferencia concreta.** Ninguna de esta clase: la sección `SAVEVALUE` del
+  reporte la imprimimos con sus tres columnas (`SAVEVALUE VALUE RETRY` y
+  `1  0  0`), igual que el original.
 
 ### SaveValue
 
@@ -610,12 +604,12 @@ seguido por -, el operando B es restado".
 - **El banco.** `Generate` (60,30) → `SaveValue` (SaveValue `1`, Op `=`,
   Valor 0) → `Terminate`, más el `Clock`.
 - **GPSS.** Coincide: `A_SaveValue SAVEVALUE 1,0`.
-- **Cifras.** 2 de 2: el bloque `A_SaveValue` con 59 entradas en el original
-  y 60 en el nuestro (2%), y el `A_Terminate` con 59 contra 60.
-- **Veredicto.** con diferencias
-- **Diferencia concreta.** La misma que en el `InitiaSV`: la **sección
-  `SAVEVALUE` del reporte** va sin la columna `RETRY` (el pendiente 5 de
-  "Cambios pendientes"). El valor (0) coincide en los dos.
+- **Cifras.** 2 de 2: el bloque `A_SaveValue` con 57 entradas en el original
+  y 61 en el nuestro (7%), y el `A_Terminate` con 57 contra 61.
+- **Veredicto.** verificada
+- **Diferencia concreta.** Ninguna de esta clase: la sección `SAVEVALUE` del
+  reporte (con su columna `RETRY`) coincide con la del original, y el valor (0)
+  también.
 
 ### Scan
 
@@ -653,8 +647,8 @@ grupo] que satisface la condición".
   defecto) → `Terminate`, más el `Clock`. La salida de fallo ("No escaneó")
   queda sin conectar y el grupo `UnGrupo` no lo define nadie.
 - **GPSS.** Coincide: `A_Scan SCAN E UnGrupo,otro,1,Param,Param`.
-- **Cifras.** 2 de 2: el bloque `A_Scan` con 58 entradas en el original y 58
-  en el nuestro (0%), y el `A_Terminate` con 58 contra 58.
+- **Cifras.** 2 de 2: el bloque `A_Scan` con 58 entradas en el original y 61
+  en el nuestro (5%), y el `A_Terminate` con 58 contra 61.
 - **Veredicto.** verificada
 - **Diferencia concreta.** Ninguna de esta clase. Lo que el banco **no**
   mide es el `SCAN` de verdad: el grupo no tiene miembros, así que no hay
@@ -696,8 +690,11 @@ nombre o el número de la cola".
   histograma: los 60 intervalos y la de desborde `> a 34800`, con su frecuencia,
   su porcentaje, su porcentaje acumulado y su porcentaje restante), y la
   nuestra es un resumen de cuatro líneas (`crates/genmsi-core/src/report.rs`,
-  fn `render`, la sección `QTABLES`, línea 227: la cabecera, la media, la
-  desviación y el "CANTIDAD DE VALORES"). Lo arreglaría esa misma fn, con la
+  fn `render`, la sección `QTABLES`: la cabecera, la media, la desviación y el
+  "CANTIDAD DE VALORES"). Además, la cabecera nuestra escribe los tres
+  operandos con decimales (`QTabla QTABLE 0,000, 600,000, 60`) donde el
+  original escribe el **nombre de la cola** y los operandos enteros
+  (`QTabla QTABLE qRecurso,0,600,60`). Lo arreglaría esa misma fn, con la
   tabla de frecuencias en `crates/genmsi-core/src/stat.rs` (la `QTable`), y
   lo fijaría un test en `crates/genmsi-core/tests/report_gpss.rs` que compare
   la sección `QTABLES` del banco `QTable` con la del reporte del original.
@@ -732,19 +729,15 @@ TABLE".
 - **GPSS.** Coincide, las tres sentencias: `Tabla TABLE P$Atrib,0,10,10`,
   `A_Tabulate TABULATE Tabla` y el reloj.
 - **Cifras.** 2 de 2: el bloque `A_Tabulate` con 60 entradas en el original y
-  60 en el nuestro (0%), y el `A_Terminate` con 60 contra 60.
-- **Veredicto.** con diferencias
-- **Diferencia concreta.** La **sección `TABLAS` del reporte**: la del original
-  es `Tabla TABLE P$Atrib,0,10,10` con la media, la desviación, el "CANTIDAD EN
-  RETRY", el histograma (la primera clase con 61 y el 100%, y la línea "Las
-  frecuencias restantes (9) son todas cero."), el "CANTIDAD DE VALORES
-  TABULADOS" y el "VALOR MAXIMO TABULADO"; la nuestra es `Tabla TABLE 0, 10,
-  10` (sin el operando del atributo), con el "CANTIDAD DE VALORES", el "VALOR
-  MAXIMO" y **las diez filas** del histograma, sin la línea de las frecuencias
-  que son cero. Es el pendiente 5 de "Cambios pendientes" (el del `Table` del
-  lote 1) más los rótulos: lo arreglaría `crates/genmsi-core/src/report.rs`,
-  fn `render` (la sección `TABLAS`, línea 178) y `crates/genmsi-core/src/stat.rs`
-  (struct `Table`).
+  60,3 en el nuestro (1%), y el `A_Terminate` con 60 contra 60,3.
+- **Veredicto.** verificada
+- **Diferencia concreta.** Ninguna de esta clase: la sección `TABLAS` del
+  reporte coincide con la del original (la cabecera con el operando del
+  atributo, el "CANTIDAD EN RETRY", el histograma con la línea "Las frecuencias
+  restantes (9) son todas cero.", el "CANTIDAD DE VALORES TABULADOS" y el
+  "VALOR MAXIMO TABULADO"). Lo único que difiere es el **número** de valores
+  tabulados (60 en la corrida del original, 59 en la nuestra), que es el ruido
+  de dos corridas distintas.
 
 ### Function
 
@@ -933,16 +926,19 @@ miembro es un número, no una transacción).
   listing"), que arregló el defecto que el lote 1 había anotado como
   pendiente A y el lote 2 como pendiente 5.
 - **Cifras.** 2 de 2: el terminador de la salida de fallo (`A_Terminate1`) con
-  64 entradas en el original y 61 en el nuestro (5%), y el `A_Terminate` con 0
+  60 entradas en el original y 61 en el nuestro (2%), y el `A_Terminate` con 0
   contra 0 (el grupo no tiene el número 0, así que todas las transacciones van
   por la salida de fallo, en los dos motores).
 - **Veredicto.** con diferencias
-- **Diferencia concreta.** La **sección `NUMERIC_GROUP`** del reporte, que el
-  original imprime (`NUMERIC_GROUP GROUP_SIZE RETRY` con `UNGRUPO 0 0`) y el
-  nuestro no: es el pendiente 5 de "Cambios pendientes" (las secciones que
-  faltan en el reporte), y lo arreglaría
-  `crates/genmsi-core/src/report.rs`, fn `render`, con el contador del grupo
-  numérico en `crates/genmsi-core/src/stat.rs`.
+- **Diferencia concreta.** La **sección `NUMERIC_GROUP`** del reporte: el
+  original imprime la fila del grupo que la sentencia nombra
+  (`NUMERIC_GROUP GROUP_SIZE RETRY` con `UNGRUPO 0 0`) y el nuestro no la
+  imprime, porque **el grupo no existe**: en el banco nadie define el grupo
+  `UnGrupo` (la clase `JoinNumber` es la que lo crea, y no está en este banco).
+  Nuestro reporte sólo lista los grupos que existen. Es el pendiente 4 de
+  "Cambios pendientes": lo arreglaría `crates/genmsi-core/src/report.rs`, fn
+  `render`, que tendría que imprimir también los grupos que una sentencia
+  nombra y que no existen (con el tamaño 0).
 
 ### RemoveNumber
 
@@ -982,10 +978,8 @@ los sesenta y seis del recuento final).
 
 | Qué | El original | El nuestro | Dónde |
 |---|---|---|---|
-| La columna `LOC` de los bloques sin nombre | el número de línea del programa (`2`, `3`, `4`…) | un contador de bloques sin nombre (`1`, `2`…) | `crates/genmsi-core/src/report.rs`, fn `render` (el contador `numeric_label`) |
-| Los decimales enteros | `0,000`, `100,000` | `0`, `100` | `crates/genmsi-core/src/report.rs`, fn `number` |
-| La línea de la semilla | no la tiene | `SEMILLA    7` | `crates/genmsi-core/src/report.rs`, fn `render` |
-| La tabla de los eventos pendientes | `FEC_XACT_NUMBER PRI BDT CURRENT NEXT PARAMETER VALUE` | no la tiene | `crates/genmsi-core/src/report.rs`, fn `render` |
+| La columna `LINE` de los bloques | el número de línea del programa (cuenta también las líneas de definición) | un contador de bloques | `crates/genmsi-core/src/report.rs`, fn `render` |
+| La columna `BDT` de la tabla de los eventos pendientes | el entero de la hora (`3646`) | el número con decimales (`3615,334`) | `crates/genmsi-core/src/report.rs`, fn `render` |
 | La referencia a un parámetro | `P$Param` | `P:Param` | `crates/genmsi-core/src/report.rs` (la fila del `TEST`) |
 
 La primera tiene un detalle que este lote deja claro: el número de línea del
@@ -995,30 +989,44 @@ la línea 1); en el de la `VariableN`, 4 y 5 (la definición de la función son
 las líneas 1 a 3); en el del `Tabulate`, 2 y 3 (la sentencia `TABLE` es la
 línea 1).
 
+Las diferencias que esta lista tenía antes y que **otra sesión arregló** (los
+commits `fae9386`, "the shape of the report is the original's", y `26b0c55`):
+la columna `LOC` (que ahora lleva el nombre de la sentencia y, para los
+bloques sin nombre, el número que tienen en el programa), los decimales
+enteros (que ahora se escriben `0,000`), la línea `SEMILLA` (que ya no
+imprimimos) y la tabla `FEC_XACT_NUMBER` (que ahora imprimimos).
+
 ## Cambios pendientes
 
 Cada fila dice **qué** hay que arreglar, **dónde** (archivo y función) y **qué
-prueba** lo fijaría. Nada de esto se hizo en esta sesión: el core lo tiene
-otra sesión.
+prueba** lo fijaría. Es la lista **definitiva** de lo que queda del inventario
+de la fase 7: lo que separa a las trece clases "con diferencias" y a las tres
+"pendientes" del resto, más lo que las diferencias de forma cubren. Nada de
+esto se hizo en esta sesión: el core lo tiene otra sesión.
 
 ### En el core (`crates/genmsi-core`)
 
 | # | Qué hay que arreglar | Dónde | La prueba que lo fijaría |
 |---|---|---|---|
-| 1 | **La fila del `ALTER` pierde los operandos:** escribimos `ALTER ungrupo` donde el original escribe `ALTER E ungrupo,1,param,0,otro,1` (el operador, el grupo, el límite, el parámetro alterado y su valor, el parámetro comparado y su valor). Y el **listado** tampoco escribe el destino de la salida de fallo cuando ésta está conectada: el original escribe `ALTER E UnGrupo,1,Param,99,Param,0,A_Terminate1` y el nuestro `ALTER E UnGrupo,1,Param,99,Param,0`. | `crates/genmsi-core/src/report.rs` · `operand_parts` (rama `BlockKind::Alter`, línea 719); `crates/genmsi-core/src/gpss.rs` · `block_statements` (rama `BlockKind::Alter`, línea 886) | Un test en `crates/genmsi-core/tests/report_gpss.rs` que compruebe que la fila del banco `Alter` sale `ALTER E ungrupo,1,param,0,otro,1`, y otro con la sonda `scripts/wine-oracle/probes/AlterMiembro.gmdl` que compruebe que el listado sale `ALTER E UnGrupo,1,Param,99,Param,0,A_Terminate1` |
-| 2 | **La sección `QTABLES` del reporte es un resumen de cuatro líneas:** el original imprime el histograma entero (los 60 intervalos y la fila de desborde `> a 34800`) con su frecuencia, su porcentaje, su acumulado y su restante, y la columna "CANTIDAD EN RETRY". | `crates/genmsi-core/src/report.rs` · `render` (la sección `QTABLES`, línea 227); las frecuencias están en `crates/genmsi-core/src/stat.rs` (la `QTable`) | Un test en `crates/genmsi-core/tests/report_gpss.rs` que compare la sección `QTABLES` del banco `QTable` con la del reporte del original |
-| 3 | **El operador "Invertir" de la llave lógica no existe:** el manual dice que `I` invierte el estado de la llave, y el motor trata cualquier operador que no sea "Set" como un "Reset". El listado tampoco escribe la `I`. | `crates/genmsi-core/src/program.rs` · `Compiler::expand` (rama `"Logic"`, línea 1717); `crates/genmsi-core/src/gpss.rs` · `block_statements` (rama `BlockKind::Logic`) | Un test con un `Logic` de operador `Invertir` que compruebe que el listado sale `LOGIC I 1` y que la llave queda invertida (la sonda 3, `scripts/wine-oracle/probes/LogicReset.gmdl`, es el modelo con el que se midió) |
-| 4 | **La sección `TABLAS` del reporte no es la del original:** la cabecera pierde el operando del atributo (`P$Atrib`), los rótulos son otros ("CANTIDAD DE VALORES" en vez de "CANTIDAD EN RETRY" y de "CANTIDAD DE VALORES TABULADOS"), el original colapsa las frecuencias que están a cero ("Las frecuencias restantes (9) son todas cero.") y el nuestro las imprime todas. | `crates/genmsi-core/src/report.rs` · `render` (la sección `TABLAS`, línea 178); `crates/genmsi-core/src/stat.rs` · struct `Table` (ya estaba anotado como pendiente 15 del lote 1) | Un test en `crates/genmsi-core/tests/report_gpss.rs` que compare la sección `TABLAS` del banco `Tabulate` con la del reporte del original |
-| 5 | **Faltan las secciones `LOGICSWITCH`, `NUMERIC_GROUP`, `XACT_GROUP` y `FEC_XACT_NUMBER` del reporte, y la de `SAVEVALUE` va sin la columna `RETRY`.** El original las imprime: `LOGICSWITCH VALUE RETRY`, `NUMERIC_GROUP GROUP_SIZE RETRY`, `XACT_GROUP GROUP_SIZE RETRY`, `SAVEVALUE VALUE RETRY` y la tabla de los eventos pendientes. | `crates/genmsi-core/src/report.rs` · `render` (la sección `SAVEVALUE`, línea 244); `crates/genmsi-core/src/stat.rs` (los contadores por llave lógica) | Un test que compare esas secciones con los reportes del original de los bancos `Logic`, `InitialLS`, `InitiaSV`, `SaveValue` y `ExamineNumber` (ya estaba anotado como pendiente 13 del lote 1) |
-| 6 | **El listado del `EXAMINE` no escribía el destino alternativo** (el original escribe `EXAMINE UnGrupo,0,A_Terminate1` y el nuestro `EXAMINE UnGrupo,0,`). **Ya está arreglado** por otra sesión: el commit `ff13c32` ("the shape of the GPSS listing") lo escribió, y el listado del banco `ExamineNumber` ya coincide con el del original. Queda aquí como prueba de que la diferencia era del listado y no del banco. | `crates/genmsi-core/src/gpss.rs` · `block_statements` (rama `BlockKind::Examine`, línea 532) | Un test en `crates/genmsi-core/tests/report_gpss.rs` que compruebe que el listado del banco `ExamineNumber` sale `EXAMINE UnGrupo,0,A_Terminate1` |
-| 7 | **La columna `LOC` de los bloques sin nombre** es un contador de bloques; el original escribe el número de línea del programa, que cuenta también las líneas de definición. | `crates/genmsi-core/src/report.rs` · `render` y `loc_label` | Un test en `crates/genmsi-core/tests/report_gpss.rs` que compruebe que la fila del `GENERATE` del banco `Variable` sale con `LOC` 2 (ya estaba anotado como pendiente 4 del lote 1) |
-| 8 | **La fila del `TEST` escribe la referencia al parámetro como `P:Param`**, donde el original escribe `P$Param`. | `crates/genmsi-core/src/report.rs` (la fila del `TEST`: fn `operand_parts` y `fn expr_operand`) | Un test en `crates/genmsi-core/tests/report_gpss.rs` que compruebe que la fila del `TEST` de la sonda `scripts/wine-oracle/probes/AssignValor.gmdl` sale `TEST E P$Param,7,A_Terminate1` |
+| 1 | **La fila del `ALTER` pierde los operandos:** escribimos `ALTER ungrupo` donde el original escribe `ALTER E ungrupo,1,param,0,otro,1` (el operador, el grupo, el límite, el parámetro alterado y su valor, el parámetro comparado y su valor). Y el **listado** tampoco escribe el destino de la salida de fallo cuando ésta está conectada: el original escribe `ALTER E UnGrupo,1,Param,99,Param,0,A_Terminate1` y el nuestro `ALTER E UnGrupo,1,Param,99,Param,0`. | `crates/genmsi-core/src/report.rs` · `operand_parts` (rama `BlockKind::Alter`); `crates/genmsi-core/src/gpss.rs` · `block_statements` (rama `BlockKind::Alter`) | Un test en `crates/genmsi-core/tests/report_gpss.rs` que compruebe que la fila del banco `Alter` sale `ALTER E ungrupo,1,param,0,otro,1`, y otro con la sonda `scripts/wine-oracle/probes/AlterMiembro.gmdl` que compruebe que el listado sale `ALTER E UnGrupo,1,Param,99,Param,0,A_Terminate1` |
+| 2 | **La fila del `ENTER` y del `LEAVE` pierde las unidades:** escribimos `ENTER AStorage` donde el original escribe `ENTER AStorage,1` (y `LEAVE AStorage,1`). | `crates/genmsi-core/src/report.rs` · `operand_parts` (ramas `BlockKind::Enter`/`BlockKind::Leave`) y `fn is_one_unit`; `crates/genmsi-core/src/gpss.rs` · `block_statements` (ramas `BlockKind::Enter` y `BlockKind::Leave`) | Un test en `crates/genmsi-core/tests/report_gpss.rs` con los bancos `Enter` y `Leave` |
+| 3 | **La fila del `TRANSFER` pierde la probabilidad:** escribimos `TRANSFER ,,A_Terminate` donde el original escribe `TRANSFER 1000,,A_Terminate`. | `crates/genmsi-core/src/report.rs` · `fn transfer_probability` y `operand_parts` (rama `BlockKind::Transfer`) | Un test en `crates/genmsi-core/tests/report_gpss.rs` que compruebe que la fila del banco `Transfer` sale `TRANSFER 1000,,A_Terminate` |
+| 4 | **Las filas de la `Multifurcacion` y la `MultifurcacionP`:** escribimos los pesos (`TRANSFER 0.2,0.2,0.2,0.2,0.2`) o el nombre de la clase (`MULTIFURCACIONP`) donde el original escribe `TRANSFER ,FN$MultifurcacionGO`. | `crates/genmsi-core/src/report.rs` · `operand_parts` (rama `BlockKind::MultiTransfer`) | Un test en `crates/genmsi-core/tests/report_gpss.rs` con las dos filas |
+| 5 | **La fila del `LOOP` pierde el segundo operando:** escribimos `LOOP Param` donde el original escribe `LOOP Param,` (el destino de la iteración, vacío cuando la salida no está conectada). | `crates/genmsi-core/src/report.rs` · `operand_parts` (rama `BlockKind::Loop`) | Un test en `crates/genmsi-core/tests/report_gpss.rs` que compruebe que la fila del banco `Loop` sale `LOOP Param,` |
+| 6 | **La fila de la `GateM` escribe `GATE LS`** donde el original escribe `GATE M` (la puerta que mira una etiqueta). | `crates/genmsi-core/src/report.rs` · `operand_parts` (rama `BlockKind::Gate`) | Un test en `crates/genmsi-core/tests/report_gpss.rs` que compruebe que la fila del banco `GateM` sale `GATE M AAA` |
+| 7 | **La sección `QTABLES` del reporte es un resumen de cuatro líneas:** el original imprime el histograma entero (los 60 intervalos y la fila de desborde `> a 34800`) con su frecuencia, su porcentaje, su acumulado y su restante, y la cabecera lleva el nombre de la cola (`QTabla QTABLE qRecurso,0,600,60`) donde la nuestra escribe los operandos con decimales. | `crates/genmsi-core/src/report.rs` · `render` (la sección `QTABLES`); las frecuencias están en `crates/genmsi-core/src/stat.rs` (la `QTable`) | Un test en `crates/genmsi-core/tests/report_gpss.rs` que compare la sección `QTABLES` del banco `QTable` con la del reporte del original |
+| 8 | **Las secciones `XACT_GROUP` y `NUMERIC_GROUP` no imprimen los grupos que una sentencia nombra y que nadie define:** el original imprime la fila del grupo (`UNGRUPO 0 0`) aunque no exista, y el nuestro sólo lista los grupos que existen. Lo afecta al `Examine`, al `RemoveTrans` y al `ExamineNumber`. | `crates/genmsi-core/src/report.rs` · `render` (las secciones de los grupos) | Un test en `crates/genmsi-core/tests/report_gpss.rs` que compare las secciones `XACT_GROUP` y `NUMERIC_GROUP` de los bancos `Examine`, `RemoveTrans` y `ExamineNumber` con las de los reportes del original |
+| 9 | **El operador "Invertir" de la llave lógica no existe:** el manual dice que `I` invierte el estado de la llave, y el motor trata cualquier operador que no sea "Set" como un "Reset" (y el listado sólo escribe `S` y `R`). | `crates/genmsi-core/src/program.rs` · `Compiler::expand` (rama `"Logic"`); `crates/genmsi-core/src/gpss.rs` · `block_statements` (rama `BlockKind::Logic`) | Un test con un `Logic` de operador `Invertir` que compruebe que el listado sale `LOGIC I 1` y que la llave queda invertida |
+| 10 | **La fila del `TEST` escribe la referencia al parámetro como `P:Param`**, donde el original escribe `P$Param`. | `crates/genmsi-core/src/report.rs` (la fila del `TEST`: fn `operand_parts` y `fn expr_operand`) | Un test en `crates/genmsi-core/tests/report_gpss.rs` que compruebe que la fila del `TEST` de la sonda `scripts/wine-oracle/probes/AssignValor.gmdl` sale `TEST E P$Param,7,A_Terminate1` |
+| 11 | **La puerta que no abre.** Nuestro motor cuenta el intento fallido como entrada de la puerta y como reintento del bloque; el original no cuenta la entrada y cuenta los intentos en la llave. Es la **única** diferencia de comportamiento que queda en el inventario entero (el `GateL` es la única clase cuyas cifras no coinciden: 1 de 2). | `crates/genmsi-core/src/sim.rs` · rama `BlockKind::Gate` | La fila de la puerta del banco `GateL` tiene que salir `0 0 0` |
+| 12 | **La columna `LINE` de la tabla de bloques** es un contador de bloques; el original escribe el número de línea del programa, que cuenta también las líneas de definición. | `crates/genmsi-core/src/report.rs` · `render` | Un test en `crates/genmsi-core/tests/report_gpss.rs` que compruebe que la fila del `GENERATE` del banco `Variable` sale con `LINE` 2 |
+| 13 | **La columna `BDT` de la tabla de los eventos pendientes** escribe el número con decimales (`3615,334`) donde el original escribe el entero (`3646`). | `crates/genmsi-core/src/report.rs` · `render` | Un test que compare la tabla `FEC_XACT_NUMBER` del reporte de un banco con la del original |
 
 ### En el catálogo y en el motor (`crates/genmsi-format` y `crates/genmsi-core`)
 
 | # | Qué hay que arreglar | Dónde | La prueba que lo fijaría |
 |---|---|---|---|
-| 9 | **Las tres clases que el catálogo no ofrece: `MFunction`, `MFunctionDist` y `RemoveNumber`.** El original las declara en su biblioteca de clases, las compila (sus GPSS están en las fichas) y las simula. Hoy nuestro motor se niega: "block class \"MFunction\" is not implemented by the engine". | `crates/genmsi-format/src/catalogue.rs` (las tres clases, con los defaults del original, que ya están anotados en `crates/genmsi-format/tests/catalogue_matches_the_reference_models.rs`); `crates/genmsi-core/src/program.rs` · fn `known_classes` (línea 944) y fn `Compiler::expand` | Un test de `crates/genmsi-format` que exija que las tres clases estén en el catálogo (el test de hoy exige lo contrario: `the_three_classes_the_original_declares_and_the_catalogue_does_not_offer`, línea 227) y un test de `crates/genmsi-core/tests/report_gpss.rs` con el listado de cada una de las tres: `FUNCTION P$Param,E3` (dos veces, con sus tablas), `FUNCTION RN4,D3` (dos veces) y `REMOVE E UnGrupo,,0` |
+| 14 | **Las tres clases que el catálogo no ofrece: `MFunction`, `MFunctionDist` y `RemoveNumber`.** El original las declara en su biblioteca de clases, las compila (sus GPSS están en las fichas) y las simula. Hoy nuestro motor se niega: "block class \"MFunction\" is not implemented by the engine". | `crates/genmsi-format/src/catalogue.rs` (las tres clases, con los defaults del original, que ya están anotados en `crates/genmsi-format/tests/catalogue_matches_the_reference_models.rs`); `crates/genmsi-core/src/program.rs` · fn `known_classes` y fn `Compiler::expand` | Un test de `crates/genmsi-format` que exija que las tres clases estén en el catálogo (el test de hoy exige lo contrario: `the_three_classes_the_original_declares_and_the_catalogue_does_not_offer`) y un test de `crates/genmsi-core/tests/report_gpss.rs` con el listado de cada una de las tres: `FUNCTION P$Param,E3` (dos veces, con sus tablas), `FUNCTION RN4,D3` (dos veces) y `REMOVE E UnGrupo,,0` |
 
 ### En los bancos (`scripts/wine-oracle/make-benches.py`)
 
@@ -1026,24 +1034,21 @@ Lo que este lote cambió, con sus pruebas:
 
 | # | Qué hay que arreglar | Dónde | La prueba que lo fijaría |
 |---|---|---|---|
-| 10 | **El generador escribía un tipo de propiedad que el original no conoce** en las clases `MFunction` (`EntityDefList` y `TSNAMatrix`) y `MFunctionDist` (`EntityDefList`), y una lista equivocada en el `RemoveNumber` (`op_Relac` en vez de `op_RelacMaxMin`). El original abría esos tres modelos adaptando el módulo, y la ventana del aviso tapaba la respuesta. | `scripts/wine-oracle/make-benches.py` · `CLASS_PROP_TYPES` (líneas 134-167) | `scripts/wine-oracle/test_make_benches.py`, clase `PropertyTypes` |
-| 11 | **El banco del `Tabulate` no declaraba la tabla que la clase tabula**, y el original se paraba con "Se intentó actualizar el valor de una tabla inexistente". | `scripts/wine-oracle/make-benches.py` · `DECLARATIONS` | `scripts/wine-oracle/test_make_benches.py`, clase `PropertyTypes` (el test de la tabla) |
-| 12 | **El arnés y el original comparten el prefijo de Wine**, y el `wineserver -k` que termina una corrida mata la simulación de la otra sesión; además, el arnés es frágil cuando otra sesión usa el mismo display. | `scripts/wine-oracle/run_oracle.sh` · la variable `WINEPREFIX` (ahora `GENMSI_WINEPREFIX` la puede Apartar) | — (es una robustez del arnés, no una regla del original) |
+| 15 | **El generador escribía un tipo de propiedad que el original no conoce** en las clases `MFunction` (`EntityDefList` y `TSNAMatrix`) y `MFunctionDist` (`EntityDefList`), y una lista equivocada en el `RemoveNumber` (`op_Relac` en vez de `op_RelacMaxMin`). El original abría esos tres modelos adaptando el módulo, y la ventana del aviso tapaba la respuesta. | `scripts/wine-oracle/make-benches.py` · `CLASS_PROP_TYPES` | `scripts/wine-oracle/test_make_benches.py`, clase `PropertyTypes` |
+| 16 | **El banco del `Tabulate` no declaraba la tabla que la clase tabula**, y el original se paraba con "Se intentó actualizar el valor de una tabla inexistente". | `scripts/wine-oracle/make-benches.py` · `DECLARATIONS` | `scripts/wine-oracle/test_make_benches.py`, clase `PropertyTypes` (el test de la tabla) |
+| 17 | **El arnés y el original comparten el prefijo de Wine**, y el `wineserver -k` que termina una corrida mata la simulación de la otra sesión; además, el arnés es frágil cuando otra sesión usa el mismo display. | `scripts/wine-oracle/run_oracle.sh` · la variable `WINEPREFIX` (ahora `GENMSI_WINEPREFIX` la puede Apartar) | — (es una robustez del arnés, no una regla del original) |
 
 ### Lo que ya está arreglado y no hay que rehacer
 
 | # | Qué | Dónde |
 |---|---|---|
-| 13 | **Las tres clases que el original no corría** (`MFunction`, `MFunctionDist`, `RemoveNumber`) y la **`Tabulate`**: los cuatro bancos responden. | `scripts/wine-oracle/make-benches.py` (los tipos, la lista y la declaración de la tabla) |
-| 14 | **La ecuación vacía de la `Variable`**: el original no la simula, y el banco usa `0`. | `scripts/wine-oracle/make-benches.py` · `PROP_VALUES` |
-| 15 | **El destino alternativo del `EXAMINE`**: lo escribió otra sesión (el commit `ff13c32`, "the shape of the GPSS listing"), así que el listado del `ExamineNumber` ya coincide con el del original. | `crates/genmsi-core/src/gpss.rs` · `block_statements` (rama `BlockKind::Examine`) |
+| 18 | **Las tres clases que el original no corría** (`MFunction`, `MFunctionDist`, `RemoveNumber`) y la **`Tabulate`**: los cuatro bancos responden. | `scripts/wine-oracle/make-benches.py` (los tipos, la lista y la declaración de la tabla) |
+| 19 | **La ecuación vacía de la `Variable`**: el original no la simula, y el banco usa `0`. | `scripts/wine-oracle/make-benches.py` · `PROP_VALUES` |
+| 20 | **El destino alternativo del `EXAMINE`**: lo escribió otra sesión (el commit `ff13c32`, "the shape of the GPSS listing"), así que el listado del `ExamineNumber` ya coincide con el del original. | `crates/genmsi-core/src/gpss.rs` · `block_statements` (rama `BlockKind::Examine`) |
+| 21 | **La forma del reporte**: la columna `LOC`, los decimales enteros, la línea `SEMILLA`, las secciones `LOGICSWITCH`, `XACT_GROUP`, `NUMERIC_GROUP` y `FEC_XACT_NUMBER`, la columna `RETRY` de la `SAVEVALUE` y las filas del `PREEMPT`, del `SELECT`, del `REMOVE` y del `LINK`. Los escribió otra sesión (los commits `fae9386` y `26b0c55`). | `crates/genmsi-core/src/report.rs` |
+| 22 | **La primera transacción de un generador**: ya no difiere (el `GENERATE` del reloj cuenta 2 entradas en los dos). | `odd/tasks/notas-primera-llegada.md` y el commit `47d0b8f` |
 
 ## El recuento definitivo de las 66 clases del original
-
-Las 66 clases del catálogo del original, después de los tres lotes. La columna
-"GPSS" dice si nuestro listado coincide con el del original, sentencia por
-sentencia; la columna "Cifras", si las métricas que el oráculo puede comparar
-caen dentro de las tolerancias (20% en conteos, 35% en tiempos).
 
 Las 66 clases del catálogo del original, después de los tres lotes. La
 columna "GPSS" dice si nuestro listado coincide con el del original, sentencia
@@ -1055,11 +1060,11 @@ compare-benches -- ... --runs 3`).
 **La regla del veredicto.** Una clase está *verificada* cuando su listado es el
 del original, sus cifras coinciden y el reporte dice lo mismo que el del
 original sobre ella. Las diferencias que **comparten todas las clases** —la
-columna `LOC` con el número de línea del programa, los decimales enteros, la
-línea `SEMILLA` y la tabla `FEC_XACT_NUMBER`, que no imprimimos— van aparte
-(abajo) y no cuentan contra ninguna clase. Una diferencia cuenta si es **de la
-clase**: su fila del reporte, su sección, su columna, su comportamiento o su
-catálogo.
+columna `LINE` con el número de línea del programa, la columna `BDT` de la
+tabla de los eventos pendientes y la referencia a un parámetro— van aparte
+(la sección "Las diferencias de forma") y no cuentan contra ninguna clase. Una
+diferencia cuenta si es **de la clase**: su fila del reporte, su sección, su
+columna, su comportamiento o su catálogo.
 
 | # | Clase | GPSS | Cifras | Estado | Lo que lo separa del original |
 | 1 | Advance | coincide | 2/2 | verificada | — |
@@ -1068,29 +1073,29 @@ catálogo.
 | 4 | Assign | coincide | 2/2 | verificada | — |
 | 5 | Buffer | coincide | 2/2 | verificada | — |
 | 6 | Clock | coincide | 0/0 | verificada | — |
-| 7 | Counter | coincide | 2/2 | con diferencias | la sección `SAVEVALUE` va sin la columna `RETRY` |
+| 7 | Counter | coincide | 2/2 | verificada | — |
 | 8 | Depart | coincide | 6/6 | verificada | — |
 | 9 | Enter | coincide | 4/4 | con diferencias | la fila dice `ENTER AStorage,1` |
 | 10 | Examine | coincide | 3/3 | con diferencias | falta la sección `XACT_GROUP` |
 | 11 | ExamineNumber | coincide | 2/2 | con diferencias | falta la sección `NUMERIC_GROUP` |
-| 12 | FacilityInt | coincide | 7/7 | con diferencias | la fila dice `PREEMPT Recurso,PR,,Remanente` |
+| 12 | FacilityInt | coincide | 7/7 | verificada | — |
 | 13 | FacilityUse | coincide | 7/7 | verificada | — |
 | 14 | Function | coincide | 0/0 | verificada | — |
 | 15 | FunctionDist | coincide | 0/0 | verificada | — |
 | 16 | FunctionExpon | coincide | 0/0 | verificada | — |
 | 17 | GateF | coincide | 4/4 | verificada | — |
-| 18 | GateL | coincide | 1/2 | con diferencias | las cifras no coinciden (1/2); falta la sección `LOGICSWITCH` |
+| 18 | GateL | coincide | 1/2 | con diferencias | las cifras no coinciden (1/2) |
 | 19 | GateM | coincide | 4/4 | con diferencias | la fila dice `GATE M AAA` |
 | 20 | GateS | coincide | 2/2 | verificada | — |
 | 21 | Gather | coincide | 2/2 | verificada | — |
 | 22 | Generate | coincide | 1/1 | verificada | — |
-| 23 | InitiaSV | coincide | 0/0 | con diferencias | la sección `SAVEVALUE` va sin la columna `RETRY` |
-| 24 | InitialLS | coincide | 0/0 | con diferencias | falta la sección `LOGICSWITCH` |
-| 25 | JoinMe | coincide | 2/2 | con diferencias | falta la sección `XACT_GROUP` |
-| 26 | JoinNumber | coincide | 2/2 | con diferencias | falta la sección `NUMERIC_GROUP` |
+| 23 | InitiaSV | coincide | 0/0 | verificada | — |
+| 24 | InitialLS | coincide | 0/0 | verificada | — |
+| 25 | JoinMe | coincide | 2/2 | verificada | — |
+| 26 | JoinNumber | coincide | 2/2 | verificada | — |
 | 27 | Leave | coincide | 5/5 | con diferencias | la fila dice `ENTER AStorage,1` |
-| 28 | Link | coincide | 2/2 | con diferencias | la fila dice `LINK Cadena,FIFO,A_Terminate` |
-| 29 | Logic | coincide | 2/2 | con diferencias | falta la sección `LOGICSWITCH` |
+| 28 | Link | coincide | 2/2 | verificada | — |
+| 29 | Logic | coincide | 2/2 | verificada | — |
 | 30 | Loop | coincide | 2/2 | con diferencias | la fila dice `LOOP Param,` |
 | 31 | MFunction | no lo tenemos | — | pendiente | nuestro motor no compila la clase |
 | 32 | MFunctionDist | no lo tenemos | — | pendiente | nuestro motor no compila la clase |
@@ -1099,28 +1104,28 @@ catálogo.
 | 35 | Multifurcacion | coincide | 6/6 | con diferencias | la fila dice `TRANSFER ,FN$MultifurcacionGO` |
 | 36 | MultifurcacionP | coincide | 5/5 | con diferencias | la fila dice `TRANSFER ,FN$MultifurcacionGO` |
 | 37 | Note | coincide | 0/0 | verificada | — |
-| 38 | Preempt | coincide | 5/5 | con diferencias | la fila dice `PREEMPT Recurso,PR,,Remanente` |
+| 38 | Preempt | coincide | 5/5 | verificada | — |
 | 39 | Priority | coincide | 2/2 | verificada | — |
 | 40 | QTable | coincide | 0/0 | con diferencias | la sección `QTABLES` no es la del original |
 | 41 | Queue | coincide | 5/5 | verificada | — |
 | 42 | Release | coincide | 5/5 | verificada | — |
-| 43 | RemoveMe | coincide | 2/2 | con diferencias | la fila dice `REMOVE UnGrupo`; falta la sección `XACT_GROUP` |
+| 43 | RemoveMe | coincide | 2/2 | verificada | — |
 | 44 | RemoveNumber | no lo tenemos | — | pendiente | nuestro motor no compila la clase |
 | 45 | RemoveTrans | coincide | 2/2 | con diferencias | falta la sección `XACT_GROUP` |
 | 46 | Return | coincide | 5/5 | verificada | — |
-| 47 | SaveValue | coincide | 2/2 | con diferencias | la sección `SAVEVALUE` va sin la columna `RETRY` |
+| 47 | SaveValue | coincide | 2/2 | verificada | — |
 | 48 | Scan | coincide | 2/2 | verificada | — |
 | 49 | Seize | coincide | 5/5 | verificada | — |
 | 50 | Select | coincide | 32/32 | verificada | — |
 | 51 | SelectF | coincide | 4/4 | verificada | — |
-| 52 | SelectL | coincide | 2/2 | con diferencias | la fila dice `SELECT LS param,1,10`; falta la sección `LOGICSWITCH` |
-| 53 | SelectS | coincide | 2/2 | con diferencias | la fila dice `SELECT SNF param,1,10` |
-| 54 | SelectSNA | coincide | 5/5 | con diferencias | la fila dice `SELECT E param,1,10,*1,Q,` |
+| 52 | SelectL | coincide | 2/2 | verificada | — |
+| 53 | SelectS | coincide | 2/2 | verificada | — |
+| 54 | SelectSNA | coincide | 5/5 | verificada | — |
 | 55 | Split | coincide | 2/2 | verificada | — |
 | 56 | StorageDef | coincide | 2/2 | verificada | — |
 | 57 | StorageUse | coincide | 7/7 | verificada | — |
-| 58 | Table | coincide | 0/0 | con diferencias | la sección `TABLAS` no es la del original |
-| 59 | Tabulate | coincide | 2/2 | con diferencias | la sección `TABLAS` no es la del original |
+| 58 | Table | coincide | 0/0 | verificada | — |
+| 59 | Tabulate | coincide | 2/2 | verificada | — |
 | 60 | Terminate | coincide | 1/1 | verificada | — |
 | 61 | Test | coincide | 2/2 | verificada | — |
 | 62 | Transfer | coincide | 2/2 | con diferencias | la fila dice `TRANSFER 1000,,A_Terminate` |
@@ -1129,28 +1134,29 @@ catálogo.
 | 65 | VariableA | coincide | 0/0 | verificada | — |
 | 66 | VariableN | coincide | 0/0 | verificada | — |
 
-**El recuento:** **34 verificadas**, **29 con diferencias** y **3 pendientes**
+**El recuento:** **50 verificadas**, **13 con diferencias** y **3 pendientes**
 (las tres son clases que nuestro catálogo no ofrece: `MFunction`,
 `MFunctionDist` y `RemoveNumber`).
+
+Las trece con diferencias son: `Alter` (la fila del `ALTER`), `Enter` y
+`Leave` (la fila con las unidades), `Examine`, `ExamineNumber` y
+`RemoveTrans` (la sección del grupo que la sentencia nombra y que nadie
+define), `GateL` (la puerta que no abre: la única diferencia de
+comportamiento que queda), `GateM` (la fila de la puerta), `Loop` (la fila),
+`Multifurcacion` y `MultifurcacionP` (la fila del reparto), `QTable` (la
+sección `QTABLES`), y `Transfer` (la fila de la probabilidad). Cada una tiene
+su archivo, su función y su prueba en "Cambios pendientes".
 
 **Cómo se midió.** Los 66 bancos con el generador de este lote
 (`python3 scripts/wine-oracle/make-benches.py`), el original bajo Wine con un
 prefijo de Wine propio (`GENMSI_WINEPREFIX`) y un display libre, y nuestro
-motor con el binario del commit `ff13c32` (la última versión del núcleo cuando
+motor con el binario del commit `26b0c55` (la última versión del núcleo cuando
 se cerró esta fase). Los tres instrumentos: el GPSS, sentencia por sentencia
 (`scripts/wine-oracle/compare-gpss.sh`), las cifras del reporte
 (`cargo run --release -p genmsi-core --example compare-benches -- ... --runs 3`,
 con la semilla base 7) y la comparación de las **filas de la tabla de bloques**
 y de las **secciones** de los dos reportes (el original contra el nuestro), que
 es lo que separa "con diferencias" de "verificada".
-
-De las 29 con diferencias, **diez** se separan del original **sólo** por una
-sección o una columna que el original imprime y el nuestro no (`XACT_GROUP`,
-`NUMERIC_GROUP`, `LOGICSWITCH` y la columna `RETRY` de la `SAVEVALUE`): son
-las `Examine`, `ExamineNumber`, `Counter`, `InitiaSV`, `InitialLS`, `JoinMe`,
-`JoinNumber`, `Logic`, `RemoveTrans` y `SaveValue`. Con la convención de los
-lotes anteriores (una sección que falta no cuenta contra la clase), el
-recuento sería **44 verificadas, 19 con diferencias y 3 pendientes**.
 
 Y así queda el inventario de la fase 7: **63 de las 66 clases** escriben el
 mismo GPSS que el original (las tres que no son las que nuestro catálogo no
@@ -1159,8 +1165,6 @@ dentro de las tolerancias salvo **una**: la fila de la puerta del `GateL`,
 que es el único cambio de comportamiento que queda en pie (el pendiente 14 del
 lote 1: nuestro motor cuenta el intento fallido como entrada de la puerta y
 el original no).
-
-
 
 ## Tasks
 
@@ -1241,10 +1245,23 @@ el original no).
   29 con diferencias y 3 pendientes; y **diez** de las 29 se separan del
   original sólo por una sección que el original imprime y el nuestro no, o sea
   por un único pendiente (el 5 de la lista).
-- **L10** — La otra sesión cambió el núcleo mientras esta sesión medía (los
-  commits `2acde39` y `ff13c32`, "the shape of the GPSS listing"), y uno de
-  ellos arregló el **destino alternativo del `EXAMINE`**, que era el pendiente
-  6 de esta lista y el que separaba al `ExamineNumber` en el GPSS. Las cifras
-  y los veredictos de este documento son los del motor de `ff13c32`.
-- **L11** — El trabajo va en dos commits: el generador de bancos con sus pruebas (y el arnés, que es lo que se puede
+- **L10** — **La otra sesión cambió el núcleo mientras esta sesión medía**, y
+  dos veces: primero los commits `2acde39` y `ff13c32` ("the shape of the GPSS
+  listing"), que arreglaron el **destino alternativo del `EXAMINE`** (el
+  pendiente 6 de esta lista, el que separaba al `ExamineNumber` en el GPSS), y
+  después los commits `fae9386` ("the shape of the report is the original's") y
+  `26b0c55` ("the failure destination of the statements"), que arreglaron la
+  columna `LOC`, los decimales, la línea `SEMILLA`, las secciones que faltaban
+  (`LOGICSWITCH`, `XACT_GROUP`, `NUMERIC_GROUP`, `FEC_XACT_NUMBER`) y las filas
+  del `PREEMPT`, del `SELECT`, del `REMOVE` y del `LINK`.
+- **L11** — Por eso las cifras y los veredictos de este documento son los del
+  motor del commit `26b0c55`, y no los de `ff13c32`: con `ff13c32` el
+  recuento de las 66 clases era 34 verificadas, 29 con diferencias y 3
+  pendientes; con `26b0c55` es **50 verificadas, 13 con diferencias y 3
+  pendientes**. La diferencia entre las dos cuentas son sixteen clases que
+  dejan de diferir por las secciones y las filas que esa otra sesión
+  arregló. Es la razón de que la lista de pendientes sea la **definitiva**: no
+  es la que había al empezar el lote, sino la que queda con el núcleo de
+  ahora.
+- **L12** — El trabajo va en dos commits: el generador de bancos con sus pruebas (y el arnés, que es lo que se puede
   tocar sin pisar a la otra sesión), y estas notas con las sondas.

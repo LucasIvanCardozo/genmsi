@@ -1,7 +1,7 @@
                 GENERATE        60,30  
 A_Assign        ASSIGN          Param,7  
 A_SaveValue     SAVEVALUE       1,5  
-A_Test          TEST            E P$Param,7  
+A_Test          TEST            E P$Param,7,A_Terminate1  
 A_Terminate     TERMINATE        
 A_Terminate1    TERMINATE        
                 GENERATE        3600  

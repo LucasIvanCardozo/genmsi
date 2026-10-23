@@ -36,7 +36,7 @@ Clock (3600) closes the run.
 | | `A_Terminate` (la comparación se cumple) | `A_Terminate1` (no se cumple) | sección `SAVEVALUE` |
 |---|---|---|---|
 | original | **60** | 0 | `1` → **5** |
-| nuestro | **57** | 0 | `1` → **5** |
+| nuestro | **60** | 0 | `1` → **5** |
 
 **La regla.** El `ASSIGN` pone el valor en el parámetro de la transacción
 activa ("Un bloque ASSIGN es usado para colocar o modificar un entero en un
@@ -66,14 +66,13 @@ pone en 1 (`LogicSet`) o la reinicia (`LogicReset`).
 | | `LOGIC S 1` (sonda 2) | `LOGIC R 1` (sonda 3) |
 |---|---|---|
 | original | valor **1** | valor **0** |
-| nuestro | (no imprimimos la sección) | (no imprimimos la sección) |
+| nuestro | valor **1** | valor **0** |
 
 **La regla.** El `LOGIC` configura la llave: con `S` la pone en "set" y con
 `R` la pone en "reset" ("Si el operador lógico es S o R, la llave lógica
 especificada por el operando A es puesta en el estado set o reset,
-respectivamente", manual). Nuestro motor cumple la regla (el bloque `Logic`
-del core la configura), pero **nuestro reporte no imprime la sección
-`LOGICSWITCH`**, así que no se puede ver.
+respectivamente", manual). Los dos motores cumplen la regla, y los dos
+imprimen la sección `LOGICSWITCH` con el estado de la llave.
 
 Con `LOGIC R 1` la llave queda en 0 **después** de que el `InitialLS` la
 ponga en 1: o sea, el bloque `LOGIC` manda sobre el valor inicial.
@@ -103,7 +102,7 @@ Clock (3600) closes the run.
 | | `A_Terminate` (el `TEST` se cumple) | `A_Terminate2` (no se cumple) | `A_Terminate1` (el `ALTER` no alteró a nadie) |
 |---|---|---|---|
 | original | **62** | 0 | 0 |
-| nuestro | **62** | 0 | 0 |
+| nuestro | **61** | 0 | 0 |
 
 **La regla.** El `ALTER` altera a los **miembros** del grupo, no a la
 transacción activa: "Un bloque ALTER selecciona transacciones de un grupo y

@@ -885,6 +885,10 @@ fn operand_parts(
                 Some(SelectState::StorageNotFull) => mode = Some("SNF"),
                 Some(SelectState::StorageEmpty) => mode = Some("SE"),
                 Some(SelectState::StorageNotEmpty) => mode = Some("SNE"),
+                // The storages that are in the "available" state (`SV`) and
+                // the ones that are not (`SNV`).
+                Some(SelectState::StorageAvailable) => mode = Some("SV"),
+                Some(SelectState::StorageNotAvailable) => mode = Some("SNV"),
                 Some(SelectState::EntityEqual) => {
                     // `E param,1,10,*1,Q,`: the value compared, the class of
                     // the entity and an empty operand after them.

@@ -27,3 +27,6 @@ __pycache__/
 
 # Phase 6 bench models: generated artefacts of scripts/wine-oracle/make-benches.py
 /scripts/wine-oracle/benches/
+
+# Phase 7 probe models: generated artefacts of the probe generators
+/scripts/wine-oracle/probes/select/models/

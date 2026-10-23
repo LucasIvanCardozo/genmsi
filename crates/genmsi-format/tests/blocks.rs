@@ -898,3 +898,28 @@ fn every_listed_default_is_one_of_the_options_of_its_subtype() {
         );
     }
 }
+
+#[test]
+fn the_editor_offers_the_six_operators_of_a_storage() {
+    // The `op_Logic_Stor` list of the original has six operators, and the
+    // editor offers the ones it offers:
+    //
+    //     SF:Lleno|SNF:NoLleno|SE:Vacio|SNE:NoVacio|SV:Disponible|SNV:NoDisponible
+    //
+    // (`Genmsi_20230711.backup/gmacroconfig.gmcfg`).  The `GateS` and the
+    // `SelectS` take their `op` from that list.
+    let options = listed_options("op_Logic_Stor");
+    for operator in [
+        "Lleno",
+        "NoLleno",
+        "Vacio",
+        "NoVacio",
+        "Disponible",
+        "NoDisponible",
+    ] {
+        assert!(
+            options.contains(&operator),
+            "the editor does not offer {operator:?}: {options:?}"
+        );
+    }
+}

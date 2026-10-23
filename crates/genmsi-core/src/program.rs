@@ -490,6 +490,17 @@ pub enum SelectState {
     StorageEmpty,
     /// A storage that is not empty (`SNE`).
     StorageNotEmpty,
+    /// A storage that is in the "available" state (`SV`).
+    ///
+    /// The state is the one the manual describes: "El storage tiene que
+    /// estar disponible para que sea seleccionado"
+    /// (`VISUALSIS.HLP`).  A storage starts available, and only the
+    /// statements `SAVAIL` and `SUNAVAIL` change it; the library of
+    /// classes of the original has none of them, so every storage of a
+    /// model of the editor is available.
+    StorageAvailable,
+    /// A storage that is not in the "available" state (`SNV`).
+    StorageNotAvailable,
     /// An entity whose value equals the compared one (`E`).
     EntityEqual,
 }
@@ -1085,6 +1096,7 @@ impl Compiler<'_> {
         self.check_match_targets(&blocks, &label_map)?;
         self.check_references(&blocks, &definitions)?;
         self.report_undeclared_storages(&blocks, &definitions);
+        self.report_examine_without_destination(&blocks);
 
         Ok(Program {
             title,
@@ -2216,6 +2228,39 @@ impl Compiler<'_> {
         }
     }
 
+    /// Report the examinations that have no destination of their own.
+    ///
+    /// The third operand of the `EXAMINE` is the block the transaction goes
+    /// to when the group does not hold it, and the manual of the original
+    /// says of it: "Número de bloque. Destino alternativo para la
+    /// transacción activa si no es encontrado ningún miembro. Requerido"
+    /// (`VISUALSIS.HLP`).  The engine of the original refuses a model whose
+    /// `EXAMINE` has no such operand ("Error en linea 1 -> Faltan
+    /// parámetros"), so the engine of this repository says it out loud
+    /// instead of compiling a model the original would not run.
+    fn report_examine_without_destination(&mut self, blocks: &[ExecBlock]) {
+        for block in blocks {
+            if !matches!(block.kind, BlockKind::Examine(_)) {
+                continue;
+            }
+            let destination = block
+                .port_names
+                .iter()
+                .position(|name| name == "Salida2")
+                .and_then(|index| block.next.get(index).copied().flatten());
+            if destination.is_some() {
+                continue;
+            }
+            self.diagnostics.push(format!(
+                "the model examines a group in the {} block {} without a destination of \
+                 its own: the original refuses the model (\"Faltan parámetros\"). The \
+                 third operand of the EXAMINE is the block the transaction goes to when \
+                 the group does not hold it.",
+                block.class, block.module_id
+            ));
+        }
+    }
+
     fn collect_definitions(&mut self) -> Result<Definitions, EngineError> {
         let mut definitions = Definitions::default();
         for module in self.model.activity_blocks() {
@@ -2910,6 +2955,8 @@ fn storage_state(op: &str) -> SelectState {
         "Lleno" | "Llena" => SelectState::StorageFull,
         "Vacio" | "Vacia" => SelectState::StorageEmpty,
         "NoVacio" | "NoVacia" => SelectState::StorageNotEmpty,
+        "Disponible" => SelectState::StorageAvailable,
+        "NoDisponible" => SelectState::StorageNotAvailable,
         _ => SelectState::StorageNotFull,
     }
 }

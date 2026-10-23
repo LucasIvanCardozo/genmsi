@@ -366,7 +366,7 @@ static LISTED_OPTIONS: &[(&str, &[&str])] = &[
     ("op_MaxMin", &["Minimo", "Maximo"]),
     ("op_Swich", &["Set", "Reset"]),
     ("op_Logic_Swich", &["Set", "Reset"]),
-    ("op_Logic_Stor", &["Vacio", "NoVacio", "Lleno", "NoLleno"]),
+    ("op_Logic_Stor", &["Vacio", "NoVacio", "Lleno", "NoLleno", "Disponible", "NoDisponible"]),
     ("op_Logic_Faci", &["Libre", "Ocupado"]),
     // The gate that waits for a label of a transaction.
     ("op_Logic_Tran", &["Maching", "NotMaching"]),

@@ -687,7 +687,14 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
                 RelOp::Ge => "GE",
                 RelOp::Gt => "G",
             };
-            let operands = format!("{operator} {},{}", sna(&spec.left), sna(&spec.right));
+            let mut operands = format!("{operator} {},{}", sna(&spec.left), sna(&spec.right));
+            // The destination of the failure output ("Falso"): the original
+            // writes it as the third operand (`TEST E 1,2,A_Terminate1`).
+            let destination = port_destination(block, names, "Salida2");
+            if !destination.is_empty() {
+                operands.push(',');
+                operands.push_str(&destination);
+            }
             statement(out, "TEST", &operands);
         }
         BlockKind::Transfer(spec) => {

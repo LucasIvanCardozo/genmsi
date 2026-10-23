@@ -143,3 +143,46 @@ fn the_selection_writes_the_destination_of_its_failure_output() {
     assert_eq!(named(&free, "A_Select"), "A_Select SELECT MIN param,1,10,,Q");
 }
 
+#[test]
+fn the_test_writes_the_destination_of_its_failure_output() {
+    // The original writes the block the transaction goes to when the
+    // comparison fails as the third operand of the statement:
+    //
+    //     A_Test   TEST  E  1,2,A_Terminate1
+    //
+    // (the probe `scripts/wine-oracle/probes/TestFalso.gmdl`, whose report
+    // the original left with that line).
+    let model = |failure: Option<&'static str>| {
+        let nodes = vec![
+            node(
+                1,
+                "Generate",
+                None,
+                &[("Salida1", Some("A"))],
+                &[("Media", "60"), ("Modificador", "30")],
+            ),
+            node(
+                2,
+                "Test",
+                Some("A"),
+                &[("Salida1", Some("B")), ("Salida2", failure)],
+                &[("1_Valor", "1"), ("2_OP", "="), ("3_Valor", "2")],
+            ),
+            node(3, "Terminate", Some("B"), &[], &[]),
+            node(4, "Terminate", Some("C"), &[], &[]),
+        ];
+        let mut links = vec![(1, 0, 2, 0), (2, 0, 3, 0)];
+        if failure.is_some() {
+            links.push((2, 1, 4, 0));
+        }
+        wired(&nodes, &links, 3600.0)
+    };
+    assert_eq!(
+        named(&model(Some("C")), "A_Test"),
+        "A_Test TEST E 1,2,A_Terminate1"
+    );
+    // Without the failure output the original writes no destination at all
+    // (`A_Test  TEST  E  1,1`, the bench of the oracle).
+    assert_eq!(named(&model(None), "A_Test"), "A_Test TEST E 1,2");
+}
+

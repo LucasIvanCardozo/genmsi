@@ -271,8 +271,7 @@ fn the_multifurcacionp_class_routes_by_the_parameter_of_the_transaction() {
 }
 
 #[test]
-fn the_multifurcacionp_class_writes_the_branch_it_took_in_the_parameter() {
-    // The captions of the original's class say what each branch does:
+fn the_multifurcacionp_class_writes_the_branch_it_took_in_the_parameter() {    // The captions of the original's class say what each branch does:
     // `[Parametro]=1`, `[Parametro]=2`, ... A transaction that arrives
     // without a value takes the first branch, and the branch writes its own
     // number in the parameter.
@@ -341,5 +340,262 @@ fn the_multifurcacionp_class_writes_the_branch_it_took_in_the_parameter() {
     assert!(
         values.iter().all(|detail| detail.ends_with(" 1")),
         "the branch writes its own number in the parameter: {values:?}"
+    );
+}
+
+// The classes of the original that route a transaction by a condition of its
+// own: the `Examine` class (the transaction belongs to a group or it does
+// not), the `GateM` class (the label of the transaction matches the one the
+// gate names) and the three selections (a logic switch, a storage and an
+// entity of a class).
+//
+// The macro code of the original names the two outputs of the first two:
+// `Salida1` is "En [Grupo]" and "No en [Grupo]" for the examination, and
+// `Salida1` is the output of the transaction that matches the label.
+
+/// A model with a group: the transactions join it and are then examined.
+fn examination_model(join: bool) -> genmsi_core::Program {
+    let mut nodes = vec![node(
+        1,
+        "Generate",
+        None,
+        &[("Salida1", Some("T1"))],
+        &[("Media", "1"), ("Modificador", "0")],
+    )];
+    let mut links = vec![(1, 0, 2, 0)];
+    let mut next_id = 2u32;
+    let mut input = "T1";
+    if join {
+        nodes.push(node(
+            next_id,
+            "JoinMe",
+            Some(input),
+            &[("Salida1", Some("T2"))],
+            &[("Grupo", "UnGrupo")],
+        ));
+        links.push((next_id, 0, next_id + 1, 0));
+        next_id += 1;
+        input = "T2";
+    }
+    let examine = next_id;
+    nodes.push(node(
+        examine,
+        "Examine",
+        Some(input),
+        &[("Salida1", Some("YES")), ("Salida2", Some("NO"))],
+        &[("Grupo", "UnGrupo")],
+    ));
+    next_id += 1;
+    links.push((examine, 0, next_id, 0));
+    nodes.push(node(
+        next_id,
+        "Terminate",
+        Some("YES"),
+        &[],
+        &[("Unidades", "0")],
+    ));
+    next_id += 1;
+    links.push((examine, 1, next_id, 0));
+    nodes.push(node(
+        next_id,
+        "Terminate",
+        Some("NO"),
+        &[],
+        &[("Unidades", "0")],
+    ));
+    wired(&nodes, &links, 4000.0)
+}
+
+#[test]
+fn the_examine_class_goes_on_when_the_transaction_is_in_the_group() {
+    // The class examines the transaction: its second output says "No en
+    // [Grupo]", so a transaction that is not in the group takes it.
+    let program = examination_model(true);
+    let result = run(&program, 400.0, 1);
+    let yes = entries(&program, &result, "YES");
+    let no = entries(&program, &result, "NO");
+    assert!(yes > 100, "the bench creates transactions: {yes}");
+    assert_eq!(no, 0, "every transaction joined the group before examining it");
+}
+
+#[test]
+fn the_examine_class_takes_the_second_output_when_the_transaction_is_not_in_the_group() {
+    let program = examination_model(false);
+    let result = run(&program, 400.0, 1);
+    let yes = entries(&program, &result, "YES");
+    let no = entries(&program, &result, "NO");
+    assert!(no > 100, "the bench creates transactions: {no}");
+    assert_eq!(yes, 0, "no transaction is in the group");
+}
+
+/// Two flows paired through `MATCH` blocks, and a gate that evaluates the
+/// label the transaction carries.
+fn gate_model(rotulo: &'static str) -> genmsi_core::Program {
+    let nodes = [
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("A1"))],
+            &[("Media", "1"), ("Modificador", "0"), ("Cantidad", "20")],
+        ),
+        node(
+            2,
+            "Match",
+            Some("A1"),
+            &[("Salida1", Some("A2")), ("Salida2", None)],
+            &[("RotuloPropio", "PA"), ("RotuloMatch", "PB")],
+        ),
+        node(
+            3,
+            "Generate",
+            None,
+            &[("Salida1", Some("B1"))],
+            &[("Media", "1"), ("Modificador", "0"), ("Cantidad", "20")],
+        ),
+        node(
+            4,
+            "Match",
+            Some("B1"),
+            &[("Salida1", Some("B2")), ("Salida2", None)],
+            &[("RotuloPropio", "PB"), ("RotuloMatch", "PA")],
+        ),
+        node(
+            5,
+            "GateM",
+            Some("A2"),
+            &[("Salida1", Some("YES")), ("Salida2", Some("NO"))],
+            &[("Rotulo", rotulo), ("op", "Maching")],
+        ),
+        node(6, "Terminate", Some("YES"), &[], &[("Unidades", "0")]),
+        node(7, "Terminate", Some("NO"), &[], &[("Unidades", "0")]),
+    ];
+    let links = [
+        (1, 0, 2, 0),
+        (3, 0, 4, 0),
+        (2, 0, 5, 0),
+        (4, 0, 5, 0),
+        (5, 0, 6, 0),
+        (5, 1, 7, 0),
+    ];
+    wired(&nodes, &links, 100.0)
+}
+
+#[test]
+fn the_gate_m_class_lets_the_transaction_go_on_when_its_label_matches() {
+    // The class of the original waits for a label: the transaction that was
+    // matched at the block `PA` carries the label `PA`, and the gate that
+    // names it lets it go on.
+    let program = gate_model("PA");
+    let result = run(&program, 100.0, 1);
+    let yes = entries(&program, &result, "YES");
+    let no = entries(&program, &result, "NO");
+    assert!(yes > 0, "the transactions matched at PA go on: {yes}");
+    assert_eq!(
+        yes, no,
+        "half of the transactions carry the label PA and half carry PB"
+    );
+}
+
+#[test]
+fn the_gate_m_class_takes_the_second_output_when_the_label_does_not_match() {
+    let program = gate_model("ZZZ");
+    let result = run(&program, 100.0, 1);
+    assert_eq!(
+        entries(&program, &result, "YES"),
+        0,
+        "no transaction carries the label ZZZ"
+    );
+    assert!(entries(&program, &result, "NO") > 0, "the gate fails");
+}
+
+
+/// The `SelectF` class of the editor picks the first facility that is free
+/// and writes its number in the parameter.
+#[test]
+fn the_select_f_class_picks_the_first_free_facility() {
+    let nodes = [
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("T1"))],
+            &[("Media", "1"), ("Modificador", "0")],
+        ),
+        node(
+            2,
+            "SelectF",
+            Some("T1"),
+            &[("Salida1", Some("T2")), ("Salida2", None)],
+            &[
+                ("Param", "param"),
+                ("minimo", "1"),
+                ("maximo", "10"),
+                ("op", "Libre"),
+            ],
+        ),
+        node(
+            3,
+            "Test",
+            Some("T2"),
+            &[("Salida1", Some("YES")), ("Salida2", Some("NO"))],
+            &[("1_Valor", "P:param"), ("2_OP", "="), ("3_Valor", "1")],
+        ),
+        node(4, "Terminate", Some("YES"), &[], &[("Unidades", "0")]),
+        node(5, "Terminate", Some("NO"), &[], &[("Unidades", "0")]),
+    ];
+    let links = [(1, 0, 2, 0), (2, 0, 3, 0), (3, 0, 4, 0), (3, 1, 5, 0)];
+    let program = wired(&nodes, &links, 400.0);
+    let result = run(&program, 400.0, 1);
+    assert!(
+        entries(&program, &result, "YES") > 100,
+        "the class picks the first facility"
+    );
+    assert_eq!(
+        entries(&program, &result, "NO"),
+        0,
+        "every transaction picks the same facility"
+    );
+}
+
+/// A `MATCH` block whose conjugate is itself holds its transactions: the
+/// report of the original for the bench of the class shows every transaction
+/// waiting at the `MATCH` block instead of pairing with the others.
+#[test]
+fn a_match_block_does_not_pair_with_the_transactions_of_its_own_block() {
+    let nodes = [
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("A1"))],
+            &[("Media", "1"), ("Modificador", "0")],
+        ),
+        node(
+            2,
+            "Match",
+            Some("A1"),
+            &[("Salida1", Some("A2")), ("Salida2", None)],
+            &[("RotuloPropio", "AAA"), ("RotuloMatch", "AAA")],
+        ),
+        node(3, "Terminate", Some("A2"), &[], &[("Unidades", "0")]),
+    ];
+    let links = [(1, 0, 2, 0), (2, 0, 3, 0)];
+    let program = wired(&nodes, &links, 400.0);
+    let result = run(&program, 400.0, 1);
+    assert_eq!(
+        entries(&program, &result, "A2"),
+        0,
+        "no transaction is released: the conjugate is the block itself"
+    );
+    let waiting = program
+        .blocks
+        .iter()
+        .position(|block| block.class == "Match")
+        .map(|index| result.blocks[index].current)
+        .expect("the model has a match block");
+    assert!(
+        waiting > 100,
+        "every transaction waits at the match block: {waiting}"
     );
 }

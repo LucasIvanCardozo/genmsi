@@ -158,16 +158,23 @@ fn the_blocks_write_the_operands_of_their_class() {
         ("Assemble", "A_Assemble ASSEMBLE 1"),
         ("Gather", "A_Gather GATHER 1"),
         ("ExamineNumber", "A_ExamineNumber EXAMINE UnGrupo,0,"),
+        ("Examine", "A_Examine EXAMINE UnGrupo,,"),
+        ("GateM", "GateM GATE M AAA"),
         ("JoinMe", "A_JoinMe JOIN UnGrupo"),
         ("JoinNumber", "A_JoinNumber JOIN UnGrupo,0"),
         ("Link", "A_Link LINK Cadena,FIFO,A_Terminate"),
         ("Logic", "A_Logic LOGIC S 1"),
         ("Loop", "A_Loop LOOP Param,"),
+        ("Mark", "A_Mark MARK Param"),
+        ("RemoveMe", "A_RemoveMe REMOVE UnGrupo"),
         ("RemoveTrans", "A_RemoveTrans REMOVE E UnGrupo,1,,otro,1"),
         ("SaveValue", "A_SaveValue SAVEVALUE 1,0"),
         ("Scan", "A_Scan SCAN E UnGrupo,otro,1,Param,Param"),
         ("Select", "A_Select SELECT MIN param,1,10,,Q"),
         ("SelectF", "A_SelectF SELECT NU param,1,10"),
+        ("SelectL", "A_SelectL SELECT LS param,1,10"),
+        ("SelectS", "A_SelectS SELECT SNF param,1,10"),
+        ("SelectSNA", "A_SelectSNA SELECT E param,1,10,*1,Q,"),
         ("Tabulate", "A_Tabulate TABULATE Tabla"),
         ("Test", "A_Test TEST E 1,1"),
         ("Unlink", "A_Unlink UNLINK E Cadena,A_Terminate1,1,Otro,0"),
@@ -181,4 +188,69 @@ fn the_blocks_write_the_operands_of_their_class() {
         let name = expected.split_whitespace().next().unwrap();
         assert_eq!(named(&program, name), expected, "the bench of {class}");
     }
+}
+
+#[test]
+fn the_variable_n_class_writes_its_function_and_its_variable() {
+    // The GPSS of the original for this bench:
+    //
+    //     NORMAL   FUNCTION  RN90,C25
+    //     .0,-50/.00003,-40/.../1.0,50
+    //     Normal   VARIABLE  60+(1#FN$NORMAL)/10
+    //
+    // The class creates the standard normal distribution with its own seed
+    // and the variable that reads it.
+    let program = bench("VariableN");
+    let gpss = render(&program);
+    assert!(
+        gpss.contains("NORMAL          FUNCTION        RN90,C25"),
+        "{gpss}"
+    );
+    assert!(
+        gpss.contains(
+            ".0,-50/.00003,-40/.00135,-30/.00621,-25/.02275,-20/.06681,-15/.11507,-12/.15866,\
+-10/.21186,-8/.27425,-6/.34458,-4/.44,2/.5,0/.56,2/.65542,4/.72575,6/.78814,8/.84134,10/.88493,\
+12/.93319,15/.97725,20/.99379,25/.99865,30/.99997,40/1.0,50"
+        ),
+        "the table of the normal distribution: {gpss}"
+    );
+    assert!(
+        gpss.contains("Normal          VARIABLE        60+(1#FN$NORMAL)/10"),
+        "{gpss}"
+    );
+}
+
+#[test]
+fn the_multifurcacion_writes_the_two_functions_the_original_creates() {
+    // The GPSS of the original for this bench:
+    //
+    //     MultifurcacionCH FUNCTION  RN2,D5
+    //     0.2,1/0.4,2/0.6,3/0.8,4/1,5
+    //     MultifurcacionGO FUNCTION  FN$MultifurcacionCH,D5
+    //     1,A_Terminate/2,A_Terminate1/3,A_Terminate2/4,A_Terminate3/5,A_Terminate4
+    //     Multifurcacion  TRANSFER  ,FN$MultifurcacionGO
+    let program = bench("Multifurcacion");
+    let gpss = render(&program);
+    assert!(
+        gpss.contains("MultifurcacionCH FUNCTION        RN2,D5"),
+        "{gpss}"
+    );
+    assert!(
+        gpss.contains("0.2,1/0.4,2/0.6,3/0.8,4/1,5"),
+        "the shares of the branches: {gpss}"
+    );
+    assert!(
+        gpss.contains("MultifurcacionGO FUNCTION        FN$MultifurcacionCH,D5"),
+        "{gpss}"
+    );
+    assert!(
+        gpss.contains("1,A_Terminate/2,A_Terminate1/3,A_Terminate2/4,A_Terminate3/5,A_Terminate4"),
+        "the destinations of the branches: {gpss}"
+    );
+    // The statement of the block takes the name of its module, without the
+    // `A_` the other macros put in front.
+    assert_eq!(
+        named(&program, "Multifurcacion"),
+        "Multifurcacion TRANSFER ,FN$MultifurcacionGO"
+    );
 }

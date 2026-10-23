@@ -26,8 +26,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::expr::{ProgramExpr, RefKind};
 use crate::program::{
-    AssignOp, BlockKind, Definitions, ExecBlock, FunctionDef, GateCondition, LogicOp, Program,
-    RandomVariable, RelOp, SelectMode,
+    AssignOp, BlockKind, Definitions, ExecBlock, FunctionDef, GateCondition, LogicOp,
+    MultiTransferSelection, Program, RandomVariable, RelOp, SelectMode, SelectState,
 };
 
 /// The table the original writes for an exponential function.
@@ -41,6 +41,7 @@ pub fn render(program: &Program) -> String {
     let names = Names::new(program);
     let mut out = String::new();
     definitions(&mut out, &program.definitions);
+    destination_functions(&mut out, program, &names);
     let order = flow_order(program);
     for (position, index) in order.iter().enumerate() {
         block_statements(&mut out, *index, program, &names);
@@ -77,6 +78,15 @@ impl Names {
         }
 
         let mut names = vec![String::new(); program.blocks.len()];
+        for block in program.blocks.iter() {
+            if let BlockKind::MultiTransfer(spec) = &block.kind
+                && let Some(go) = &spec.destination_function
+            {
+                // The function the multifurcation routes by is a name of the
+                // program: no block may take it.
+                taken.insert(go.clone());
+            }
+        }
         for (index, block) in program.blocks.iter().enumerate() {
             if block.label.is_none() {
                 // A block with no input port is the start of the flow: the
@@ -113,7 +123,11 @@ fn base_name(program: &Program, block: &ExecBlock) -> String {
         // The split names its statement after what it does.
         "Split" => "Clona".to_string(),
         // These macros write the name of their module.
-        "GateF" | "GateL" | "GateS" | "GateM" => block.name.clone(),
+        "GateF" | "GateL" | "GateS" | "GateM" | "Gate" => block.name.clone(),
+        // The multifurcations name their statement after the module too: the
+        // macro code of the original writes `='moduleName'`, without the `A_`
+        // the other macros put in front.
+        "Multifurcacion" | "MultifurcacionP" => block.name.clone(),
         _ if is_storage_macro(program, block) => block.name.clone(),
         _ => format!("A_{}", block.name),
     }
@@ -316,6 +330,49 @@ fn definitions(out: &mut String, defs: &Definitions) {
     }
 }
 
+/// The function that maps the branch of a multifurcation to its destination.
+///
+/// The macro code of the original writes `MULTITRANSFER MultifurcacionGO,
+/// FN:MultifurcacionCH,{...}`: the function takes the number the branch
+/// function chose and gives back the name of the block the transaction goes
+/// to.
+fn destination_functions(out: &mut String, program: &Program, names: &Names) {
+    for block in &program.blocks {
+        let BlockKind::MultiTransfer(spec) = &block.kind else {
+            continue;
+        };
+        let Some(go) = &spec.destination_function else {
+            continue;
+        };
+        let argument = match &spec.selection {
+            MultiTransferSelection::Weights => match &spec.branch_function {
+                Some(branch) => format!("FN${branch}"),
+                None => continue,
+            },
+            MultiTransferSelection::Parameter(parameter) => format!("P${parameter}"),
+        };
+        line(
+            out,
+            go,
+            "FUNCTION",
+            &format!("{argument},D{}", block.next.len()),
+        );
+        let points: Vec<String> = block
+            .next
+            .iter()
+            .enumerate()
+            .map(|(index, target)| {
+                let name = target
+                    .map(|target| names.get(target).to_string())
+                    .unwrap_or_default();
+                format!("{},{}", index + 1, name)
+            })
+            .collect();
+        out.push_str(&points.join("/"));
+        out.push('\n');
+    }
+}
+
 /// A function: the statement, and the table of its points below it.
 fn function_definition(out: &mut String, name: &str, function: &FunctionDef) {
     match function {
@@ -472,14 +529,49 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
             ]);
             statement(out, "ADVANCE", &operands);
         }
-        BlockKind::Assign(spec) => {
-            let operator = match spec.op {
-                AssignOp::Set => "",
-                AssignOp::Add => "+",
-                AssignOp::Sub => "-",
+        BlockKind::Examine(spec) => {
+            // The `Examine` class examines the transaction itself: the number
+            // of the `ExamineNumber` class is not part of it.
+            let operands = if spec.transaction {
+                format!("{},,", spec.group)
+            } else {
+                format!("{},{},", spec.group, sna(&spec.number))
             };
-            let operands = format!("{}{},{}", spec.parameter, operator, sna(&spec.value));
-            statement(out, "ASSIGN", &operands);
+            statement(out, "EXAMINE", &operands);
+        }
+        BlockKind::Remove(spec) => {
+            if spec.me {
+                // The class takes the transaction out of its group: the
+                // `REMOVE` without the comparison of the `RemoveTrans` class.
+                statement(out, "REMOVE", &spec.group);
+            } else {
+                // The original writes: the group, the number of transactions,
+                // the parameter it compares and its value.
+                let operands = format!(
+                    "E {},{},{},{},{}",
+                    spec.group,
+                    sna(&spec.count),
+                    "",
+                    spec.parameter.clone().unwrap_or_default(),
+                    spec.value.as_ref().map(sna).unwrap_or_default(),
+                );
+                statement(out, "REMOVE", &operands);
+            }
+        }
+        BlockKind::Assign(spec) => {
+            if block.class == "Mark" {
+                // The `Mark` class writes the hour in a parameter: the
+                // original gives the statement a name of its own.
+                statement(out, "MARK", &spec.parameter);
+            } else {
+                let operator = match spec.op {
+                    AssignOp::Set => "",
+                    AssignOp::Add => "+",
+                    AssignOp::Sub => "-",
+                };
+                let operands = format!("{}{},{}", spec.parameter, operator, sna(&spec.value));
+                statement(out, "ASSIGN", &operands);
+            }
         }
         BlockKind::SaveValue(spec) => {
             let operator = match spec.op {
@@ -575,19 +667,34 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
             statement(out, "TRANSFER", &operands);
         }
         BlockKind::MultiTransfer(spec) => {
-            let mut operands = String::new();
-            for (index, weight) in spec.weights.iter().enumerate() {
-                if index > 0 {
-                    operands.push(',');
+            // The original writes the transfer that sends the transaction to
+            // the function that maps the branch to its destination.
+            let operands = match &spec.destination_function {
+                Some(go) => format!(",FN${go}"),
+                None => {
+                    let mut operands = String::new();
+                    for (index, weight) in spec.weights.iter().enumerate() {
+                        if index > 0 {
+                            operands.push(',');
+                        }
+                        operands.push_str(&weight.to_string());
+                    }
+                    operands
                 }
-                operands.push_str(&weight.to_string());
-            }
+            };
             statement(out, "TRANSFER", &operands);
         }
         BlockKind::Gate(spec) => {
             let operands = match &spec.condition {
                 GateCondition::Logic { switch, state } => {
-                    format!("{} {switch}", if *state { "LS" } else { "L" })
+                    if block.class == "Gate" {
+                        // The `GateM` class evaluates the label of the
+                        // transaction: `M` when the transaction must match
+                        // and `NM` when it must not.
+                        format!("{} {switch}", if *state { "M" } else { "NM" })
+                    } else {
+                        format!("{} {switch}", if *state { "LS" } else { "L" })
+                    }
                 }
                 GateCondition::Storage { storage, empty } => {
                     format!("{} {storage}", if *empty { "S" } else { "SNF" })
@@ -651,29 +758,68 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
                 RefKind::Queue => "Q",
                 RefKind::Storage => "S",
                 RefKind::Facility => "R",
+                RefKind::LogicSwitch => "LS",
                 _ => "",
             };
-            let operands = match spec.mode {
-                SelectMode::FirstFree => format!(
-                    "NU {},{},{}",
+            let operands = match spec.state {
+                // The logic switches: `LS` picks one that is set and `LR` one
+                // that is not.
+                Some(SelectState::LogicSet) => format!(
+                    "LS {},{},{}",
                     spec.parameter,
                     sna(&spec.low),
                     sna(&spec.high)
                 ),
-                SelectMode::Max => format!(
-                    "MAX {},{},{},,{}",
+                Some(SelectState::LogicReset) => format!(
+                    "LR {},{},{}",
+                    spec.parameter,
+                    sna(&spec.low),
+                    sna(&spec.high)
+                ),
+                // The storages: `SF` a full one and `SNF` one that is not.
+                Some(SelectState::StorageFull) => format!(
+                    "SF {},{},{}",
+                    spec.parameter,
+                    sna(&spec.low),
+                    sna(&spec.high)
+                ),
+                Some(SelectState::StorageNotFull) => format!(
+                    "SNF {},{},{}",
+                    spec.parameter,
+                    sna(&spec.low),
+                    sna(&spec.high)
+                ),
+                // The entity of a class whose value equals the compared one.
+                Some(SelectState::EntityEqual) => format!(
+                    "E {},{},{},{},{},",
                     spec.parameter,
                     sna(&spec.low),
                     sna(&spec.high),
+                    spec.compare_value.as_ref().map(sna).unwrap_or_default(),
                     class
                 ),
-                SelectMode::Min => format!(
-                    "MIN {},{},{},,{}",
-                    spec.parameter,
-                    sna(&spec.low),
-                    sna(&spec.high),
-                    class
-                ),
+                None => match spec.mode {
+                    SelectMode::FirstFree => format!(
+                        "NU {},{},{}",
+                        spec.parameter,
+                        sna(&spec.low),
+                        sna(&spec.high)
+                    ),
+                    SelectMode::Max => format!(
+                        "MAX {},{},{},,{}",
+                        spec.parameter,
+                        sna(&spec.low),
+                        sna(&spec.high),
+                        class
+                    ),
+                    SelectMode::Min => format!(
+                        "MIN {},{},{},,{}",
+                        spec.parameter,
+                        sna(&spec.low),
+                        sna(&spec.high),
+                        class
+                    ),
+                },
             };
             statement(out, "SELECT", &operands);
         }
@@ -690,24 +836,6 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
                 None => spec.group.clone(),
             };
             statement(out, "JOIN", &operands);
-        }
-        BlockKind::Examine(spec) => {
-            statement(
-                out,
-                "EXAMINE",
-                &format!("{},{},", spec.group, sna(&spec.number)),
-            );
-        }
-        BlockKind::Remove(spec) => {
-            let operands = format!(
-                "E {},{},{},{},{}",
-                spec.group,
-                sna(&spec.count),
-                "",
-                spec.parameter.clone().unwrap_or_default(),
-                spec.value.as_ref().map(sna).unwrap_or_default(),
-            );
-            statement(out, "REMOVE", &operands);
         }
         BlockKind::Scan(spec) => {
             let operands = format!(

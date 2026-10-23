@@ -13,7 +13,8 @@ use crate::error::EngineError;
 use crate::expr::{Ctx, ProgramExpr, RefKind};
 use crate::program::{
     BlockKind, EntityName, ExecBlock, FunctionDef, GateCondition, GenerateSpec, LogicOp,
-    MultiTransferSelection, PreemptPriority, Program, SelectMode, TerminateSpec, UnlinkSpec,
+    MultiTransferSelection, PreemptPriority, Program, SelectMode, SelectSpec, SelectState,
+    TerminateSpec, UnlinkSpec,
 };
 use crate::report::number;
 use crate::rng::Streams;
@@ -250,6 +251,11 @@ pub struct Simulation<'p> {
     passed: HashMap<String, u64>,
     transaction_groups: BTreeMap<String, Vec<XactId>>,
     numeric_groups: BTreeMap<String, Vec<f64>>,
+    /// The label a transaction carries after a `MATCH` block.
+    ///
+    /// The gate of the original that waits for a label (`GateM`) compares the
+    /// label of the transaction with the one it names.
+    transaction_labels: HashMap<XactId, String>,
     assemble_waiters: HashMap<usize, Vec<(u64, XactId)>>,
     match_waiters: HashMap<usize, VecDeque<XactId>>,
     gate_waiters: HashMap<usize, Vec<XactId>>,
@@ -281,6 +287,7 @@ impl<'p> Simulation<'p> {
             passed: HashMap::new(),
             transaction_groups: BTreeMap::new(),
             numeric_groups: BTreeMap::new(),
+            transaction_labels: HashMap::new(),
             assemble_waiters: HashMap::new(),
             match_waiters: HashMap::new(),
             gate_waiters: HashMap::new(),
@@ -974,7 +981,18 @@ impl<'p> Simulation<'p> {
                 self.leave(xact, block_index, target);
             }
             BlockKind::Gate(spec) => {
-                let pass = self.gate_condition(&spec.condition, xact);
+                let pass = match &spec.condition {
+                    // The `GateM` class of the original evaluates the label of
+                    // the transaction: the transaction goes on when it matches
+                    // the label the gate names, and the other way round with
+                    // the `NotMaching` operator.
+                    GateCondition::Logic { switch, state } if block.class == "Gate" => {
+                        let name = self.resolve_name(switch, xact);
+                        let label = self.transaction_label(xact);
+                        (label == name) == *state
+                    }
+                    _ => self.gate_condition(&spec.condition, xact),
+                };
                 if pass {
                     self.leave(xact, block_index, block.next_named("Salida1"));
                 } else if block.has_failure_port() {
@@ -1179,15 +1197,33 @@ impl<'p> Simulation<'p> {
                 // block. Every waiter is kept: a block can hold any number of
                 // them, and pairing them first-in first-out is what keeps the
                 // two flows in step.
-                let partner = self
-                    .match_waiters
-                    .get_mut(&conjugate)
-                    .and_then(VecDeque::pop_front)
-                    .filter(|partner| self.xacts.contains_key(partner));
+                //
+                // The conjugate must be *another* block: the bench of the
+                // original gives its `Match` the label the class defines, and
+                // the report of that run holds every transaction at the
+                // `MATCH` block instead of pairing them with each other.
+                let partner = if conjugate == block_index {
+                    None
+                } else {
+                    self.match_waiters
+                        .get_mut(&conjugate)
+                        .and_then(VecDeque::pop_front)
+                        .filter(|partner| self.xacts.contains_key(partner))
+                };
                 match partner {
                     Some(partner) => {
                         if let Some(transaction) = self.xacts.get_mut(&partner) {
                             transaction.transition(XactState::Ready);
+                        }
+                        // The transaction carries the label of the block it was
+                        // matched at: the gate that waits for a label compares
+                        // it with the one it names.
+                        if let Some(label) = &self.program.blocks[conjugate].label {
+                            self.transaction_labels
+                                .insert(partner, label.clone());
+                        }
+                        if let Some(label) = &block.label {
+                            self.transaction_labels.insert(xact, label.clone());
                         }
                         // `leave` decrements the conjugate block's CURRENT count:
                         // the partner is leaving that block, not this one.
@@ -1233,7 +1269,7 @@ impl<'p> Simulation<'p> {
                         spec.high.eval(&mut ctx).round() as i64,
                     )
                 };
-                let chosen = self.select(&spec.kind, low.min(high), low.max(high), spec.mode);
+                let chosen = self.select(&spec, low.min(high), low.max(high), xact);
                 match chosen {
                     Some(number) => {
                         if let Some(transaction) = self.xacts.get_mut(&xact) {
@@ -1242,7 +1278,11 @@ impl<'p> Simulation<'p> {
                         self.leave(xact, block_index, block.next_named("Salida1"));
                     }
                     None => {
-                        let target = if block.has_failure_port() {
+                        // The classes of the original that pick an entity go on
+                        // by their first output when there is nothing to pick;
+                        // the `Select` and the `SelectF` classes of the editor
+                        // take their second output.
+                        let target = if spec.missing_to_failure && block.has_failure_port() {
                             block.next_named("Salida2")
                         } else {
                             block.next_named("Salida1")
@@ -1319,6 +1359,23 @@ impl<'p> Simulation<'p> {
                 self.leave(xact, block_index, block.next_default());
             }
             BlockKind::Examine(spec) => {
+                if spec.transaction {
+                    // The `Examine` class of the original examines the
+                    // transaction: it goes on by the first output when it
+                    // belongs to the group and by the second one when it does
+                    // not.
+                    let present = self
+                        .transaction_groups
+                        .get(&spec.group)
+                        .is_some_and(|members| members.contains(&xact));
+                    let target = if present {
+                        block.next_named("Salida1")
+                    } else {
+                        block.next_named("Salida2")
+                    };
+                    self.leave(xact, block_index, target);
+                    return Ok(());
+                }
                 let number = {
                     let mut ctx = CtxView {
                         sim: self,
@@ -1343,6 +1400,15 @@ impl<'p> Simulation<'p> {
                 self.leave(xact, block_index, target);
             }
             BlockKind::Remove(spec) => {
+                if spec.me {
+                    // The `RemoveMe` class of the original takes the
+                    // transaction out of its group and lets it go on.
+                    if let Some(members) = self.transaction_groups.get_mut(&spec.group) {
+                        members.retain(|member| *member != xact);
+                    }
+                    self.leave(xact, block_index, block.next_default());
+                    return Ok(());
+                }
                 let (count, wanted) = {
                     let mut ctx = CtxView {
                         sim: self,
@@ -1774,7 +1840,80 @@ impl<'p> Simulation<'p> {
         removed
     }
 
-    fn select(&mut self, kind: &RefKind, low: i64, high: i64, mode: SelectMode) -> Option<i64> {
+    /// The label a transaction carries after a `MATCH` block.
+    fn transaction_label(&self, xact: XactId) -> String {
+        self.transaction_labels
+            .get(&xact)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// Pick an entity of a class.
+    ///
+    /// The `SelectL`, `SelectS` and `SelectSNA` classes of the original pick
+    /// the entity whose state is the one their operator names: a logic switch
+    /// that is set, a storage that is not full, or an entity whose value is
+    /// the one that is compared against.
+    fn select(
+        &mut self,
+        spec: &SelectSpec,
+        low: i64,
+        high: i64,
+        xact: XactId,
+    ) -> Option<i64> {
+        let kind = &spec.kind;
+        let mode = spec.mode;
+        let wanted = spec.compare_value.as_ref().map(|expr| {
+            let mut ctx = CtxView {
+                sim: self,
+                xact,
+                depth: 0,
+            };
+            expr.eval(&mut ctx)
+        });
+        if let Some(state) = spec.state {
+            for number in low..=high {
+                let name = crate::error::numeric_name(number as f64);
+                let matches = match state {
+                    SelectState::LogicSet => *self.entities.logic(&name),
+                    SelectState::LogicReset => !*self.entities.logic(&name),
+                    SelectState::StorageFull => {
+                        let storage =
+                            self.entities
+                                .storage(&name, UNDECLARED_STORAGE_CAPACITY, self.now);
+                        storage.remaining() <= 0
+                    }
+                    SelectState::StorageNotFull => {
+                        let storage =
+                            self.entities
+                                .storage(&name, UNDECLARED_STORAGE_CAPACITY, self.now);
+                        storage.remaining() > 0
+                    }
+                    SelectState::EntityEqual => {
+                        let wanted = wanted.unwrap_or(0.0);
+                        let value = match kind {
+                            RefKind::Queue => {
+                                self.entities.queue(&name, self.now).content as f64
+                            }
+                            RefKind::Storage => self
+                                .entities
+                                .storage(&name, UNDECLARED_STORAGE_CAPACITY, self.now)
+                                .in_use as f64,
+                            RefKind::Facility => {
+                                let facility = self.entities.facility(&name, self.now);
+                                (facility.busy as i64) as f64
+                            }
+                            _ => 0.0,
+                        };
+                        (value - wanted).abs() < 1e-9
+                    }
+                };
+                if matches {
+                    return Some(number);
+                }
+            }
+            return None;
+        }
         let mut best: Option<(i64, f64)> = None;
         for number in low..=high {
             let name = crate::error::numeric_name(number as f64);

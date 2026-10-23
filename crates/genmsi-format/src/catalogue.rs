@@ -58,12 +58,13 @@ pub struct ClassSpec {
 
 /// Every class the editor offers, in catalogue order.
 pub static CLASSES: &[ClassSpec] = &[
-    ADVANCE, ALTER, ASSEMBLE, ASSIGN, BUFFER, CLOCK, COUNTER, DEPART, ENTER, EXAMINENUMBER,
-    FACILITYINT, FACILITYUSE, FUNCTION, FUNCTIONDIST, FUNCTIONEXPON, GATEF, GATEL, GATES, GATHER,
-    GENERATE, INITIASV, INITIALLS, JOINME, JOINNUMBER, LEAVE, LINK, LOGIC, LOOP, MATCH,
-    MULTIFURCACION, MULTIFURCACIONP, NOTE, PREEMPT, PRIORITY, QTABLE, QUEUE, RELEASE, REMOVETRANS,
-    RETURN, SAVEVALUE, SCAN, SEIZE, SELECT, SELECTF, SPLIT, STORAGEDEF, STORAGEUSE, TABLE, TABULATE,
-    TERMINATE, TEST, TRANSFER, UNLINK, VARIABLE, VARIABLEA,
+    ADVANCE, ALTER, ASSEMBLE, ASSIGN, BUFFER, CLOCK, COUNTER, DEPART, ENTER, EXAMINE, EXAMINENUMBER,
+    FACILITYINT, FACILITYUSE, FUNCTION, FUNCTIONDIST, FUNCTIONEXPON, GATEF, GATEL, GATEM, GATES,
+    GATHER, GENERATE, INITIASV, INITIALLS, JOINME, JOINNUMBER, LEAVE, LINK, LOGIC, LOOP, MARK,
+    MATCH, MULTIFURCACION, MULTIFURCACIONP, NOTE, PREEMPT, PRIORITY, QTABLE, QUEUE, RELEASE,
+    REMOVEME, REMOVETRANS, RETURN, SAVEVALUE, SCAN, SEIZE, SELECT, SELECTF, SELECTL, SELECTS,
+    SELECTSNA, SPLIT, STORAGEDEF, STORAGEUSE, TABLE, TABULATE, TERMINATE, TEST, TRANSFER, UNLINK,
+    VARIABLE, VARIABLEA, VARIABLEN,
 ];
 
 /// The value a new block of a class comes with, per property.
@@ -102,6 +103,37 @@ pub static DEFAULTS: &[(&str, &str, &str)] = &[
     ("MultifurcacionP", "Prob3", "20%25"),
     ("MultifurcacionP", "Prob4", "20%25"),
     ("MultifurcacionP", "Prob5", "20%25"),
+    // The `Examine` class asks whether the transaction belongs to a group.
+    ("Examine", "Grupo", "UnGrupo"),
+    // The `GateM` class asks whether the transaction matches a label.
+    ("GateM", "Rotulo", "Rotulo"),
+    ("GateM", "op", "Maching"),
+    // The `Mark` class writes the hour in a parameter.
+    ("Mark", "Parametro", "Param"),
+    // The `RemoveMe` class takes the transaction out of its group.
+    ("RemoveMe", "Grupo", "UnGrupo"),
+    // The three selections of the original: a logic switch, a storage and an
+    // entity of a class.
+    ("SelectL", "Param", "param"),
+    ("SelectL", "maximo", "10"),
+    ("SelectL", "minimo", "1"),
+    ("SelectL", "op", "Set"),
+    ("SelectS", "Param", "param"),
+    ("SelectS", "maximo", "10"),
+    ("SelectS", "minimo", "1"),
+    ("SelectS", "op", "NoLleno"),
+    ("SelectSNA", "ClaseSNA", "Q"),
+    ("SelectSNA", "Param", "param"),
+    ("SelectSNA", "maximo", "10"),
+    ("SelectSNA", "minimo", "1"),
+    ("SelectSNA", "op", "="),
+    ("SelectSNA", "valorComp", "*1"),
+    // The `VariableN` class: a normal variable with its own function.
+    ("VariableN", "Desvio", "1"),
+    ("VariableN", "Media", "60"),
+    ("VariableN", "NombreFunc", "NORMAL"),
+    ("VariableN", "NombreVar", "Normal"),
+    ("VariableN", "Seed", "90"),
 ];
 
 /// The default value a new block of `class` comes with for `property`, when
@@ -124,8 +156,10 @@ static LISTED_OPTIONS: &[(&str, &[&str])] = &[
     ("op_MaxMin", &["Minimo", "Maximo"]),
     ("op_Swich", &["Set", "Reset"]),
     ("op_Logic_Swich", &["Set", "Reset"]),
-    ("op_Logic_Stor", &["Vacio", "NoVacio"]),
+    ("op_Logic_Stor", &["Vacio", "NoVacio", "Lleno", "NoLleno"]),
     ("op_Logic_Faci", &["Libre", "Ocupado"]),
+    // The gate that waits for a label of a transaction.
+    ("op_Logic_Tran", &["Maching", "NotMaching"]),
     ("FuncTypes", &["Continua", "Discreta", "Eval"]),
     ("LinkMode", &["FIFO"]),
     ("OperationMode", &["Algunos", "Todos"]),
@@ -382,6 +416,21 @@ pub static ENTER: ClassSpec = ClassSpec {
     ],
 };
 
+pub static EXAMINE: ClassSpec = ClassSpec {
+    class: "Examine",
+    title: "Examinar grupo",
+    inputs: &[
+        PortSpec { ioid: 1, name: "Entrada1", caption: "Entrada1" },
+    ],
+    outputs: &[
+        PortSpec { ioid: 2, name: "Salida1", caption: "En%20%5BGrupo%5D" },
+        PortSpec { ioid: 3, name: "Salida2", caption: "No%20en%20%5BGrupo%5D" },
+    ],
+    properties: &[
+        PropertySpec { name: "Grupo", hint: "Grupo%20de%20transacciones%20a%20examinar", ty: "EntityUse", subtype: "TransacGroup", unique: false },
+    ],
+};
+
 pub static EXAMINENUMBER: ClassSpec = ClassSpec {
     class: "ExamineNumber",
     title: "Examinar número",
@@ -502,6 +551,22 @@ pub static GATEL: ClassSpec = ClassSpec {
     properties: &[
         PropertySpec { name: "LogicSwich", hint: "Logic%20Swich%20a%20evaluar.", ty: "EntityUse", subtype: "LogicSwich", unique: false },
         PropertySpec { name: "op", hint: "Operador%20logico%20del%20logic%20swich.", ty: "Listed", subtype: "op_Logic_Swich", unique: false },
+    ],
+};
+
+pub static GATEM: ClassSpec = ClassSpec {
+    class: "GateM",
+    title: "Verificar etiqueta",
+    inputs: &[
+        PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
+    ],
+    outputs: &[
+        PortSpec { ioid: 2, name: "Salida1", caption: "" },
+        PortSpec { ioid: 3, name: "Salida2", caption: "fallo" },
+    ],
+    properties: &[
+        PropertySpec { name: "Rotulo", hint: "Rotulo%20a%20evaluar.", ty: "EntityUse", subtype: "Label", unique: false },
+        PropertySpec { name: "op", hint: "Operador%20logico%20de%20transaccion.", ty: "Listed", subtype: "op_Logic_Tran", unique: false },
     ],
 };
 
@@ -663,6 +728,20 @@ pub static LOOP: ClassSpec = ClassSpec {
     ],
 };
 
+pub static MARK: ClassSpec = ClassSpec {
+    class: "Mark",
+    title: "Marcar hora",
+    inputs: &[
+        PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
+    ],
+    outputs: &[
+        PortSpec { ioid: 2, name: "Salida1", caption: "" },
+    ],
+    properties: &[
+        PropertySpec { name: "Parametro", hint: "Parametro%20donde%20se%20guarda%20la%20hora", ty: "EntityUse", subtype: "Parameter", unique: false },
+    ],
+};
+
 pub static MATCH: ClassSpec = ClassSpec {
     class: "Match",
     title: "Sincronizar",
@@ -809,6 +888,21 @@ pub static RELEASE: ClassSpec = ClassSpec {
     ],
 };
 
+pub static REMOVEME: ClassSpec = ClassSpec {
+    class: "RemoveMe",
+    title: "Remover del grupo",
+    inputs: &[
+        PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
+    ],
+    outputs: &[
+        PortSpec { ioid: 2, name: "Salida1", caption: "" },
+        PortSpec { ioid: 3, name: "Salida2", caption: "No%20en%20%5BGrupo%5D" },
+    ],
+    properties: &[
+        PropertySpec { name: "Grupo", hint: "Grupo%20num%E9rico%20al%20que%20se%20agrega%20un%20n%FAmero", ty: "EntityUse", subtype: "TransacGroup", unique: false },
+    ],
+};
+
 pub static REMOVETRANS: ClassSpec = ClassSpec {
     class: "RemoveTrans",
     title: "Remover transacciones",
@@ -930,6 +1024,62 @@ pub static SELECTF: ClassSpec = ClassSpec {
         PropertySpec { name: "maximo", hint: "Maximo%20valor%20de%20la%20selecci%F3n%20%28Cualquier%20SNA%29.", ty: "TSNA", subtype: "SNA", unique: false },
         PropertySpec { name: "minimo", hint: "Minimo%20valor%20de%20la%20selecci%F3n%20%28Cualquier%20SNA%29.", ty: "TSNA", subtype: "SNA", unique: false },
         PropertySpec { name: "op", hint: "Operador%20Logico%20de%20Facility.", ty: "Listed", subtype: "op_Logic_Faci", unique: false },
+    ],
+};
+
+pub static SELECTL: ClassSpec = ClassSpec {
+    class: "SelectL",
+    title: "Seleccionar llave lógica",
+    inputs: &[
+        PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
+    ],
+    outputs: &[
+        PortSpec { ioid: 2, name: "Salida1", caption: "" },
+        PortSpec { ioid: 3, name: "Salida2", caption: "No%20selec" },
+    ],
+    properties: &[
+        PropertySpec { name: "Param", hint: "par%E1metro%20donde%20se%20guarda%20el%20valor%20seleccionado", ty: "EntityUse", subtype: "Parameter", unique: false },
+        PropertySpec { name: "maximo", hint: "Maximo%20valor%20de%20la%20selecci%F3n%20%28Cualquier%20SNA%29.", ty: "TSNA", subtype: "SNA", unique: false },
+        PropertySpec { name: "minimo", hint: "Minimo%20valor%20de%20la%20selecci%F3n%20%28Cualquier%20SNA%29.", ty: "TSNA", subtype: "SNA", unique: false },
+        PropertySpec { name: "op", hint: "Operador%20Logico%20de%20LogicSwich.", ty: "Listed", subtype: "op_Logic_Swich", unique: false },
+    ],
+};
+
+pub static SELECTS: ClassSpec = ClassSpec {
+    class: "SelectS",
+    title: "Seleccionar depósito",
+    inputs: &[
+        PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
+    ],
+    outputs: &[
+        PortSpec { ioid: 2, name: "Salida1", caption: "" },
+        PortSpec { ioid: 3, name: "Salida2", caption: "No%20selec" },
+    ],
+    properties: &[
+        PropertySpec { name: "Param", hint: "par%E1metro%20donde%20se%20guarda%20el%20valor%20seleccionado", ty: "EntityUse", subtype: "Parameter", unique: false },
+        PropertySpec { name: "maximo", hint: "Maximo%20valor%20de%20la%20selecci%F3n%20%28Cualquier%20SNA%29.", ty: "TSNA", subtype: "SNA", unique: false },
+        PropertySpec { name: "minimo", hint: "Minimo%20valor%20de%20la%20selecci%F3n%20%28Cualquier%20SNA%29.", ty: "TSNA", subtype: "SNA", unique: false },
+        PropertySpec { name: "op", hint: "Operador%20Logico%20de%20Storage.", ty: "Listed", subtype: "op_Logic_Stor", unique: false },
+    ],
+};
+
+pub static SELECTSNA: ClassSpec = ClassSpec {
+    class: "SelectSNA",
+    title: "Seleccionar entidad",
+    inputs: &[
+        PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
+    ],
+    outputs: &[
+        PortSpec { ioid: 2, name: "Salida1", caption: "" },
+        PortSpec { ioid: 3, name: "Salida2", caption: "No%20selec" },
+    ],
+    properties: &[
+        PropertySpec { name: "ClaseSNA", hint: "Clase%20de%20SNA%20de%20entidad%20por%20el%20cual%20se%20realiza%20la%20seleccion", ty: "Listed", subtype: "entitySNAclass", unique: false },
+        PropertySpec { name: "Param", hint: "Nombre%2C%20numero%20o%20%2Aparam%20donde%20se%20guarda%20el%20valor%20seleccionado", ty: "EntityUse", subtype: "Parameter", unique: false },
+        PropertySpec { name: "maximo", hint: "Maximo%20valor%20de%20la%20selecci%F3n%20%28Cualquier%20SNA%29.", ty: "TSNA", subtype: "SNA", unique: false },
+        PropertySpec { name: "minimo", hint: "Minimo%20valor%20de%20la%20selecci%F3n%20%28Cualquier%20SNA%29.", ty: "TSNA", subtype: "SNA", unique: false },
+        PropertySpec { name: "op", hint: "Operador%20Relacional.", ty: "Listed", subtype: "op_Relac", unique: false },
+        PropertySpec { name: "valorComp", hint: "Valor%20a%20comparar.%20%28cualquier%20SNA%29.", ty: "TSNA", subtype: "SNA", unique: false },
     ],
 };
 
@@ -1081,6 +1231,20 @@ pub static VARIABLE: ClassSpec = ClassSpec {
     properties: &[
         PropertySpec { name: "Expresion", hint: "Expresion%20matematica", ty: "Expresion", subtype: "Expresion", unique: false },
         PropertySpec { name: "NombreVar", hint: "Nombre%20o%20Nro%20de%20la%20variable", ty: "EntityDef", subtype: "Variable", unique: true },
+    ],
+};
+
+pub static VARIABLEN: ClassSpec = ClassSpec {
+    class: "VariableN",
+    title: "Definir variable normal",
+    inputs: &[],
+    outputs: &[],
+    properties: &[
+        PropertySpec { name: "Desvio", hint: "Sigma", ty: "Expresion", subtype: "Expresion", unique: false },
+        PropertySpec { name: "Media", hint: "Valor%20medio", ty: "Expresion", subtype: "Expresion", unique: false },
+        PropertySpec { name: "NombreFunc", hint: "Nombre%20de%20la%20Funci%F3n", ty: "EntityDef", subtype: "Function", unique: true },
+        PropertySpec { name: "NombreVar", hint: "Nombre%20o%20Nro%20de%20la%20variable", ty: "EntityDef", subtype: "Variable", unique: true },
+        PropertySpec { name: "Seed", hint: "Semilla", ty: "EntityUse", subtype: "RandomSeed", unique: false },
     ],
 };
 

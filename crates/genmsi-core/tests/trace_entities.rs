@@ -27,7 +27,7 @@
 
 use std::path::{Path, PathBuf};
 
-use genmsi_core::program::{BlockKind, ExecBlock};
+use genmsi_core::program::{BlockKind, ExecBlock, FunctionDef};
 use genmsi_core::{Program, RunResult, SimConfig, Simulation};
 
 mod support;
@@ -931,5 +931,430 @@ fn the_preempt_class_removes_the_owner_it_interrupts_when_the_class_says_so() {
         entries(&program, &result, "C"),
         0,
         "the removed owner does not carry on with its own work"
+    );
+}
+
+// The classes of the original that work with the entities of the model: the
+// `Mark` class (the hour goes to a parameter), the `RemoveMe` class (the
+// transaction leaves its group) and the three selections (a logic switch, a
+// storage and an entity of a class).
+
+#[test]
+fn the_mark_class_writes_the_hour_in_the_parameter() {
+    // The macro code of the original: `MARK [Parametro:'Parametro donde se
+    // guarda la hora']`. The class writes the time of the model in the
+    // parameter and lets the transaction go on.
+    let nodes = [
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("T1"))],
+            &[("Media", "10"), ("Modificador", "0")],
+        ),
+        node(
+            2,
+            "Mark",
+            Some("T1"),
+            &[("Salida1", Some("T2"))],
+            &[("Parametro", "Param")],
+        ),
+        node(
+            3,
+            "SaveValue",
+            Some("T2"),
+            &[("Salida1", Some("T3"))],
+            &[("SaveValue", "V"), ("Op", "="), ("Valor", "P:Param")],
+        ),
+        node(4, "Terminate", Some("T3"), &[], &[("Unidades", "0")]),
+    ];
+    let links = [(1, 0, 2, 0), (2, 0, 3, 0), (3, 0, 4, 0)];
+    let program = wired(&nodes, &links, 400.0);
+    let result = Simulation::new(
+        &program,
+        SimConfig {
+            seed: 1,
+            stop_time: Some(400.0),
+            trace: true,
+            ..SimConfig::default()
+        },
+    )
+    .run()
+    .expect("runs");
+
+    // The value published is the hour of the transaction: the time the trace
+    // records and the value the parameter holds are the same.
+    let values: Vec<(f64, f64)> = result
+        .trace
+        .iter()
+        .filter(|event| event.event == "value")
+        .map(|event| {
+            let value = event
+                .detail
+                .rsplit_once(' ')
+                .map(|(_, value)| value)
+                .expect("the detail carries the value")
+                .parse::<f64>()
+                .expect("the value is a number");
+            (event.time, value)
+        })
+        .collect();
+    assert!(!values.is_empty(), "the trace publishes the value");
+    for (time, value) in values {
+        assert!(
+            (time - value).abs() < 1e-9,
+            "the parameter holds the hour of the transaction: {time} and {value}"
+        );
+    }
+}
+
+#[test]
+fn the_remove_me_class_takes_the_transaction_out_of_its_group() {
+    // The class of the original removes the transaction from the group it
+    // names; the examination that follows finds it in no group.
+    let nodes = [
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("T1"))],
+            &[("Media", "1"), ("Modificador", "0")],
+        ),
+        node(
+            2,
+            "JoinMe",
+            Some("T1"),
+            &[("Salida1", Some("T2"))],
+            &[("Grupo", "UnGrupo")],
+        ),
+        node(
+            3,
+            "RemoveMe",
+            Some("T2"),
+            &[("Salida1", Some("T3")), ("Salida2", None)],
+            &[("Grupo", "UnGrupo")],
+        ),
+        node(
+            4,
+            "Examine",
+            Some("T3"),
+            &[("Salida1", Some("YES")), ("Salida2", Some("NO"))],
+            &[("Grupo", "UnGrupo")],
+        ),
+        node(5, "Terminate", Some("YES"), &[], &[("Unidades", "0")]),
+        node(6, "Terminate", Some("NO"), &[], &[("Unidades", "0")]),
+    ];
+    let links = [
+        (1, 0, 2, 0),
+        (2, 0, 3, 0),
+        (3, 0, 4, 0),
+        (4, 0, 5, 0),
+        (4, 1, 6, 0),
+    ];
+    let program = wired(&nodes, &links, 400.0);
+    let result = run(&program, 400.0, 1);
+    let in_group = entries(&program, &result, "YES");
+    let out_group = entries(&program, &result, "NO");
+    assert!(out_group > 100, "the bench creates transactions: {out_group}");
+    assert_eq!(
+        in_group, 0,
+        "the transaction left the group before the examination"
+    );
+}
+
+#[test]
+fn the_select_l_class_picks_the_logic_switch_that_is_set() {
+    // The class of the original selects a logic switch: `SELECT LS
+    // param,1,10`. The number of the switch goes to the parameter.
+    let nodes = [
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("T1"))],
+            &[("Media", "1"), ("Modificador", "0")],
+        ),
+        node(
+            2,
+            "Logic",
+            Some("T1"),
+            &[("Salida1", Some("T2"))],
+            &[("LogicSwich", "3"), ("Op", "Set")],
+        ),
+        node(
+            3,
+            "SelectL",
+            Some("T2"),
+            &[("Salida1", Some("T3")), ("Salida2", None)],
+            &[
+                ("Param", "param"),
+                ("minimo", "1"),
+                ("maximo", "10"),
+                ("op", "Set"),
+            ],
+        ),
+        node(
+            4,
+            "Test",
+            Some("T3"),
+            &[("Salida1", Some("YES")), ("Salida2", Some("NO"))],
+            &[("1_Valor", "P:param"), ("2_OP", "="), ("3_Valor", "3")],
+        ),
+        node(5, "Terminate", Some("YES"), &[], &[("Unidades", "0")]),
+        node(6, "Terminate", Some("NO"), &[], &[("Unidades", "0")]),
+    ];
+    let links = [
+        (1, 0, 2, 0),
+        (2, 0, 3, 0),
+        (3, 0, 4, 0),
+        (4, 0, 5, 0),
+        (4, 1, 6, 0),
+    ];
+    let program = wired(&nodes, &links, 400.0);
+    let result = run(&program, 400.0, 1);
+    assert!(
+        entries(&program, &result, "YES") > 100,
+        "the switch that is set is the one the class picks"
+    );
+    assert_eq!(
+        entries(&program, &result, "NO"),
+        0,
+        "every transaction picks the same switch"
+    );
+}
+
+#[test]
+fn the_select_s_class_picks_the_storage_that_is_not_full() {
+    // `SELECT SNF param,1,10`: the class picks a storage that has room.
+    let nodes = [
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("T1"))],
+            &[("Media", "1"), ("Modificador", "0")],
+        ),
+        node(
+            2,
+            "SelectS",
+            Some("T1"),
+            &[("Salida1", Some("T2")), ("Salida2", None)],
+            &[
+                ("Param", "param"),
+                ("minimo", "1"),
+                ("maximo", "10"),
+                ("op", "NoLleno"),
+            ],
+        ),
+        node(
+            3,
+            "Test",
+            Some("T2"),
+            &[("Salida1", Some("YES")), ("Salida2", Some("NO"))],
+            &[("1_Valor", "P:param"), ("2_OP", ">="), ("3_Valor", "1")],
+        ),
+        node(4, "Terminate", Some("YES"), &[], &[("Unidades", "0")]),
+        node(5, "Terminate", Some("NO"), &[], &[("Unidades", "0")]),
+    ];
+    let links = [(1, 0, 2, 0), (2, 0, 3, 0), (3, 0, 4, 0), (3, 1, 5, 0)];
+    let program = wired(&nodes, &links, 400.0);
+    let result = run(&program, 400.0, 1);
+    assert!(
+        entries(&program, &result, "YES") > 100,
+        "the class picks a storage"
+    );
+    assert_eq!(
+        entries(&program, &result, "NO"),
+        0,
+        "every transaction picks a storage"
+    );
+}
+
+#[test]
+fn the_select_sna_class_picks_the_entity_whose_value_is_the_compared_one() {
+    // `SELECT E param,1,10,*1,Q,`: the class picks the entity of the class
+    // whose value is the one that is compared against.
+    let nodes = [
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("T1"))],
+            &[("Media", "1"), ("Modificador", "0")],
+        ),
+        node(
+            2,
+            "SelectSNA",
+            Some("T1"),
+            &[("Salida1", Some("T2")), ("Salida2", None)],
+            &[
+                ("ClaseSNA", "Q"),
+                ("Param", "param"),
+                ("minimo", "1"),
+                ("maximo", "10"),
+                ("op", "="),
+                ("valorComp", "0"),
+            ],
+        ),
+        node(
+            3,
+            "Test",
+            Some("T2"),
+            &[("Salida1", Some("YES")), ("Salida2", Some("NO"))],
+            &[("1_Valor", "P:param"), ("2_OP", "="), ("3_Valor", "1")],
+        ),
+        node(4, "Terminate", Some("YES"), &[], &[("Unidades", "0")]),
+        node(5, "Terminate", Some("NO"), &[], &[("Unidades", "0")]),
+    ];
+    let links = [(1, 0, 2, 0), (2, 0, 3, 0), (3, 0, 4, 0), (3, 1, 5, 0)];
+    let program = wired(&nodes, &links, 400.0);
+    let result = run(&program, 400.0, 1);
+    assert!(
+        entries(&program, &result, "YES") > 100,
+        "the class picks the entity"
+    );
+    assert_eq!(
+        entries(&program, &result, "NO"),
+        0,
+        "every transaction picks the same entity"
+    );
+}
+
+#[test]
+fn the_select_classes_go_on_when_there_is_nothing_to_pick() {
+    // The report of the original for the benches of the three classes shows
+    // every transaction going on by the first output, although there is
+    // nothing to select: no logic switch is set, no storage exists and the
+    // queue the class looks at is empty.
+    for (class, props) in [
+        (
+            "SelectL",
+            vec![
+                ("Param", "param"),
+                ("minimo", "1"),
+                ("maximo", "10"),
+                ("op", "Set"),
+            ],
+        ),
+        (
+            "SelectS",
+            vec![
+                ("Param", "param"),
+                ("minimo", "1"),
+                ("maximo", "10"),
+                ("op", "NoLleno"),
+            ],
+        ),
+        (
+            "SelectSNA",
+            vec![
+                ("ClaseSNA", "Q"),
+                ("Param", "param"),
+                ("minimo", "1"),
+                ("maximo", "10"),
+                ("op", "="),
+                ("valorComp", "1"),
+            ],
+        ),
+    ] {
+        let nodes = [
+            node(
+                1,
+                "Generate",
+                None,
+                &[("Salida1", Some("T1"))],
+                &[("Media", "1"), ("Modificador", "0")],
+            ),
+            node(
+                2,
+                class,
+                Some("T1"),
+                &[("Salida1", Some("T2")), ("Salida2", Some("T3"))],
+                &props,
+            ),
+            node(3, "Terminate", Some("T2"), &[], &[("Unidades", "0")]),
+            node(4, "Terminate", Some("T3"), &[], &[("Unidades", "0")]),
+        ];
+        let links = [(1, 0, 2, 0), (2, 0, 3, 0), (2, 1, 4, 0)];
+        let program = wired(&nodes, &links, 400.0);
+        let result = run(&program, 400.0, 1);
+        assert!(
+            entries(&program, &result, "T2") > 100,
+            "{class}: every transaction goes on by the first output"
+        );
+        assert_eq!(
+            entries(&program, &result, "T3"),
+            0,
+            "{class}: the second output is the one of a selection that failed"
+        );
+    }
+}
+
+#[test]
+fn the_variable_n_class_defines_a_normal_variable() {
+    // The class creates the standard normal distribution with the seed it
+    // names and the variable that reads it: `60+(1#FN$NORMAL)/10`. The
+    // variable is a normal one around its mean, not a constant.
+    let nodes = [
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("T1"))],
+            &[("Media", "1"), ("Modificador", "0")],
+        ),
+        node(
+            5,
+            "VariableN",
+            None,
+            &[],
+            &[
+                ("Media", "60"),
+                ("Desvio", "1"),
+                ("NombreFunc", "NORMAL"),
+                ("NombreVar", "Normal"),
+                ("Seed", "90"),
+            ],
+        ),
+        node(
+            2,
+            "Test",
+            Some("T1"),
+            &[("Salida1", Some("YES")), ("Salida2", Some("NO"))],
+            &[("1_Valor", "V:Normal"), ("2_OP", ">"), ("3_Valor", "60")],
+        ),
+        node(3, "Terminate", Some("YES"), &[], &[("Unidades", "0")]),
+        node(4, "Terminate", Some("NO"), &[], &[("Unidades", "0")]),
+    ];
+    let links = [(1, 0, 2, 0), (2, 0, 3, 0), (2, 1, 4, 0)];
+    let program = wired(&nodes, &links, 4000.0);
+
+    // The class defines the function it reads and the variable itself.
+    let function = program
+        .definitions
+        .functions
+        .get("NORMAL")
+        .expect("the class creates its function");
+    assert!(
+        matches!(function, FunctionDef::Continuous { .. }),
+        "the function is the continuous distribution of the normal variable"
+    );
+    assert!(
+        program.definitions.variables.contains_key("Normal"),
+        "the class creates its variable"
+    );
+
+    let result = run(&program, 4000.0, 1);
+    let above = entries(&program, &result, "YES");
+    let below = entries(&program, &result, "NO");
+    assert!(above > 100, "the bench creates transactions: {above}");
+    // The table of the original is the one of the standard normal
+    // distribution, ten times the quantile: the variable is above its mean
+    // about six times out of ten (the table of the original has its pair
+    // `0.44,2` where the quantile is negative).
+    let share = above as f64 / (above + below) as f64;
+    assert!(
+        (0.45..0.75).contains(&share),
+        "the variable is a normal one around its mean, measured {share:.3}"
     );
 }

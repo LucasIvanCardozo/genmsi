@@ -11,8 +11,21 @@ use std::collections::HashMap;
 use genmsi_format::{Block, GmdlModel};
 
 use crate::error::EngineError;
-use crate::expr::{Expr, NameSource, ProgramExpr, RefKind};
+use crate::expr::{BinOp, Expr, NameSource, ProgramExpr, RefKind};
 use crate::rng::BLOCK_STREAM_BASE;
+
+/// The table of the standard normal distribution the `VariableN` class uses.
+///
+/// The macro code of the original carries twenty-five points: the
+/// accumulated probability and ten times the quantile, so that the
+/// deviation of the variable is the one the class declares.
+const NORMAL_TABLE: &str = ".0|-50;.00003|-40;.00135|-30;.00621|-25;.02275|-20;.06681|-15;\
+.11507|-12;.15866|-10;.21186|-8;.27425|-6;.34458|-4;.44|2;.5|0;.56|2;.65542|4;.72575|6;\
+.78814|8;.84134|10;.88493|12;.93319|15;.97725|20;.99379|25;.99865|30;.99997|40;1.0|50";
+
+/// The random stream the original's multifurcation writes in the function
+/// that chooses the branch (`FUNCTIONDIST MultifurcacionCH,2,{...}`).
+const MULTIFURCACION_STREAM: u32 = 2;
 
 /// How an assignment combines the new value with the old one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -389,6 +402,25 @@ pub struct LoopSpec {
     pub parameter: String,
 }
 
+/// The state an entity is selected by.
+///
+/// The three selections of the original that pick an entity of a class —a
+/// logic switch, a storage and an entity whose value is compared— say in
+/// their `Listed` operator which state they want.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelectState {
+    /// A logic switch that is set (`LS`).
+    LogicSet,
+    /// A logic switch that is not set (`LR`).
+    LogicReset,
+    /// A storage that is full (`SF`).
+    StorageFull,
+    /// A storage that is not full (`SNF`).
+    StorageNotFull,
+    /// An entity whose value equals the compared one (`E`).
+    EntityEqual,
+}
+
 /// Selection mode of `SELECT`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SelectMode {
@@ -413,6 +445,20 @@ pub struct SelectSpec {
     pub high: ProgramExpr,
     /// Selection mode.
     pub mode: SelectMode,
+    /// The state the entity is selected by, when the class names one.
+    ///
+    /// The `SelectL`, `SelectS` and `SelectSNA` classes of the original pick
+    /// the entity of a class whose state is the one their operator names.
+    pub state: Option<SelectState>,
+    /// Value the entity is compared against (`SelectSNA`).
+    pub compare_value: Option<ProgramExpr>,
+    /// Whether a selection that finds nothing takes the second output.
+    ///
+    /// The benches of the original show the transactions of a `SelectL`, a
+    /// `SelectS` and a `SelectSNA` going on by the first output when there is
+    /// nothing to select; the `Select` and the `SelectF` classes of the
+    /// editor take their second output instead.
+    pub missing_to_failure: bool,
 }
 
 /// `TABULATE` specification.
@@ -434,12 +480,21 @@ pub struct JoinSpec {
 }
 
 /// `EXAMINE` specification.
+///
+/// The `ExamineNumber` class asks whether a *number* belongs to a numeric
+/// group; the `Examine` class asks whether the *transaction* belongs to a
+/// group of transactions.
 #[derive(Debug, Clone)]
 pub struct ExamineSpec {
     /// Numeric group name.
     pub group: String,
     /// Value tested for membership.
     pub number: ProgramExpr,
+    /// Whether the transaction itself is the one examined.
+    ///
+    /// The `Examine` class of the original examines the transaction: the
+    /// number of the `ExamineNumber` class is not part of it.
+    pub transaction: bool,
 }
 
 /// `REMOVE` specification.
@@ -455,6 +510,12 @@ pub struct RemoveSpec {
     pub parameter: Option<String>,
     /// Value compared.
     pub value: Option<ProgramExpr>,
+    /// Whether the transaction itself is the one removed.
+    ///
+    /// The `RemoveMe` class of the original takes the transaction out of its
+    /// group; the `RemoveTrans` class takes the members that match a
+    /// comparison.
+    pub me: bool,
 }
 
 /// `SCAN` specification.
@@ -788,6 +849,7 @@ pub fn known_classes() -> &'static [&'static str] {
         "Counter",
         "Depart",
         "Enter",
+        "Examine",
         "ExamineNumber",
         "FacilityInt",
         "FacilityUse",
@@ -796,6 +858,7 @@ pub fn known_classes() -> &'static [&'static str] {
         "FunctionExpon",
         "GateF",
         "GateL",
+        "GateM",
         "GateS",
         "Gather",
         "Generate",
@@ -807,6 +870,7 @@ pub fn known_classes() -> &'static [&'static str] {
         "Link",
         "Logic",
         "Loop",
+        "Mark",
         "Match",
         "Multifurcacion",
         "MultifurcacionP",
@@ -816,6 +880,7 @@ pub fn known_classes() -> &'static [&'static str] {
         "QTable",
         "Queue",
         "Release",
+        "RemoveMe",
         "RemoveTrans",
         "Return",
         "SaveValue",
@@ -823,6 +888,9 @@ pub fn known_classes() -> &'static [&'static str] {
         "Seize",
         "Select",
         "SelectF",
+        "SelectL",
+        "SelectS",
+        "SelectSNA",
         "Split",
         "StorageDef",
         "StorageUse",
@@ -834,6 +902,7 @@ pub fn known_classes() -> &'static [&'static str] {
         "Unlink",
         "Variable",
         "VariableA",
+        "VariableN",
     ]
 }
 
@@ -952,8 +1021,8 @@ impl Compiler<'_> {
 
         match class {
             // Definitions and non-runtime modules.
-            "Function" | "FunctionDist" | "FunctionExpon" | "Variable" | "VariableA" | "Table"
-            | "QTable" | "StorageDef" | "InitiaSV" | "InitialLS" | "Note" => Ok(None),
+            "Function" | "FunctionDist" | "FunctionExpon" | "Variable" | "VariableA" | "VariableN"
+            | "Table" | "QTable" | "StorageDef" | "InitiaSV" | "InitialLS" | "Note" => Ok(None),
             "Clock" => {
                 let frequency = self.require_number(module, "Frecuencia")?;
                 let generate = push!(
@@ -1470,6 +1539,27 @@ impl Compiler<'_> {
                     class,
                 )))
             }
+            "GateM" => {
+                // The gate waits for a label: the transaction must match the
+                // label the class names, or the opposite when the operator is
+                // `NotMaching`. The label travels in the `Logic` condition:
+                // the condition of a gate is the thing it evaluates, and the
+                // engine tells the two apart by the class of the statement.
+                let rotulo = self.entity(module, "Rotulo")?;
+                let matching = !module
+                    .prop_value("op")
+                    .is_some_and(|op| op.trim().eq_ignore_ascii_case("notmaching"));
+                Ok(Some(push!(
+                    BlockKind::Gate(GateSpec {
+                        condition: GateCondition::Logic {
+                            switch: rotulo,
+                            state: matching,
+                        },
+                    }),
+                    label,
+                    "Gate",
+                )))
+            }
             "GateL" => {
                 let switch = self.entity(module, "LogicSwich")?;
                 let state = module
@@ -1585,6 +1675,21 @@ impl Compiler<'_> {
                     class,
                 )))
             }
+            "Mark" => {
+                // The class writes the hour in a parameter: it is the
+                // assignment of the clock, and the original writes it as a
+                // `MARK` statement of its own.
+                let parameter = self.require_name(module, "Parametro")?;
+                Ok(Some(push!(
+                    BlockKind::Assign(AssignSpec {
+                        parameter,
+                        op: AssignOp::Set,
+                        value: self.clock_expr(),
+                    }),
+                    label,
+                    class,
+                )))
+            }
             "Match" => {
                 let own = module
                     .prop_value("RotuloPropio")
@@ -1611,22 +1716,38 @@ impl Compiler<'_> {
                 })?;
                 Ok(Some(push!(BlockKind::Priority(priority), label, class)))
             }
-            "Select" | "SelectF" => {
-                let kind = match module
-                    .prop_value("ClaseSNA")
-                    .unwrap_or_else(|| "Q".to_string())
-                    .trim()
+            "Select" | "SelectF" | "SelectL" | "SelectS" | "SelectSNA" => {
+                let mode = if class == "SelectF" {
+                    SelectMode::FirstFree
+                } else if class == "Select"
+                    && module
+                        .prop_value("op")
+                        .is_some_and(|op| op.eq_ignore_ascii_case("Maximo"))
                 {
-                    "Q" => RefKind::Queue,
-                    "S" => RefKind::Storage,
-                    "R" => RefKind::Facility,
-                    other => {
-                        return Err(EngineError::invalid_block(
-                            node,
-                            class,
-                            format!("unsupported SELECT entity class {other:?}"),
-                        ));
-                    }
+                    SelectMode::Max
+                } else {
+                    SelectMode::Min
+                };
+                let kind = match class {
+                    "SelectF" => RefKind::Facility,
+                    "SelectS" => RefKind::Storage,
+                    "SelectL" => RefKind::LogicSwitch,
+                    _ => match module
+                        .prop_value("ClaseSNA")
+                        .unwrap_or_else(|| "Q".to_string())
+                        .trim()
+                    {
+                        "Q" => RefKind::Queue,
+                        "S" => RefKind::Storage,
+                        "R" => RefKind::Facility,
+                        other => {
+                            return Err(EngineError::invalid_block(
+                                node,
+                                class,
+                                format!("unsupported SELECT entity class {other:?}"),
+                            ));
+                        }
+                    },
                 };
                 let parameter = self.require_name(module, "Param")?;
                 let low = self
@@ -1635,15 +1756,26 @@ impl Compiler<'_> {
                 let high = self
                     .sna(module, "maximo")?
                     .unwrap_or_else(|| self.number_expr(1.0));
-                let mode = if class == "SelectF" {
-                    SelectMode::FirstFree
-                } else if module
-                    .prop_value("op")
-                    .is_some_and(|op| op.eq_ignore_ascii_case("Maximo"))
-                {
-                    SelectMode::Max
+                let op = module.prop_value("op").unwrap_or_default();
+                let state = match class {
+                    // `op_Logic_Swich`: `Set` picks a switch that is set and
+                    // `Reset` one that is not.
+                    "SelectL" => Some(if op.trim().eq_ignore_ascii_case("reset") {
+                        SelectState::LogicReset
+                    } else {
+                        SelectState::LogicSet
+                    }),
+                    // `op_Logic_Stor`: the state of the storage.
+                    "SelectS" => Some(storage_state(&op)),
+                    // `op_Relac`: the value of the entity is compared with the
+                    // one the class names.
+                    "SelectSNA" => Some(SelectState::EntityEqual),
+                    _ => None,
+                };
+                let compare_value = if class == "SelectSNA" {
+                    self.sna(module, "valorComp")?
                 } else {
-                    SelectMode::Min
+                    None
                 };
                 Ok(Some(push!(
                     BlockKind::Select(SelectSpec {
@@ -1652,9 +1784,19 @@ impl Compiler<'_> {
                         low,
                         high,
                         mode,
+                        state,
+                        compare_value,
+                        // The classes that pick an entity of the original go on
+                        // by their first output when there is nothing to pick.
+                        missing_to_failure: matches!(class, "Select" | "SelectF"),
                     }),
                     label,
-                    class,
+                    // The three selections of the original are `SELECT`
+                    // statements: the class says which one they are.
+                    match class {
+                        "SelectL" | "SelectS" | "SelectSNA" => "Select",
+                        other => other,
+                    },
                 )))
             }
             "Tabulate" => {
@@ -1685,9 +1827,47 @@ impl Compiler<'_> {
                     EngineError::invalid_block(node, class, "Numero is required")
                 })?;
                 Ok(Some(push!(
-                    BlockKind::Examine(ExamineSpec { group, number }),
+                    BlockKind::Examine(ExamineSpec {
+                        group,
+                        number,
+                        transaction: false,
+                    }),
                     label,
                     class,
+                )))
+            }
+            "Examine" => {
+                // The class asks whether the *transaction* belongs to a group
+                // of transactions; the number of the `ExamineNumber` class is
+                // not part of it.
+                let group = self.require_name(module, "Grupo")?;
+                Ok(Some(push!(
+                    BlockKind::Examine(ExamineSpec {
+                        group,
+                        number: self.empty_expr(),
+                        transaction: true,
+                    }),
+                    label,
+                    class,
+                )))
+            }
+            "RemoveMe" => {
+                // The class takes the transaction out of its group.
+                let group = self.require_name(module, "Grupo")?;
+                Ok(Some(push!(
+                    BlockKind::Remove(RemoveSpec {
+                        group,
+                        // The class removes the transaction itself: the number
+                        // of transactions the `RemoveTrans` class removes is
+                        // not part of it.
+                        count: self.empty_expr(),
+                        all: false,
+                        parameter: None,
+                        value: None,
+                        me: true,
+                    }),
+                    label,
+                    "Remove",
                 )))
             }
             "RemoveTrans" => {
@@ -1705,6 +1885,7 @@ impl Compiler<'_> {
                         all,
                         parameter: self.name(module, "CompParam"),
                         value: self.sna(module, "CompValue")?,
+                        me: false,
                     }),
                     label,
                     class,
@@ -1888,6 +2069,63 @@ impl Compiler<'_> {
                         .random_variables
                         .insert(name, RandomVariable { min, max, stream });
                 }
+                "VariableN" => {
+                    // The class creates its own function (the standard normal
+                    // distribution, drawn from the seed it names) and the
+                    // variable that reads it.
+                    let function = self.require_name(module, "NombreFunc")?;
+                    let variable = self.require_name(module, "NombreVar")?;
+                    let seed = self.number(module, "Seed").unwrap_or(90.0) as u32;
+                    let argument = ProgramExpr::parse(&format!("RN{seed}")).map_err(|err| {
+                        EngineError::invalid_block(node, class, format!("{err}"))
+                    })?;
+                    let points = self.parse_points(module, NORMAL_TABLE)?;
+                    definitions.functions.insert(
+                        function.clone(),
+                        FunctionDef::Continuous { argument, points },
+                    );
+                    let expression = self.normal_variable(module, &function)?;
+                    definitions.variables.insert(variable, expression);
+                }
+                "Multifurcacion" => {
+                    // The macro code of the original creates the function that
+                    // chooses the branch: a distribution over the shares the
+                    // class declares.
+                    let Some(name) = self.name(module, "MultifurcacionCH") else {
+                        continue;
+                    };
+                    let mut weights = Vec::new();
+                    for index in 1..=5 {
+                        let Some(value) = module.prop_value(&format!("Prob{index}")) else {
+                            continue;
+                        };
+                        weights.push(self.percent_to_fraction(&value)?);
+                    }
+                    if weights.is_empty() {
+                        continue;
+                    }
+                    let total: f64 = weights.iter().sum();
+                    let mut cumulative = Vec::with_capacity(weights.len());
+                    let mut running = 0.0;
+                    for weight in &weights {
+                        running += weight / total;
+                        // The original writes the running sum with the
+                        // decimals it can show; the sums of twentieths are
+                        // rounded so that the text says `0.6` and not
+                        // `0.6000000000000001`.
+                        cumulative.push((running * 1e10).round() / 1e10);
+                    }
+                    if let Some(last) = cumulative.last_mut() {
+                        *last = 1.0;
+                    }
+                    definitions.functions.insert(
+                        name,
+                        FunctionDef::Distribution {
+                            stream: MULTIFURCACION_STREAM,
+                            cumulative,
+                        },
+                    );
+                }
                 "Function" => {
                     let name = self.require_name(module, "NombreFunc")?;
                     let argument = self
@@ -1979,6 +2217,42 @@ impl Compiler<'_> {
             }
         }
         Ok(definitions)
+    }
+
+    /// The expression of the `VariableN` class.
+    ///
+    /// The macro code of the original writes `[Media]+([Desvio]#FN:NORMAL)/10`:
+    /// the `#` is the multiplication of the original's language (its
+    /// expression editor offers no `*` key) and the table of the function
+    /// holds ten times the quantile, so that the deviation of the variable
+    /// is the one the class declares. Our expression language reads `#` as an
+    /// integer division, so the tree is built with the multiplication and the
+    /// text keeps the spelling of the original.
+    fn normal_variable(&self, module: &Block, function: &str) -> Result<ProgramExpr, EngineError> {
+        let media = self
+            .sna(module, "Media")?
+            .unwrap_or_else(|| self.number_expr(0.0));
+        let desvio = self
+            .sna(module, "Desvio")?
+            .unwrap_or_else(|| self.number_expr(0.0));
+        let source = format!("{}+({}#FN:{})/10", media.source(), desvio.source(), function);
+        let tree = Expr::Bin(
+            BinOp::Add,
+            Box::new(media.ast().clone()),
+            Box::new(Expr::Bin(
+                BinOp::Div,
+                Box::new(Expr::Bin(
+                    BinOp::Mul,
+                    Box::new(desvio.ast().clone()),
+                    Box::new(Expr::Ref {
+                        kind: RefKind::Function,
+                        name: NameSource::Literal(function.to_string()),
+                    }),
+                )),
+                Box::new(Expr::Num(10.0)),
+            )),
+        );
+        Ok(ProgramExpr::new(source, tree))
     }
 
     fn parse_points(
@@ -2103,8 +2377,7 @@ impl Compiler<'_> {
             .is_some_and(|mode| mode.trim().eq_ignore_ascii_case("remover"))
     }
 
-    fn percent_to_fraction(&self, text: &str) -> Result<f64, EngineError> {
-        let trimmed = text.trim();
+    fn percent_to_fraction(&self, text: &str) -> Result<f64, EngineError> {        let trimmed = text.trim();
         let value = trimmed.trim_end_matches('%').trim();
         let number = value.parse::<f64>().map_err(|_| EngineError::Expression {
             text: text.to_string(),
@@ -2209,6 +2482,21 @@ impl Compiler<'_> {
 
     fn number_expr(&self, value: f64) -> ProgramExpr {
         ProgramExpr::parse(&format!("{value}")).expect("formatted numbers always parse")
+    }
+
+    /// The expression of the model clock, written the way the original writes
+    /// the `MARK` statement: without a text of its own, because the statement
+    /// carries the hour in its name.
+    fn clock_expr(&self) -> ProgramExpr {
+        ProgramExpr::new(
+            String::new(),
+            Expr::System(crate::expr::SystemSymbol::Clock),
+        )
+    }
+
+    /// An expression with no text: the operand the original leaves empty.
+    fn empty_expr(&self) -> ProgramExpr {
+        ProgramExpr::new(String::new(), Expr::Num(0.0))
     }
 
     fn number(&self, module: &Block, name: &str) -> Option<f64> {
@@ -2376,6 +2664,19 @@ impl Compiler<'_> {
             owner = container.owner;
         }
         None
+    }
+}
+
+/// The state a storage is selected by.
+///
+/// The `op_Logic_Stor` list of the original offers four states, and the
+/// GPSS operator of each is the one its code names: `SF` a full storage,
+/// `SNF` one that is not full, `SE` an empty one and `SNE` one that is not.
+fn storage_state(op: &str) -> SelectState {
+    match op.trim() {
+        "Lleno" | "Llena" => SelectState::StorageFull,
+        "Vacio" | "Vacia" => SelectState::StorageNotFull,
+        _ => SelectState::StorageNotFull,
     }
 }
 

@@ -352,8 +352,7 @@ fn the_catalogue_offers_the_four_classes_the_original_declares() {
 }
 
 #[test]
-fn a_new_block_of_the_four_classes_comes_with_the_defaults_of_the_original() {
-    // The `Preempt` class: the facility, the mode, the parameter and the way
+fn a_new_block_of_the_four_classes_comes_with_the_defaults_of_the_original() {    // The `Preempt` class: the facility, the mode, the parameter and the way
     // the owner goes on.
     let block = build_block("Preempt", 0, None).expect("Preempt is in the catalogue");
     let value = |name: &str| {
@@ -396,4 +395,203 @@ fn a_new_block_of_the_four_classes_comes_with_the_defaults_of_the_original() {
         assert_eq!(go.raw_value, "MultifurcacionGO");
         assert!(go.unique, "{class}: the function is defined by the block");
     }
+}
+
+// The eight classes the original declares and the catalogue did not offer
+// yet: `Examine`, `GateM`, `Mark`, `RemoveMe`, `SelectL`, `SelectS`,
+// `SelectSNA` and `VariableN`.
+
+#[test]
+fn the_catalogue_offers_the_eight_classes_the_original_declares() {
+    // The `Examine` class: the transaction is examined in a group.
+    let examine = class_spec("Examine").expect("the catalogue offers Examine");
+    assert_eq!(ports(examine, true), vec![(1, "Entrada1")]);
+    assert_eq!(
+        ports(examine, false),
+        vec![(2, "Salida1"), (3, "Salida2")],
+        "the transaction goes on by the first output and by the second one \
+         when it does not belong to the group"
+    );
+    assert_eq!(
+        examine
+            .properties
+            .iter()
+            .map(|property| property.name)
+            .collect::<Vec<_>>(),
+        vec!["Grupo"]
+    );
+
+    // The `GateM` class: the gate evaluates the label of the transaction.
+    let gate = class_spec("GateM").expect("the catalogue offers GateM");
+    assert_eq!(ports(gate, true), vec![(1, "Entrada1")]);
+    assert_eq!(ports(gate, false), vec![(2, "Salida1"), (3, "Salida2")]);
+    assert_eq!(
+        gate
+            .properties
+            .iter()
+            .map(|property| property.name)
+            .collect::<Vec<_>>(),
+        vec!["Rotulo", "op"]
+    );
+
+    // The `Mark` class: the hour goes to a parameter.
+    let mark = class_spec("Mark").expect("the catalogue offers Mark");
+    assert_eq!(ports(mark, true), vec![(1, "Entrada1")]);
+    assert_eq!(ports(mark, false), vec![(2, "Salida1")]);
+    assert_eq!(
+        mark
+            .properties
+            .iter()
+            .map(|property| property.name)
+            .collect::<Vec<_>>(),
+        vec!["Parametro"]
+    );
+
+    // The `RemoveMe` class: the transaction leaves its group.
+    let remove = class_spec("RemoveMe").expect("the catalogue offers RemoveMe");
+    assert_eq!(ports(remove, true), vec![(1, "Entrada1")]);
+    assert_eq!(ports(remove, false), vec![(2, "Salida1"), (3, "Salida2")]);
+    assert_eq!(
+        remove
+            .properties
+            .iter()
+            .map(|property| property.name)
+            .collect::<Vec<_>>(),
+        vec!["Grupo"]
+    );
+
+    // The three selections: a logic switch, a storage and an entity.
+    for class in ["SelectL", "SelectS", "SelectSNA"] {
+        let spec = class_spec(class).expect("the catalogue offers the class");
+        assert_eq!(ports(spec, true), vec![(1, "Entrada1")], "{class}");
+        assert_eq!(
+            ports(spec, false),
+            vec![(2, "Salida1"), (3, "Salida2")],
+            "{class}"
+        );
+    }
+    assert_eq!(
+        class_spec("SelectL")
+            .expect("SelectL")
+            .properties
+            .iter()
+            .map(|property| property.name)
+            .collect::<Vec<_>>(),
+        vec!["Param", "maximo", "minimo", "op"]
+    );
+    assert_eq!(
+        class_spec("SelectS")
+            .expect("SelectS")
+            .properties
+            .iter()
+            .map(|property| property.name)
+            .collect::<Vec<_>>(),
+        vec!["Param", "maximo", "minimo", "op"]
+    );
+    assert_eq!(
+        class_spec("SelectSNA")
+            .expect("SelectSNA")
+            .properties
+            .iter()
+            .map(|property| property.name)
+            .collect::<Vec<_>>(),
+        vec!["ClaseSNA", "Param", "maximo", "minimo", "op", "valorComp"]
+    );
+
+    // The `VariableN` class: a normal variable and the function it reads.
+    let variable = class_spec("VariableN").expect("the catalogue offers VariableN");
+    assert!(ports(variable, true).is_empty());
+    assert!(ports(variable, false).is_empty());
+    assert_eq!(
+        variable
+            .properties
+            .iter()
+            .map(|property| property.name)
+            .collect::<Vec<_>>(),
+        vec!["Desvio", "Media", "NombreFunc", "NombreVar", "Seed"]
+    );
+}
+
+#[test]
+fn a_new_block_of_the_eight_classes_comes_with_the_defaults_of_the_original() {
+    // The group of the examination and of the removal.
+    for class in ["Examine", "RemoveMe"] {
+        let block = build_block(class, 0, None).expect("the class is in the catalogue");
+        let group = block
+            .props
+            .iter()
+            .find(|prop| prop.name == "Grupo")
+            .expect("the class declares its group");
+        assert_eq!(group.raw_value, "UnGrupo", "{class}");
+    }
+
+    // The gate: the label it evaluates and the operator.
+    let block = build_block("GateM", 0, None).expect("GateM is in the catalogue");
+    let value = |name: &str| {
+        block
+            .props
+            .iter()
+            .find(|prop| prop.name == name)
+            .unwrap_or_else(|| panic!("the class declares {name}"))
+            .raw_value
+            .clone()
+    };
+    assert_eq!(value("Rotulo"), "Rotulo");
+    assert_eq!(value("op"), "Maching");
+
+    // The mark: the parameter that receives the hour.
+    let block = build_block("Mark", 0, None).expect("Mark is in the catalogue");
+    assert_eq!(block.props.len(), 1);
+    assert_eq!(block.props[0].raw_value, "Param");
+
+    // The three selections: the parameter, the range and the operator.
+    for (class, op) in [("SelectL", "Set"), ("SelectS", "NoLleno")] {
+        let block = build_block(class, 0, None).expect("the class is in the catalogue");
+        let value = |name: &str| {
+            block
+                .props
+                .iter()
+                .find(|prop| prop.name == name)
+                .unwrap_or_else(|| panic!("the class declares {name}"))
+                .raw_value
+                .clone()
+        };
+        assert_eq!(value("Param"), "param", "{class}");
+        assert_eq!(value("minimo"), "1", "{class}");
+        assert_eq!(value("maximo"), "10", "{class}");
+        assert_eq!(value("op"), op, "{class}");
+    }
+    let block = build_block("SelectSNA", 0, None).expect("SelectSNA is in the catalogue");
+    let value = |name: &str| {
+        block
+            .props
+            .iter()
+            .find(|prop| prop.name == name)
+            .unwrap_or_else(|| panic!("the class declares {name}"))
+            .raw_value
+            .clone()
+    };
+    assert_eq!(value("ClaseSNA"), "Q");
+    assert_eq!(value("Param"), "param");
+    assert_eq!(value("minimo"), "1");
+    assert_eq!(value("maximo"), "10");
+    assert_eq!(value("op"), "=");
+    assert_eq!(value("valorComp"), "*1");
+
+    // The normal variable: the function it creates and the variable itself.
+    let block = build_block("VariableN", 0, None).expect("VariableN is in the catalogue");
+    let value = |name: &str| {
+        block
+            .props
+            .iter()
+            .find(|prop| prop.name == name)
+            .unwrap_or_else(|| panic!("the class declares {name}"))
+            .raw_value
+            .clone()
+    };
+    assert_eq!(value("Media"), "60");
+    assert_eq!(value("Desvio"), "1");
+    assert_eq!(value("NombreFunc"), "NORMAL");
+    assert_eq!(value("NombreVar"), "Normal");
+    assert_eq!(value("Seed"), "90");
 }

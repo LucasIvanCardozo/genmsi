@@ -1,0 +1,10 @@
+almacen         STORAGE         1  
+                GENERATE        30,0  
+StorageUse      QUEUE           qAlmacen,2  
+                ENTER           almacen,2  
+                DEPART          qAlmacen,2  
+                ADVANCE         600,0  
+                LEAVE           almacen,2  
+A_Terminate     TERMINATE         
+                GENERATE        3600  
+                TERMINATE       1  

@@ -48,6 +48,13 @@ pub struct Transaction {
     pub parameters: BTreeMap<String, f64>,
     /// Index of the block the transaction is executing or waiting in.
     pub current_block: Option<usize>,
+    /// Index of the block the transaction came from.
+    ///
+    /// The original counts a transaction that waits for a storage in the
+    /// block it came from, not in the `ENTER` that could not admit it: the
+    /// `ENTER` row of its report counts the entries that got in and its
+    /// `CURRENT` column stays empty.
+    pub previous_block: Option<usize>,
     /// Assembly set this transaction belongs to, when it was split.
     pub assembly: Option<u64>,
     /// Chain the transaction is linked into, when waiting in a user chain.
@@ -70,6 +77,7 @@ impl Transaction {
             mark: now,
             parameters: BTreeMap::new(),
             current_block: None,
+            previous_block: None,
             assembly: None,
             chain: None,
             state: XactState::Ready,

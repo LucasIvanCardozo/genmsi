@@ -536,6 +536,12 @@ impl<'p> Simulation<'p> {
                 if self.config.trace {
                     self.record_trace(xact, block_index, "leave", format!("-> {target}"));
                 }
+                if let Some(transaction) = self.xacts.get_mut(&xact) {
+                    // The transaction comes from the generator: a transaction
+                    // that waits for a storage is counted in the generator,
+                    // as the original counts it.
+                    transaction.previous_block = Some(block_index);
+                }
                 self.enter_block(xact, target);
             }
             None => self.remove_transaction(xact),
@@ -645,8 +651,16 @@ impl<'p> Simulation<'p> {
                 transaction.current_block = Some(block_index);
                 transaction.entered_at = self.now;
             }
-            self.block_stats[block_index].entries += 1;
-            self.block_stats[block_index].current += 1;
+            // A block that waits counts only what it achieved: the original's
+            // `ENTER` row holds the entries that got in, not the attempts,
+            // and the transaction that waits is counted in the block it came
+            // from.
+            if matches!(block.kind, BlockKind::Enter(_)) {
+                self.block_stats[block_index].current += 1;
+            } else {
+                self.block_stats[block_index].entries += 1;
+                self.block_stats[block_index].current += 1;
+            }
             if let Some(label) = &block.label {
                 *self.passed.entry(label.clone()).or_insert(0) += 1;
             }
@@ -754,14 +768,21 @@ impl<'p> Simulation<'p> {
             }
             BlockKind::Queue(spec) => {
                 let name = self.resolve_name(&spec.queue, xact);
-                if spec.units > 0.0 {
-                    self.entities.queue(&name, self.now).enqueue(xact, self.now);
+                let units = self.eval_units(&spec.units, xact);
+                if units > 0 {
+                    self.entities
+                        .queue(&name, self.now)
+                        .enqueue(xact, units as u64, self.now);
                 }
                 self.leave(xact, block_index, block.next_default());
             }
             BlockKind::Depart(spec) => {
                 let name = self.resolve_name(&spec.queue, xact);
-                let waited = self.entities.queue(&name, self.now).dequeue(xact, self.now);
+                let units = self.eval_units(&spec.units, xact);
+                let waited = self
+                    .entities
+                    .queue(&name, self.now)
+                    .dequeue(xact, units as u64, self.now);
                 self.record_queue_tables(&name, waited, xact, block_index);
                 self.leave(xact, block_index, block.next_default());
             }
@@ -872,11 +893,27 @@ impl<'p> Simulation<'p> {
                         "the storage '{name}' is used but no StorageDef declares it"
                     ))
                 })?;
+                if resume {
+                    // The transaction comes back to the block it backed up
+                    // from: it is in it again.
+                    self.block_stats[block_index].current += 1;
+                }
                 let admitted = self
                     .entities
                     .storage(&name, capacity, self.now)
                     .try_enter(units, self.now);
                 if admitted {
+                    // The entry is what the block counts: the original's
+                    // `ENTER` row holds the entries that got in.
+                    self.block_stats[block_index].entries += 1;
+                    // A transaction that was waiting leaves the block it was
+                    // counted in.
+                    if resume
+                        && let Some(previous) = self.previous_block_of(xact)
+                        && self.block_stats[previous].current > 0
+                    {
+                        self.block_stats[previous].current -= 1;
+                    }
                     self.release_storage_waiters(&name);
                     self.retry_gates();
                     self.leave(xact, block_index, block.next_default());
@@ -891,8 +928,17 @@ impl<'p> Simulation<'p> {
                     if let Some(transaction) = self.xacts.get_mut(&xact) {
                         transaction.transition(XactState::Waiting);
                     }
-                    // The original counts the refusal in the storage, not in
-                    // the block: its `ENTER` row keeps `RETRY` at zero.
+                    // The transaction backs up to the block it came from: the
+                    // original's `ENTER` row has no `CURRENT` for it and the
+                    // queue in front of the storage holds the waiters.
+                    if self.block_stats[block_index].current > 0 {
+                        self.block_stats[block_index].current -= 1;
+                    }
+                    if !resume
+                        && let Some(previous) = self.previous_block_of(xact)
+                    {
+                        self.block_stats[previous].current += 1;
+                    }
                     if self.config.trace {
                         self.record_trace(xact, block_index, "wait", name);
                     }
@@ -1520,9 +1566,21 @@ impl<'p> Simulation<'p> {
         expr.eval(&mut ctx).round().max(1.0) as i64
     }
 
+    /// The block a transaction came from, when it is still known.
+    fn previous_block_of(&self, xact: XactId) -> Option<usize> {
+        self.xacts
+            .get(&xact)
+            .and_then(|transaction| transaction.previous_block)
+    }
+
     fn leave(&mut self, xact: XactId, from: usize, target: Option<usize>) {
         if self.block_stats[from].current > 0 {
             self.block_stats[from].current -= 1;
+        }
+        if let Some(transaction) = self.xacts.get_mut(&xact) {
+            // The block the transaction comes from: a transaction that waits
+            // for a storage is counted there.
+            transaction.previous_block = Some(from);
         }
         match target {
             Some(target) => {

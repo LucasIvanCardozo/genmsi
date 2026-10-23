@@ -1,0 +1,19 @@
+                             Reporte MicroVisualSIS
+
+ START_TIME    END_TIME     BLOCKS    FACILITIES    STORAGES
+        0         3600         5           0            1
+
+ LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE                                 
+         COUNT   COUNT   
+    2      121     120     0              1  GENERATE        30,0                       
+    3        1       0     0        A_Enter  ENTER           almacen,1                  
+    4        1       0     0    A_Terminate  TERMINATE                                  
+    5        2       1     0              4  GENERATE        3600                       
+    6        1       0     0              5  TERMINATE       1                          
+
+STORAGE           CAP. REMAIN. MIN.  MAX. ENTRIES AVL. AVE.C.  UTIL. RETRY DELAY
+  ALMACEN           1      0     0     1       1   1   0,992   0,992    0   119
+
+FEC_XACT_NUMBER    PRI      BDT    CURRENT   NEXT   PARAMETER   VALUE
+           122      0       3630        1       1
+           123      0       7200        4       4

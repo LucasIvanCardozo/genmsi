@@ -127,10 +127,14 @@ impl Facility {
 pub struct Queue {
     /// Entity name.
     pub name: String,
-    /// Current content.
+    /// Current content, in units.
+    ///
+    /// A queue counts units, not transactions: the original compiles the
+    /// `StorageUse` as `ARRIVE [Queue],[Cantidad]` and its queue holds one
+    /// place per unit (`QUEUE qAlmacen,2` puts two places in the queue).
     #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub content: u64,
-    /// Maximum content observed.
+    /// Maximum content observed, in units.
     #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub max: u64,
     /// Total enqueues.
@@ -172,21 +176,21 @@ impl Queue {
         }
     }
 
-    /// Record an enqueue at `now`.
-    pub fn enqueue(&mut self, xact: XactId, now: f64) {
+    /// Record an enqueue of `units` at `now`.
+    pub fn enqueue(&mut self, xact: XactId, units: u64, now: f64) {
         self.area += self.content as f64 * (now - self.last_change).max(0.0);
         self.last_change = now;
-        self.content += 1;
+        self.content += units;
         self.max = self.max.max(self.content);
         self.entries += 1;
         self.enqueued_at.insert(xact, now);
     }
 
-    /// Record a dequeue at `now`, returning the waiting time.
-    pub fn dequeue(&mut self, xact: XactId, now: f64) -> f64 {
+    /// Record a dequeue of `units` at `now`, returning the waiting time.
+    pub fn dequeue(&mut self, xact: XactId, units: u64, now: f64) -> f64 {
         self.area += self.content as f64 * (now - self.last_change).max(0.0);
         self.last_change = now;
-        self.content = self.content.saturating_sub(1);
+        self.content = self.content.saturating_sub(units);
         let started = self.enqueued_at.remove(&xact).unwrap_or(now);
         let waited = (now - started).max(0.0);
         self.total_time += waited;
@@ -206,21 +210,29 @@ impl Queue {
     }
 
     /// Average waiting time over all enqueues.
+    ///
+    /// The original divides the queue's integral (its content over the time,
+    /// in units) by the number of entries: `AVE.TIME` in its report. The
+    /// integral counts the transactions that are still waiting, which the
+    /// sum of the waits of the ones that left does not.
     pub fn average_time(&self) -> f64 {
         if self.entries == 0 {
             0.0
         } else {
-            self.total_time / self.entries as f64
+            self.area / self.entries as f64
         }
     }
 
     /// Average waiting time excluding zero waits.
+    ///
+    /// A transaction that did not wait adds nothing to the integral, so the
+    /// integral of the entries that waited is the whole one.
     pub fn average_time_nonzero(&self) -> f64 {
         let nonzero = self.entries - self.zero_entries;
         if nonzero == 0 {
             0.0
         } else {
-            self.total_time / nonzero as f64
+            self.area / nonzero as f64
         }
     }
 
@@ -255,9 +267,15 @@ pub struct Storage {
     #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub entries: u64,
     /// Failed ENTER attempts.
+    ///
+    /// The original never counts a refusal here: its storage rows show
+    /// `RETRY` 0 and the transactions that wait in a `DELAY` column.
     #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub retry: u64,
-    /// Transactions delayed by a GATE test on this storage.
+    /// Transactions waiting for the storage.
+    ///
+    /// This is the original's `DELAY` column: the transactions that are
+    /// waiting for units the storage does not have.
     #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub delay: u64,
     /// Transactions waiting for units.
@@ -307,7 +325,6 @@ impl Storage {
             self.entries += 1;
             true
         } else {
-            self.retry += 1;
             false
         }
     }
@@ -347,6 +364,9 @@ impl Storage {
     pub fn finish(&mut self, now: f64) {
         self.area += self.in_use as f64 * (now - self.last_change).max(0.0);
         self.last_change = now;
+        // The original's `DELAY` column: the transactions that are waiting
+        // for the storage when the run ends.
+        self.delay = self.waiters.len() as u64;
     }
 }
 
@@ -591,10 +611,10 @@ mod tests {
     #[test]
     fn queue_integral_matches_hand_computation() {
         let mut queue = Queue::new("q", 0.0);
-        queue.enqueue(1, 0.0);
-        queue.enqueue(2, 1.0);
-        queue.dequeue(1, 2.0);
-        queue.dequeue(2, 4.0);
+        queue.enqueue(1, 1, 0.0);
+        queue.enqueue(2, 1, 1.0);
+        queue.dequeue(1, 1, 2.0);
+        queue.dequeue(2, 1, 4.0);
         queue.finish(4.0);
         // Content was 1 for [0,1), 2 for [1,2), 1 for [2,4).
         assert!((queue.area - (1.0 + 2.0 + 2.0)).abs() < 1e-9, "{}", queue.area);
@@ -606,15 +626,47 @@ mod tests {
     }
 
     #[test]
+    fn a_queue_counts_units_and_not_transactions() {
+        let mut queue = Queue::new("q", 0.0);
+        queue.enqueue(1, 2, 0.0);
+        queue.enqueue(2, 2, 1.0);
+        // Two transactions of two units each: the queue holds four places.
+        assert_eq!(queue.content, 4);
+        assert_eq!(queue.max, 4);
+        assert_eq!(queue.entries, 2);
+        queue.dequeue(1, 2, 2.0);
+        assert_eq!(queue.content, 2);
+        queue.finish(2.0);
+        // The integral counts the units: four places for [0,1), two for [1,2).
+        assert!((queue.area - 6.0).abs() < 1e-9, "{}", queue.area);
+    }
+
+    #[test]
+    fn the_average_wait_is_the_integral_over_the_entries() {
+        // The original divides the queue's integral by the number of
+        // entries: a transaction that is still waiting counts in the
+        // integral and in the entries.
+        let mut queue = Queue::new("q", 0.0);
+        queue.enqueue(1, 1, 0.0);
+        queue.enqueue(2, 1, 1.0);
+        queue.dequeue(1, 1, 2.0);
+        queue.finish(4.0);
+        // Content was 1 for [0,1), 2 for [1,2), 1 for [2,4).
+        assert!((queue.area - 5.0).abs() < 1e-9, "{}", queue.area);
+        assert!((queue.average_time() - 2.5).abs() < 1e-9);
+        assert!((queue.average_time_nonzero() - 2.5).abs() < 1e-9);
+    }
+
+    #[test]
     fn zero_waits_are_counted_separately() {
         let mut queue = Queue::new("q", 0.0);
-        queue.enqueue(1, 0.0);
-        queue.dequeue(1, 0.0);
-        queue.enqueue(2, 0.0);
-        queue.dequeue(2, 5.0);
+        queue.enqueue(1, 1, 0.0);
+        queue.dequeue(1, 1, 0.0);
+        queue.enqueue(2, 1, 0.0);
+        queue.dequeue(2, 1, 5.0);
         assert_eq!(queue.entries, 2);
         assert_eq!(queue.zero_entries, 1);
-        assert_eq!(queue.average_time_nonzero(), 5.0);
+        assert!((queue.average_time_nonzero() - 5.0).abs() < 1e-9);
     }
 
     #[test]
@@ -628,7 +680,9 @@ mod tests {
         assert_eq!(storage.max_use, 9);
         assert_eq!(storage.min_use, 0);
         assert_eq!(storage.entries, 2);
-        assert_eq!(storage.retry, 1);
+        // The original's storage row counts no refusal: its `RETRY` column
+        // stays at zero and the transactions that wait are in `DELAY`.
+        assert_eq!(storage.retry, 0);
         assert!((storage.average_content(10.0) - (4.0 * 2.0 + 9.0 * 4.0 + 2.0 * 4.0) / 10.0).abs() < 1e-9);
         assert!((storage.utilization(10.0) - storage.average_content(10.0) / 10.0).abs() < 1e-9);
     }

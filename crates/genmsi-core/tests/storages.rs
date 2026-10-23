@@ -90,9 +90,12 @@ fn a_storage_of_one_unit_holds_one_transaction_at_a_time() {
         "two transactions were inside the storage at the same time"
     );
     assert!(storage.entries > 0, "no transaction ever got in");
+    // The original's storage row counts no refusal: its `RETRY` column is
+    // zero and the transactions that wait are in its `DELAY` column.
+    assert_eq!(storage.retry, 0, "the storage counted a refusal");
     assert!(
-        storage.retry > 0,
-        "the transactions that did not fit were not counted as refusals"
+        storage.delay > 0,
+        "the transactions that did not fit are not counted as waiting"
     );
 }
 
@@ -124,9 +127,144 @@ fn the_units_of_a_transaction_are_the_cantidad_operand() {
         "a transaction of two units entered a storage of one unit"
     );
     assert_eq!(storage.entries, 0, "a transaction of two units got in");
+    assert_eq!(storage.retry, 0, "the storage counted a refusal");
     assert!(
-        storage.retry > 0,
-        "the transactions that did not fit were not counted as refusals"
+        storage.delay > 0,
+        "the transactions that did not fit are not counted as waiting"
+    );
+}
+
+/// The queue of a storage counts units, not transactions.
+///
+/// The original compiles the `StorageUse` as `ARRIVE [Queue],[Cantidad]` and
+/// `DEPART [Queue],[Cantidad]`: the `Cantidad` is the number of places the
+/// transaction takes in the queue. Its report agrees: a `StorageUse` with a
+/// `Cantidad` of 2 and a queue of 120 transactions shows a queue of 240
+/// places (`scripts/wine-oracle/probes/almacen`).
+#[test]
+fn the_queue_of_a_storage_counts_units() {
+    let nodes = storage_model("4", "2", "100");
+    let program = try_wired(&nodes, &links(), 1_000.0).expect("the model compiles");
+    let result = run(&program, 1_000.0, 7);
+    let queue = &result.entities.queues["qAlmacen"];
+    let storage = &result.entities.storages["almacen"];
+    assert!(
+        queue.entries > storage.entries,
+        "the queue must hold the transactions that did not get in"
+    );
+    assert_eq!(
+        queue.content,
+        2 * (queue.entries - storage.entries),
+        "the queue must count two places per waiting transaction"
+    );
+    assert_eq!(
+        queue.max % 2,
+        0,
+        "the queue's maximum must be a number of places"
+    );
+}
+
+/// The `ENTER` row counts the entries that got in.
+///
+/// The original's `ENTER` row holds the entries that were admitted and
+/// nothing else: the transactions that wait are in the block they came from
+/// (in a `StorageUse`, the queue in front of the storage) and the refusals
+/// are not counted anywhere in the block table.
+#[test]
+fn the_enter_row_counts_the_entries_that_got_in() {
+    let nodes = storage_model("1", "1", "100");
+    let program = try_wired(&nodes, &links(), 1_000.0).expect("the model compiles");
+    let result = run(&program, 1_000.0, 7);
+    let storage = &result.entities.storages["almacen"];
+    let enter = program
+        .blocks
+        .iter()
+        .position(|block| block.class == "Enter")
+        .expect("the model has an `ENTER` block");
+    let enter_stats = &result.blocks[enter];
+    assert_eq!(
+        enter_stats.entries, storage.entries,
+        "the `ENTER` row must count the entries that got in"
+    );
+    assert_eq!(
+        enter_stats.current, 0,
+        "the `ENTER` row must not hold the transactions that wait"
+    );
+    assert_eq!(
+        enter_stats.retries, 0,
+        "the `ENTER` row must not count the refusals"
+    );
+
+    // The transactions that wait are counted in the queue they came from.
+    let queue_block = program
+        .blocks
+        .iter()
+        .position(|block| block.class == "Queue")
+        .expect("the model has a `QUEUE` block");
+    assert_eq!(
+        result.blocks[queue_block].current, storage.delay,
+        "the waiters must be counted in the queue in front of the storage"
+    );
+}
+
+/// A lone `ENTER` counts its waiters in the block they came from.
+///
+/// The original's report of a model with a plain `Enter` (no queue) shows the
+/// transactions that wait in the row of the block before it, and its `ENTER`
+/// row with no `CURRENT` at all.
+#[test]
+fn a_lone_enter_counts_its_waiters_where_they_came_from() {
+    let nodes = vec![
+        node(
+            1,
+            "Generate",
+            None,
+            &[("Salida1", Some("A_Enter"))],
+            &[("Media", "10"), ("Modificador", "0")],
+        ),
+        node(
+            2,
+            "Enter",
+            Some("A_Enter"),
+            &[("Salida1", Some("A_Terminate"))],
+            &[("Storage", "almacen"), ("Cantidad", "1")],
+        ),
+        node(
+            3,
+            "Terminate",
+            Some("A_Terminate"),
+            &[],
+            &[("Unidades", "0")],
+        ),
+        node(
+            4,
+            "StorageDef",
+            None,
+            &[],
+            &[("Storage", "almacen"), ("Tamaño", "1")],
+        ),
+    ];
+    let program = try_wired(&nodes, &links(), 1_000.0).expect("the model compiles");
+    let result = run(&program, 1_000.0, 7);
+    let storage = &result.entities.storages["almacen"];
+    let enter = program
+        .blocks
+        .iter()
+        .position(|block| block.class == "Enter")
+        .expect("the model has an `ENTER` block");
+    assert_eq!(result.blocks[enter].entries, storage.entries);
+    assert_eq!(result.blocks[enter].current, 0);
+    // The generator holds the transactions that wait and the creation that is
+    // still scheduled.
+    let generator = program
+        .blocks
+        .iter()
+        .position(|block| block.class == "Generate")
+        .expect("the model has a generator");
+    assert_eq!(
+        result.blocks[generator].current as u64,
+        storage.delay + 1,
+        "the waiters must be counted in the block they came from"
     );
 }
 

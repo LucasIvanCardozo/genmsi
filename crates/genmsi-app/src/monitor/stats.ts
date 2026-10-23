@@ -133,8 +133,8 @@ export interface Figures {
  * that remembers when the transaction entered the queue.
  */
 export type FigureChange =
-  | { kind: "queue-enqueue"; name: string; time: number }
-  | { kind: "queue-dequeue"; name: string; time: number; waited: number }
+  | { kind: "queue-enqueue"; name: string; time: number; units: number }
+  | { kind: "queue-dequeue"; name: string; time: number; waited: number; units: number }
   | { kind: "facility-seize"; name: string; time: number; xact: number }
   | { kind: "facility-release"; name: string; time: number }
   | {
@@ -266,15 +266,15 @@ export function applyChange(figures: Figures, change: FigureChange): Figures {
         ...before,
         area: before.area + before.content * elapsed(before.lastChange, change.time),
         lastChange: change.time,
-        content: before.content + 1,
-        max: Math.max(before.max, before.content + 1),
+        content: before.content + change.units,
+        max: Math.max(before.max, before.content + change.units),
         entries: before.entries + 1,
       };
       return { ...figures, queues: { ...figures.queues, [change.name]: queue } };
     }
     case "queue-dequeue": {
       const before = figures.queues[change.name] ?? emptyQueue(change.time);
-      const content = Math.max(0, before.content - 1);
+      const content = Math.max(0, before.content - change.units);
       const queue: QueueFigure = {
         ...before,
         area: before.area + before.content * elapsed(before.lastChange, change.time),

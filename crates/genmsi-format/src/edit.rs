@@ -546,6 +546,12 @@ impl EditSession {
         }
     }
 
+    /// Connect an output port to an input port of a sibling block.
+    ///
+    /// A port has a single successor, so the link that starts at the
+    /// source port is replaced by the new one. An input port may receive
+    /// from several blocks (as the reference models do), so the links that
+    /// end at the target port are kept.
     fn connect(
         &mut self,
         from: u32,
@@ -583,7 +589,9 @@ impl EditSession {
                 format!("el bloque {to} no tiene el puerto de entrada {to_ioid}"),
             ));
         }
-        // An occupied port loses its link first: the connection replaces it.
+        // The source port has a single successor: the link that starts
+        // there is replaced by the new one. The links that end at the
+        // target port stay: an input may receive from several blocks.
         let replaced: Vec<(usize, Link)> = self
             .model
             .block(container)
@@ -591,10 +599,7 @@ impl EditSession {
             .links
             .iter()
             .enumerate()
-            .filter(|(_, link)| {
-                (link.from_module == from && link.from_ioid == from_ioid)
-                    || (link.to_module == to && link.to_ioid == to_ioid)
-            })
+            .filter(|(_, link)| link.from_module == from && link.from_ioid == from_ioid)
             .map(|(index, link)| (index, link.clone()))
             .collect();
         remove_links(&mut self.model, container, &replaced);
@@ -1021,6 +1026,13 @@ mod tests {
         .expect("parses")
     }
 
+    /// The two ends of a link, as `from:from_ioid->to:to_ioid`.
+    fn ends(link: &Link) -> String {
+        let (from, from_ioid) = (link.from_module, link.from_ioid);
+        let (to, to_ioid) = (link.to_module, link.to_ioid);
+        format!("{from}:{from_ioid}->{to}:{to_ioid}")
+    }
+
     #[test]
     fn add_block_gives_a_fresh_id_and_lands_in_the_container() {
         let mut session = EditSession::new(model());
@@ -1181,8 +1193,20 @@ mod tests {
         // The target port already carries A_Queue; an existing label is kept.
         assert_eq!(advance.output(2).expect("out").mylabel, "A_Queue");
         assert_eq!(terminate.input(1).expect("in").mylabel, "A_Queue");
-        let link = &model.block(0).expect("root").links[0];
-        assert_eq!((link.from_module, link.from_ioid, link.to_module, link.to_ioid), (3, 2, 2, 1));
+        let links = &model.block(0).expect("root").links;
+        // The link that ended at that input is kept: an input may receive
+        // from several blocks.
+        assert_eq!(links.len(), 2);
+        assert_eq!(
+            ends(&links[0]),
+            "1:1->2:1",
+            "the link the Generate already had is kept"
+        );
+        let link = links
+            .iter()
+            .find(|l| l.from_module == 3)
+            .expect("the new link");
+        assert_eq!(ends(link), "3:2->2:1");
     }
 
     #[test]
@@ -1231,7 +1255,7 @@ mod tests {
     }
 
     #[test]
-    fn connecting_over_an_occupied_port_replaces_the_link() {
+    fn connecting_over_an_occupied_output_replaces_the_link() {
         let mut session = EditSession::new(model());
         session
             .apply(EditCommand::AddBlock { class: "Advance".into(), container: 0, x: 0, y: 0 })
@@ -1245,16 +1269,25 @@ mod tests {
         assert_eq!(session.model().block(0).expect("root").links.len(), 2);
         session
             .apply(EditCommand::Connect { from: 1, from_ioid: 1, to: 4, to_ioid: 1 })
-            .expect("the occupied input port is freed first");
+            .expect("the occupied output port is freed first");
         let links = &session.model().block(0).expect("root").links;
-        // The source port's own previous link (1->2) is also removed first:
-        // one port, one link.
-        assert_eq!(links.len(), 1, "one link per port");
-        let new_link = &links[0];
-        assert_eq!(
-            (new_link.from_module, new_link.from_ioid, new_link.to_module, new_link.to_ioid),
-            (1, 1, 4, 1)
+        // The source port's own previous link (1->2) is removed: one port,
+        // one link. The link that ended at the target port (3->4) stays:
+        // an input may receive from several blocks.
+        assert_eq!(links.len(), 2);
+        assert!(
+            links.iter().any(|l| l.from_module == 3 && l.to_module == 4),
+            "the link that ends at the target port is kept"
         );
+        assert!(
+            !links.iter().any(|l| l.from_module == 1 && l.to_module == 2),
+            "the link that starts at the source port is replaced"
+        );
+        let new_link = links
+            .iter()
+            .find(|l| l.from_module == 1)
+            .expect("the new link");
+        assert_eq!(ends(new_link), "1:1->4:1");
     }
 
     #[test]

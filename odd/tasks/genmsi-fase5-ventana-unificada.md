@@ -173,3 +173,30 @@ El análisis del código actual que sostiene las specs:
   Ese mecanismo es el que se extiende para verificar las cifras vivas (S4).
 - `scripts/check-visual-loop.sh:250`: el script visual hace clic en la pestaña
   "Monitor" por nombre; hay que actualizarlo (T6).
+
+### L5 — 2026-10-22 — Decisiones del usuario sobre la motor
+
+El usuario eligió que **el motor sea la fuente de verdad** y que publique en
+la traza lo que el reporte cuenta y la traza no llevaba:
+
+- el nombre de la entidad en el evento `enter` (S4, T-1);
+- las muestras de las tablas, el estado de los interruptores y el valor de los
+  savevalues (S4, T-2);
+- los miembros que salen de una cadena (S4, T-3).
+
+El usuario: "en mi ultima respuesta me parecio la mejor para que todo
+tenga coherencia y siga la misma filosofia".
+
+### L6 — 2026-10-22 — Lo que se midió
+
+- Las cifras vivas coinciden **exactamente** con el reporte del motor en 17 de
+  los 22 modelos que compilan, después de que el motor publicara el nombre de
+  la entidad. Los que no coinciden son los que vacían una cadena con un
+  criterio: la traza no decía qué miembro sale.
+- La distancia de la bolita a la curva de su arista es de **0.00** (medida en
+  el navegador contra el `path` que React Flow dibuja).
+- 60 fps con 81 nodos, 64 aristas y la capa viva activa (mediana 16,7 ms,
+  p95 16,8 ms).
+- La bola sale 2 s de modelo antes de la llegada y llega exactamente con la
+  instancia: 38% de los cuadros con alguna bola en el modelo más simple, 79%
+  en el supermercado.

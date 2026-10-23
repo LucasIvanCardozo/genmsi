@@ -368,6 +368,14 @@ fn transfer_probability(spec: &TransferSpec) -> String {
     }
 }
 
+/// Whether an operand is the number one.
+///
+/// The original writes the units of a queue or a storage only when the model
+/// gives them: `QUEUE qAlmacen,2` has two, `ENTER Migracion` has none.
+fn is_one_unit(expr: &ProgramExpr) -> bool {
+    expr.source().parse::<f64>() == Ok(1.0)
+}
+
 /// Operand text of an expression, the way the original prints it.
 ///
 /// A percentage literal is the editor's per-mille value (`70%` is the number
@@ -444,13 +452,27 @@ fn operand_parts(block: &ExecBlock, program: &Program) -> (Option<&'static str>,
                 expr_operand(&spec.increment),
             ]
         }
-        BlockKind::Queue(spec) | BlockKind::Depart(spec) => vec![spec.queue.to_string()],
+        BlockKind::Queue(spec) | BlockKind::Depart(spec) => {
+            // The original writes the units the queue holds: `QUEUE
+            // qAlmacen,2`.
+            let mut refs = vec![spec.queue.to_string()];
+            if !is_one_unit(&spec.units) {
+                refs.push(spec.units.to_string());
+            }
+            refs
+        }
         BlockKind::Seize(spec) | BlockKind::Release(spec) | BlockKind::Return(spec) => {
             vec![spec.facility.to_string()]
         }
         BlockKind::Preempt(spec) => vec![spec.facility.to_string()],
         BlockKind::Enter(spec) | BlockKind::Leave(spec) => {
-            vec![spec.storage.to_string(), spec.units.to_string()]
+            // The units are written when the model gives them: the original's
+            // `ENTER Migracion` has none, and its `ENTER almacen,2` has two.
+            let mut refs = vec![spec.storage.to_string()];
+            if !is_one_unit(&spec.units) {
+                refs.push(spec.units.to_string());
+            }
+            refs
         }
         BlockKind::Test(spec) => {
             // `TEST    E       P$SectorVisitado,3,A_Test1`.

@@ -591,10 +591,22 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
             }
         }
         BlockKind::Queue(spec) => {
-            statement(out, "QUEUE", &spec.queue.to_string());
+            // The original writes the units the queue holds: `QUEUE
+            // qAlmacen,2` is a queue of two places per transaction.
+            let operands = if spec.units.source().parse::<f64>() == Ok(1.0) {
+                spec.queue.to_string()
+            } else {
+                format!("{},{}", spec.queue, spec.units)
+            };
+            statement(out, "QUEUE", &operands);
         }
         BlockKind::Depart(spec) => {
-            statement(out, "DEPART", &spec.queue.to_string());
+            let operands = if spec.units.source().parse::<f64>() == Ok(1.0) {
+                spec.queue.to_string()
+            } else {
+                format!("{},{}", spec.queue, spec.units)
+            };
+            statement(out, "DEPART", &operands);
         }
         BlockKind::Seize(spec) => {
             statement(out, "SEIZE", &spec.facility.to_string());

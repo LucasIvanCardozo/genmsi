@@ -204,7 +204,11 @@ pub struct QueueSpec {
     /// Queue name.
     pub queue: EntityName,
     /// Units to enqueue/dequeue.
-    pub units: f64,
+    ///
+    /// The original's `ARRIVE [Queue],[Cantidad]` and `DEPART [Queue],[Cantidad]`
+    /// carry the units a transaction occupies in the queue: a queue counts
+    /// units, not transactions.
+    pub units: ProgramExpr,
 }
 
 /// Facility operand of `SEIZE` / `RELEASE`.
@@ -1151,7 +1155,9 @@ impl Compiler<'_> {
             }
             "Queue" => {
                 let queue = self.entity(module, "Queue")?;
-                let units = self.number(module, "Cantidad").unwrap_or(1.0);
+                let units = self
+                    .sna(module, "Cantidad")?
+                    .unwrap_or_else(|| self.number_expr(1.0));
                 Ok(Some(push!(
                     BlockKind::Queue(QueueSpec { queue, units }),
                     label,
@@ -1160,7 +1166,9 @@ impl Compiler<'_> {
             }
             "Depart" => {
                 let queue = self.entity(module, "Queue")?;
-                let units = self.number(module, "Cantidad").unwrap_or(1.0);
+                let units = self
+                    .sna(module, "Cantidad")?
+                    .unwrap_or_else(|| self.number_expr(1.0));
                 Ok(Some(push!(
                     BlockKind::Depart(QueueSpec { queue, units }),
                     label,
@@ -1179,7 +1187,7 @@ impl Compiler<'_> {
                     first = Some(push!(
                         BlockKind::Queue(QueueSpec {
                             queue: queue.clone(),
-                            units: 1.0,
+                            units: self.number_expr(1.0),
                         }),
                         label.clone(),
                         "Queue",
@@ -1203,7 +1211,7 @@ impl Compiler<'_> {
                         label: None,
                         kind: BlockKind::Depart(QueueSpec {
                             queue: queue.clone(),
-                            units: 1.0,
+                            units: self.number_expr(1.0),
                         }),
                         next: Vec::new(),
                         port_names: Vec::new(),
@@ -1309,7 +1317,7 @@ impl Compiler<'_> {
                     first = Some(push!(
                         BlockKind::Queue(QueueSpec {
                             queue: queue.clone(),
-                            units: 1.0,
+                            units: self.number_expr(1.0),
                         }),
                         label.clone(),
                         "Queue",
@@ -1337,7 +1345,7 @@ impl Compiler<'_> {
                         label: None,
                         kind: BlockKind::Depart(QueueSpec {
                             queue: queue.clone(),
-                            units: 1.0,
+                            units: self.number_expr(1.0),
                         }),
                         next: Vec::new(),
                         port_names: Vec::new(),
@@ -1393,7 +1401,7 @@ impl Compiler<'_> {
                     first = Some(push!(
                         BlockKind::Queue(QueueSpec {
                             queue: queue.clone(),
-                            units: 1.0,
+                            units: units.clone(),
                         }),
                         label.clone(),
                         "Queue",
@@ -1418,7 +1426,7 @@ impl Compiler<'_> {
                         label: None,
                         kind: BlockKind::Depart(QueueSpec {
                             queue: queue.clone(),
-                            units: 1.0,
+                            units: units.clone(),
                         }),
                         next: Vec::new(),
                         port_names: Vec::new(),

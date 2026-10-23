@@ -31,4 +31,4 @@ expression: stdout(&output)
    18        0       0     0   A_Terminate1  TERMINATE       
 
 QUEUE            MAX  CONT. ENTRIES ENTRIES(0) AVE.CONT. AVE.TIME AVE.(-0) RETRY
-  QAFUERA            9      9       9          0     1,250         0        0     0
+  QAFUERA            9      9       9          0     1,250   500,124  500,124     0

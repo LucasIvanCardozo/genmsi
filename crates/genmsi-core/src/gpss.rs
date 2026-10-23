@@ -803,9 +803,15 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
             statement(out, "GATE", &operands);
         }
         BlockKind::Logic(spec) => {
-            let operator = match spec.op {
-                LogicOp::Set => "S",
-                LogicOp::Reset => "R",
+            // The three operators of the original's `op_Swich` list: `S` sets
+            // the switch, `R` resets it and `I` inverts it.
+            let operator = if spec.invert {
+                "I"
+            } else {
+                match spec.op {
+                    LogicOp::Set => "S",
+                    LogicOp::Reset => "R",
+                }
             };
             statement(out, "LOGIC", &format!("{operator} {}", spec.switch));
         }
@@ -977,7 +983,7 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
             // The original writes: the group, the number of transactions, the
             // parameter it alters and its value, and the parameter it
             // compares and its value.
-            let operands = format!(
+            let mut operands = format!(
                 "E {},{},{},{},{},{}",
                 spec.group,
                 sna(&spec.count),
@@ -986,6 +992,17 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
                 spec.compared_parameter.clone().unwrap_or_default(),
                 spec.compared_value.as_ref().map(sna).unwrap_or_default(),
             );
+            // The destination of the failure output ("No alteró") is the last
+            // operand of the statement, and only when that output is
+            // connected: the original's listing for the probe
+            // `AlterMiembro` is `ALTER E UnGrupo,1,Param,99,Param,0,A_Terminate1`
+            // and the one of the bench, whose failure output is unconnected,
+            // is `ALTER E ungrupo,1,param,0,otro,1`.
+            let destination = port_destination(block, names, "Salida2");
+            if !destination.is_empty() {
+                operands.push(',');
+                operands.push_str(&destination);
+            }
             statement(out, "ALTER", &operands);
         }
         BlockKind::Priority(value) => {
@@ -995,9 +1012,13 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
             statement(out, "BUFFER", "");
         }
         BlockKind::InitialLogic(spec) => {
-            let operator = match spec.op {
-                LogicOp::Set => "S",
-                LogicOp::Reset => "R",
+            let operator = if spec.invert {
+                "I"
+            } else {
+                match spec.op {
+                    LogicOp::Set => "S",
+                    LogicOp::Reset => "R",
+                }
             };
             statement(out, "LOGIC", &format!("{operator} {}", spec.switch));
         }

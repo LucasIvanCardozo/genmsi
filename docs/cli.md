@@ -235,7 +235,22 @@ from it, so a consumer that wants `AVE.CONT.` divides `area` by
 `events[]`: `time` (number), `xact` (number, the transaction id), `block` (number,
 0-based statement index: the human output prints `block + 1`), `class` (string),
 `label` (string or null), `event` (`generate`, `enter`, `leave`, `wait`,
-`terminate`), `detail` (string, possibly empty).
+`terminate`, `table`, `logic`, `value`, `unlink`), `detail` (string, possibly
+empty).
+
+The detail says what the event is about, and the events that carry a name and
+a value separate the two by the **last** space (a name may hold spaces, a
+number does not):
+
+| Event | Detail | Published when |
+|---|---|---|
+| `enter` | the name of the entity the block touches, empty when it touches none | the transaction enters a block |
+| `wait` | the name of the entity it waits for | the transaction cannot take an entity |
+| `leave` | `-> {block}`, the statement it goes to | the transaction leaves a block |
+| `table` | the name of the table and the value tabulated | the run tabulates a value |
+| `logic` | the name of the switch and its state (`1` or `0`) | the run sets a switch |
+| `value` | the name of the savevalue and its value | the run assigns a savevalue |
+| `unlink` | the transactions that left the chain, separated by commas | the run empties a chain |
 
 ### `genmsi.run-all/1`
 

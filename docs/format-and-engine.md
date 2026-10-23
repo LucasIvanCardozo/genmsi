@@ -162,7 +162,11 @@ All errors carry a `Location` with file, 1-based source line and `moduleid`.
   and reports mean, standard deviation and the 95% Student-t interval per metric
   (`t_critical` uses the exact table up to 30 degrees of freedom).
 - When the trace is enabled, every entry, leave, wait and termination is
-  recorded with time, transaction, block, label and detail.
+  recorded with time, transaction, block, label and detail. The trace also
+  says what the run did to the things the report counts and the events
+  cannot say on their own: the name of the entity a block touches, the
+  samples of a table, the state of a logic switch, the value of a savevalue
+  and the members that leave a chain.
 
 ### Deviations from the original's report
 

@@ -2640,13 +2640,13 @@ sesión.
 
 ## Tasks
 
-- **T1** — Fichas de StorageDef, StorageUse, FacilityUse, FacilityInt, GateF, GateL (S1, S2, S4) — hecho: las seis fichas están en "Fichas"; commit: COMMIT_PENDIENTE
-- **T2** — Fichas de GateS, GateM, Select, SelectF, SelectS, SelectL (S1, S2, S4) — hecho: las seis fichas están en "Fichas"; commit: COMMIT_PENDIENTE
-- **T3** — Fichas de SelectSNA, Match, Assemble, Split, Link, Unlink (S1, S2, S4) — hecho: las seis fichas están en "Fichas"; commit: COMMIT_PENDIENTE
-- **T4** — Fichas de JoinMe, JoinNumber, RemoveMe, RemoveTrans, Examine, Mark, Counter, Table (S1, S2, S4) — hecho: las ocho fichas están en "Fichas"; commit: COMMIT_PENDIENTE
-- **T5** — Comprobar el alcance de la rama `feature/almacen` sobre las diferencias medidas (S4, S8) — hecho: se compiló esa rama aparte (worktree `../genmsi-fase7-almacen`, `5f1490c`) y se corrieron los bancos afectados; el almacén deja de ser inventado y `StorageUse` para con error como el original, pero la condición de la `GateS` y la letra de la fila del `SELECT` siguen en pie; commit: COMMIT_PENDIENTE
-- **T6** — Ensamblar el documento: tabla resumen, las 24 fichas y la lista final de cambios pendientes con archivo y prueba (S3) — hecho: las tres secciones están en este archivo; commit: COMMIT_PENDIENTE
-- **T7** — Commit de las notas y entrega de la rama (S5) — hecho: rama `feature/fase7-inventario`, worktree `../genmsi-fase7`; commit: COMMIT_PENDIENTE
+- **T1** — Fichas de StorageDef, StorageUse, FacilityUse, FacilityInt, GateF, GateL (S1, S2, S4) — hecho: las seis fichas están en "Fichas"; commit: `06ea66b`
+- **T2** — Fichas de GateS, GateM, Select, SelectF, SelectS, SelectL (S1, S2, S4) — hecho: las seis fichas están en "Fichas"; commit: `06ea66b`
+- **T3** — Fichas de SelectSNA, Match, Assemble, Split, Link, Unlink (S1, S2, S4) — hecho: las seis fichas están en "Fichas"; commit: `06ea66b`
+- **T4** — Fichas de JoinMe, JoinNumber, RemoveMe, RemoveTrans, Examine, Mark, Counter, Table (S1, S2, S4) — hecho: las ocho fichas están en "Fichas"; commit: `06ea66b`
+- **T5** — Comprobar el alcance de la rama `feature/almacen` sobre las diferencias medidas (S4, S8) — hecho: se compiló esa rama aparte (worktree `../genmsi-fase7-almacen`, `5f1490c`) y se corrieron los bancos afectados; el almacén deja de ser inventado y `StorageUse` para con error como el original, pero la condición de la `GateS` y la letra de la fila del `SELECT` siguen en pie; commit: `06ea66b`
+- **T6** — Ensamblar el documento: tabla resumen, las 24 fichas y la lista final de cambios pendientes con archivo y prueba (S3) — hecho: las tres secciones están en este archivo; commit: `06ea66b`
+- **T7** — Commit de las notas y entrega de la rama (S5) — hecho: rama `feature/fase7-inventario`, worktree `../genmsi-fase7`; commit: `06ea66b`
 
 ## Log
 
@@ -2737,3 +2737,8 @@ sesión.
   el nuestro (`target/release/genmsi gpss|simulate`) y las cifras del oráculo
   (el ejemplo `crates/genmsi-core/examples/compare-benches.rs`, con las
   tolerancias del oráculo).
+- **L8** — Las notas viven en un solo commit (`06ea66b`), que es lo que pedía
+  el encargo: un archivo con la tabla resumen, las 24 fichas y la lista final
+  de cambios pendientes. El corte de ~400 líneas no aplica aquí: partir el
+  documento en varios commits dejaría el entregable a medias, que es justo lo
+  que el encargo no quiere.

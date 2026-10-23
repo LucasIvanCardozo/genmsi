@@ -1331,7 +1331,21 @@ impl<'p> Simulation<'p> {
             }
             BlockKind::Logic(spec) => {
                 let name = self.resolve_name(&spec.switch, xact);
-                let state = spec.op == LogicOp::Set;
+                // The third operator of the original's `LOGIC` block, `I`,
+                // inverts the state of the switch: the manual says of it that
+                // "el estado de la llave lógica especificada por el operando
+                // A es invertido", and the original's own report agrees. The
+                // probes of `odd/tasks/notas-w5-motor.md` measure it: a switch
+                // that starts set is reset by one inversion and set again by
+                // two, and a switch that starts reset is set by one. A `Set`
+                // would answer `1` in all of them and a `Reset` would answer
+                // `0` in all of them; only the inversion answers `0`, `1` and
+                // `1`.
+                let state = if spec.invert {
+                    !*self.entities.logic(&name)
+                } else {
+                    spec.op == LogicOp::Set
+                };
                 *self.entities.logic(&name) = state;
                 if self.config.trace {
                     let detail = name_and_value(&name, if state { "1" } else { "0" });

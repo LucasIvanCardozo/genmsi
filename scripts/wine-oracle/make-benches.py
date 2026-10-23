@@ -196,11 +196,24 @@ PROP_VALUES: dict[tuple[str, str], str] = {
 
 # Outputs the original needs connected: the `Unlink` block carries in its
 # second output the label of the transactions it unchains, and refuses to
-# run without it.
+# run without it.  The `EXAMINE` needs its failure output for the same
+# reason: the third operand of the GPSS statement is the block the
+# transaction goes to when it is not in the group, and the original refuses
+# the model with "Faltan parámetros" when that operand is empty.
 EXTRA_OUTPUTS: dict[str, list[str]] = {
     "Unlink": ["SalidaAlt"],
+    "Examine": ["Salida2"],
+    "ExamineNumber": ["Salida2"],
     "Multifurcacion": ["SalidaProb2", "SalidaProb3", "SalidaProb4", "SalidaProb5"],
     "MultifurcacionP": ["SalidaProb2", "SalidaProb3", "SalidaProb4", "SalidaProb5"],
+}
+
+# Entities the class uses that the model has to declare: the original stops
+# the run with "Referencia a una entidad storage inexistente" when a
+# transaction enters a storage that nobody declared, so the bench of the
+# `StorageUse` carries the declaration of its storage.
+DECLARATIONS: dict[str, list[str]] = {
+    "StorageUse": ["StorageDef"],
 }
 
 # The original refuses to end a transaction that owns a facility, and refuses
@@ -248,6 +261,18 @@ LISTED_FIRST = {
 
 PROP_RE = re.compile(r"\[([^\[\]:'=]+)(?::'([^']*)')?(?:='([^']*)')?\]")
 RN_SEED_RE = re.compile(r"RN:(\d+)")
+IN_LABEL_RE = re.compile(r"(?:^|[^A-Za-z0-9_])IN\s+(\w+):'[^']*'='([^']*)'")
+
+# What the macro of the original writes as the label of a block:
+#
+# - `A_moduleName` is the name of the module with the `A_` in front of it,
+#   which is what most classes do;
+# - `moduleName` is the name of the module, with nothing in front of it (the
+#   four gates, the multifurcations and the storage macro do this);
+# - any other token is a literal the original writes as it is (`Clona` for the
+#   split, `Entrada1` for the transfer).
+LABEL_PREFIXED = ("A_moduleName", "A_ModuleName")
+LABEL_PLAIN = ("moduleName", "modulename")
 
 
 def encode(text: str) -> str:
@@ -298,6 +323,9 @@ class Port:
     def __init__(self, name: str, caption: str) -> None:
         self.name = name
         self.caption = caption
+        # What the macro of the original writes as the label of the block
+        # that owns this port (`IN Entrada1:'Ingreso'='moduleName'`).
+        self.label_token = ""
 
 
 class Prop:
@@ -368,6 +396,14 @@ def parse_class(element: ET.Element) -> ClassDef:
         match = re.search(r"(?<![\w])" + re.escape(port.name) + r":'([^']*)'", code)
         if match:
             port.caption = match.group(1)
+
+    # The label of the block: the macro code says what it writes on the
+    # input of the class (`IN Entrada1:'Ingreso'='moduleName'`).
+    for match in IN_LABEL_RE.finditer(code):
+        port_name, token = match.group(1), match.group(2)
+        for port in cls.inputs:
+            if port.name == port_name:
+                port.label_token = token
 
     # Properties: the macro code declares them with a hint and a default.
     declared: dict[str, Prop] = {}
@@ -478,13 +514,68 @@ class Block:
         self.outputs = outputs
 
 
+def label_of(definition: ClassDef, module_name: str) -> str:
+    """The label the original gives to a block of this class.
+
+    The macro of the class says what it writes on the input of the block:
+    the name of the module (with the `A_` in front of it or without it) or a
+    literal of its own.  That label is the name of the block in the GPSS
+    program and the one the report writes in its `LOC` column.
+    """
+    for port in definition.inputs:
+        token = port.label_token
+        if not token:
+            continue
+        if token in LABEL_PREFIXED:
+            return "A_" + module_name
+        if token in LABEL_PLAIN:
+            return module_name
+        return token
+    if definition.inputs:
+        # The macro does not say: the original names it like the others.
+        return "A_" + module_name
+    return ""
+
+
+def main_output(definition: ClassDef) -> int:
+    """The index of the output the flow of a class leaves by."""
+    return next(
+        (index for index, port in enumerate(definition.outputs) if port.name == "Salida1"),
+        0,
+    )
+
+
+def declaration_class(decl: ClassDef, used: ClassDef) -> ClassDef:
+    """A copy of a declaration class that declares what the class uses.
+
+    The entity is the one the class names: the `StorageUse` uses the storage
+    `Almacen`, so the declaration has to declare `Almacen` and not the
+    default of the declaration class.
+    """
+    copy = ClassDef(decl.name, decl.width, decl.height)
+    values = {prop.name: prop.value for prop in used.props}
+    for prop in decl.props:
+        copy.props.append(
+            Prop(
+                prop.name,
+                prop.hint,
+                values.get(prop.name, prop.value),
+                prop.ty,
+                prop.subtype,
+                prop.visible,
+                prop.unique,
+            )
+        )
+    return copy
+
+
 def build_bench(cls: ClassDef, classes: dict[str, ClassDef]) -> tuple[str, list[str]]:
     """Return the text of the bench of a class and the notes about it.
 
     The bench is a chain of blocks: a `Generate`, the blocks the class needs
-    around it, the class under test, and a `Terminate`.  Every link of the
-    chain is named after the block it feeds (`A_<block>`), and that name is
-    what the original writes as the name of the GPSS block.
+    around it, the class under test, and a `Terminate`.  Every block is named
+    after the label the macro of its class gives it, and every link of the
+    chain points to the label of the block it feeds.
     """
     notes: list[str] = []
     blocks: list[Block] = []
@@ -528,26 +619,53 @@ def build_bench(cls: ClassDef, classes: dict[str, ClassDef]) -> tuple[str, list[
     if cls.outputs and cls.name != "Terminate":
         chain.append(("Terminate", classes["Terminate"], "Terminate"))
 
-    # The blocks of the chain, with their ports and their labels.
+    # The terminators of the outputs the original needs connected.  The
+    # original names them `Terminate`, `Terminate1`, ... , and the label of
+    # each one is the one the macro of the terminator gives it.
+    terminators: list[tuple[str, ClassDef, str]] = []
+    for port in cls.outputs:
+        if port.name not in extra_outputs:
+            continue
+        name = "Terminate" + str(len(terminators) + 1)
+        terminators.append((name, classes["Terminate"], "Terminate " + port.name))
+
+    # The declarations of the entities the class uses.
+    declarations: list[tuple[str, ClassDef, str]] = []
+    for decl_name in DECLARATIONS.get(cls.name, []):
+        decl = declaration_class(classes[decl_name], cls)
+        declarations.append((decl_name, decl, decl_name))
+
+    # Every block of the model, in the order it is written.
+    blocks_spec = declarations + chain + terminators
+
+    # The label of every block: the one the macro of its class gives it.
+    labels = {name: label_of(definition, name) for name, definition, _ in blocks_spec}
+
+    # The blocks of the model, with their ports and their labels.
     moduleids: dict[str, int] = {}
-    for index, (name, definition, block_caption) in enumerate(chain):
+    for index, (name, definition, block_caption) in enumerate(blocks_spec):
         moduleids[name] = index + 1
-        label_in = "A_" + name
+        label_in = labels[name]
         if definition is cls and cls.name in LABELLED_INPUT:
             # The class waits for a label: the link that feeds it carries it.
             label_in = LABELLED_INPUT[cls.name]
-        label_out = "A_" + chain[index + 1][0] if index + 1 < len(chain) else ""
+        chain_index = next((i for i, item in enumerate(chain) if item[0] == name), None)
+        label_out = ""
+        if chain_index is not None and chain_index + 1 < len(chain):
+            label_out = labels[chain[chain_index + 1][0]]
         inputs = []
         for port_index, port in enumerate(definition.inputs):
             inputs.append((port_index + 1, port.name, port.caption, label_in))
         outputs = []
         for port_index, port in enumerate(definition.outputs):
-            if port_index == main and definition is cls:
+            if definition is cls and port.name in extra_outputs:
+                # The output the original needs connected: it points to its
+                # own terminator.
+                label = labels[terminators[extra_outputs.index(port.name)][0]]
+            elif port_index == main_output(definition):
                 label = label_out
-            elif port.name in extra_outputs and definition is cls:
-                label = label_out + "_" + port.name
             else:
-                label = label_out if port_index == main else ""
+                label = ""
             outputs.append((len(definition.inputs) + port_index + 1, port.name, port.caption, label))
         blocks.append(
             Block(
@@ -565,13 +683,10 @@ def build_bench(cls: ClassDef, classes: dict[str, ClassDef]) -> tuple[str, list[
     # The links of the chain.
     for index in range(len(chain) - 1):
         source, target = chain[index], chain[index + 1]
-        source_main = next(
-            (i for i, port in enumerate(source[1].outputs) if port.name == "Salida1"), 0
-        )
         links.append(
             (
                 moduleids[source[0]],
-                len(source[1].inputs) + source_main + 1,
+                len(source[1].inputs) + main_output(source[1]) + 1,
                 moduleids[target[0]],
                 1,
             )
@@ -581,21 +696,8 @@ def build_bench(cls: ClassDef, classes: dict[str, ClassDef]) -> tuple[str, list[
     for index, port in enumerate(cls.outputs):
         if port.name not in extra_outputs:
             continue
-        terminator = classes["Terminate"]
-        label = "A_Terminate_" + port.name
-        blocks.append(
-            Block(
-                len(blocks) + 1,
-                terminator,
-                "Terminate",
-                "Terminate " + port.name,
-                120,
-                40 + 100 * len(blocks),
-                [(1, item.name, item.caption, label) for item in terminator.inputs],
-                [],
-            )
-        )
-        links.append((moduleids[cls.name], len(cls.inputs) + index + 1, len(blocks), 1))
+        name = terminators[extra_outputs.index(port.name)][0]
+        links.append((moduleids[cls.name], len(cls.inputs) + index + 1, moduleids[name], 1))
 
     # A `Clock` closes the run: the original stops when the start counter
     # reaches zero, and only the clock (or a terminate with an operand) does.
@@ -612,6 +714,16 @@ def build_bench(cls: ClassDef, classes: dict[str, ClassDef]) -> tuple[str, list[
         notes.append(f"el banco antepone un bloque {companion}: hace falta para que la classe corra")
     for companion in COMPANIONS_AFTER.get(cls.name, []):
         notes.append(f"el banco añade un bloque {companion}: hace falta para que la classe corra")
+    for decl_name in DECLARATIONS.get(cls.name, []):
+        notes.append(
+            f"el banco lleva un bloque {decl_name}: la clase usa una entidad que "
+            f"el original sólo simula si el modelo la declara"
+        )
+    for port_name in extra_outputs:
+        notes.append(
+            f"el banco conecta la salida {port_name}: el original la necesita para "
+            f"escribir la sentencia"
+        )
     return text, notes
 
 

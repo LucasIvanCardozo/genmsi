@@ -3,11 +3,11 @@ source: crates/genmsi-cli/tests/cli.rs
 expression: stdout(&output)
 ---
  2700.000  T1    #1    Generate       generate
- 2700.000  T1    #14   Queue          enter
+ 2700.000  T1    #14   Queue          enter      qAfuera
  2700.000  T1    #14   Queue          leave      -> 4
  2700.000  T1    #5    GateL          enter
  2700.000  T1    #5    GateL          wait       gate
  2808.288  T2    #1    Generate       generate
- 2808.288  T2    #14   Queue          enter
+ 2808.288  T2    #14   Queue          enter      qAfuera
  2808.288  T2    #14   Queue          leave      -> 4
 # trace stopped at the 8 record limit (raise --limit)

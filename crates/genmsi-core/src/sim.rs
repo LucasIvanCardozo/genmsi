@@ -12,7 +12,7 @@ use serde::Serialize;
 use crate::error::EngineError;
 use crate::expr::{Ctx, ProgramExpr, RefKind};
 use crate::program::{
-    BlockKind, EntityName, FunctionDef, GateCondition, GenerateSpec, LogicOp, Program,
+    BlockKind, EntityName, ExecBlock, FunctionDef, GateCondition, GenerateSpec, LogicOp, Program,
     SelectMode, TerminateSpec, UnlinkSpec,
 };
 use crate::rng::Streams;
@@ -592,7 +592,8 @@ impl<'p> Simulation<'p> {
                 *self.passed.entry(label.clone()).or_insert(0) += 1;
             }
             if self.config.trace {
-                self.record_trace(xact, block_index, "enter", String::new());
+                let detail = self.entity_name(&block, xact).unwrap_or_default();
+                self.record_trace(xact, block_index, "enter", detail);
             }
         }
 
@@ -1351,6 +1352,27 @@ impl<'p> Simulation<'p> {
             self.record_trace(xact, block_index, "terminate", String::new());
         }
         self.remove_transaction(xact);
+    }
+
+    /// Name of the entity a block touches, resolved for one transaction.
+    ///
+    /// The name is only known at run time when the model names the entity by a
+    /// parameter (`*caja`) or by an expression, so the trace publishes the
+    /// resolved name. Blocks that touch no entity return `None`.
+    fn entity_name(&mut self, block: &ExecBlock, xact: XactId) -> Option<String> {
+        match &block.kind {
+            BlockKind::Queue(spec) => Some(self.resolve_name(&spec.queue, xact)),
+            BlockKind::Depart(spec) => Some(self.resolve_name(&spec.queue, xact)),
+            BlockKind::Seize(spec) => Some(self.resolve_name(&spec.facility, xact)),
+            BlockKind::Release(spec) => Some(self.resolve_name(&spec.facility, xact)),
+            BlockKind::Preempt(spec) => Some(self.resolve_name(&spec.facility, xact)),
+            BlockKind::Return(spec) => Some(self.resolve_name(&spec.facility, xact)),
+            BlockKind::Enter(spec) => Some(self.resolve_name(&spec.storage, xact)),
+            BlockKind::Leave(spec) => Some(self.resolve_name(&spec.storage, xact)),
+            BlockKind::Link(spec) => Some(self.resolve_name(&spec.chain, xact)),
+            BlockKind::Unlink(spec) => Some(self.resolve_name(&spec.chain, xact)),
+            _ => None,
+        }
     }
 
     fn resolve_name(&mut self, entity: &EntityName, xact: XactId) -> String {

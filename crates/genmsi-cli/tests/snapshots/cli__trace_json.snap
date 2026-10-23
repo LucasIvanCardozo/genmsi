@@ -29,7 +29,7 @@ expression: stdout(&output)
       "class": "Queue",
       "label": "A_Queue",
       "event": "enter",
-      "detail": ""
+      "detail": "qAfuera"
     },
     {
       "time": 2700.0,

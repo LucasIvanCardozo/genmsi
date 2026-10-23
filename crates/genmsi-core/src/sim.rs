@@ -15,6 +15,7 @@ use crate::program::{
     BlockKind, EntityName, ExecBlock, FunctionDef, GateCondition, GenerateSpec, LogicOp, Program,
     SelectMode, TerminateSpec, UnlinkSpec,
 };
+use crate::report::number;
 use crate::rng::Streams;
 use crate::stat::Entities;
 use crate::stat::Table;
@@ -105,9 +106,14 @@ pub struct TraceEvent {
     pub class: String,
     /// Block label.
     pub label: Option<String>,
-    /// What happened (`enter`, `leave`, `wait`, `terminate`).
+    /// What happened (`enter`, `leave`, `wait`, `terminate`, `generate`,
+    /// `table`, `logic`, `value`, `unlink`).
     pub event: &'static str,
     /// Detail (entity name, target block, ...).
+    ///
+    /// The events that carry a name and a value (`table`, `logic`, `value`)
+    /// separate the two by the *last* space: the name may contain spaces, the
+    /// value never does.
     pub detail: String,
 }
 
@@ -663,6 +669,11 @@ impl<'p> Simulation<'p> {
                 };
                 let cell = self.entities.savevalue(&spec.savevalue);
                 *cell = spec.op.apply(*cell, value);
+                let assigned = *cell;
+                if self.config.trace {
+                    let detail = name_and_value(&spec.savevalue, &number(assigned));
+                    self.record_trace(xact, block_index, "value", detail);
+                }
                 self.leave(xact, block_index, block.next_default());
             }
             BlockKind::Counter(spec) => {
@@ -682,6 +693,10 @@ impl<'p> Simulation<'p> {
                 {
                     transaction.set_parameter(parameter, new_value);
                 }
+                if self.config.trace {
+                    let detail = name_and_value(&spec.savevalue, &number(new_value));
+                    self.record_trace(xact, block_index, "value", detail);
+                }
                 self.leave(xact, block_index, block.next_default());
             }
             BlockKind::Queue(spec) => {
@@ -694,7 +709,7 @@ impl<'p> Simulation<'p> {
             BlockKind::Depart(spec) => {
                 let name = self.resolve_name(&spec.queue, xact);
                 let waited = self.entities.queue(&name, self.now).dequeue(xact, self.now);
-                self.record_queue_tables(&name, waited);
+                self.record_queue_tables(&name, waited, xact, block_index);
                 self.leave(xact, block_index, block.next_default());
             }
             BlockKind::Seize(spec) => {
@@ -896,7 +911,12 @@ impl<'p> Simulation<'p> {
             }
             BlockKind::Logic(spec) => {
                 let name = self.resolve_name(&spec.switch, xact);
-                *self.entities.logic(&name) = spec.op == LogicOp::Set;
+                let state = spec.op == LogicOp::Set;
+                *self.entities.logic(&name) = state;
+                if self.config.trace {
+                    let detail = name_and_value(&name, if state { "1" } else { "0" });
+                    self.record_trace(xact, block_index, "logic", detail);
+                }
                 self.retry_gates();
                 self.leave(xact, block_index, block.next_default());
             }
@@ -943,6 +963,11 @@ impl<'p> Simulation<'p> {
                     (count, wanted)
                 };
                 let removed = self.unlink(&name, count, &spec, wanted);
+                if !removed.is_empty() && self.config.trace {
+                    let members: Vec<String> = removed.iter().map(|id| id.to_string()).collect();
+                    let detail = members.join(",");
+                    self.record_trace(xact, block_index, "unlink", detail);
+                }
                 if removed.is_empty() {
                     let target = if block.has_failure_port() {
                         block.next_named("Salida2")
@@ -1155,8 +1180,17 @@ impl<'p> Simulation<'p> {
                         };
                         definition.attribute.eval(&mut ctx)
                     };
-                    if let Some(table) = self.entities.tables.get_mut(&spec.table) {
-                        table.tabulate(value);
+                    let tabulated = {
+                        if let Some(table) = self.entities.tables.get_mut(&spec.table) {
+                            table.tabulate(value);
+                            true
+                        } else {
+                            false
+                        }
+                    };
+                    if tabulated && self.config.trace {
+                        let detail = name_and_value(&spec.table, &value.to_string());
+                        self.record_trace(xact, block_index, "table", detail);
                     }
                 } else {
                     self.diagnostics
@@ -1723,7 +1757,7 @@ impl<'p> Simulation<'p> {
         changed
     }
 
-    fn record_queue_tables(&mut self, queue: &str, waited: f64) {
+    fn record_queue_tables(&mut self, queue: &str, waited: f64, xact: XactId, block: usize) {
         let program = self.program;
         let names: Vec<String> = program
             .definitions
@@ -1733,11 +1767,28 @@ impl<'p> Simulation<'p> {
             .map(|(name, _)| name.clone())
             .collect();
         for name in names {
-            if let Some(table) = self.entities.qtables.get_mut(&name) {
-                table.tabulate(waited);
+            let tabulated = {
+                if let Some(table) = self.entities.qtables.get_mut(&name) {
+                    table.tabulate(waited);
+                    true
+                } else {
+                    false
+                }
+            };
+            if tabulated && self.config.trace {
+                let detail = name_and_value(&name, &waited.to_string());
+                self.record_trace(xact, block, "table", detail);
             }
         }
     }
+}
+
+/// Build the detail of a trace event that carries a name and a value.
+///
+/// The two are separated by a single space, and a reader splits the detail on
+/// its *last* space: a table's name may contain spaces, a value never does.
+fn name_and_value(name: &str, value: &str) -> String {
+    format!("{name} {value}")
 }
 
 /// Evaluate the mean and optional modifier of a delay expression.

@@ -62,6 +62,11 @@ export interface AppState {
   seed: number;
   /** The horizon the next run uses, in simulated time. */
   until: number | null;
+  /** The commands that were applied, so the app knows whether the change it
+   * is undoing moved the blocks or changed the program. */
+  history: EditCommand[];
+  /** The commands that were undone, ready to be redone. */
+  redoStack: EditCommand[];
   /** What the app is doing. */
   status: Status;
   /** The message of the last failure, if any. */
@@ -187,6 +192,15 @@ function containerAt(model: ModelBody, x: number, y: number): number {
   return hits[0]?.id ?? root?.id ?? 0;
 }
 
+/**
+ * The commands that only move the blocks.
+ *
+ * Moving a block does not change the program: what the engine simulates is
+ * the program, not the geometry. The run the monitor replays is therefore
+ * still the run of the model, and it stays on the screen.
+ */
+const COSMETIC_COMMANDS: ReadonlySet<string> = new Set(["moveBlock", "setLayouts"]);
+
 export const useApp = create<AppState>((set, get) => ({
   models: [],
   currentPath: null,
@@ -204,6 +218,8 @@ export const useApp = create<AppState>((set, get) => ({
   seed: 1,
   until: null,
   status: "idle",
+  history: [],
+  redoStack: [],
   error: null,
   dirty: false,
   canUndo: false,
@@ -249,6 +265,8 @@ export const useApp = create<AppState>((set, get) => ({
         playing: false,
         selectedBlockIds: [],
         clipboard: [],
+        history: [],
+        redoStack: [],
         status: "ready",
         savedMessage: null,
         error: null,
@@ -283,6 +301,8 @@ export const useApp = create<AppState>((set, get) => ({
         playing: false,
         selectedBlockIds: [],
         clipboard: [],
+        history: [],
+        redoStack: [],
         status: "ready",
         savedMessage: null,
         error: null,
@@ -295,6 +315,9 @@ export const useApp = create<AppState>((set, get) => ({
   apply: async (command: EditCommand) => {
     try {
       const state = await engine().apply(command);
+      // A block that moved does not change the program, so the run stays:
+      // the reader keeps the reproduction he was watching.
+      const keepsRun = COSMETIC_COMMANDS.has(command.op);
       set({
         model: state.model,
         diagnostics: state.diagnostics,
@@ -303,12 +326,16 @@ export const useApp = create<AppState>((set, get) => ({
         canRedo: state.canRedo,
         // The model moved: the run the monitor replays is not the model any
         // more, so the replay goes away with it.
-        report: null,
-        trace: null,
-        monitor: null,
-        transitions: null,
-        playhead: 0,
-        playing: false,
+        ...(keepsRun
+          ? {}
+          : {
+              report: null,
+              trace: null,
+              monitor: null,
+              transitions: null,
+              playhead: 0,
+              playing: false,
+            }),
         error: null,
         status: "ready",
       });
@@ -320,18 +347,29 @@ export const useApp = create<AppState>((set, get) => ({
   undo: async () => {
     try {
       const state = await engine().undo();
+      // The command that is undone is the last one the app applied: the
+      // app is the only one that changes the model, so it is the one that
+      // knows whether the change moved the blocks or changed the program.
+      const history = get().history;
+      const undone = history[history.length - 1];
       set({
         model: state.model,
         diagnostics: state.diagnostics,
         dirty: state.dirty,
         canUndo: state.canUndo,
         canRedo: state.canRedo,
-        report: null,
-        trace: null,
-        monitor: null,
-        transitions: null,
-        playhead: 0,
-        playing: false,
+        history: history.slice(0, -1),
+        redoStack: undone === undefined ? get().redoStack : [...get().redoStack, undone],
+        ...(undone !== undefined && COSMETIC_COMMANDS.has(undone.op)
+          ? {}
+          : {
+              report: null,
+              trace: null,
+              monitor: null,
+              transitions: null,
+              playhead: 0,
+              playing: false,
+            }),
         error: null,
       });
     } catch (error) {
@@ -342,18 +380,26 @@ export const useApp = create<AppState>((set, get) => ({
   redo: async () => {
     try {
       const state = await engine().redo();
+      const redoStack = get().redoStack;
+      const redone = redoStack[redoStack.length - 1];
       set({
         model: state.model,
         diagnostics: state.diagnostics,
         dirty: state.dirty,
         canUndo: state.canUndo,
         canRedo: state.canRedo,
-        report: null,
-        trace: null,
-        monitor: null,
-        transitions: null,
-        playhead: 0,
-        playing: false,
+        history: redone === undefined ? get().history : [...get().history, redone],
+        redoStack: redoStack.slice(0, -1),
+        ...(redone !== undefined && COSMETIC_COMMANDS.has(redone.op)
+          ? {}
+          : {
+              report: null,
+              trace: null,
+              monitor: null,
+              transitions: null,
+              playhead: 0,
+              playing: false,
+            }),
         error: null,
       });
     } catch (error) {

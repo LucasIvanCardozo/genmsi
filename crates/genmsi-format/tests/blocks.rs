@@ -693,6 +693,22 @@ const CLASS_LIBRARY_DEFAULTS: &[(&str, &str, &str)] = &[
     ("Mark", "Parametro", "Param"),
     ("Match", "RotuloMatch", "BBB"),
     ("Match", "RotuloPropio", "AAA"),
+    // The three classes the catalogue did not offer, whose defaults the
+    // class library of the original declares (the macro code of each class
+    // carries them).
+    ("MFunction", "Atributo", "P%3AParam"),
+    ("MFunction", "Matriz", "%7B%7B11%3B12%3B13%7D%3B%7B21%3B22%3B23%7D%7D"),
+    ("MFunction", "NombresFunc", "%7BFuncA%3BFuncB%7D"),
+    ("MFunctionDist", "NombresDist", "%7BFunc1%3BFunc2%7D"),
+    (
+        "MFunctionDist",
+        "Resultados",
+        "%7B%0A%7B20%25%3B30%25%3B50%25%7D%3B%0A%7B25%25%3B35%25%3B40%25%7D%0A%7D",
+    ),
+    ("MFunctionDist", "Semilla", "4"),
+    ("RemoveNumber", "Grupo", "UnGrupo"),
+    ("RemoveNumber", "Numero", "0"),
+    ("RemoveNumber", "Op", "%3D"),
     ("Preempt", "Facility", "Recurso"),
     ("Preempt", "ModoArrebato", "NoRemover"),
     ("Preempt", "ModoInterrupcion", "Prioridad"),

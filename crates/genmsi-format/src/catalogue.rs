@@ -61,10 +61,10 @@ pub static CLASSES: &[ClassSpec] = &[
     ADVANCE, ALTER, ASSEMBLE, ASSIGN, BUFFER, CLOCK, COUNTER, DEPART, ENTER, EXAMINE, EXAMINENUMBER,
     FACILITYINT, FACILITYUSE, FUNCTION, FUNCTIONDIST, FUNCTIONEXPON, GATEF, GATEL, GATEM, GATES,
     GATHER, GENERATE, INITIASV, INITIALLS, JOINME, JOINNUMBER, LEAVE, LINK, LOGIC, LOOP, MARK,
-    MATCH, MULTIFURCACION, MULTIFURCACIONP, NOTE, PREEMPT, PRIORITY, QTABLE, QUEUE, RELEASE,
-    REMOVEME, REMOVETRANS, RETURN, SAVEVALUE, SCAN, SEIZE, SELECT, SELECTF, SELECTL, SELECTS,
-    SELECTSNA, SPLIT, STORAGEDEF, STORAGEUSE, TABLE, TABULATE, TERMINATE, TEST, TRANSFER, UNLINK,
-    VARIABLE, VARIABLEA, VARIABLEN,
+    MATCH, MFUNCTION, MFUNCTIONDIST, MULTIFURCACION, MULTIFURCACIONP, NOTE, PREEMPT, PRIORITY,
+    QTABLE, QUEUE, RELEASE, REMOVEME, REMOVENUMBER, REMOVETRANS, RETURN, SAVEVALUE, SCAN, SEIZE,
+    SELECT, SELECTF, SELECTL, SELECTS, SELECTSNA, SPLIT, STORAGEDEF, STORAGEUSE, TABLE, TABULATE,
+    TERMINATE, TEST, TRANSFER, UNLINK, VARIABLE, VARIABLEA, VARIABLEN,
 ];
 
 /// The value a new block of a class comes with, per property.
@@ -204,6 +204,23 @@ pub static DEFAULTS: &[(&str, &str, &str)] = &[
     // The `Match` class synchronizes the transactions of a label.
     ("Match", "RotuloMatch", "BBB"),
     ("Match", "RotuloPropio", "AAA"),
+    // The `MFunction` class defines several functions over the same input
+    // attribute: one row of the matrix per function.
+    ("MFunction", "Atributo", "P%3AParam"),
+    ("MFunction", "Matriz", "%7B%7B11%3B12%3B13%7D%3B%7B21%3B22%3B23%7D%7D"),
+    ("MFunction", "NombresFunc", "%7BFuncA%3BFuncB%7D"),
+    // The `MFunctionDist` class defines several distribution functions: one
+    // row of the matrix of results per function.
+    //
+    // The value of `Resultados` is the one the macro code of the class
+    // carries, with the line breaks the macro code writes inside it.
+    ("MFunctionDist", "NombresDist", "%7BFunc1%3BFunc2%7D"),
+    (
+        "MFunctionDist",
+        "Resultados",
+        "%7B%0A%7B20%25%3B30%25%3B50%25%7D%3B%0A%7B25%25%3B35%25%3B40%25%7D%0A%7D",
+    ),
+    ("MFunctionDist", "Semilla", "4"),
     // The `Multifurcacion` class creates the two functions it needs and
     // splits the traffic in five equal shares.
     // The macro code of the two multifurcations names these properties
@@ -246,6 +263,10 @@ pub static DEFAULTS: &[(&str, &str, &str)] = &[
     ("Release", "Facility", "Recurso"),
     // The `RemoveMe` class takes the transaction out of its group.
     ("RemoveMe", "Grupo", "UnGrupo"),
+    // The `RemoveNumber` class asks a numeric group for a number.
+    ("RemoveNumber", "Grupo", "UnGrupo"),
+    ("RemoveNumber", "Numero", "0"),
+    ("RemoveNumber", "Op", "%3D"),
     // The `RemoveTrans` class removes the transactions of a group.
     ("RemoveTrans", "Cantidad", "1"),
     ("RemoveTrans", "CompOp", "%3D"),
@@ -979,6 +1000,30 @@ pub static MATCH: ClassSpec = ClassSpec {
     ],
 };
 
+pub static MFUNCTION: ClassSpec = ClassSpec {
+    class: "MFunction",
+    title: "Definir múltiples funciones",
+    inputs: &[],
+    outputs: &[],
+    properties: &[
+        PropertySpec { name: "Atributo", hint: "Variable%20independiente%20de%20todas%20las%20funciones", ty: "TSNA", subtype: "SNA", unique: false },
+        PropertySpec { name: "Matriz", hint: "Matriz%20que%20define%20las%20salidas%20de%20las%20funciones%20para%20cada%20valor%20de%20entrada%2E", ty: "TSNAMATRIX", subtype: "", unique: false },
+        PropertySpec { name: "NombresFunc", hint: "lista%20de%20nombres%20de%20las%20Funciones", ty: "TEntityDefList", subtype: "Function", unique: true },
+    ],
+};
+
+pub static MFUNCTIONDIST: ClassSpec = ClassSpec {
+    class: "MFunctionDist",
+    title: "Definir múltiples funciones de distribución",
+    inputs: &[],
+    outputs: &[],
+    properties: &[
+        PropertySpec { name: "NombresDist", hint: "Nombres%20de%20las%20funciones%20de%20distribuci%F3n", ty: "TEntityDefList", subtype: "Function", unique: true },
+        PropertySpec { name: "Resultados", hint: "", ty: "FloatPercentMatrix", subtype: "", unique: false },
+        PropertySpec { name: "Semilla", hint: "n%FAmero%20de%20semilla%20utilizada%20para%20calcular%20los%20n%FAmeros%20aleatorios", ty: "PosInteger", subtype: "", unique: false },
+    ],
+};
+
 pub static MULTIFURCACION: ClassSpec = ClassSpec {
     class: "Multifurcacion",
     title: "Multifurcación",
@@ -1122,6 +1167,23 @@ pub static REMOVEME: ClassSpec = ClassSpec {
     ],
     properties: &[
         PropertySpec { name: "Grupo", hint: "Grupo%20num%E9rico%20al%20que%20se%20agrega%20un%20n%FAmero", ty: "EntityUse", subtype: "TransacGroup", unique: false },
+    ],
+};
+
+pub static REMOVENUMBER: ClassSpec = ClassSpec {
+    class: "RemoveNumber",
+    title: "Remover número",
+    inputs: &[
+        PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
+    ],
+    outputs: &[
+        PortSpec { ioid: 2, name: "Salida1", caption: "" },
+        PortSpec { ioid: 3, name: "Salida2", caption: "No%20existe%20el%20N%BA" },
+    ],
+    properties: &[
+        PropertySpec { name: "Grupo", hint: "Grupo%20num%E9rico%20al%20que%20se%20agrega%20un%20n%FAmero", ty: "EntityUse", subtype: "NumericGroup", unique: false },
+        PropertySpec { name: "Numero", hint: "N%FAmero%20agregardo%20al%20grupo", ty: "TSNA", subtype: "SNA", unique: false },
+        PropertySpec { name: "Op", hint: "Operador%20relacional", ty: "Listed", subtype: "op_RelacMaxMin", unique: false },
     ],
 };
 

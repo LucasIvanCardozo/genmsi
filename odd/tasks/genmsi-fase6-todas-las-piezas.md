@@ -91,6 +91,34 @@ distinto. Falta el lado del motor (T1).
 
 `genmsi gpss <model>` imprime el programa tal como lo escribe el original
 (`genmsi.gpss/1`). Las sentencias coinciden casi una a una con las del TP2 del
+original, y las diferencias que quedan son hallazgos, no ruido.
+
+### L5 — El GPSS ya reproduce el del original
+
+El render ahora ordena los bloques como el original — por el recorrido de la
+transacción, no por el orden del modelo — y escribe las conexiones que rompen
+ese recorrido como un `TRANSFER` sin nombre, como hace el original. La
+comparación del TP2 queda con **cuatro diferencias**, y las cuatro son
+información:
+
+1. El original escribe los destinos de un `TRANSFER` en el orden inverso al de
+   nuestros puertos. En el modelo, `Entrada1` tiene Salida1→A_Advance12 y
+   Salida2→A_Advance1, y el original escribe `850,A_Advance1,A_Advance12`. Como
+   en GPSS el orden de los destinos *es* la semántica de la probabilidad, esto
+   hay que resolverlo con un banco (T3), no con el texto: el oráculo de
+   números dice que el comportamiento coincide, pero el texto dice lo
+   contrario.
+2. Al `PREEMPT` le falta un operando: la prioridad de la transacción que
+   preempta (`PR` en el original). Nuestro modelo no la tiene (T2).
+3. Al `LEAVE` del original le sobran las unidades (`SalaEspera,1`): las
+   escribimos cuando el bloque las tiene puestas y él las omite. Es
+   cosmético: la comparación las normaliza.
+4. El original escribe una conexión donde el nuestro cae solo al bloque
+   siguiente. El grafo es el mismo; la diferencia es de orden, y por eso la
+   comparación debe mirar el grafo y no el texto.
+
+`genmsi gpss <model>` imprime el programa tal como lo escribe el original
+(`genmsi.gpss/1`). Las sentencias coinciden casi una a una con las del TP2 del
 original, y las diferencias que quedan son hallazgos, no ruido:
 
 1. El original escribe la probabilidad de un `TRANSFER` en milésimas (850 = 85 %).

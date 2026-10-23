@@ -932,6 +932,11 @@ export const SPEEDS = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1000] as const;
  * The trace states the move itself: the `leave` record of a block carries the
  * block it goes to (`-> 12`), and the transaction's id says which instance
  * moved. A transition is therefore read from the trace, never inferred.
+ *
+ * The transition also carries the **flight**: the time the transaction spent
+ * in the block it left. The ball that crosses the link travels exactly that
+ * time, so it leaves the block when the transaction enters it and arrives
+ * when the transaction leaves it.
  */
 export interface Transition {
   /** The transaction that moved. */
@@ -942,6 +947,8 @@ export interface Transition {
   to: number;
   /** The time of the run at which the move happened. */
   time: number;
+  /** The seconds the transaction spent in the block it came from. */
+  flight: number;
 }
 
 /**
@@ -973,10 +980,12 @@ export function buildTransitions(
   nodeOf: (block: number) => number | null,
 ): TransitionIndex {
   const moves: Transition[] = [];
-  // The block each transaction is in, to know where a move comes from when the
-  // trace does not say it (a transaction that enters a block without leaving
-  // another one first).
-  const inside = new Map<number, number>();
+  // The block of the model every transaction is in, and the instant it
+  // entered it. The flight of a move is the difference between the two: the
+  // time the transaction spent in the block it left. A transaction that is
+  // between blocks has no block of the model (null).
+  const inside = new Map<number, number | null>();
+  const enteredAt = new Map<number, number>();
   for (const event of trace.events) {
     if (event.event === "leave") {
       const target = targetOf(event.detail);
@@ -985,25 +994,33 @@ export function buildTransitions(
         const to = nodeOf(target);
         // A move that stays inside the same block of the model is invisible.
         if (to !== null && to !== from) {
-          moves.push({ xact: event.xact, from, to, time: event.time });
+          const entered = enteredAt.get(event.xact);
+          // A move whose entry is not known has no flight at all.
+          const flight = entered === undefined ? 0 : Math.max(0, event.time - entered);
+          moves.push({ xact: event.xact, from, to, time: event.time, flight });
+          // The transaction leaves the block of the model it was in: the
+          // block it enters next is another one, and the flight of the move
+          // that takes it out is measured from that entry.
+          inside.set(event.xact, null);
         }
-      }
-      if (target !== null) {
-        inside.set(event.xact, target);
       }
       continue;
     }
     if (event.event === "enter") {
-      const to = nodeOf(event.block);
-      // The move that brought the transaction here: the trace says it on the
-      // `leave` of the previous block, which was already counted.
-      if (to !== null) {
-        inside.set(event.xact, event.block);
+      const node = nodeOf(event.block);
+      // The transaction enters a block of the model: the ball of the move
+      // that brought it here leaves now. A block of the model may be
+      // several blocks of the program, and the transaction stays in it
+      // until it leaves the block of the model.
+      if (node !== null && inside.get(event.xact) !== node) {
+        enteredAt.set(event.xact, event.time);
+        inside.set(event.xact, node);
       }
       continue;
     }
     if (event.event === "generate" || event.event === "terminate") {
       inside.delete(event.xact);
+      enteredAt.delete(event.xact);
     }
   }
   const times = moves.map((move) => move.time);

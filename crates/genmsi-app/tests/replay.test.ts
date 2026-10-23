@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   advanceClock,
   buildIndex,
+  buildTransitions,
   checkFidelity,
   frameAt,
   mergeSeries,
@@ -361,6 +362,96 @@ test("the entries of every block are rebuilt from the trace and match the engine
   const fidelity = checkFidelity(index, smallReport);
   assert.deepEqual(fidelity.entryMismatches, [], "the entries differ from the report");
   assert.equal(fidelity.entries, true);
+});
+
+test("a move carries the time the transaction spent in the block it left", () => {
+  // The transaction enters the block at 0 and leaves it at 4: the move
+  // happens at 4 and carries the four seconds it spent in the block, which
+  // is the flight of the ball that crosses the link.
+  const trace: TraceDocumentLike = {
+    start_time: 0,
+    end_time: 10,
+    limit: 100,
+    records: 3,
+    truncated: false,
+    events: [
+      event(0, 1, 0, "Queue", "enter"),
+      event(4, 1, 0, "Queue", "leave", "-> 1"),
+      event(4, 1, 1, "Advance", "enter"),
+    ],
+  };
+  const index = buildTransitions(trace, (block) => block);
+  assert.equal(index.moves.length, 1);
+  assert.equal(index.moves[0].flight, 4, "the flight is the time in the block");
+  assert.equal(index.moves[0].time, 4, "the move still happens at the arrival");
+});
+
+test("the flight of a move is the time the transaction spent in the block of the model", () => {
+  // A block of the model may be several blocks of the program (a queue and
+  // its depart): the transaction enters the block of the model at 0 and
+  // leaves it at 6, so the flight of the move that takes it out is 6.
+  const trace: TraceDocumentLike = {
+    start_time: 0,
+    end_time: 10,
+    limit: 100,
+    records: 4,
+    truncated: false,
+    events: [
+      event(0, 1, 0, "Queue", "enter"),
+      event(2, 1, 1, "Depart", "enter"),
+      event(6, 1, 1, "Depart", "leave", "-> 2"),
+      event(6, 1, 2, "Advance", "enter"),
+    ],
+  };
+  const nodeOf = (block: number) => (block === 0 || block === 1 ? 10 : block);
+  const index = buildTransitions(trace, nodeOf);
+  assert.equal(index.moves.length, 1);
+  assert.equal(index.moves[0].from, 10, "the move leaves the block of the model");
+  assert.equal(index.moves[0].flight, 6, "the flight is the time in the block");
+});
+
+test("two consecutive moves of the same transaction do not overlap", () => {
+  // The transaction enters the first block at 0, leaves it at 4 (the first
+  // move), enters the second at 4 and leaves it at 9 (the second move): the
+  // flight of the first ends exactly when the flight of the second begins,
+  // so the two balls never share the link.
+  const trace: TraceDocumentLike = {
+    start_time: 0,
+    end_time: 10,
+    limit: 100,
+    records: 5,
+    truncated: false,
+    events: [
+      event(0, 1, 0, "Queue", "enter"),
+      event(4, 1, 0, "Queue", "leave", "-> 1"),
+      event(4, 1, 1, "Advance", "enter"),
+      event(9, 1, 1, "Advance", "leave", "-> 2"),
+      event(9, 1, 2, "Seize", "enter"),
+    ],
+  };
+  const index = buildTransitions(trace, (block) => block);
+  assert.equal(index.moves.length, 2);
+  const [first, second] = index.moves;
+  assert.equal(first.flight, 4, "the first flight is the time in the first block");
+  assert.equal(second.flight, 5, "the second flight is the time in the second block");
+  // The first ball lands exactly when the second one leaves.
+  assert.equal(first.time, second.time - second.flight);
+});
+
+test("a move whose entry is not known has no flight", () => {
+  // The trace does not say when the transaction entered the block: the
+  // flight is zero, and the ball flies the shortest flight there is.
+  const trace: TraceDocumentLike = {
+    start_time: 0,
+    end_time: 10,
+    limit: 100,
+    records: 1,
+    truncated: false,
+    events: [event(3, 1, 0, "Queue", "leave", "-> 1")],
+  };
+  const index = buildTransitions(trace, (block) => block);
+  assert.equal(index.moves.length, 1);
+  assert.equal(index.moves[0].flight, 0);
 });
 
 test("the slider is a clock: a time selects the last record at or before it", () => {

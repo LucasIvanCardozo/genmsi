@@ -70,6 +70,13 @@ export default function MonitorView({
   } = useApp();
   const [panel, setPanel] = useState<Panel>("reproduccion");
   const [aside, setAside] = useState<Aside>("estado");
+  // A block the reader picks brings its properties forward: the lateral
+  // panel follows the selection.
+  useEffect(() => {
+    if (selectedBlockIds.length > 0) {
+      setAside("bloque");
+    }
+  }, [selectedBlockIds]);
   // The state of the replay at the playhead. It is carried from one frame to
   // the next while the replay runs forward, and rebuilt when it goes back.
   const carried = useRef<{ run: unknown; frame: number; state: ReplayState } | null>(null);

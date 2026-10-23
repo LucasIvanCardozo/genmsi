@@ -168,10 +168,14 @@ agent-browser screenshot "$SHOTS/01-grafo.png"
 agent-browser click ".react-flow__node$FLOW_NODE"
 agent-browser screenshot "$SHOTS/02-propiedades.png"
 
-# The run and its report.
+# The run and its report: the report is one of the panels of the window.
 agent-browser find role button click --name "Simular"
+agent-browser click '[data-monitor-panel="reporte"]'
 agent-browser wait --text "Bloques"
 agent-browser screenshot "$SHOTS/03-reporte.png"
+# The editing below happens on the graph, so the window goes back to it.
+agent-browser click '[data-monitor-panel="reproduccion"]'
+agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > 0"
 
 # 5. The editing steps, on the copy of the model.
 agent-browser select '[aria-label="Modelo"]' "$EDITED"
@@ -247,7 +251,6 @@ agent-browser screenshot "$SHOTS/11-error.png"
 # the charts need a model that has all of them.
 agent-browser select '[aria-label="Modelo"]' "$MONITOR_MODEL"
 agent-browser wait --text "supermercado"
-agent-browser find role button click --name "Monitor"
 agent-browser wait --text "Ejecutar y reproducir"
 agent-browser find role button click --name "Ejecutar y reproducir"
 # The header of the monitor says how many records the trace kept.
@@ -267,6 +270,11 @@ agent-browser screenshot "$SHOTS/13-monitor-reproduccion.png"
 agent-browser click '[data-monitor-panel="graficos"]'
 agent-browser wait --text "Histograma"
 agent-browser screenshot "$SHOTS/14-monitor-graficos.png"
+
+# The report of the run, with the numbers of the instant the replay is at.
+agent-browser click '[data-monitor-panel="reporte"]'
+agent-browser wait --text "Colas"
+agent-browser screenshot "$SHOTS/15-monitor-reporte.png"
 
 agent-browser close
 echo "==> the visual loop ran; the screenshots are in $SHOTS"

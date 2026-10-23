@@ -146,11 +146,15 @@ similarity with the original.
 - **Toolbar**: the editing actions — `Nuevo`, `Guardar`, `Guardar como…`,
   `Deshacer`, `Rehacer`, `Encuadrar`, `Borrar` and `Reacomodar` — and the
   palette that creates a block (`Añadir bloque`).
-- **Three views**: *Grafo*, *Monitor* and *Reporte*. The graph shows the blocks
-  with the geometry the model carries; the monitor replays the last run; the
-  report shows the engine's tables.
-- **Property panel**: the selected block's identity and its declared
-  properties, one editor per declared type.
+- **One window, three panels**: *Reproducción*, *Gráficos* and *Reporte*. The
+  reproduction is the graph of the model — with the geometry the model
+  carries — with the run on it: the blocks the run is filling are marked,
+  and the transactions that are on their way travel over the links. The
+  charts are the time series and the histograms of the run; the report is
+  the engine's tables, with the numbers of the instant the replay is at.
+- **Lateral panel**: two tabs, *Bloque* (the selected block's identity and
+  its declared properties, one editor per declared type) and *Estado* (the
+  queues, the facilities and the storages of the run).
 - **Diagnostics**: what the model compiles to, recomputed after every
   change.
 - **Numbers**: the original's comma decimals, so a report read in the app

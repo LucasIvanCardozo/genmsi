@@ -155,9 +155,10 @@ text of the thing that appeared is the condition to wait for.
 
 ### The monitor
 
-The monitor tab replays a finished run: the engine publishes the trace of the
-run next to the report, and the app rebuilds the state of the run by walking
-it.
+The window replays a finished run: the engine publishes the trace of the run
+next to the report, and the app rebuilds the state of the run by walking it.
+The run lives on the graph itself, so the reproduction is the picture of the
+model with the run on it.
 
 ```bash
 # The model of the monitor: it has queues, facilities and tables, so the
@@ -165,8 +166,7 @@ it.
 agent-browser select '[aria-label="Modelo"]' "fixtures/models/TP4__supermercado.gmdl"
 agent-browser wait --text "supermercado"
 
-# The monitor tab, and the run it needs.
-agent-browser find role button click --name "Monitor"
+# The run it needs.
 agent-browser wait --text "Ejecutar y reproducir"
 agent-browser find role button click --name "Ejecutar y reproducir"
 agent-browser wait --text "Registros"
@@ -185,6 +185,11 @@ agent-browser screenshot /tmp/genmsi-app/13-monitor-reproduccion.png
 agent-browser click '[data-monitor-panel="graficos"]'
 agent-browser wait --text "Histograma"
 agent-browser screenshot /tmp/genmsi-app/14-monitor-graficos.png
+
+# The report of the run, with the numbers of the instant the replay is at.
+agent-browser click '[data-monitor-panel="reporte"]'
+agent-browser wait --text "Colas"
+agent-browser screenshot /tmp/genmsi-app/15-monitor-reporte.png
 ```
 
 ## 4. Look, fix, repeat

@@ -134,7 +134,7 @@ fn test_and_logic_rows_use_the_gpss_letters() {
     let report = render_model("Problema 1__semaforo-1");
     assert_eq!(
         block_row(&report, "A_Test"),
-        ("TEST".into(), "E".into(), "P:Cuadra,50,A_Test1".into())
+        ("TEST".into(), "E".into(), "P$Cuadra,50,A_Test1".into())
     );
     assert_eq!(
         block_row(&report, "A_Logic"),
@@ -169,19 +169,19 @@ fn counter_select_join_examine_and_remove_rows_match_the_baseline() {
     );
     assert_eq!(
         block_row(&report, "A_Test"),
-        ("TEST".into(), "GE".into(), "P:CantPescados,1,A_Terminate7".into())
+        ("TEST".into(), "GE".into(), "P$CantPescados,1,A_Terminate7".into())
     );
     assert_eq!(
         block_row(&report, "A_JoinNumber"),
-        ("JOIN".into(), "".into(), "GPesos,P:PesoPescado".into())
+        ("JOIN".into(), "".into(), "GPesos,P$PesoPescado".into())
     );
     assert_eq!(
         block_row(&report, "A_ExamineNumber"),
-        ("EXAMINE".into(), "".into(), "GPesos,P:PesoPescado,A_Assign7".into())
+        ("EXAMINE".into(), "".into(), "GPesos,P$PesoPescado,A_Assign7".into())
     );
     assert_eq!(
         block_row(&report, "A_RemoveTrans"),
-        ("REMOVE".into(), "E".into(), "GPescando,1,,IdPescador,P:NroPescador".into())
+        ("REMOVE".into(), "E".into(), "GPescando,1,,IdPescador,P$NroPescador".into())
     );
 }
 
@@ -213,7 +213,7 @@ fn transfer_rows_keep_the_raw_expression_and_the_unconditional_form() {
     let report = render_model("TP3__aeropuerto");
     assert_eq!(
         block_row(&report, "Entrada11"),
-        ("TRANSFER".into(), "".into(), "X:qValue,Entrada13,A_Queue2".into())
+        ("TRANSFER".into(), "".into(), "X$qValue,Entrada13,A_Queue2".into())
     );
     let report = render_model("ejercicio_3__ejercicio_3");
     assert_eq!(
@@ -251,7 +251,7 @@ fn unlink_rows_render_the_engine_branches_in_baseline_order() {
         (
             "UNLINK".into(),
             "E".into(),
-            "CPescando,A_Advance2,1,NroEspera,P:NroEspera,A_Terminate2".into()
+            "CPescando,A_Advance2,1,NroEspera,P$NroEspera,A_Terminate2".into()
         )
     );
     assert_eq!(
@@ -278,7 +278,7 @@ fn split_rows_render_the_copy_target() {
     let report = render_model("Parcial 6-11-23__Veron - Parcial");
     assert_eq!(
         block_row(&report, "Clona"),
-        ("SPLIT".into(), "".into(), "P:CantTuristas,A_Queue1".into())
+        ("SPLIT".into(), "".into(), "P$CantTuristas,A_Queue1".into())
     );
     let report = render_model("TP10__tp10");
     assert_eq!(
@@ -340,7 +340,7 @@ fn scan_rows_use_the_comp_op_letter() {
         (
             "SCAN".into(),
             "E".into(),
-            "GPescando,IdPescador,P:NroPescador,IdPescador,IdPescador,A_Advance1".into()
+            "GPescando,IdPescador,P$NroPescador,IdPescador,IdPescador,A_Advance1".into()
         )
     );
     let report = render_model("TP8__mecanicos");
@@ -385,6 +385,6 @@ fn assign_rows_print_a_bare_parameter_operand_with_the_indirection_star() {
     let report = render_model("TP4__supermercado");
     assert_eq!(
         block_row(&report, "A_Assign"),
-        ("ASSIGN".into(), "".into(), "TipoCliente,FN:ProbCliente".into())
+        ("ASSIGN".into(), "".into(), "TipoCliente,FN$ProbCliente".into())
     );
 }

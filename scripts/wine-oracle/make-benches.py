@@ -231,6 +231,11 @@ DECLARATIONS: dict[str, list[str]] = {
     # declared, so the bench of the `Tabulate` carries the `Table` that
     # declares it.
     "Tabulate": ["Table"],
+    # The gate that looks at a storage asks it whether it is full, and the
+    # original refuses to run a model that uses a storage nobody declared
+    # ("Referencia a una entidad storage inexistente"), so the bench of the
+    # `GateS` carries the `StorageDef` that declares it.
+    "GateS": ["StorageDef"],
 }
 
 # The original refuses to end a transaction that owns a facility, and refuses

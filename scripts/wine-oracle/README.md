@@ -133,6 +133,30 @@ stdout:
   nobody owns, so these benches carry the block that completes the pair
   (`Seize`/`Release`, `Seize`/`Return`, `Preempt`/`Return`).
 
+Three rules decide that the bench asks the original the same question the
+rest of the benches ask — the same operands, the same names and the same
+entities:
+
+* **The label of a block.** The macro of the original says what it writes on
+  the input of the class (`IN Entrada1:'Ingreso'='moduleName'`): the name of
+  the module with the `A_` in front of it (`A_moduleName`, what most classes
+  do), the name of the module with nothing in front of it (`moduleName`: the
+  four gates, the multifurcations and the storage macro), or a literal of its
+  own (`Clona` for the split, `Entrada1` for the transfer). The generator
+  reads that token and writes it as the label of the block. The blocks that
+  end a run are named `Terminate`, `Terminate1`, ... , the way the original
+  names them, and the label of the link is the label of the block it feeds.
+* **The entities the class uses.** The original stops the run with
+  "Referencia a una entidad storage inexistente" when a transaction enters a
+  storage that nobody declared, so the bench of the `StorageUse` carries the
+  `StorageDef` that declares the storage it uses.
+* **The destinations the statement needs.** The `EXAMINE` writes three
+  operands: the group, the number (empty in transaction mode) and the block
+  the transaction goes to when it is not in the group. The last one is
+  required, and the original refuses the model with "Faltan parámetros"
+  without it, so the benches of the `Examine` and of the `ExamineNumber`
+  connect their failure output to a terminator of its own.
+
 Fifteen classes declare no ports at all (`Clock`, `Note`, the definitions,
 the functions). Their bench is the `Generate`/`Terminate` chain with the class
 in the model, unconnected.
@@ -143,6 +167,13 @@ subtypes and their options (`op_Logic_Faci`, `op_Logic_Tran`, ...) and the
 type of a list of entity definitions (`EntityDefList`, `TSNAMatrix`,
 `FloatPercentMatrix`). A `Listed` value that the original does not accept
 makes it refuse the model with "el archivo presenta errores estructurales".
+
+The generator has its own tests, `test_make_benches.py`. They build a little
+catalogue of their own, so they run without the backup of the original:
+
+```
+python3 -m unittest discover -s scripts/wine-oracle -p "test_*.py"
+```
 
 ## `run-benches.sh` — run the original over the benches
 

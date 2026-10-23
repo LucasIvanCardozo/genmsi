@@ -34,7 +34,8 @@ pub struct Diagnostics {
     /// `ok` when the compiler was silent, `diagnostics` when it had
     /// observations, `error` when the model does not compile.
     pub status: &'static str,
-    /// The compiler's observations.
+    /// The compiler's observations and the format's own findings (the
+    /// entities a block uses that the model does not declare).
     pub diagnostics: Vec<String>,
     /// The engine's message, when the model does not compile.
     pub message: Option<String>,
@@ -223,13 +224,26 @@ impl Session {
 ///
 /// A model that does not compile is a state the app shows: the engine's
 /// message, without the path (the app shows the path on its own).
+///
+/// The format's findings come along: a block that uses an entity the model
+/// does not declare (a storage nobody declares, for instance) is a warning
+/// the app shows next to the compiler's observations. It is a warning and
+/// not an error: the model still compiles, and the original opens a model
+/// like that too.
 pub fn diagnostics_of(model: &GmdlModel) -> Diagnostics {
+    let warnings = genmsi_format::declaration_warnings(model);
     match genmsi_core::compile_model(model) {
         Ok(program) => {
             let lint = lint_document(&program, "");
+            let mut diagnostics = lint.diagnostics.to_vec();
+            diagnostics.extend(warnings);
             Diagnostics {
-                status: lint.status,
-                diagnostics: lint.diagnostics.to_vec(),
+                status: if diagnostics.is_empty() {
+                    "ok"
+                } else {
+                    "diagnostics"
+                },
+                diagnostics,
                 message: None,
                 blocks: Some(lint.blocks),
                 definitions: Some(lint.definitions.clone()),
@@ -237,7 +251,7 @@ pub fn diagnostics_of(model: &GmdlModel) -> Diagnostics {
         }
         Err(error) => Diagnostics {
             status: "error",
-            diagnostics: Vec::new(),
+            diagnostics: warnings,
             message: Some(error.to_string()),
             blocks: None,
             definitions: None,

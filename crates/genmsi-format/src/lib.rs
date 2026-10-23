@@ -25,6 +25,7 @@
 //! ```
 
 pub mod catalogue;
+pub mod declaration;
 pub mod edit;
 pub mod error;
 pub mod model;
@@ -33,6 +34,9 @@ pub mod validate;
 pub mod writer;
 
 pub use catalogue::{ClassSpec, PortSpec, PropertySpec, build_block, class_spec, listed_options};
+pub use declaration::{
+    UndeclaredEntity, declaration_warnings, undeclared_entities, validate_declarations,
+};
 pub use edit::{EditCommand, EditSession, Position, UndoStep};
 pub use error::{FormatError, Location};
 pub use model::{

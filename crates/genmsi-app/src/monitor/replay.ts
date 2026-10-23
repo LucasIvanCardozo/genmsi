@@ -26,10 +26,12 @@
  * run and the animation reads it, so the replay of a big trace never walks
  * the whole trace again per frame.
  *
- * This module has no imports on purpose: it is the pure part of the monitor,
- * and the tests run it without a bundler. The shapes below are the parts of
- * the engine's documents the replay reads; the generated types satisfy them.
+ * The module imports one thing, and it is pure: the figures of the run, the
+ * arithmetic the engine uses to count them. The shapes below are the parts
+ * of the engine's documents the replay reads; the generated types satisfy
+ * them.
  */
+import { applyChange, closeFigures, emptyFigures, type FigureChange, type Figures } from "./stats.ts";
 
 /** One event of the trace, as the replay reads it. */
 export interface TraceEventLike {
@@ -86,7 +88,56 @@ export interface ReportDocumentLike {
   /** The entities of the run. */
   entities: {
     /** The queues of the run, with the content they ended with. */
-    queues: Record<string, { name: string; content: number }>;
+    queues: Record<
+      string,
+      {
+        name: string;
+        content: number;
+        max?: number;
+        entries?: number;
+        zero_entries?: number;
+        total_time?: number;
+        area?: number;
+        retry?: number;
+      }
+    >;
+    /** The facilities of the run. */
+    facilities?: Record<
+      string,
+      {
+        name: string;
+        entries: number;
+        busy_time: number;
+        busy: boolean;
+        retry: number;
+        inter: number;
+      }
+    >;
+    /** The storages of the run. */
+    storages?: Record<
+      string,
+      {
+        name: string;
+        in_use: number;
+        min_use: number;
+        max_use: number;
+        entries: number;
+        area: number;
+        retry: number;
+      }
+    >;
+    /** The chains of the run. */
+    chains?: Record<
+      string,
+      {
+        name: string;
+        content: number;
+        max: number;
+        entries: number;
+        total_time: number;
+        area: number;
+      }
+    >;
   };
 }
 
@@ -118,6 +169,8 @@ export interface ReplayState {
   blocks: Record<number, number>;
   /** The entries every program block has had, since the run started. */
   totals: Record<number, number>;
+  /** The figures of the entities of the run, as the engine counts them. */
+  figures: Figures;
 }
 
 /** What one trace event changes in the state of the run. */
@@ -138,6 +191,8 @@ export interface StateChange {
   left?: number;
   /** The program block that counts an entry. */
   entered_count?: number;
+  /** What the change does to the figures of the entity it touches. */
+  figure?: FigureChange;
 }
 
 /** One frame of the replay: a trace event and what it changes. */
@@ -202,15 +257,17 @@ export interface ReplayIndex {
 }
 
 /** The property that holds the entity of each program class. */
-const ENTITY_PROPERTY: Record<string, string> = {
-  Queue: "Queue",
-  Depart: "Queue",
-  Seize: "Facility",
-  Release: "Facility",
-  Preempt: "Facility",
-  Return: "Facility",
-  Enter: "Storage",
-  Leave: "Storage",
+const ENTITY_PROPERTY: Record<string, string[]> = {
+  Queue: ["Queue"],
+  Depart: ["Queue"],
+  Seize: ["Facility"],
+  Release: ["Facility"],
+  Preempt: ["Facility"],
+  Return: ["Facility"],
+  Enter: ["Storage"],
+  Leave: ["Storage"],
+  Link: ["Cadena", "Chain"],
+  Unlink: ["Cadena", "Chain"],
 };
 
 /** The details of a `wait` that are not an entity's name. */
@@ -225,6 +282,7 @@ export function emptyState(): ReplayState {
     storages: {},
     blocks: {},
     totals: {},
+    figures: emptyFigures(),
   };
 }
 
@@ -237,19 +295,25 @@ export function emptyState(): ReplayState {
  * engine resolved when it happens.
  */
 function declaredName(properties: Record<string, string>, className: string): string | null {
-  const property = ENTITY_PROPERTY[className];
-  if (property === undefined) {
+  const candidates = ENTITY_PROPERTY[className];
+  if (candidates === undefined) {
     return null;
   }
-  const raw = properties[property];
-  if (raw === undefined) {
-    return null;
+  for (const property of candidates) {
+    const raw = properties[property];
+    if (raw === undefined) {
+      continue;
+    }
+    const text = raw.trim();
+    // A name that is a parameter (`*caja`) or an expression (`[QCajas]`)
+    // is not a name: the entity it points at is only known at run time, and
+    // the trace is the one that says it.
+    if (text === "" || text.startsWith("*") || text.includes("[")) {
+      continue;
+    }
+    return text;
   }
-  const text = raw.trim();
-  if (text === "" || text.startsWith("*") || text.includes("[")) {
-    return null;
-  }
-  return text;
+  return null;
 }
 
 /**
@@ -314,6 +378,16 @@ export function buildIndex(
   const blocks: number[] = [];
   // The name the engine resolved when a transaction waited for an entity.
   const learned = new Map<number, string>();
+  // When every transaction entered each queue, to know how long it waited
+  // when it left it: the engine keeps the same map (`Queue::enqueued_at`).
+  const enqueuedAt = new Map<string, Map<number, number>>();
+  // And when every transaction joined each chain, in the order they joined:
+  // the engine takes the members out from the oldest, and the trace does not
+  // say which one it took out.
+  const chainMembers = new Map<string, number[]>();
+  // Who holds each facility right now, to know whether a preemption
+  // interrupts somebody.
+  const holders = new Map<string, number | null>();
   const seen = {
     queue: new Set<string>(),
     facility: new Set<string>(),
@@ -345,6 +419,10 @@ export function buildIndex(
         // A transaction that enters a queue block is enqueued there.
         if (event.event === "enter" && entity !== null) {
           change.queue = { name: entity, delta: 1 };
+          change.figure = { kind: "queue-enqueue", name: entity, time: event.time };
+          // The engine remembers when each transaction entered the queue:
+          // that is what the wait of its departure is measured from.
+          remember(enqueuedAt, entity, event.xact, event.time);
           if (!seen.queue.has(entity)) {
             seen.queue.add(entity);
             queues.push(entity);
@@ -355,6 +433,14 @@ export function buildIndex(
         // A transaction that enters a depart block leaves the queue.
         if (event.event === "enter" && entity !== null) {
           change.queue = { name: entity, delta: -1 };
+          const entered = recall(enqueuedAt, entity, event.xact, event.time);
+          change.figure = {
+            kind: "queue-dequeue",
+            name: entity,
+            time: event.time,
+            waited: event.time - entered,
+          };
+          forget(enqueuedAt, entity, event.xact);
           if (!seen.queue.has(entity)) {
             seen.queue.add(entity);
             queues.push(entity);
@@ -366,6 +452,13 @@ export function buildIndex(
         // transaction that could not take it waits instead.
         if (event.event === "leave" && entity !== null) {
           change.facility = { name: entity, owner: event.xact };
+          change.figure = {
+            kind: "facility-seize",
+            name: entity,
+            time: event.time,
+            xact: event.xact,
+          };
+          holders.set(entity, event.xact);
           if (!seen.facility.has(entity)) {
             seen.facility.add(entity);
             facilities.push(entity);
@@ -375,6 +468,8 @@ export function buildIndex(
       case "Release":
         if (event.event === "enter" && entity !== null) {
           change.facility = { name: entity, owner: null };
+          change.figure = { kind: "facility-release", name: entity, time: event.time };
+          holders.set(entity, null);
           if (!seen.facility.has(entity)) {
             seen.facility.add(entity);
             facilities.push(entity);
@@ -386,6 +481,17 @@ export function buildIndex(
         // it took it from takes it back when it returns.
         if (event.event === "enter" && entity !== null) {
           change.facility = { name: entity, owner: event.xact };
+          // The engine counts the interruption only when there was a holder
+          // to interrupt, and it restarts the clock of the facility.
+          const holder = holders.get(entity) ?? null;
+          change.figure = {
+            kind: "facility-preempt",
+            name: entity,
+            time: event.time,
+            xact: event.xact,
+            interrupted: holder !== null && holder !== event.xact,
+          };
+          holders.set(entity, event.xact);
           if (!seen.facility.has(entity)) {
             seen.facility.add(entity);
             facilities.push(entity);
@@ -397,6 +503,8 @@ export function buildIndex(
         // takes it back when it resumes (its seize block says so).
         if (event.event === "enter" && entity !== null) {
           change.facility = { name: entity, owner: null };
+          change.figure = { kind: "facility-release", name: entity, time: event.time };
+          holders.set(entity, null);
           if (!seen.facility.has(entity)) {
             seen.facility.add(entity);
             facilities.push(entity);
@@ -406,20 +514,63 @@ export function buildIndex(
       case "Enter":
         // A transaction that leaves an enter block took the units.
         if (event.event === "leave" && entity !== null) {
-          change.storage = { name: entity, delta: units.get(index) ?? 1 };
+          const taken = units.get(index) ?? 1;
+          change.storage = { name: entity, delta: taken };
+          change.figure = {
+            kind: "storage-enter",
+            name: entity,
+            time: event.time,
+            units: taken,
+          };
+          if (!seen.storage.has(entity)) {
+            seen.storage.add(entity);
+            storages.push(entity);
+          }
+        }
+        // A transaction that waits at an enter block did not get the units.
+        if (event.event === "wait" && entity !== null) {
+          change.figure = { kind: "storage-retry", name: entity };
+        }
+        break;
+      case "Leave":
+        if (event.event === "enter" && entity !== null) {
+          const given = units.get(index) ?? 1;
+          change.storage = { name: entity, delta: -given };
+          change.figure = {
+            kind: "storage-leave",
+            name: entity,
+            time: event.time,
+            units: given,
+          };
           if (!seen.storage.has(entity)) {
             seen.storage.add(entity);
             storages.push(entity);
           }
         }
         break;
-      case "Leave":
+      case "Link":
+        // A transaction that enters a link block joins the chain.
         if (event.event === "enter" && entity !== null) {
-          change.storage = { name: entity, delta: -(units.get(index) ?? 1) };
-          if (!seen.storage.has(entity)) {
-            seen.storage.add(entity);
-            storages.push(entity);
-          }
+          change.figure = {
+            kind: "chain-enter",
+            name: entity,
+            time: event.time,
+            xact: event.xact,
+          };
+          joined(chainMembers, entity, event.time);
+        }
+        break;
+      case "Unlink":
+        // A transaction that enters an unlink block leaves the chain.
+        if (event.event === "enter" && entity !== null) {
+          const linked = left(chainMembers, entity, event.time);
+          change.figure = {
+            kind: "chain-leave",
+            name: entity,
+            time: event.time,
+            xact: event.xact,
+            linked,
+          };
         }
         break;
       default:
@@ -518,7 +669,13 @@ export function applyFrame(state: ReplayState, frame: Frame): ReplayState {
   if (change.entered_count !== undefined) {
     totals = { ...totals, [change.entered_count]: (totals[change.entered_count] ?? 0) + 1 };
   }
-  return { time: frame.time, queues, facilities, storages, blocks, totals };
+  // The figures of the entities: the engine's own arithmetic, applied to the
+  // change the frame carries.
+  let figures = state.figures;
+  if (change.figure !== undefined) {
+    figures = applyChange(figures, change.figure);
+  }
+  return { time: frame.time, queues, facilities, storages, blocks, totals, figures };
 }
 
 /**
@@ -528,6 +685,82 @@ export function applyFrame(state: ReplayState, frame: Frame): ReplayState {
  * The state is a pure function of the prefix of the trace: the same prefix
  * always gives the same state.
  */
+/**
+ * Remember when a transaction entered an entity.
+ *
+ * The engine keeps a map per entity — `Queue::enqueued_at` and
+ * `Chain::linked_at` — and so does the replay: the wait of a transaction is
+ * the time between its entry and its departure.
+ */
+function remember(
+  map: Map<string, Map<number, number>>,
+  entity: string,
+  xact: number,
+  time: number,
+): void {
+  const entries = map.get(entity);
+  if (entries === undefined) {
+    map.set(entity, new Map([[xact, time]]));
+    return;
+  }
+  entries.set(xact, time);
+}
+
+/**
+ * When a transaction entered an entity.
+ *
+ * When the entry is not known, the instant itself is returned: the wait is
+ * then no time at all, which is what the engine counts when a transaction
+ * leaves something it never entered.
+ */
+function recall(
+  map: Map<string, Map<number, number>>,
+  entity: string,
+  xact: number,
+  fallback: number,
+): number {
+  return map.get(entity)?.get(xact) ?? fallback;
+}
+
+/** Forget that a transaction entered an entity: it left it. */
+function forget(
+  map: Map<string, Map<number, number>>,
+  entity: string,
+  xact: number,
+): void {
+  map.get(entity)?.delete(xact);
+}
+
+/**
+ * Remember that a transaction joined a chain.
+ *
+ * The engine keeps the members of a chain in the order they joined, and
+ * takes them out from the oldest: the trace says that a member left, and
+ * not which one, so the oldest is the one that leaves.
+ */
+function joined(map: Map<string, number[]>, entity: string, time: number): void {
+  const members = map.get(entity);
+  if (members === undefined) {
+    map.set(entity, [time]);
+    return;
+  }
+  members.push(time);
+}
+
+/**
+ * When the member that left a chain joined it.
+ *
+ * When the chain is not known, the instant itself is returned: the member
+ * was there for no time at all.
+ */
+function left(map: Map<string, number[]>, entity: string, fallback: number): number {
+  const members = map.get(entity);
+  if (members === undefined || members.length === 0) {
+    return fallback;
+  }
+  return members.shift() ?? fallback;
+}
+
 export function stateAt(index: ReplayIndex, upTo: number): ReplayState {
   const last = Math.min(upTo, index.frames.length - 1);
   let state = index.initial;
@@ -820,6 +1053,25 @@ export interface Fidelity {
   entryMismatches: number[];
   /** The generator blocks, which the engine counts apart. */
   generators: number;
+  /** Whether the live figures of every entity are the ones the report publishes. */
+  figures: boolean;
+  /** The entities whose live figures differ from the report's. */
+  figureMismatches: string[];
+}
+
+/**
+ * Whether two numbers are the same number.
+ *
+ * The figures are computed with the engine's arithmetic, in the same order,
+ * so they come out the same; a hair of tolerance keeps a rounding apart
+ * from a mistake.
+ */
+function sameNumber(derived: number, published: number | undefined): boolean {
+  if (published === undefined) {
+    return true;
+  }
+  const scale = Math.max(1, Math.abs(published));
+  return Math.abs(derived - published) <= scale * 1e-9;
 }
 
 /**
@@ -855,6 +1107,86 @@ export function checkFidelity(index: ReplayIndex, report: ReportDocumentLike): F
       entryMismatches.push(block.line - 1);
     }
   }
+  // The live figures, closed at the end of the run, against the report the
+  // engine published. This is the proof that the figures the app shows while
+  // the run is replayed are the engine's own numbers.
+  const figureMismatches: string[] = [];
+  const closed = closeFigures(final.figures, index.endTime);
+  for (const [name, queue] of Object.entries(report.entities.queues)) {
+    const derived = closed.queues[name];
+    if (derived === undefined) {
+      // The engine knows an entity the projection does not: that is a
+      // difference too, and the reader must not see a number that is not
+      // the run's.
+      if ((queue.entries ?? 0) > 0 || queue.content !== 0) {
+        figureMismatches.push(`cola ${name}`);
+      }
+      continue;
+    }
+    if (
+      derived.content !== queue.content ||
+      !sameNumber(derived.max, queue.max) ||
+      !sameNumber(derived.entries, queue.entries) ||
+      !sameNumber(derived.zeroEntries, queue.zero_entries) ||
+      !sameNumber(derived.totalTime, queue.total_time) ||
+      !sameNumber(derived.area, queue.area)
+    ) {
+      figureMismatches.push(`cola ${name}`);
+    }
+  }
+  for (const [name, facility] of Object.entries(report.entities.facilities ?? {})) {
+    const derived = closed.facilities[name];
+    if (derived === undefined) {
+      if (facility.entries > 0 || facility.busy_time > 0) {
+        figureMismatches.push(`facility ${name}`);
+      }
+      continue;
+    }
+    if (
+      derived.busy !== facility.busy ||
+      !sameNumber(derived.entries, facility.entries) ||
+      !sameNumber(derived.busyTime, facility.busy_time) ||
+      !sameNumber(derived.inter, facility.inter)
+    ) {
+      figureMismatches.push(`facility ${name}`);
+    }
+  }
+  for (const [name, storage] of Object.entries(report.entities.storages ?? {})) {
+    const derived = closed.storages[name];
+    if (derived === undefined) {
+      if (storage.entries > 0 || storage.area > 0) {
+        figureMismatches.push(`almacen ${name}`);
+      }
+      continue;
+    }
+    if (
+      derived.inUse !== storage.in_use ||
+      !sameNumber(derived.minUse, storage.min_use) ||
+      !sameNumber(derived.maxUse, storage.max_use) ||
+      !sameNumber(derived.entries, storage.entries) ||
+      !sameNumber(derived.area, storage.area)
+    ) {
+      figureMismatches.push(`almacen ${name}`);
+    }
+  }
+  for (const [name, chain] of Object.entries(report.entities.chains ?? {})) {
+    const derived = closed.chains[name];
+    if (derived === undefined) {
+      if (chain.entries > 0) {
+        figureMismatches.push(`cadena ${name}`);
+      }
+      continue;
+    }
+    if (
+      derived.content !== chain.content ||
+      !sameNumber(derived.max, chain.max) ||
+      !sameNumber(derived.entries, chain.entries) ||
+      !sameNumber(derived.totalTime, chain.total_time) ||
+      !sameNumber(derived.area, chain.area)
+    ) {
+      figureMismatches.push(`cadena ${name}`);
+    }
+  }
   return {
     queues: queueMismatches.length === 0,
     blocks: blockMismatches.length === 0,
@@ -862,6 +1194,7 @@ export function checkFidelity(index: ReplayIndex, report: ReportDocumentLike): F
     queueMismatches,
     blockMismatches,
     entryMismatches,
-    generators,
+    figures: figureMismatches.length === 0,
+    figureMismatches,    generators,
   };
 }

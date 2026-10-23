@@ -195,6 +195,22 @@ test("the replay of the reference model ends in the state the report publishes",
   assert.ok(fidelity.generators > 0, "the model has no generator");
 });
 
+test("the live figures of the run are the ones the engine publishes", { timeout: 300_000 }, () => {
+  const documentsOf = documents(model, 200_000);
+  const index = buildIndex(documentsOf.trace, documentsOf.report, documentsOf.model);
+  const fidelity = checkFidelity(index, documentsOf.report);
+
+  // The figures the app shows while the run is replayed are rebuilt from the
+  // trace with the engine's own arithmetic, so at the end of the run they
+  // have to be the report's numbers, and not an approximation of them.
+  assert.deepEqual(
+    fidelity.figureMismatches,
+    [],
+    "the live figures differ from the engine's own",
+  );
+  assert.ok(fidelity.figures, "the live figures are not the engine's");
+});
+
 test("the replay of a big trace is faithful and is built once", { timeout: 600_000 }, () => {
   const documentsOf = documents(bigModel, 200_000);
   assert.equal(documentsOf.trace.truncated, false, "the trace of the big model fits");

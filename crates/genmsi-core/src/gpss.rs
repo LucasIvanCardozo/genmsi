@@ -22,7 +22,7 @@
 //! - **The spelling of an expression.** A typed reference is written with a
 //!   `$` where the model writes a `:` (`P:Param` becomes `P$Param`).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::expr::ProgramExpr;
 use crate::program::{
@@ -227,80 +227,63 @@ fn unique(taken: &mut HashSet<String>, base: String) -> String {
 ///
 /// The original writes the program's blocks in the order the transaction
 /// walks them, so a transaction goes to the next block by itself and only the
-/// connections that break that order are written as a `TRANSFER`. The order
-/// is the one a walk of the graph gives, with the order of the model to break
-/// the ties, and the statements of a compound block stay together.
+/// connections that break that order are written as a `TRANSFER`.
+///
+/// The order is the one a walk of the flow gives: a **depth-first** walk
+/// that follows the outputs of every block in the order of its ports, and
+/// takes the branch of a port only after the whole branch of the port before
+/// it. The walk starts at the blocks nothing leads to (the sources of the
+/// flow), in the order of the model, and every block the walk does not reach
+/// (a cycle, or a branch nothing leads to) goes at the end, in the order of
+/// the model.
+///
+/// The original's own report of the model `TP10__tp10` shows the rule: the
+/// statements of the block `A_Assign4` come before the ones of `A_Scan`, the
+/// branch of the `A_Unlink` comes after the whole branch of the
+/// `A_RemoveTrans`, the `GENERATE` of the group `EsperaHastaAbrir` comes
+/// before the `A_Logic` it feeds, and the `A_ExamineNumber` and its two
+/// branches come where the flow reaches them, not at the top of the listing.
 fn flow_order(program: &Program) -> Vec<usize> {
-    // The modules, in the order of the model, with the range of blocks each
-    // one owns.
-    let mut modules: Vec<(u32, Vec<usize>)> = Vec::new();
-    for (index, block) in program.blocks.iter().enumerate() {
-        match modules.last_mut() {
-            Some((id, blocks)) if *id == block.module_id => blocks.push(index),
-            _ => modules.push((block.module_id, vec![index])),
-        }
-    }
-
-    // The walk: from a module to the ones its last statement leads to.
-    let module_of: HashMap<usize, usize> = modules
-        .iter()
-        .enumerate()
-        .flat_map(|(position, (_, blocks))| blocks.iter().map(move |index| (*index, position)))
-        .collect();
-    let mut successors: Vec<Vec<usize>> = vec![Vec::new(); modules.len()];
-    for (position, (_, blocks)) in modules.iter().enumerate() {
-        let Some(last) = blocks.last() else {
-            continue;
-        };
-        let block = &program.blocks[*last];
-        for target in block.next.iter().flatten() {
-            let Some(destination) = module_of.get(target).copied() else {
-                continue;
-            };
-            if destination != position && !successors[position].contains(&destination) {
-                successors[position].push(destination);
-            }
-        }
-    }
-
-    // The walk itself: a module goes when every module that leads to it has
-    // already gone, so the order is the one the transaction follows.
-    let mut predecessors = vec![0usize; modules.len()];
-    for successors_of in &successors {
-        for successor in successors_of {
-            predecessors[*successor] += 1;
-        }
-    }
-    let mut pending: Vec<usize> = (0..modules.len()).collect();
-    let mut visited = vec![false; modules.len()];
+    let mut visited = vec![false; program.blocks.len()];
     let mut order = Vec::with_capacity(program.blocks.len());
-    let mut follows: Vec<usize> = Vec::new();
-    while !pending.is_empty() {
-        // The module that continues the walk goes first; when the walk is
-        // broken, the order of the model breaks the tie.
-        let available = |candidate: usize| predecessors[candidate] == 0;
-        let chosen = pending
-            .iter()
-            .position(|candidate| available(*candidate) && follows.contains(candidate))
-            .or_else(|| pending.iter().position(|candidate| available(*candidate)));
-        let Some(position) = chosen else {
-            // A cycle: the remaining modules keep the order of the model.
-            break;
-        };
-        let position = pending.remove(position);
-        visited[position] = true;
-        order.extend(modules[position].1.iter().copied());
-        follows = successors[position].clone();
-        for successor in &successors[position] {
-            predecessors[*successor] -= 1;
-            if !visited[*successor] && !pending.contains(successor) {
-                pending.push(*successor);
-            }
+    // The stack of the walk: the blocks it still has to visit. The
+    // successors of a block are pushed the other way round, so the branch of
+    // the first port is the one the walk takes first.
+    let mut stack: Vec<usize> = Vec::new();
+    // The blocks nothing leads to: the walk starts there.
+    let mut incoming = vec![0usize; program.blocks.len()];
+    for block in &program.blocks {
+        for target in block.next.iter().flatten() {
+            incoming[*target] += 1;
         }
     }
-    for (position, (_, blocks)) in modules.iter().enumerate() {
-        if !visited[position] {
-            order.extend(blocks.iter().copied());
+    let mut roots: Vec<usize> = (0..program.blocks.len())
+        .filter(|index| incoming[*index] == 0)
+        .collect();
+    // The blocks the walk does not reach (a cycle) go at the end.
+    roots.extend(0..program.blocks.len());
+    for root in roots {
+        if visited[root] {
+            continue;
+        }
+        stack.push(root);
+        while let Some(index) = stack.pop() {
+            if visited[index] {
+                continue;
+            }
+            visited[index] = true;
+            order.push(index);
+            let targets: Vec<usize> = program.blocks[index]
+                .next
+                .iter()
+                .flatten()
+                .copied()
+                .collect();
+            for target in targets.into_iter().rev() {
+                if !visited[target] {
+                    stack.push(target);
+                }
+            }
         }
     }
     order
@@ -341,8 +324,22 @@ fn definitions(out: &mut String, defs: &Definitions) {
         );
     }
 
-    let mut tables: Vec<_> = defs.tables.iter().collect();
-    tables.sort_by(|a, b| a.0.cmp(b.0));
+    // The tables come in the order the model declares them: the listing of
+    // the original writes `TBL2`, `TBL1` and `TBL3` for a model that
+    // declares the tables in that order (the probe `tablas_tres`).
+    let mut tables: Vec<_> = defs
+        .table_order
+        .iter()
+        .filter_map(|name| defs.tables.get(name).map(|table| (name, table)))
+        .collect();
+    // A table the declaration order does not know goes at the end, sorted.
+    let mut missing: Vec<_> = defs
+        .tables
+        .iter()
+        .filter(|(name, _)| !defs.table_order.contains(name))
+        .collect();
+    missing.sort_by(|a, b| a.0.cmp(b.0));
+    tables.extend(missing);
     for (name, table) in tables {
         line(
             out,

@@ -912,6 +912,14 @@ pub struct Definitions {
     pub storages: HashMap<String, i64>,
     /// `Table` definitions.
     pub tables: HashMap<String, TableDef>,
+    /// The names of the `Table` definitions, in the order the model declares
+    /// them.
+    ///
+    /// The original writes the tables of its listing in the order the model
+    /// declares them, and the tables of its report the other way round: the
+    /// last one declared is the first one of the report
+    /// (`/tmp/all-oracle/` and the probe `tablas_tres`).
+    pub table_order: Vec<String>,
     /// `QTable` definitions.
     pub qtables: HashMap<String, QTableDef>,
     /// `InitiaSV` initial values.
@@ -2539,7 +2547,7 @@ impl Compiler<'_> {
                     let width = self.number(module, "TamFrecuencia").unwrap_or(1.0);
                     let intervals = self.number(module, "Cantidad").unwrap_or(1.0) as usize;
                     definitions.tables.insert(
-                        name,
+                        name.clone(),
                         TableDef {
                             attribute,
                             first,
@@ -2547,6 +2555,11 @@ impl Compiler<'_> {
                             intervals: intervals.max(1),
                         },
                     );
+                    if !definitions.table_order.contains(&name) {
+                        // The order the model declares the tables in is the
+                        // order the original writes them in.
+                        definitions.table_order.push(name);
+                    }
                 }
                 "QTable" => {
                     let name = self.require_name(module, "NombreTabla")?;

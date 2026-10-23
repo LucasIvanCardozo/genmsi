@@ -12,10 +12,10 @@ use std::path::{Path, PathBuf};
 use genmsi_core::{SimConfig, Simulation};
 
 /// Block-table rows start at column 29 (four numeric fields); the `LOC` field
-/// runs 14 columns from there and the `BLOCK_TYPE` cell follows. Labels longer
+/// runs 15 columns from there and the `BLOCK_TYPE` cell follows. Labels longer
 /// than the field overflow it (baseline `A_ExamineNumber`), so rows are parsed
 /// from the token stream instead of fixed offsets.
-const BLOCK_TABLE: usize = 29;
+const BLOCK_TABLE: usize = 28;
 
 /// GPSS mode letters the original prints in their own column between the
 /// block type and the operand list.

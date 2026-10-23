@@ -562,9 +562,14 @@ impl<'p> Simulation<'p> {
             .chain(self.diagnostics.iter())
             .cloned()
             .collect();
+        // The tables of the report come the other way round than the ones of
+        // the listing: the original writes the last table the model declares
+        // first (the probe `tablas_tres`, whose model declares `TBL2`, `TBL1`
+        // and `TBL3`, gives a report that starts with `TBL3` and goes on with
+        // `TBL1` and `TBL2`).
         let mut table_names: Vec<String> =
-            self.program.definitions.tables.keys().cloned().collect();
-        table_names.sort();
+            self.program.definitions.table_order.to_vec();
+        table_names.reverse();
         let mut qtable_names: Vec<String> =
             self.program.definitions.qtables.keys().cloned().collect();
         qtable_names.sort();

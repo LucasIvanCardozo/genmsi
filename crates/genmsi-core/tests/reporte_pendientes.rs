@@ -18,7 +18,12 @@ mod support;
 use support::{node, run, wired};
 
 /// The column where the `LOC` field of a row of the block table starts.
-const LOC_COLUMN: usize = 29;
+///
+/// The field is right-aligned in fifteen columns and ends at the column
+/// forty-three; a name that does not fit in it eats the space that separates
+/// it from the `RETRY` column, the way the original writes it (the row of
+/// the bench `MultifurcacionP` reads `0MultifurcacionP`).
+const LOC_COLUMN: usize = 28;
 
 /// The path of one bench model.
 fn bench(name: &str) -> PathBuf {

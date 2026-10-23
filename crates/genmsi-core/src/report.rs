@@ -108,14 +108,25 @@ pub fn render(result: &RunResult, program: &Program) -> String {
     let _ = writeln!(out, "         COUNT   COUNT   ");
     for row in table.rows.iter() {
         let stats = result.blocks.get(row.block).cloned().unwrap_or_default();
+        // The `LOC` column is a field of fifteen columns, right-aligned and
+        // starting right behind the `RETRY` one. A name that does not fit
+        // eats the space that separates it from the `RETRY` column, the way
+        // the original writes a field that overflows: the row of the
+        // `MultifurcacionP` reads `0MultifurcacionP` and not
+        // `0 MultifurcacionP` (`/tmp/all-oracle/MultifurcacionP.report.txt`).
+        let loc = if row.loc.chars().count() > 14 {
+            row.loc.clone()
+        } else {
+            format!(" {:>14}", row.loc)
+        };
         let _ = writeln!(
             out,
-            "{:>5} {:>8} {:>7} {:>5} {:>14}  {:<43}",
+            "{:>5} {:>8} {:>7} {:>5}{}  {:<43}",
             row.line,
             stats.entries,
             stats.current,
             stats.retries,
-            row.loc,
+            loc,
             row.text
         );
     }

@@ -380,7 +380,19 @@ static LISTED_OPTIONS: &[(&str, &[&str])] = &[
     // preempted owner goes on is to remove it or to keep it.
     ("PriorityMode", &["Prioridad", "Incondicional"]),
     ("RemoveMode", &["Remover", "NoRemover"]),
-    ("entitySNAclass", &["Q", "S", "R"]),
+    // The original's `entitySNAclass` list (`gmacroconfig.gmcfg`) has 38
+    // classes: each one names an attribute of an entity (the content of a
+    // queue, the units in use of a storage, the average time of a chain...)
+    // and the `SELECT` statement carries the class as its last operand. The
+    // original accepts every one of them.
+    (
+        "entitySNAclass",
+        &[
+            "SR", "FR", "CH", "CC", "CA", "QZ", "GN", "W", "N", "SC", "FC", "GT", "QC", "CM", "QM",
+            "SM", "QA", "SA", "MP", "FV", "LR", "LS", "RN", "S", "F", "Q", "R", "BV", "FN", "V",
+            "SV", "FT", "QT", "QX", "CT", "ST", "X", "P",
+        ],
+    ),
 ];
 
 /// Options of a `Listed` property by its subtype; empty for an unknown

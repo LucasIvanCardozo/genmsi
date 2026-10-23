@@ -486,6 +486,10 @@ pub enum SelectState {
     StorageFull,
     /// A storage that is not full (`SNF`).
     StorageNotFull,
+    /// A storage that is empty (`SE`).
+    StorageEmpty,
+    /// A storage that is not empty (`SNE`).
+    StorageNotEmpty,
     /// An entity whose value equals the compared one (`E`).
     EntityEqual,
 }
@@ -501,11 +505,41 @@ pub enum SelectMode {
     FirstFree,
 }
 
+/// The entity a `SELECT` walks.
+///
+/// The original's `entitySNAclass` list has 38 classes, and each one names an
+/// attribute of an entity: the content of a queue, the units in use of a
+/// storage, the busy flag of a facility, the average time of a chain... The
+/// engine walks the queues, the storages, the facilities and the logic
+/// switches; the other families (the chains, the groups, the labels, the
+/// parameters, the savevalues, the variables, the functions and the random
+/// seeds) are named and written, but the engine does not walk them yet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelectEntity {
+    /// A queue (`Q`, `QA`, `QC`, `QM`, `QT`, `QX`, `QZ`).
+    Queue,
+    /// A storage and the units in use in it (`S`, `SA`, `SC`, `SM`, `SR`,
+    /// `ST`, `SV`).
+    Storage,
+    /// A storage and the units left in it (`R`).
+    StorageRemaining,
+    /// A facility (`F`, `FC`, `FT`, `FV`, `FR`).
+    Facility,
+    /// A logic switch (`LS`, `LR`).
+    LogicSwitch,
+    /// A class of a family the engine does not walk yet.
+    Other,
+}
+
 /// `SELECT` / `SELECTF` specification.
 #[derive(Debug, Clone)]
 pub struct SelectSpec {
-    /// Entity class scanned (`Q`, `S`, `R`).
-    pub kind: RefKind,
+    /// Entity the selection walks.
+    pub entity: SelectEntity,
+    /// Class of the entity, as the original's `entitySNAclass` list names it
+    /// (`Q`, `S`, `R`, `F`, ...): the statement carries it as its last
+    /// operand.
+    pub class: String,
     /// Parameter receiving the chosen entity number.
     pub parameter: String,
     /// First entity number.
@@ -1821,26 +1855,29 @@ impl Compiler<'_> {
                 } else {
                     SelectMode::Min
                 };
-                let kind = match class {
-                    "SelectF" => RefKind::Facility,
-                    "SelectS" => RefKind::Storage,
-                    "SelectL" => RefKind::LogicSwitch,
-                    _ => match module
-                        .prop_value("ClaseSNA")
-                        .unwrap_or_else(|| "Q".to_string())
-                        .trim()
-                    {
-                        "Q" => RefKind::Queue,
-                        "S" => RefKind::Storage,
-                        "R" => RefKind::Facility,
-                        other => {
-                            return Err(EngineError::invalid_block(
+                let (entity, entity_class) = match class {
+                    // The three classes that pick an entity of a kind say
+                    // which one they pick.
+                    "SelectF" => (SelectEntity::Facility, "F".to_string()),
+                    "SelectS" => (SelectEntity::Storage, "S".to_string()),
+                    "SelectL" => (SelectEntity::LogicSwitch, "LS".to_string()),
+                    // The `Select` and the `SelectSNA` classes take it from
+                    // the `ClaseSNA` property, whose options are the 38
+                    // classes of the original's `entitySNAclass` list.
+                    _ => {
+                        let letter = module
+                            .prop_value("ClaseSNA")
+                            .unwrap_or_else(|| "Q".to_string());
+                        let letter = letter.trim().to_string();
+                        let entity = select_entity(&letter).ok_or_else(|| {
+                            EngineError::invalid_block(
                                 node,
                                 class,
-                                format!("unsupported SELECT entity class {other:?}"),
-                            ));
-                        }
-                    },
+                                format!("unsupported SELECT entity class {letter:?}"),
+                            )
+                        })?;
+                        (entity, letter)
+                    }
                 };
                 let parameter = self.require_name(module, "Param")?;
                 let low = self
@@ -1872,7 +1909,8 @@ impl Compiler<'_> {
                 };
                 Ok(Some(push!(
                     BlockKind::Select(SelectSpec {
-                        kind,
+                        entity,
+                        class: entity_class,
                         parameter,
                         low,
                         high,
@@ -2833,15 +2871,45 @@ impl Compiler<'_> {
     }
 }
 
+/// The entity a class of the original's `entitySNAclass` list belongs to.
+///
+/// The list has 38 classes, and each one names an attribute of an entity: the
+/// content of a queue, the units in use of a storage, the busy flag of a
+/// facility, the size of a chain... The engine walks the queues, the
+/// storages, the facilities and the logic switches; the other families (the
+/// chains, the groups, the labels, the parameters, the savevalues, the
+/// variables, the functions and the random seeds) are named and written, but
+/// the engine does not walk them yet.
+fn select_entity(class: &str) -> Option<SelectEntity> {
+    Some(match class {
+        // The queues.
+        "Q" | "QA" | "QC" | "QM" | "QT" | "QX" | "QZ" => SelectEntity::Queue,
+        // The storages: `S` is the units in use and `R` the units left.
+        "S" | "SA" | "SC" | "SM" | "SR" | "ST" | "SV" => SelectEntity::Storage,
+        "R" => SelectEntity::StorageRemaining,
+        // The facilities.
+        "F" | "FC" | "FT" | "FV" | "FR" => SelectEntity::Facility,
+        // The logic switches.
+        "LS" | "LR" => SelectEntity::LogicSwitch,
+        // The chains, the groups, the labels, the parameters, the savevalues,
+        // the variables, the functions and the random seeds.
+        "CH" | "CC" | "CA" | "CM" | "CT" | "GN" | "GT" | "W" | "N" | "MP" | "P" | "X" | "BV"
+        | "V" | "FN" | "RN" => SelectEntity::Other,
+        _ => return None,
+    })
+}
+
 /// The state a storage is selected by.
 ///
-/// The `op_Logic_Stor` list of the original offers four states, and the
-/// GPSS operator of each is the one its code names: `SF` a full storage,
-/// `SNF` one that is not full, `SE` an empty one and `SNE` one that is not.
+/// The `op_Logic_Stor` list of the original offers six states, and the GPSS
+/// operator of each is the one its code names: `SF` a full storage, `SNF` one
+/// that is not full, `SE` an empty one, `SNE` one that is not empty, `SV` one
+/// that is available and `SNV` one that is not.
 fn storage_state(op: &str) -> SelectState {
     match op.trim() {
         "Lleno" | "Llena" => SelectState::StorageFull,
-        "Vacio" | "Vacia" => SelectState::StorageNotFull,
+        "Vacio" | "Vacia" => SelectState::StorageEmpty,
+        "NoVacio" | "NoVacia" => SelectState::StorageNotEmpty,
         _ => SelectState::StorageNotFull,
     }
 }

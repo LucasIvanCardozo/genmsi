@@ -137,7 +137,11 @@ text in entity-name positions.
 - **SELECT / SELECTF**: `SELECT MIN|MAX` picks the entity number in `[minimo,
   maximo]` with the smallest/largest metric (queue content, storage occupancy);
   `SELECTF` (`op="Libre"`, GPSS `NU`) picks the first entity that is actually
-  free. Facilities and queues are auto-created by number, as GPSS does.
+  free. Facilities and queues are auto-created by number, as GPSS does. The
+  class of the entity is the `ClaseSNA` property, and the original's list of
+  classes has 38 of them (`Q` queue, `S` storage, `R` storage left, `F`
+  facility, `LS` logic switch...): the statement carries the class as its
+  last operand (`SELECT MIN param,1,10,,F`).
 - **GATE**: pass goes to `Salida1`; a failure goes to `Salida2` when it is
   connected, otherwise the transaction waits in the block and every state change
   retries the waiters (the original reports these as RETRY counts).
@@ -352,7 +356,8 @@ alterado>,<valor>,<parámetro comparado>,<valor>`; `REMOVE E <grupo>,<cantidad>
 `UNLINK E <cadena>,<bloque que recibe>,<cantidad>,<comparado>,<valor>`;
 `SELECT <modo> <parámetro>,<mínimo>,<máximo>,,<clase>`; `LINK <cadena>,<modo>
 ,<bloque que sigue>`; `LOGIC <S|R> <interruptor>`; `GATE <condición> <entidad>`;
-`LOOP <parámetro>,`; `JOIN <grupo>[,<número>]`; `EXAMINE <grupo>,<número>,`;
+`LOOP <parámetro>,`; `JOIN <grupo>[,<número>]`; `EXAMINE <grupo>,<número>,
+<destino>`;
 `ASSEMBLE`/`GATHER <cantidad>`; `SPLIT <total>`; `TABULATE <tabla>`;
 `TEST E <izquierda>,<derecha>`; `SAVEVALUE <nombre><operador>,<valor>`;
 `ASSIGN <parámetro><operador>,<valor>`.
@@ -362,7 +367,9 @@ savevalue and copies it to a parameter (`SAVEVALUE Count+,1` and
 `ASSIGN Nro,X$Count`). The match writes the transfer to its conjugate before
 the match itself (`A_Match TRANSFER ,AAA` and `AAA MATCH AAA`), and the report
 lists the two statements: the entries are in the transfer and the transactions
-that wait are in both.
+that wait are in both. The counter's two statements are two rows of the block
+table too, and the header counts the rows: the report of the counter says six
+blocks where the model has five.
 
 **The definitions come first.** The storages, the queue tables, the tables,
 the functions, the variables and the initial values, and then the blocks. The

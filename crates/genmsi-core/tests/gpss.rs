@@ -157,8 +157,11 @@ fn the_blocks_write_the_operands_of_their_class() {
         ("Alter", "A_Alter ALTER E ungrupo,1,param,0,otro,1"),
         ("Assemble", "A_Assemble ASSEMBLE 1"),
         ("Gather", "A_Gather GATHER 1"),
-        ("ExamineNumber", "A_ExamineNumber EXAMINE UnGrupo,0,"),
-        ("Examine", "A_Examine EXAMINE UnGrupo,,"),
+        // The `EXAMINE` carries the block the transaction goes to when it is
+        // not in the group: the original writes it
+        // (`EXAMINE UnGrupo,,A_Terminate1`) and refuses the model without it.
+        ("ExamineNumber", "A_ExamineNumber EXAMINE UnGrupo,0,A_Terminate1"),
+        ("Examine", "A_Examine EXAMINE UnGrupo,,A_Terminate1"),
         ("GateM", "GateM GATE M AAA"),
         ("JoinMe", "A_JoinMe JOIN UnGrupo"),
         ("JoinNumber", "A_JoinNumber JOIN UnGrupo,0"),

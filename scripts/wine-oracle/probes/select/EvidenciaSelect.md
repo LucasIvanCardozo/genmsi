@@ -98,6 +98,66 @@ original con la salida de fallo (`Salida2`, "No selec") **sin** conectar y
 Los modelos son `sels_<op>.gmdl` (con la salida conectada) y
 `sels_<op>_libre.gmdl` (sin ella).
 
+## El destino de la salida de fallo de las otras clases de la familia
+
+Las sondas `select_<clase>_dest.gmdl` (una por clase de la familia, con la
+salida de fallo conectada) miden lo que el original escribe en el listado
+cuando tiene un destino que escribir. Las tres:
+
+| Clase | Lo que escribe el original |
+|---|---|
+| `SelectF` | `SELECT NU param,1,10,,,A_Terminate1` |
+| `SelectL` | `SELECT LS param,1,10,,,A_Terminate1` |
+| `SelectSNA` | `SELECT E param,1,10,*1,Q,A_Terminate1` |
+
+La clase `SelectSNA` es la excepción: su campo de destino es propio y lo
+escribe siempre, aunque esté vacío (`SELECT E param,1,10,*1,Q,` es lo que
+escribe el banco del oráculo cuando la salida de fallo no está conectada).
+La clase `Select` (la del `MIN` y el `MAX`) no tiene salida de fallo: su
+sentencia es `SELECT MIN param,1,10,,Q` y no lleva destino.
+
+## El `EXAMINE` sin destino
+
+La sonda `examine_sin_destino.gmdl` (el `Examine` con la salida de fallo sin
+conectar) no deja listing: el original se niega a abrir el modelo y dice
+
+```
+Error en linea     1 -> Faltan parámetros
+```
+
+Con la salida conectada (`examine_probe.gmdl`) el modelo corre y el listado
+es `A_Examine EXAMINE UnGrupo,,A_Terminate1`.
+
+## La disponibilidad de un almacén (los operadores `SV` y `SNV`)
+
+La selección deja en un parámetro el número de la entidad que eligió (y un
+cero cuando no eligió ninguna, según el manual: "Si la entidad no es
+encontrada, 0 es colocado en el parámetro de la transacción activa"). Las
+sondas `par_<op>_<estado>.gmdl` leen ese parámetro con un `TEST` y dicen
+cuántas transacciones lo encontraron.
+
+El modelo declara el almacén `1` (el `SELECT` camina las entidades cuyo
+número cae en el rango de la sentencia, `1,10`, así que un almacén llamado
+`Almacen` nunca está en él) y lo pone en uno de tres estados: vacío, con una
+unidad dentro, o lleno.
+
+| Sonda | `op` | Estado del almacén | Lo encontró | No lo encontró |
+|---|---|---|---|---|
+| `par_se_vacio` | `Vacio` | vacío | 59 | 0 |
+| `par_se_uno` | `Vacio` | una unidad | 0 | 120 |
+| `par_sv_vacio` | `Disponible` | vacío | 55 | 0 |
+| `par_sv_uno` | `Disponible` | una unidad | 114 | 0 |
+| `par_snv_vacio` | `NoDisponible` | vacío | 0 | 57 |
+| `par_snv_lleno` | `NoDisponible` | lleno | 0 | 120 |
+
+La regla que queda: el `SV` elige el almacén y el `SNV` no elige ninguno.
+Es la que dice el manual del simulador (`VISUALSIS.HLP`): "El storage tiene
+que estar disponible para que sea seleccionado" y "El storage no tiene que
+estar disponible para que sea seleccionado". El estado de "disponible" es
+una bandera del almacén que sólo cambian las sentencias `SAVAIL` y
+`SUNAVAIL` (la biblioteca de clases del original no tiene ninguna de las
+dos), así que un almacén de un modelo del editor siempre está disponible.
+
 ## El `EXAMINE`
 
 Con la salida de fallo conectada a un terminador, el original escribe:
@@ -125,3 +185,8 @@ Lo que **no** coincide, y queda anotado en `odd/tasks/notas-gpss-forma.md`
   no;
 - los operadores `SV` y `SNV` de la lista `op_Logic_Stor`: el original los
   escribe y el catálogo del editor no los ofrece.
+
+Las dos cosas están arregladas en `odd/tasks/notas-destinos.md` (rama
+`feature/destinos-y-operadores`): el listado escribe el destino de la salida
+de fallo de las cuatro clases de la familia y los seis operadores de
+`op_Logic_Stor` están en el catálogo del editor.

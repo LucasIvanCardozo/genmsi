@@ -194,8 +194,178 @@ def select_s(op_text: str, connect_failure: bool) -> str:
     return mb.render(blocks, links)
 
 
-def examine_probe() -> str:
-    """One model: Generate -> Examine -> Terminate, Salida2 -> Terminate1."""
+def select_dest(cls_name: str, values: dict[str, str]) -> str:
+    """One model: Generate -> SelectX -> Terminate, Salida2 -> Terminate1.
+
+    The failure output (`Salida2`, "No selec") of the classes of the family
+    is connected, which is what makes the original write it in the listing.
+    """
+    cls = clone(CLASSES[cls_name], **values)
+    blocks = []
+    links = []
+    ids = {}
+    names = ["Generate", "Select", "Terminate", "Terminate1"]
+    for index, module_name in enumerate(names):
+        if module_name == "Select":
+            definition = cls
+        elif module_name == "Generate":
+            definition = CLASSES["Generate"]
+        else:
+            definition = CLASSES["Terminate"]
+        moduleid = index + 1
+        ids[module_name] = moduleid
+        label = "A_" + module_name
+        inputs = [(i + 1, p.name, p.caption, label) for i, p in enumerate(definition.inputs)]
+        blocks.append(mb.Block(moduleid, definition, module_name, module_name, 120, 40 + 100 * index, inputs, []))
+    blocks[ids["Generate"] - 1].outputs = [
+        (1, p.name, p.caption, "A_Select") for p in CLASSES["Generate"].outputs
+    ]
+    blocks[ids["Select"] - 1].outputs = [
+        (2, "Salida1", "", "A_Terminate"),
+        (3, "Salida2", "No selec", "A_Terminate1"),
+    ]
+    links.append((ids["Generate"], 1, ids["Select"], 1))
+    links.append((ids["Select"], 2, ids["Terminate"], 1))
+    links.append((ids["Select"], 3, ids["Terminate1"], 1))
+    blocks.append(mb.Block(len(blocks) + 1, CLASSES["Clock"], "Clock", "Clock", 420, 40, [], []))
+    return mb.render(blocks, links)
+
+
+def select_s_storage(
+    ops: list[str], capacity: int, filler: int, storage: str = "Almacen"
+) -> str:
+    """One model: a declared storage in one state and the `SelectS` of each
+    operator, with the failure output connected.
+
+    The storage is declared (`StorageDef`) because the original does not run
+    a `SelectS` that asks for a storage nobody declared.  `filler` is the
+    number of units a flow puts into it and keeps there: 0 leaves it empty,
+    1 leaves one unit in it.  `storage` is the name of the storage: the
+    `SELECT` walks the entities whose number falls in the range of the
+    statement, so a storage named `1` is the one the range `1,10` covers.
+    """
+    blocks = []
+    links = []
+    next_id = 1
+    y = 40
+
+    blocks.append(
+        mb.Block(next_id, clone(CLASSES["StorageDef"], Storage=storage, Tamaño=str(capacity)), "StorageDef", "StorageDef", 120, y, [], [])
+    )
+    next_id += 1
+
+    if filler > 0:
+        # A flow that enters one unit and never leaves it: the storage holds
+        # one unit from the first arrival on.
+        blocks.append(
+            mb.Block(next_id, clone(CLASSES["Generate"], Cantidad="1", Media="10"), "Generate", "Generate", 120, y, [], [(1, "Salida1", "", "A_Enter")])
+        )
+        links.append((next_id, 1, next_id + 1, 1))
+        next_id += 1
+        blocks.append(
+            mb.Block(next_id, clone(CLASSES["Enter"], Cantidad="1", Storage=storage), "Enter", "Enter", 120, y, [(1, "Entrada1", "Ingreso", "A_Enter")], [])
+        )
+        next_id += 1
+
+    for index, op in enumerate(ops):
+        name = f"SelectS{index}"
+        blocks.append(
+            mb.Block(next_id, clone(CLASSES["Generate"], Media="60"), f"Generate{index}", "Generate", 120, y, [], [(1, "Salida1", "", f"A_{name}")])
+        )
+        links.append((next_id, 1, next_id + 1, 1))
+        next_id += 1
+        select_id = next_id
+        blocks.append(
+            mb.Block(next_id, clone(CLASSES["SelectS"], op=op), name, "SelectS", 120, y, [(1, "Entrada1", "Ingreso", f"A_{name}")], [])
+        )
+        next_id += 1
+        # The two outputs of the `SelectS`: the one it selects by and the one
+        # it fails by ("No selec").  Each one gets a terminator of its own.
+        terms = []
+        for port in (2, 3):
+            number = index * 2 + port - 1
+            term_name = "Terminate" if number == 1 else f"Terminate{number}"
+            blocks.append(
+                mb.Block(next_id, CLASSES["Terminate"], term_name, "Terminate", 120, y, [(1, "Entrada1", "Ingreso", f"A_{term_name}")], [])
+            )
+            links.append((select_id, port, next_id, 1))
+            terms.append(f"A_{term_name}")
+            next_id += 1
+        blocks[select_id - 1].outputs = [
+            (2, "Salida1", "", terms[0]),
+            (3, "Salida2", "No selec", terms[1]),
+        ]
+
+    blocks.append(mb.Block(next_id, CLASSES["Clock"], "Clock", "Clock", 420, 40, [], []))
+    return mb.render(blocks, links)
+
+
+def select_s_parameter(op_text: str, capacity: int, filler: int, storage: str = "1") -> str:
+    """One model that says whether the selection found an entity.
+
+    The `SelectS` writes the number of the entity it chose in a parameter,
+    and the manual says what it writes when it finds none: "Si la entidad
+    no es encontrada, 0 es colocado en el parámetro de la transacción
+    activa".  A `Test` after the selection compares that parameter with one,
+    so the report says how many transactions found an entity and how many
+    did not.
+    """
+    blocks = []
+    links = []
+    next_id = 1
+    y = 40
+
+    blocks.append(
+        mb.Block(next_id, clone(CLASSES["StorageDef"], Storage=storage, Tamaño=str(capacity)), "StorageDef", "StorageDef", 120, y, [], [])
+    )
+    next_id += 1
+
+    if filler > 0:
+        blocks.append(
+            mb.Block(next_id, clone(CLASSES["Generate"], Cantidad="1", Media="10"), "Generate", "Generate", 120, y, [], [(1, "Salida1", "", "A_Enter")])
+        )
+        links.append((next_id, 1, next_id + 1, 1))
+        next_id += 1
+        blocks.append(
+            mb.Block(next_id, clone(CLASSES["Enter"], Cantidad="1", Storage=storage), "Enter", "Enter", 120, y, [(1, "Entrada1", "Ingreso", "A_Enter")], [])
+        )
+        next_id += 1
+
+    blocks.append(
+        mb.Block(next_id, clone(CLASSES["Generate"], Media="60"), "Generate", "Generate", 120, y, [], [(1, "Salida1", "", "A_SelectS")])
+    )
+    links.append((next_id, 1, next_id + 1, 1))
+    next_id += 1
+    blocks.append(
+        mb.Block(next_id, clone(CLASSES["SelectS"], op=op_text, Param="ParamSel"), "SelectS", "SelectS", 120, y, [(1, "Entrada1", "Ingreso", "A_SelectS")], [(2, "Salida1", "", "A_Test"), (3, "Salida2", "No selec", "")])
+    )
+    links.append((next_id, 2, next_id + 1, 1))
+    next_id += 1
+    blocks.append(
+        mb.Block(next_id, clone(CLASSES["Test"], **{"1_Valor": "P:ParamSel", "2_OP": "=", "3_Valor": "1"}), "Test", "Test", 120, y, [(1, "Entrada1", "Entrada1", "A_Test")], [])
+    )
+    test_id = next_id
+    next_id += 1
+    for port, term_name in ((2, "Terminate"), (3, "Terminate1")):
+        blocks.append(
+            mb.Block(next_id, CLASSES["Terminate"], term_name, "Terminate", 120, y, [(1, "Entrada1", "Ingreso", f"A_{term_name}")], [])
+        )
+        links.append((test_id, port, next_id, 1))
+        next_id += 1
+    blocks[test_id - 1].outputs = [
+        (2, "Salida1", "Verdadero", "A_Terminate"),
+        (3, "Salida2", "Falso", "A_Terminate1"),
+    ]
+    blocks.append(mb.Block(next_id, CLASSES["Clock"], "Clock", "Clock", 420, 40, [], []))
+    return mb.render(blocks, links)
+
+
+def examine_probe(connect_failure: bool = True) -> str:
+    """One model: Generate -> Examine -> Terminate, Salida2 -> Terminate1.
+
+    With `connect_failure` false the failure output of the `Examine` stays
+    unconnected, which is what makes the original refuse the model.
+    """
     specs = [
         ("Generate", "Generate", {}),
         ("Examine", "Examine", {}),
@@ -215,14 +385,15 @@ def examine_probe() -> str:
     # Generate -> Examine, Examine -> Terminate, Examine -> Terminate1.
     links.append((ids["Generate"], 1, ids["Examine"], 1))
     links.append((ids["Examine"], 2, ids["Terminate"], 1))
-    links.append((ids["Examine"], 3, ids["Terminate1"], 1))
     blocks[ids["Generate"] - 1].outputs = [
         (1, p.name, p.caption, "A_Examine") for p in CLASSES["Generate"].outputs
     ]
     blocks[ids["Examine"] - 1].outputs = [
         (2, "Salida1", "En [Grupo]", "A_Terminate"),
-        (3, "Salida2", "No en [Grupo]", "A_Terminate1"),
+        (3, "Salida2", "No en [Grupo]", "A_Terminate1" if connect_failure else ""),
     ]
+    if connect_failure:
+        links.append((ids["Examine"], 3, ids["Terminate1"], 1))
     blocks.append(mb.Block(len(blocks) + 1, CLASSES["Clock"], "Clock", "Clock", 420, 40, [], []))
     return mb.render(blocks, links)
 
@@ -277,6 +448,49 @@ def main() -> None:
     path = out / "examine_probe.gmdl"
     path.write_bytes(examine_probe().encode("utf-8"))
     print(f"wrote {path}")
+
+    path = out / "examine_sin_destino.gmdl"
+    path.write_bytes(examine_probe(connect_failure=False).encode("utf-8"))
+    print(f"wrote {path}  (the failure output of the Examine is unconnected)")
+
+    # The failure output of the other classes of the family, connected: what
+    # the original writes in the listing when it has a destination to write.
+    for cls_name, values in (
+        ("SelectF", {"op": "Libre", "Param": "param", "minimo": "1", "maximo": "10"}),
+        ("SelectL", {"op": "Set", "Param": "param", "minimo": "1", "maximo": "10"}),
+        ("SelectSNA", {"op": "=", "Param": "param", "minimo": "1", "maximo": "10", "valorComp": "*1", "ClaseSNA": "Q"}),
+    ):
+        path = out / f"select_{cls_name.lower()}_dest.gmdl"
+        path.write_bytes(select_dest(cls_name, values).encode("utf-8"))
+        print(f"wrote {path}  ({cls_name}, Salida2 connected)")
+
+    # The `Disponible` and the `NoDisponible` of a storage: the storage is
+    # declared and in one of three states (empty, one unit in it, full).
+    for state, capacity, filler in (
+        ("vacio", 10, 0),
+        ("uno", 10, 1),
+        ("lleno", 1, 1),
+    ):
+        path = out / f"sels_sv_{state}.gmdl"
+        path.write_bytes(
+            select_s_storage(["Disponible", "NoDisponible"], capacity, filler).encode("utf-8")
+        )
+        print(f"wrote {path}  (storage {state})")
+
+    # The same, with the storage named `1`: the `SELECT` walks the entities
+    # whose number falls in the range of the statement (`1,10`), so a storage
+    # named `Almacen` is never in it.
+    for key, text in (("sv", "Disponible"), ("snv", "NoDisponible")):
+        for state, capacity, filler in (
+            ("vacio", 10, 0),
+            ("uno", 10, 1),
+            ("lleno", 1, 1),
+        ):
+            path = out / f"sels_{key}_num_{state}.gmdl"
+            path.write_bytes(
+                select_s_storage([text], capacity, filler, storage="1").encode("utf-8")
+            )
+            print(f"wrote {path}  (op {text}, storage 1 {state})")
 
 
 if __name__ == "__main__":

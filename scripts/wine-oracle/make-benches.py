@@ -171,14 +171,15 @@ EXTRA_PROPS: dict[str, list[tuple[str, str, str, str, str, str]]] = {
         ("Prob4", "FloatPercent", "", "1", "0", "20%"),
         ("Prob5", "FloatPercent", "", "1", "0", "20%"),
     ],
+    # The `MultifurcacionP` routes by the value of a parameter, not by
+    # probabilities: its class definition has no `Prob` properties, and a
+    # model that carries them is "adapted" by the original when it opens it
+    # ("uno o mas de los modulos utilizados dentro de este fueron adaptados
+    # a las definiciones de clases existentes en este sistema"), and the
+    # dialog that says so stops the oracle from reading the answer.
     "MultifurcacionP": [
         ("MultifurcacionGO", "EntityDef", "Function", "0", "1", "MultifurcacionGO"),
         ("Parametro", "EntityUse", "Parameter", "1", "0", "Param"),
-        ("Prob1", "FloatPercent", "", "1", "0", "20%"),
-        ("Prob2", "FloatPercent", "", "1", "0", "20%"),
-        ("Prob3", "FloatPercent", "", "1", "0", "20%"),
-        ("Prob4", "FloatPercent", "", "1", "0", "20%"),
-        ("Prob5", "FloatPercent", "", "1", "0", "20%"),
     ],
 }
 
@@ -214,6 +215,8 @@ EXTRA_OUTPUTS: dict[str, list[str]] = {
 # `StorageUse` carries the declaration of its storage.
 DECLARATIONS: dict[str, list[str]] = {
     "StorageUse": ["StorageDef"],
+    "Enter": ["StorageDef"],
+    "Leave": ["StorageDef"],
 }
 
 # The original refuses to end a transaction that owns a facility, and refuses
@@ -224,6 +227,14 @@ COMPANIONS_BEFORE: dict[str, list[str]] = {
     "Return": ["Seize"],
     # The gate waits for a label: only a `Match` block can create one.
     "GateM": ["Match"],
+    # A `DEPART` of a queue that nobody filled is an error in the original
+    # ("Contenido de la cola QRECURSO negativo"): the queue has to exist and
+    # to have a transaction in it, so the bench enqueues one first.
+    "Depart": ["Queue"],
+    # A `LEAVE` of a storage that nobody entered is an error in the original
+    # ("Se liberaron más unidades de storage que la capacidad máxima"): the
+    # units have to be there to be released, so the bench enters first.
+    "Leave": ["Enter"],
 }
 
 COMPANIONS_AFTER: dict[str, list[str]] = {
@@ -552,9 +563,38 @@ def declaration_class(decl: ClassDef, used: ClassDef) -> ClassDef:
     `Almacen`, so the declaration has to declare `Almacen` and not the
     default of the declaration class.
     """
-    copy = ClassDef(decl.name, decl.width, decl.height)
+    return copy_with_values(decl, used)
+
+
+def companion_class(companion: ClassDef, used: ClassDef) -> ClassDef:
+    """A copy of the block that has to come with the class.
+
+    The companion works on the same entity the class works on: the `Queue`
+    that comes before a `Depart` has to be the queue the `Depart` names
+    (`Qrecurso`), not the one its own default says (`QRecurso`), or the
+    transaction leaves a queue nobody filled.
+    """
+    return copy_with_values(companion, used)
+
+
+def copy_port(port: Port) -> Port:
+    """A copy of a port, with the label its macro gives it."""
+    copied = Port(port.name, port.caption)
+    copied.label_token = port.label_token
+    return copied
+
+
+def copy_with_values(definition: ClassDef, used: ClassDef) -> ClassDef:
+    """A copy of a class with the values the class under test uses.
+
+    The properties that both classes have take the value of the class under
+    test; the others keep the default of their own class.
+    """
+    copy = ClassDef(definition.name, definition.width, definition.height)
+    copy.inputs = [copy_port(port) for port in definition.inputs]
+    copy.outputs = [copy_port(port) for port in definition.outputs]
     values = {prop.name: prop.value for prop in used.props}
-    for prop in decl.props:
+    for prop in definition.props:
         copy.props.append(
             Prop(
                 prop.name,
@@ -612,10 +652,10 @@ def build_bench(cls: ClassDef, classes: dict[str, ClassDef]) -> tuple[str, list[
     if cls.inputs and cls.name != "Generate":
         chain.append(("Generate", classes["Generate"], "Generate"))
     for companion in COMPANIONS_BEFORE.get(cls.name, []):
-        chain.append((companion, classes[companion], companion))
+        chain.append((companion, companion_class(classes[companion], cls), companion))
     chain.append((cls.name, cls, caption))
     for companion in COMPANIONS_AFTER.get(cls.name, []):
-        chain.append((companion, classes[companion], companion))
+        chain.append((companion, companion_class(classes[companion], cls), companion))
     if cls.outputs and cls.name != "Terminate":
         chain.append(("Terminate", classes["Terminate"], "Terminate"))
 

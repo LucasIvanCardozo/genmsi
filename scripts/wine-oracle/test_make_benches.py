@@ -249,6 +249,95 @@ class FailureOutput(unittest.TestCase):
         self.assertEqual(labels["Terminate1"], "A_Terminate1")
 
 
+class Companions(unittest.TestCase):
+    """A class that needs another block next to it carries it.
+
+    The original refuses to run a `DEPART` of a queue that nobody filled
+    ("Contenido de la cola QRECURSO negativo") and a `LEAVE` of a storage
+    that nobody entered ("Se liberaron más unidades de storage que la
+    capacidad máxima"), so those benches carry the block that fills what the
+    class takes out.
+    """
+
+    def setUp(self) -> None:
+        classes = [
+            GENERATE,
+            TERMINATE,
+            CLOCK,
+            module_class(
+                "StorageDef",
+                ["STORAGE%20%20[Storage:'Storage a Declarar'='Almacen'],...",
+                 "%20%20%20%20[Tama%F1o:'Capacidad del Storage'='10']"],
+                "",
+            ),
+            module_class(
+                "Queue",
+                ["IN%20%20Entrada1:'Ingreso'='A_moduleName'",
+                 "ARRIVE%20%20[Queue:'Queue en la que ingresa'='QRecurso']"],
+                '<part type="Input" value="38,0" ident="Entrada1"/>'
+                '<part type="Output" value="38,48" ident="Salida1"/>',
+            ),
+            module_class(
+                "Depart",
+                ["IN%20%20Entrada1:'Ingreso'='A_ModuleName'",
+                 "DEPART%20[Queue:'Queue de la cual se egresa'='Qrecurso']"],
+                '<part type="Input" value="38,0" ident="Entrada1"/>'
+                '<part type="Output" value="38,48" ident="Salida1"/>',
+            ),
+            module_class(
+                "Enter",
+                ["IN%20%20Entrada1:'Ingreso'='A_ModuleName'",
+                 "ENTER%20%20[Storage:'Storage al cual ingresa'='AStorage']"],
+                '<part type="Input" value="38,0" ident="Entrada1"/>'
+                '<part type="Output" value="38,48" ident="Salida1"/>',
+            ),
+            module_class(
+                "Leave",
+                ["IN%20%20Entrada1:'Entrada1'='A_ModuleName'",
+                 "LEAVE%20%20[Storage:'Storage del cual egresa'='AStorage']"],
+                '<part type="Input" value="38,0" ident="Entrada1"/>'
+                '<part type="Output" value="38,48" ident="Salida1"/>',
+            ),
+        ]
+        path = Path(tempfile.mkdtemp()) / "gClasses.xml"
+        path.write_text(catalogue("".join(classes)), encoding="cp1252")
+        self.classes = mb.load_classes(path)
+
+    def test_the_depart_is_preceded_by_a_queue(self) -> None:
+        text = bench_of(self.classes, "Depart")
+        self.assertIn('moduleclass="Queue"', text)
+        self.assertIn('moduleclass="Depart"', text)
+
+    def test_the_companion_works_on_the_entity_of_the_class(self) -> None:
+        # The `Depart` names the queue `Qrecurso`; the companion has to fill
+        # that very queue, not the one its own default says (`QRecurso`).
+        text = bench_of(self.classes, "Depart")
+        queues = re.findall(r'<property name="Queue"[^>]*value="([^"]*)"', text)
+        self.assertEqual(set(queues), {"Qrecurso"})
+
+    def test_the_leave_is_preceded_by_an_enter(self) -> None:
+        text = bench_of(self.classes, "Leave")
+        self.assertIn('moduleclass="Enter"', text)
+        self.assertIn('moduleclass="Leave"', text)
+
+    def test_the_leave_declares_the_storage_it_releases(self) -> None:
+        text = bench_of(self.classes, "Leave")
+        self.assertIn('moduleclass="StorageDef"', text)
+        storages = re.findall(r'<property name="Storage"[^>]*value="([^"]*)"', text)
+        self.assertEqual(set(storages), {"AStorage"})
+
+    def test_the_companion_keeps_the_ports_of_its_class(self) -> None:
+        # A companion without ports cannot be linked: the bench would have a
+        # link that ends at a port that does not exist.
+        text = bench_of(self.classes, "Depart")
+        queue = re.search(
+            r'<module [^>]*moduleclass="Queue"[^>]*>(.*?)</module>', text
+        )
+        self.assertIsNotNone(queue)
+        self.assertIn('<input ioid="1" name="Entrada1"', queue.group(1))
+        self.assertIn('<output ioid="2" name="Salida1"', queue.group(1))
+
+
 @unittest.skipUnless(mb.CLASSES_XML.is_file(), "the backup of the original is not here")
 class TheRealCatalogue(unittest.TestCase):
     """The labels of the benches of the original's own catalogue."""
@@ -273,6 +362,28 @@ class TheRealCatalogue(unittest.TestCase):
 
     def test_the_others_keep_the_prefix(self) -> None:
         self.assertEqual(labels_of(self.bench("FacilityUse"))["FacilityUse"], "A_FacilityUse")
+
+    def test_the_depart_fills_the_queue_it_empties(self) -> None:
+        text = self.bench("Depart")
+        queues = re.findall(r'<property name="Queue"[^>]*value="([^"]*)"', text)
+        self.assertEqual(set(queues), {"Qrecurso"})
+
+    def test_the_leave_enters_the_storage_it_releases(self) -> None:
+        text = self.bench("Leave")
+        self.assertIn('moduleclass="StorageDef"', text)
+        self.assertIn('moduleclass="Enter"', text)
+
+    def test_the_multifurcacion_by_parameter_has_no_probabilities(self) -> None:
+        # The class of the original routes by the value of a parameter: its
+        # definition has no `Prob` properties, and a model that carries them
+        # is "adapted" by the original when it opens it.
+        text = self.bench("MultifurcacionP")
+        self.assertNotIn('name="Prob1"', text)
+        self.assertIn('name="Parametro"', text)
+
+    def test_the_multifurcacion_by_probability_has_them(self) -> None:
+        text = self.bench("Multifurcacion")
+        self.assertIn('name="Prob1"', text)
 
     def test_every_bench_is_written(self) -> None:
         with tempfile.TemporaryDirectory() as outdir, contextlib.redirect_stdout(io.StringIO()):

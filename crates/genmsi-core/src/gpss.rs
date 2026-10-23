@@ -94,11 +94,13 @@ impl Names {
                 continue;
             }
             if block.class == "Match" {
-                // The match names its statement after the label of its
-                // conjugate, and that label is a name of the program.
-                if let Some(label) = &block.label {
-                    taken.insert(label.clone());
-                }
+                // The match names its statement after the label it defines,
+                // and the label is a name of the program: no other block
+                // takes it.
+                let label = block.label.clone().unwrap_or_default();
+                taken.insert(label.clone());
+                names[index] = label;
+                continue;
             }
             names[index] = unique(&mut taken, base_name(program, block));
         }
@@ -122,6 +124,11 @@ fn base_name(program: &Program, block: &ExecBlock) -> String {
         "Transfer" => "Entrada1".to_string(),
         // The split names its statement after what it does.
         "Split" => "Clona".to_string(),
+        // The match names its statement after the label it defines.
+        "Match" => block
+            .label
+            .clone()
+            .unwrap_or_else(|| format!("A_{}", block.name)),
         // These macros write the name of their module.
         "GateF" | "GateL" | "GateS" | "GateM" | "Gate" => block.name.clone(),
         // The multifurcations name their statement after the module too: the
@@ -708,8 +715,8 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
                         format!("{} {switch}", if *state { "LS" } else { "L" })
                     }
                 }
-                GateCondition::Storage { storage, empty } => {
-                    format!("{} {storage}", if *empty { "S" } else { "SNF" })
+                GateCondition::Storage { storage, op } => {
+                    format!("{} {storage}", op.letter())
                 }
                 GateCondition::Facility {
                     facility,
@@ -757,10 +764,9 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
         }
         BlockKind::Match(spec) => {
             // The macro of the match writes the transfer to the conjugate
-            // first, and the match statement itself after it.
-            line(out, &name, "TRANSFER", &format!(",{}", spec.conjugate));
-            let label = block.label.clone().unwrap_or_default();
-            line(out, &label, "MATCH", &spec.conjugate);
+            // first, and the match statement itself after it: the transfer
+            // is a statement of its own.
+            statement(out, "MATCH", &spec.conjugate);
         }
         BlockKind::Loop(spec) => {
             statement(out, "LOOP", &format!("{},", spec.parameter));

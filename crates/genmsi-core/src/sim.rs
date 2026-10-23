@@ -14,7 +14,7 @@ use crate::expr::{Ctx, ProgramExpr, RefKind};
 use crate::program::{
     BlockKind, EntityName, ExecBlock, FunctionDef, GateCondition, GenerateSpec, LogicOp,
     MultiTransferSelection, PreemptPriority, Program, SelectMode, SelectSpec, SelectState,
-    TerminateSpec, UnlinkSpec,
+    StorageOp, TerminateSpec, UnlinkSpec,
 };
 use crate::report::number;
 use crate::rng::Streams;
@@ -191,7 +191,11 @@ enum EventKind {
 struct Event {
     time: f64,
     priority: i64,
-    seq: u64,
+    /// The order of the event among the ones of its hour.
+    ///
+    /// It is negative for the events of the hour in which the run ends: the
+    /// original processes those the other way round.
+    seq: i64,
     block: usize,
     xact: Option<XactId>,
     kind: EventKind,
@@ -241,6 +245,11 @@ pub struct Simulation<'p> {
     terminations_left: f64,
     ended: bool,
     end_reason: Option<EndReason>,
+    /// The hour in which the run ends, when the model has a clock.
+    ///
+    /// The original processes the events of that hour the other way round:
+    /// the last one scheduled is the first one processed.
+    end_time: Option<f64>,
     events: u64,
     streams: Streams,
     trace: Vec<TraceEvent>,
@@ -277,6 +286,7 @@ impl<'p> Simulation<'p> {
             terminations_left: program.start_counter,
             ended: false,
             end_reason: None,
+            end_time: None,
             events: 0,
             streams: Streams::new(config.seed),
             trace: Vec::new(),
@@ -297,6 +307,22 @@ impl<'p> Simulation<'p> {
 
     fn install_definitions(&mut self) {
         let program = self.program;
+        // The hour in which the run ends: the clock of the model stops it.
+        // The original processes the events of that hour the other way round
+        // (the last one scheduled is the first one processed), and that
+        // order is what decides whether the arrival of that hour is counted.
+        let end_time = program
+            .blocks
+            .iter()
+            .find_map(|block| match &block.kind {
+                BlockKind::Generate(spec) if spec.termination_tick => Some(spec.mean.eval(&mut CtxView {
+                    sim: self,
+                    xact: 0,
+                    depth: 0,
+                })),
+                _ => None,
+            });
+        self.end_time = end_time;
         for (name, capacity) in &program.definitions.storages {
             self.entities.storage(name, *capacity, 0.0);
         }
@@ -347,6 +373,10 @@ impl<'p> Simulation<'p> {
                 pending: true,
             });
             self.block_stats[index].current = 1;
+            // The original counts the arrival that is already on its way in
+            // the `ENTRY COUNT` of the generator, not only the ones it has
+            // already made.
+            self.block_stats[index].entries = 1;
             self.push_event(first.max(0.0), 0, index, None, EventKind::Tick);
         }
     }
@@ -373,7 +403,14 @@ impl<'p> Simulation<'p> {
         kind: EventKind,
     ) {
         self.seq += 1;
-        let seq = self.seq;
+        let seq = self.seq as i64;
+        // The events of the hour in which the run ends are processed the other
+        // way round: the last one scheduled is the first one processed. Their
+        // number is negated to say so.
+        let seq = match self.end_time {
+            Some(end_time) if time == end_time => -seq,
+            _ => seq,
+        };
         self.heap.push(std::cmp::Reverse(Event {
             time,
             priority,
@@ -505,6 +542,11 @@ impl<'p> Simulation<'p> {
                 ..state
             });
             self.block_stats[block_index].current = 0;
+            // The arrival that was scheduled never happens: it is not an
+            // entry of the generator.
+            if self.block_stats[block_index].entries > 0 {
+                self.block_stats[block_index].entries -= 1;
+            }
             return Ok(());
         }
 
@@ -554,6 +596,11 @@ impl<'p> Simulation<'p> {
                 pending: false,
             });
             self.block_stats[block_index].current = 0;
+            // The arrival that was scheduled never happens: it is not an
+            // entry of the generator.
+            if self.block_stats[block_index].entries > 0 {
+                self.block_stats[block_index].entries -= 1;
+            }
             return Ok(());
         }
         let (mean, modifier) = {
@@ -652,10 +699,14 @@ impl<'p> Simulation<'p> {
                 transaction.entered_at = self.now;
             }
             // A block that waits counts only what it achieved: the original's
-            // `ENTER` row holds the entries that got in, not the attempts,
-            // and the transaction that waits is counted in the block it came
-            // from.
-            if matches!(block.kind, BlockKind::Enter(_)) {
+            // `ENTER` and `SEIZE` rows hold the entries that got in, not the
+            // attempts, and the transaction that waits is counted in the
+            // block it came from. The `MATCH` row holds the matches that
+            // were made, not the transactions that arrived.
+            if matches!(
+                block.kind,
+                BlockKind::Enter(_) | BlockKind::Seize(_) | BlockKind::Match(_)
+            ) {
                 self.block_stats[block_index].current += 1;
             } else {
                 self.block_stats[block_index].entries += 1;
@@ -788,6 +839,11 @@ impl<'p> Simulation<'p> {
             }
             BlockKind::Seize(spec) => {
                 let name = self.resolve_name(&spec.facility, xact);
+                if resume {
+                    // The transaction comes back to the block it backed up
+                    // from: it is in it again.
+                    self.block_stats[block_index].current += 1;
+                }
                 let acquired = {
                     let facility = self.entities.facility(&name, self.now);
                     if facility.available && !facility.busy {
@@ -801,6 +857,18 @@ impl<'p> Simulation<'p> {
                     }
                 };
                 if acquired {
+                    // The entry is what the block counts: the original's
+                    // `SEIZE` row holds the seizures that got the facility,
+                    // not the attempts.
+                    self.block_stats[block_index].entries += 1;
+                    // A transaction that was waiting leaves the block it was
+                    // counted in.
+                    if resume
+                        && let Some(previous) = self.previous_block_of(xact)
+                        && self.block_stats[previous].current > 0
+                    {
+                        self.block_stats[previous].current -= 1;
+                    }
                     self.leave(xact, block_index, block.next_default());
                 } else {
                     let mut waiters = {
@@ -812,7 +880,17 @@ impl<'p> Simulation<'p> {
                     if let Some(transaction) = self.xacts.get_mut(&xact) {
                         transaction.transition(XactState::Waiting);
                     }
-                    self.block_stats[block_index].retries += 1;
+                    // The transaction backs up to the block it came from: the
+                    // original's `SEIZE` row has no `CURRENT` for it and no
+                    // `RETRY` either.
+                    if self.block_stats[block_index].current > 0 {
+                        self.block_stats[block_index].current -= 1;
+                    }
+                    if !resume
+                        && let Some(previous) = self.previous_block_of(xact)
+                    {
+                        self.block_stats[previous].current += 1;
+                    }
                     if self.config.trace {
                         self.record_trace(xact, block_index, "wait", name);
                     }
@@ -1082,26 +1160,44 @@ impl<'p> Simulation<'p> {
             }
             BlockKind::Link(spec) => {
                 let name = self.resolve_name(&spec.chain, xact);
-                {
+                // The chain has an indicator, off until the first transaction
+                // reaches it. That one goes on to the destination of the
+                // statement (when the model gives one) and does not join the
+                // chain; the ones that find the indicator on wait in it.
+                let first = {
                     let chain = self.entities.chain(&name, self.now);
-                    chain.area += chain.content as f64 * (self.now - chain.last_change).max(0.0);
-                    chain.last_change = self.now;
-                    if spec.fifo {
-                        chain.members.push(xact);
+                    if chain.indicator {
+                        false
                     } else {
-                        chain.members.insert(0, xact);
+                        chain.indicator = true;
+                        true
                     }
-                    chain.content += 1;
-                    chain.max = chain.max.max(chain.content);
-                    chain.entries += 1;
-                    chain.linked_at.insert(xact, self.now);
-                }
-                if let Some(transaction) = self.xacts.get_mut(&xact) {
-                    transaction.chain = Some(name);
-                    transaction.transition(XactState::Waiting);
-                }
-                if self.config.trace {
-                    self.record_trace(xact, block_index, "wait", "chain".to_string());
+                };
+                let destination = block.next_default();
+                if first && destination.is_some() {
+                    self.leave(xact, block_index, destination);
+                } else {
+                    {
+                        let chain = self.entities.chain(&name, self.now);
+                        chain.area += chain.content as f64 * (self.now - chain.last_change).max(0.0);
+                        chain.last_change = self.now;
+                        if spec.fifo {
+                            chain.members.push(xact);
+                        } else {
+                            chain.members.insert(0, xact);
+                        }
+                        chain.content += 1;
+                        chain.max = chain.max.max(chain.content);
+                        chain.entries += 1;
+                        chain.linked_at.insert(xact, self.now);
+                    }
+                    if let Some(transaction) = self.xacts.get_mut(&xact) {
+                        transaction.chain = Some(name);
+                        transaction.transition(XactState::Waiting);
+                    }
+                    if self.config.trace {
+                        self.record_trace(xact, block_index, "wait", "chain".to_string());
+                    }
                 }
             }
             BlockKind::Unlink(spec) => {
@@ -1239,11 +1335,18 @@ impl<'p> Simulation<'p> {
                             if let Some(transaction) = self.xacts.get_mut(&id) {
                                 transaction.transition(XactState::Ready);
                             }
-                            match target {
-                                Some(target) => self.enter_block(id, target),
-                                None => self.remove_transaction(id),
-                            }
+                            // The block gives the transaction back when the
+                            // set is complete: the original's `ASSEMBLE` row
+                            // has no `CURRENT` for it.
+                            self.leave(id, block_index, target);
                         } else {
+                            // The copy is destroyed: it leaves the block.
+                            if self.block_stats[block_index].current > 0 {
+                                self.block_stats[block_index].current -= 1;
+                            }
+                            if self.config.trace {
+                                self.record_trace(id, block_index, "terminate", String::new());
+                            }
                             self.remove_transaction(id);
                         }
                     }
@@ -1289,10 +1392,27 @@ impl<'p> Simulation<'p> {
                         // `leave` decrements the conjugate block's CURRENT count:
                         // the partner is leaving that block, not this one.
                         let partner_target = self.program.blocks[conjugate].next_default();
+                        // The partner was waiting: it was counted in the
+                        // transfer that brought it, and it leaves it now.
+                        let partner_transfer = self.previous_block_of(partner);
                         self.leave(partner, conjugate, partner_target);
+                        if let Some(transfer) = partner_transfer
+                            && self.block_stats[transfer].current > 0
+                        {
+                            self.block_stats[transfer].current -= 1;
+                        }
+                        self.block_stats[conjugate].entries += 1;
+                        // The transaction that finds a partner never waited:
+                        // it already left the transfer that brought it.
                         self.leave(xact, block_index, block.next_default());
+                        self.block_stats[block_index].entries += 1;
                     }
                     None => {
+                        // The transaction waits in the match: the original
+                        // keeps it counted in the transfer that brought it.
+                        if let Some(previous) = self.previous_block_of(xact) {
+                            self.block_stats[previous].current += 1;
+                        }
                         self.match_waiters
                             .entry(block_index)
                             .or_default()
@@ -1650,15 +1770,30 @@ impl<'p> Simulation<'p> {
                 let name = self.resolve_name(switch, xact);
                 *self.entities.logic(&name) == *state
             }
-            GateCondition::Storage { storage, empty } => {
+            GateCondition::Storage { storage, op } => {
                 let name = self.resolve_name(storage, xact);
-                // A storage the model does not declare holds nothing: the
-                // gate reads it as empty.
-                let is_empty = match self.storage_capacity(&name) {
-                    Some(capacity) => self.entities.storage(&name, capacity, self.now).is_empty(),
-                    None => true,
-                };
-                is_empty == *empty
+                match self.storage_capacity(&name) {
+                    Some(capacity) => {
+                        let storage = self.entities.storage(&name, capacity, self.now);
+                        match op {
+                            StorageOp::Full => storage.in_use >= capacity,
+                            StorageOp::NotFull => storage.in_use < capacity,
+                            StorageOp::Empty => storage.in_use == 0,
+                            StorageOp::NotEmpty => storage.in_use > 0,
+                            // The storage is declared, so it is available.
+                            StorageOp::Available => true,
+                            StorageOp::NotAvailable => false,
+                        }
+                    }
+                    None => match op {
+                        // A storage the model does not declare holds nothing
+                        // and is never full. The original opens the `SNF` and
+                        // the `SE` gates on it, and stops the run at the
+                        // `SF`, the `SNE` and the `SV` ones.
+                        StorageOp::NotFull | StorageOp::Empty | StorageOp::NotAvailable => true,
+                        StorageOp::Full | StorageOp::NotEmpty | StorageOp::Available => false,
+                    },
+                }
             }
             GateCondition::Facility {
                 facility,

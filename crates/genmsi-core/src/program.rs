@@ -322,6 +322,66 @@ pub struct LogicSpec {
     pub op: LogicOp,
 }
 
+/// The state of a storage a `GATE` or a `SELECT` tests.
+///
+/// The original's `op_Logic_Stor` list has six operators, and the letter each
+/// one writes in the program listing is its own:
+///
+/// | Letter | Operator     | What it asks of the storage        |
+/// |--------|--------------|------------------------------------|
+/// | `SF`   | `Lleno`      | the storage is full                |
+/// | `SNF`  | `NoLleno`    | the storage is not full            |
+/// | `SE`   | `Vacio`      | the storage is empty               |
+/// | `SNE`  | `NoVacio`    | the storage is not empty           |
+/// | `SV`   | `Disponible` | the storage is available (it exists) |
+/// | `SNV`  | `NoDisponible` | the storage is not available     |
+///
+/// The truth table is measured against the original with the probes in
+/// `scripts/wine-oracle/probes/gates/` (see
+/// `odd/tasks/notas-comportamiento.md`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StorageOp {
+    /// `SF`: the storage is full.
+    Full,
+    /// `SNF`: the storage is not full.
+    NotFull,
+    /// `SE`: the storage is empty.
+    Empty,
+    /// `SNE`: the storage is not empty.
+    NotEmpty,
+    /// `SV`: the storage is available.
+    Available,
+    /// `SNV`: the storage is not available.
+    NotAvailable,
+}
+
+impl StorageOp {
+    /// The letter the original writes in the program listing.
+    pub fn letter(self) -> &'static str {
+        match self {
+            Self::Full => "SF",
+            Self::NotFull => "SNF",
+            Self::Empty => "SE",
+            Self::NotEmpty => "SNE",
+            Self::Available => "SV",
+            Self::NotAvailable => "SNV",
+        }
+    }
+
+    /// The operator the original names in the property of the class.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.trim() {
+            "Lleno" | "Llena" => Some(Self::Full),
+            "NoLleno" | "NoLlena" => Some(Self::NotFull),
+            "Vacio" | "Vacia" => Some(Self::Empty),
+            "NoVacio" | "NoVacia" => Some(Self::NotEmpty),
+            "Disponible" => Some(Self::Available),
+            "NoDisponible" => Some(Self::NotAvailable),
+            _ => None,
+        }
+    }
+}
+
 /// `GATE` condition.
 #[derive(Debug, Clone)]
 pub enum GateCondition {
@@ -332,12 +392,12 @@ pub enum GateCondition {
         /// Required state.
         state: bool,
     },
-    /// Storage is empty / not empty.
+    /// The state of a storage.
     Storage {
         /// Storage name.
         storage: EntityName,
-        /// `true` requires empty.
-        empty: bool,
+        /// The state the gate asks of the storage.
+        op: StorageOp,
     },
     /// Facility is available / unavailable.
     Facility {
@@ -1589,12 +1649,16 @@ impl Compiler<'_> {
             }
             "GateS" => {
                 let storage = self.entity(module, "Storage")?;
-                let empty = module
+                // The class has six operators (`op_Logic_Stor`); the default of
+                // the class is `NoLleno`, the one that opens the gate when the
+                // storage still has room.
+                let op = module
                     .prop_value("op")
-                    .is_some_and(|op| op.eq_ignore_ascii_case("vacio") || op.eq_ignore_ascii_case("empty"));
+                    .and_then(|op| StorageOp::from_name(&op))
+                    .unwrap_or(StorageOp::NotFull);
                 Ok(Some(push!(
                     BlockKind::Gate(GateSpec {
-                        condition: GateCondition::Storage { storage, empty },
+                        condition: GateCondition::Storage { storage, op },
                     }),
                     label,
                     class,
@@ -1710,11 +1774,26 @@ impl Compiler<'_> {
                     .or_else(|| module.label().map(str::to_string))
                     .unwrap_or_else(|| format!("MATCH{node}"));
                 let conjugate = module.prop_value("RotuloMatch").unwrap_or_default();
-                Ok(Some(push!(
+                // The original expands the class into two statements: a
+                // `TRANSFER` that sends the transaction to the conjugate and
+                // the `MATCH` itself. The report lists the two, and the
+                // entries are in the transfer.
+                let transfer = push!(
+                    BlockKind::Transfer(TransferSpec {
+                        probability: self.unconditional_expr(),
+                        thousandths: false,
+                    }),
+                    label,
+                    "MatchTransfer",
+                );
+                let matching = push!(
                     BlockKind::Match(MatchSpec { conjugate }),
                     Some(own),
                     class
-                )))
+                );
+                blocks[transfer].next = vec![Some(matching)];
+                blocks[transfer].port_names = vec!["Salida1".to_string()];
+                Ok(Some(transfer))
             }
             "Loop" => {
                 let parameter = self.require_name(module, "Parametro")?;
@@ -2576,6 +2655,14 @@ impl Compiler<'_> {
     /// An expression with no text: the operand the original leaves empty.
     fn empty_expr(&self) -> ProgramExpr {
         ProgramExpr::new(String::new(), Expr::Num(0.0))
+    }
+
+    /// An expression that always holds, written with no text.
+    ///
+    /// The original writes the probability of an unconditional transfer with
+    /// an empty field (`TRANSFER  ,A_Enter`).
+    fn unconditional_expr(&self) -> ProgramExpr {
+        ProgramExpr::new(String::new(), Expr::Num(1.0))
     }
 
     fn number(&self, module: &Block, name: &str) -> Option<f64> {

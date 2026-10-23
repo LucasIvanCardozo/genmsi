@@ -999,6 +999,8 @@ pub fn known_classes() -> &'static [&'static str] {
         "Loop",
         "Mark",
         "Match",
+        "MFunction",
+        "MFunctionDist",
         "Multifurcacion",
         "MultifurcacionP",
         "Note",
@@ -1008,6 +1010,7 @@ pub fn known_classes() -> &'static [&'static str] {
         "Queue",
         "Release",
         "RemoveMe",
+        "RemoveNumber",
         "RemoveTrans",
         "Return",
         "SaveValue",
@@ -1150,8 +1153,9 @@ impl Compiler<'_> {
 
         match class {
             // Definitions and non-runtime modules.
-            "Function" | "FunctionDist" | "FunctionExpon" | "Variable" | "VariableA" | "VariableN"
-            | "Table" | "QTable" | "StorageDef" | "InitiaSV" | "InitialLS" | "Note" => Ok(None),
+            "Function" | "FunctionDist" | "FunctionExpon" | "MFunction" | "MFunctionDist"
+            | "Variable" | "VariableA" | "VariableN" | "Table" | "QTable" | "StorageDef"
+            | "InitiaSV" | "InitialLS" | "Note" => Ok(None),
             "Clock" => {
                 let frequency = self.require_number(module, "Frecuencia")?;
                 let generate = push!(
@@ -2030,6 +2034,39 @@ impl Compiler<'_> {
                     "Remove",
                 )))
             }
+            "RemoveNumber" => {
+                // The `REMOVE` of the original in numeric mode: the manual
+                // says that the statement works on a numeric group when the
+                // operand C (the number) is there, and that the transaction
+                // goes to the alternative destination (the operand F, the
+                // failure output of the class, "No existe el Nº") when the
+                // number is not a member of the group.
+                //
+                // The statement the original writes is
+                // `REMOVE E <grupo>,,<número>` (and the destination as the
+                // seventh operand when the failure output is connected):
+                // `crates/genmsi-core/src/gpss.rs` cannot write it yet (see
+                // `odd/tasks/notas-w3-clases.md`).
+                let group = self.require_name(module, "Grupo")?;
+                let number = self
+                    .sna(module, "Numero")?
+                    .unwrap_or_else(|| self.number_expr(0.0));
+                Ok(Some(push!(
+                    BlockKind::Remove(RemoveSpec {
+                        group,
+                        // The limit of the removal is empty in numeric mode.
+                        count: self.empty_expr(),
+                        all: false,
+                        parameter: None,
+                        value: Some(number),
+                        me: false,
+                    }),
+                    label,
+                    // The statement is a `REMOVE`: the report names it by
+                    // the verb, as it does with the `RemoveMe` class.
+                    "Remove",
+                )))
+            }
             "RemoveTrans" => {
                 let group = self.require_name(module, "Grupo")?;
                 let count = self
@@ -2417,24 +2454,70 @@ impl Compiler<'_> {
                         EngineError::invalid_block(node, class, "Distribucion is required")
                     })?;
                     let weights = self.parse_percent_list(module, &text)?;
-                    let total: f64 = weights.iter().sum();
-                    let mut cumulative = Vec::with_capacity(weights.len());
-                    let mut running = 0.0;
-                    for weight in &weights {
-                        running += weight / total;
-                        cumulative.push(running);
-                    }
-                    if let Some(last) = cumulative.last_mut() {
-                        *last = 1.0;
-                    }
                     let stream = self.number(module, "Semilla").unwrap_or(1.0) as u32;
                     definitions.functions.insert(
                         name,
                         FunctionDef::Distribution {
                             stream: stream.max(1),
-                            cumulative,
+                            cumulative: cumulative_bounds(&weights),
                         },
                     );
+                }
+                "MFunction" => {
+                    // The class defines several functions over the same
+                    // input attribute: one row of the matrix per function,
+                    // and the row holds the value of the function for each
+                    // input (the first, the second, ...).
+                    let names = self.parse_name_list(module, "NombresFunc")?;
+                    let argument = self
+                        .sna(module, "Atributo")?
+                        .unwrap_or_else(|| self.number_expr(0.0));
+                    let rows = self.parse_matrix(module, "Matriz")?;
+                    for (index, name) in names.iter().enumerate() {
+                        let Some(row) = rows.get(index) else {
+                            continue;
+                        };
+                        let mut points = Vec::with_capacity(row.len());
+                        for (position, value) in row.iter().enumerate() {
+                            points.push((
+                                self.number_expr(position as f64 + 1.0),
+                                self.resolve_sna_text(module, value)?,
+                            ));
+                        }
+                        if points.is_empty() {
+                            continue;
+                        }
+                        definitions.functions.insert(
+                            name.clone(),
+                            FunctionDef::Evaluate {
+                                argument: argument.clone(),
+                                points,
+                            },
+                        );
+                    }
+                }
+                "MFunctionDist" => {
+                    // The class defines several distribution functions: one
+                    // row of the matrix of results per function, with the
+                    // probability of each result.
+                    let names = self.parse_name_list(module, "NombresDist")?;
+                    let rows = self.parse_percent_matrix(module, "Resultados")?;
+                    let stream = self.number(module, "Semilla").unwrap_or(1.0) as u32;
+                    for (index, name) in names.iter().enumerate() {
+                        let Some(weights) = rows.get(index) else {
+                            continue;
+                        };
+                        if weights.is_empty() {
+                            continue;
+                        }
+                        definitions.functions.insert(
+                            name.clone(),
+                            FunctionDef::Distribution {
+                                stream: stream.max(1),
+                                cumulative: cumulative_bounds(weights),
+                            },
+                        );
+                    }
                 }
                 "Table" => {
                     let name = self.require_name(module, "NombreTabla")?;
@@ -2511,6 +2594,79 @@ impl Compiler<'_> {
             )),
         );
         Ok(ProgramExpr::new(source, tree))
+    }
+
+    /// The names of a list property (`{FuncA;FuncB}`).
+    ///
+    /// The `MFunction` and the `MFunctionDist` classes declare the names of
+    /// the functions they define in a list: one name per function.
+    fn parse_name_list(
+        &self,
+        module: &Block,
+        prop: &str,
+    ) -> Result<Vec<String>, EngineError> {
+        let text = module.prop_value(prop).ok_or_else(|| {
+            EngineError::invalid_block(module.id, &module.class, format!("{prop} is required"))
+        })?;
+        Ok(strip_braces(text.trim())
+            .split(';')
+            .map(|name| name.trim().to_string())
+            .filter(|name| !name.is_empty())
+            .collect())
+    }
+
+    /// The rows of a matrix property (`{{11;12;13};{21;22;23}}`).
+    ///
+    /// The `MFunction` class declares the values of every function it
+    /// defines in a matrix: one row per function.
+    fn parse_matrix(
+        &self,
+        module: &Block,
+        prop: &str,
+    ) -> Result<Vec<Vec<String>>, EngineError> {
+        let text = module.prop_value(prop).ok_or_else(|| {
+            EngineError::invalid_block(module.id, &module.class, format!("{prop} is required"))
+        })?;
+        Ok(split_outside_braces(strip_braces(text.trim()))
+            .iter()
+            .map(|row| {
+                strip_braces(row.trim())
+                    .split(';')
+                    .map(|cell| cell.trim().to_string())
+                    .filter(|cell| !cell.is_empty())
+                    .collect()
+            })
+            .filter(|row: &Vec<String>| !row.is_empty())
+            .collect())
+    }
+
+    /// The rows of a matrix of percentages (`{{20%;30%;50%};{25%;35%;40%}}`).
+    ///
+    /// The `MFunctionDist` class declares the probability of every result of
+    /// every function it defines in a matrix: one row per function.
+    fn parse_percent_matrix(
+        &self,
+        module: &Block,
+        prop: &str,
+    ) -> Result<Vec<Vec<f64>>, EngineError> {
+        let rows = self.parse_matrix(module, prop)?;
+        let mut weights = Vec::with_capacity(rows.len());
+        for row in rows {
+            let mut values = Vec::with_capacity(row.len());
+            for entry in row {
+                let value = entry.trim_end_matches('%').trim();
+                let number = value.parse::<f64>().map_err(|_| {
+                    EngineError::invalid_block(
+                        module.id,
+                        &module.class,
+                        format!("invalid percentage {entry:?}"),
+                    )
+                })?;
+                values.push(number.max(0.0));
+            }
+            weights.push(values);
+        }
+        Ok(weights)
     }
 
     fn parse_points(
@@ -2931,6 +3087,61 @@ impl Compiler<'_> {
         }
         None
     }
+}
+
+/// The text of a value the original writes between braces.
+fn strip_braces(text: &str) -> &str {
+    let trimmed = text.trim();
+    trimmed
+        .strip_prefix('{')
+        .and_then(|rest| rest.strip_suffix('}'))
+        .unwrap_or(trimmed)
+}
+
+/// Split a list on `;`, leaving the separators inside braces alone.
+///
+/// The matrix of the original holds a list of lists (`{{11;12};{21;22}}`), and
+/// the separators of the inner lists are not the separators of the outer one.
+fn split_outside_braces(text: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut depth = 0usize;
+    for character in text.chars() {
+        match character {
+            '{' => {
+                depth += 1;
+                current.push(character);
+            }
+            '}' => {
+                depth = depth.saturating_sub(1);
+                current.push(character);
+            }
+            ';' if depth == 0 => {
+                parts.push(std::mem::take(&mut current));
+            }
+            _ => current.push(character),
+        }
+    }
+    parts.push(current);
+    parts
+}
+
+/// The running sum of the weights of a distribution.
+///
+/// The original writes the table of a `D` function as the running sum of the
+/// probabilities and the number each of them selects (`0.2,1/0.5,2/1,3`).
+fn cumulative_bounds(weights: &[f64]) -> Vec<f64> {
+    let total: f64 = weights.iter().sum();
+    let mut cumulative = Vec::with_capacity(weights.len());
+    let mut running = 0.0;
+    for weight in weights {
+        running += weight / total;
+        cumulative.push(running);
+    }
+    if let Some(last) = cumulative.last_mut() {
+        *last = 1.0;
+    }
+    cumulative
 }
 
 /// The entity a class of the original's `entitySNAclass` list belongs to.

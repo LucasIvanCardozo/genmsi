@@ -210,25 +210,123 @@ fn build_block_produces_the_reference_shape() {
     assert!(err.to_string().contains("MacroPropio"), "{err}");
 }
 
-// The three classes the original declares and the catalogue does not offer
-// yet: `MFunction`, `MFunctionDist` and `RemoveNumber`.
+// The three classes the original declares and the catalogue did not offer
+// until now: `MFunction`, `MFunctionDist` and `RemoveNumber`.
 //
-// Their defaults come from the original's class library, and they wait for
-// the day the catalogue shapes these classes:
+// Their shape comes from the original's class library
+// (`Genmsi_20230711.backup/gClasses.xml`): the ports its graph declares and
+// the properties its macro code declares, with the default value the macro
+// code carries.
 //
-// - `MFunction`: `NombresFunc` `{FuncA;FuncB}`, `Atributo` `P:Param` and
-//   `Matriz` `{{11;12;13};{21;22;23}}`;
-// - `MFunctionDist`: `NombresDist` `{Func1;Func2}`, `Semilla` `4` and
-//   `Resultados` `{{20%;30%;50%};{25%;35%;40%}}`;
-// - `RemoveNumber`: `Op` `=`, `Grupo` `UnGrupo` and `Numero` `0`.
+// - `MFunction`: no ports. `NombresFunc` (a list of names, `{FuncA;FuncB}`),
+//   `Atributo` (`P:Param`) and `Matriz` (`{{11;12;13};{21;22;23}}`);
+// - `MFunctionDist`: no ports. `NombresDist` (`{Func1;Func2}`), `Semilla`
+//   (`4`) and `Resultados` (`{{20%;30%;50%};{25%;35%;40%}}`, with the line
+//   breaks the macro code writes inside the value);
+// - `RemoveNumber`: one input (`Entrada1`) and two outputs (`Salida1` and
+//   `Salida2`, "No existe el Nº"). `Op` (`=`), `Grupo` (`UnGrupo`) and
+//   `Numero` (`0`).
 
 #[test]
-fn the_three_classes_the_original_declares_and_the_catalogue_does_not_offer() {
-    for class in ["MFunction", "MFunctionDist", "RemoveNumber"] {
-        assert!(
-            class_spec(class).is_none(),
-            "{class}: the catalogue offers the class now: give it the defaults \
-             of the original's class library"
+fn the_three_classes_the_original_declares_are_offered_with_its_defaults() {
+    // The `MFunction` class: the functions it defines over one attribute.
+    let mfunction = class_spec("MFunction").expect("the catalogue offers MFunction");
+    assert!(mfunction.inputs.is_empty(), "the class declares no ports");
+    assert!(mfunction.outputs.is_empty(), "the class declares no ports");
+    assert_eq!(mfunction.properties.len(), 3);
+    assert_eq!(mfunction.properties[0].name, "Atributo");
+    assert_eq!(mfunction.properties[0].ty, "TSNA");
+    assert_eq!(mfunction.properties[0].subtype, "SNA");
+    assert_eq!(mfunction.properties[1].name, "Matriz");
+    assert_eq!(mfunction.properties[1].ty, "TSNAMATRIX");
+    assert_eq!(mfunction.properties[2].name, "NombresFunc");
+    assert_eq!(mfunction.properties[2].ty, "TEntityDefList");
+    assert_eq!(mfunction.properties[2].subtype, "Function");
+    assert!(
+        mfunction.properties[2].unique,
+        "a list of names defines the functions"
+    );
+
+    // The `MFunctionDist` class: the distribution functions it defines.
+    let mfunctiondist = class_spec("MFunctionDist").expect("the catalogue offers MFunctionDist");
+    assert!(mfunctiondist.inputs.is_empty(), "the class declares no ports");
+    assert!(mfunctiondist.outputs.is_empty(), "the class declares no ports");
+    assert_eq!(mfunctiondist.properties.len(), 3);
+    assert_eq!(mfunctiondist.properties[0].name, "NombresDist");
+    assert_eq!(mfunctiondist.properties[0].ty, "TEntityDefList");
+    assert_eq!(mfunctiondist.properties[0].subtype, "Function");
+    assert_eq!(mfunctiondist.properties[1].name, "Resultados");
+    assert_eq!(mfunctiondist.properties[1].ty, "FloatPercentMatrix");
+    assert_eq!(mfunctiondist.properties[2].name, "Semilla");
+    assert_eq!(mfunctiondist.properties[2].ty, "PosInteger");
+
+    // The `RemoveNumber` class: the number it asks a numeric group for.
+    let removenumber = class_spec("RemoveNumber").expect("the catalogue offers RemoveNumber");
+    assert_eq!(removenumber.inputs.len(), 1);
+    assert_eq!(removenumber.inputs[0].ioid, 1);
+    assert_eq!(removenumber.inputs[0].name, "Entrada1");
+    assert_eq!(removenumber.outputs.len(), 2);
+    assert_eq!(removenumber.outputs[0].ioid, 2);
+    assert_eq!(removenumber.outputs[0].name, "Salida1");
+    assert_eq!(removenumber.outputs[1].ioid, 3);
+    assert_eq!(removenumber.outputs[1].name, "Salida2");
+    assert_eq!(removenumber.outputs[1].caption, "No%20existe%20el%20N%BA");
+    assert_eq!(removenumber.properties.len(), 3);
+    assert_eq!(removenumber.properties[0].name, "Grupo");
+    assert_eq!(removenumber.properties[0].ty, "EntityUse");
+    assert_eq!(removenumber.properties[0].subtype, "NumericGroup");
+    assert_eq!(removenumber.properties[1].name, "Numero");
+    assert_eq!(removenumber.properties[1].ty, "TSNA");
+    assert_eq!(removenumber.properties[2].name, "Op");
+    assert_eq!(removenumber.properties[2].ty, "Listed");
+    assert_eq!(removenumber.properties[2].subtype, "op_RelacMaxMin");
+}
+
+#[test]
+fn the_three_classes_the_original_declares_carry_its_defaults() {
+    // The defaults of the original's class library, percent-encoded the way
+    // the file carries them.
+    for (class, property, value) in [
+        ("MFunction", "Atributo", "P%3AParam"),
+        (
+            "MFunction",
+            "Matriz",
+            "%7B%7B11%3B12%3B13%7D%3B%7B21%3B22%3B23%7D%7D",
+        ),
+        ("MFunction", "NombresFunc", "%7BFuncA%3BFuncB%7D"),
+        ("MFunctionDist", "NombresDist", "%7BFunc1%3BFunc2%7D"),
+        (
+            "MFunctionDist",
+            "Resultados",
+            "%7B%0A%7B20%25%3B30%25%3B50%25%7D%3B%0A%7B25%25%3B35%25%3B40%25%7D%0A%7D",
+        ),
+        ("MFunctionDist", "Semilla", "4"),
+        ("RemoveNumber", "Grupo", "UnGrupo"),
+        ("RemoveNumber", "Numero", "0"),
+        ("RemoveNumber", "Op", "%3D"),
+    ] {
+        assert_eq!(
+            genmsi_format::catalogue::default_value(class, property),
+            Some(value),
+            "{class}.{property}: the default of the original's class library"
         );
     }
 }
+
+#[test]
+fn a_new_block_of_the_three_classes_carries_the_defaults() {
+    use genmsi_format::{build_block, catalogue::default_value};
+
+    for class in ["MFunction", "MFunctionDist", "RemoveNumber"] {
+        let block = build_block(class, 0, None).expect("the class is in the catalogue");
+        for property in &block.props {
+            let expected = default_value(class, &property.name).unwrap_or_default();
+            assert_eq!(
+                property.raw_value, expected,
+                "{class}.{}: the block does not come with the default",
+                property.name
+            );
+        }
+    }
+}
+

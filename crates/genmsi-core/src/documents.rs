@@ -24,6 +24,8 @@ pub const EXPLAIN_SCHEMA: &str = "genmsi.explain/1";
 pub const MODEL_SCHEMA: &str = "genmsi.model/1";
 /// Schema id of the catalogue document.
 pub const CATALOGUE_SCHEMA: &str = "genmsi.catalogue/1";
+/// Schema id of the `gpss` document.
+pub const GPSS_SCHEMA: &str = "genmsi.gpss/1";
 
 /// A versioned document: the schema id followed by the body fields.
 #[derive(Debug, Serialize)]

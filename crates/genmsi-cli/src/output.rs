@@ -14,7 +14,7 @@ use crate::error::CliError;
 // The schema ids and the envelope are the engine's documents, published from
 // one place (`genmsi_core::documents`) so every client agrees on them. The
 // CLI adds `run-all`, which only it produces.
-pub use genmsi_core::documents::{LINT_SCHEMA, REPORT_SCHEMA};
+pub use genmsi_core::documents::{GPSS_SCHEMA, LINT_SCHEMA, REPORT_SCHEMA};
 /// Schema id of the `run-all` document.
 pub const RUN_ALL_SCHEMA: &str = "genmsi.run-all/1";
 

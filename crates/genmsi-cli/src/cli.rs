@@ -35,6 +35,8 @@ pub enum Command {
     Simulate(SimulateArgs),
     /// Simulate a model and print its event trace.
     Trace(TraceArgs),
+    /// Print the GPSS program a model compiles to.
+    Gpss(GpssArgs),
     /// Simulate every model of a directory and summarise the outcome.
     RunAll(RunAllArgs),
     /// Serve the MCP protocol over stdio (the same server as `genmsi-mcp`).
@@ -108,6 +110,17 @@ pub struct TraceArgs {
     /// Maximum number of trace records to keep.
     #[arg(long, value_name = "N", default_value_t = 100)]
     pub limit: usize,
+}
+
+/// `genmsi gpss <model>`.
+#[derive(Debug, Args)]
+pub struct GpssArgs {
+    /// Options of the model to compile.
+    #[command(flatten)]
+    pub model: ModelArgs,
+    /// Output form.
+    #[command(flatten)]
+    pub output: OutputArgs,
 }
 
 /// `genmsi run-all <directory>`.

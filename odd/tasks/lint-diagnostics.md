@@ -172,3 +172,12 @@ aplica (no hay dos unidades independientes).
   Lo único que un consumidor ve de más es que más modelos dicen `diagnostics`
   y salen con 3, que es justo lo que se quería. El tipo TypeScript sigue siendo
   `Array<string>` (sólo cambia el comentario del campo generado).
+
+- L6 (commits, T8): `a899904` `feat(core): the lint says what the format
+  found` lleva T1 (core), T2 (CLI), T3 (MCP), T4 (app), T5 (tests), T6 (docs)
+  y T7 (verificación): un solo work unit, porque el comportamiento atraviesa
+  los tres clientes y sus tests y sus docs son la misma unidad. El slice
+  quedó en 511 líneas authored (290 de código y tests, 174 de este documento,
+  47 de docs y tipos generados), apenas por encima de la guía de ~400: partir
+  el comportamiento en dos commits habría dejado el primer commit sin los
+  clientes que lo consumen, y el feature se cierra aquí.

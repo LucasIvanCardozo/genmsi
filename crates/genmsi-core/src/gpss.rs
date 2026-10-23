@@ -837,6 +837,16 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
                     format!("SNE {},{},{}", spec.parameter, sna(&spec.low), sna(&spec.high)),
                     Failure::AfterTwoEmpties,
                 ),
+                // The storages that are in the "available" state (`SV`) and
+                // the ones that are not (`SNV`).
+                Some(SelectState::StorageAvailable) => (
+                    format!("SV {},{},{}", spec.parameter, sna(&spec.low), sna(&spec.high)),
+                    Failure::AfterTwoEmpties,
+                ),
+                Some(SelectState::StorageNotAvailable) => (
+                    format!("SNV {},{},{}", spec.parameter, sna(&spec.low), sna(&spec.high)),
+                    Failure::AfterTwoEmpties,
+                ),
                 // The entity of a class whose value equals the compared one.
                 Some(SelectState::EntityEqual) => (
                     format!(

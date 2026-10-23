@@ -2122,6 +2122,16 @@ impl<'p> Simulation<'p> {
                         }
                         None => false,
                     },
+                    // The "available" state of a storage is the one the
+                    // manual describes: "El storage tiene que estar
+                    // disponible para que sea seleccionado"
+                    // (`VISUALSIS.HLP`).  A storage starts available and
+                    // only the statements `SAVAIL` and `SUNAVAIL` change
+                    // it; the library of classes of the original has none of
+                    // them, so every storage of a model of the editor is
+                    // available.
+                    SelectState::StorageAvailable => true,
+                    SelectState::StorageNotAvailable => false,
                     SelectState::EntityEqual => {
                         let wanted = wanted.unwrap_or(0.0);
                         let value = match kind {

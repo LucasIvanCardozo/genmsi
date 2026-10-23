@@ -9,6 +9,7 @@ mod support;
 
 use genmsi_core::Program;
 use genmsi_core::gpss::render;
+use genmsi_core::report::render as render_report;
 use support::{node, wired};
 
 /// The statements of a program, with their padding removed.
@@ -57,6 +58,26 @@ fn selection(class: &'static str, props: &[(&'static str, &'static str)]) -> (Pr
         wired(&nodes, &links, 3600.0)
     };
     (model(Some("C")), model(None))
+}
+
+/// The rows of the block table of a report, with their padding removed.
+fn block_rows(report: &str) -> Vec<String> {
+    report
+        .lines()
+        .skip_while(|line| !line.contains("BLOCK_TYPE"))
+        .skip(2)
+        .take_while(|line| !line.trim().is_empty())
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .collect()
+}
+
+/// The transactions that entered the block `label`, as the report says.
+fn entries(report: &str, label: &str) -> i64 {
+    block_rows(report)
+        .iter()
+        .find(|row| row.split_whitespace().any(|field| field == label))
+        .and_then(|row| row.split_whitespace().nth(1).and_then(|count| count.parse().ok()))
+        .unwrap_or_else(|| panic!("no row for {label} in the report"))
 }
 
 #[test]
@@ -184,6 +205,115 @@ fn the_test_writes_the_destination_of_its_failure_output() {
     // Without the failure output the original writes no destination at all
     // (`A_Test  TEST  E  1,1`, the bench of the oracle).
     assert_eq!(named(&model(None), "A_Test"), "A_Test TEST E 1,2");
+}
+
+#[test]
+fn the_availability_of_a_storage_decides_the_selection() {
+    // The manual of the original says of the two operators of the
+    // availability of a storage: "El storage tiene que estar disponible
+    // para que sea seleccionado" (`SV`) and "El storage no tiene que estar
+    // disponible para que sea seleccionado" (`SNV`)
+    // (`VISUALSIS.HLP`).
+    //
+    // The state of a storage starts available, and only the statements
+    // `SAVAIL` and `SUNAVAIL` change it; the library of classes of the
+    // original has none of them, so every storage of a model of the editor
+    // is available: `SV` picks it and `SNV` picks none.
+    //
+    // The probes of `scripts/wine-oracle/probes/select/` say the same with
+    // the original: with the storage `1` declared, the `SV` selection
+    // leaves the number of the entity in the parameter and the `SNV` one
+    // leaves a zero.
+    let model = |op: &'static str| {
+        let nodes = vec![
+            node(
+                1,
+                "StorageDef",
+                None,
+                &[],
+                &[("Storage", "1"), ("Tamaño", "10")],
+            ),
+            node(
+                2,
+                "Generate",
+                None,
+                &[("Salida1", Some("A"))],
+                &[("Media", "60"), ("Modificador", "0")],
+            ),
+            node(
+                3,
+                "SelectS",
+                Some("A"),
+                &[("Salida1", Some("B")), ("Salida2", None)],
+                &[("Param", "P"), ("minimo", "1"), ("maximo", "10"), ("op", op)],
+            ),
+            // The selection leaves the number of the entity it picked in the
+            // parameter `P` (and a zero when it picks none), so the test says
+            // which of the two happened.
+            node(
+                4,
+                "Test",
+                Some("B"),
+                &[("Salida1", Some("A_Terminate")), ("Salida2", Some("A_Terminate1"))],
+                &[("1_Valor", "P:P"), ("2_OP", "="), ("3_Valor", "1")],
+            ),
+            node(5, "Terminate", Some("A_Terminate"), &[], &[]),
+            node(6, "Terminate", Some("A_Terminate1"), &[], &[]),
+        ];
+        let links = vec![(2, 0, 3, 0), (3, 0, 4, 0), (4, 0, 5, 0), (4, 1, 6, 0)];
+        let program = wired(&nodes, &links, 3600.0);
+        let report = render_report(&support::run(&program, 3600.0, 1), &program);
+        (entries(&report, "A_Terminate"), entries(&report, "A_Terminate1"))
+    };
+    // The available storage is picked: every transaction leaves the number
+    // of the entity in the parameter.
+    let (picked, missed) = model("Disponible");
+    assert!(picked > 0, "the SV selection picked nothing: {picked}/{missed}");
+    assert_eq!(missed, 0, "the SV selection missed a transaction");
+    // The unavailable one is not: nothing is picked and the parameter stays
+    // at zero.
+    let (picked, missed) = model("NoDisponible");
+    assert_eq!(picked, 0, "the SNV selection picked something");
+    assert!(missed > 0, "the SNV selection did not run");
+}
+
+#[test]
+fn the_selection_by_the_availability_of_a_storage_writes_its_letter() {
+    // The `op_Logic_Stor` list of the original has six operators, and the
+    // `SelectS` class takes its `op` from it: `SF` a full storage, `SNF` one
+    // that is not full, `SE` an empty one, `SNE` one that is not empty, `SV`
+    // one that is available and `SNV` one that is not
+    // (`Genmsi_20230711.backup/gmacroconfig.gmcfg`, and the listing of the
+    // original in `scripts/wine-oracle/probes/select/`).
+    let model = |op: &'static str| {
+        let nodes = vec![
+            node(
+                1,
+                "Generate",
+                None,
+                &[("Salida1", Some("A"))],
+                &[("Media", "60"), ("Modificador", "0")],
+            ),
+            node(
+                2,
+                "SelectS",
+                Some("A"),
+                &[("Salida1", Some("B")), ("Salida2", None)],
+                &[("Param", "param"), ("minimo", "1"), ("maximo", "10"), ("op", op)],
+            ),
+            node(3, "Terminate", Some("B"), &[], &[]),
+        ];
+        let links = vec![(1, 0, 2, 0), (2, 0, 3, 0)];
+        wired(&nodes, &links, 3600.0)
+    };
+    assert_eq!(
+        named(&model("Disponible"), "A_SelectS"),
+        "A_SelectS SELECT SV param,1,10"
+    );
+    assert_eq!(
+        named(&model("NoDisponible"), "A_SelectS"),
+        "A_SelectS SELECT SNV param,1,10"
+    );
 }
 
 #[test]

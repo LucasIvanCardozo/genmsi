@@ -5,6 +5,10 @@
 //! trace has to carry the resolved name. Blocks that touch no entity keep an
 //! empty detail, and the `wait` and `leave` events keep the detail they had.
 //!
+//! A transaction born in a generator leaves it for the next block: the trace
+//! says so, with the block it goes to, so a reader can follow the
+//! transaction from the place it was born.
+//!
 //! The report also publishes the samples of a table, the state of a logic
 //! switch, the value of a savevalue and the members that leave a chain. The
 //! trace says all of it, so a reader can rebuild the report's figures from
@@ -255,6 +259,68 @@ fn leave_trace_still_carries_the_target() {
             .any(|next| next.event == "enter" && next.block == target && next.xact == event.xact);
         assert!(enters, "the transaction enters the target block");
     }
+}
+
+#[test]
+fn the_generator_publishes_the_leave_of_the_transaction_it_born() {
+    let (program, result) = run_model();
+    let generators: Vec<usize> = program
+        .blocks
+        .iter()
+        .enumerate()
+        .filter(|(_, block)| block.class == "Generate")
+        .map(|(index, _)| index)
+        .collect();
+    assert!(!generators.is_empty(), "the model has a Generate block");
+    let mut checked = 0;
+    for (at, event) in result.trace.iter().enumerate() {
+        if event.event != "generate" {
+            continue;
+        }
+        let generator = event.block;
+        assert!(
+            generators.contains(&generator),
+            "the transaction is born in a Generate block: {generator}"
+        );
+        // The transaction that was born is the one that leaves.
+        let (leave_at, leave) = result
+            .trace
+            .iter()
+            .enumerate()
+            .find(|(later, other)| {
+                *later > at
+                    && other.event == "leave"
+                    && other.block == generator
+                    && other.xact == event.xact
+            })
+            .unwrap_or_else(|| {
+                panic!(
+                    "the transaction {} leaves the generator {generator}",
+                    event.xact
+                )
+            });
+        let target: usize = leave
+            .detail
+            .strip_prefix("-> ")
+            .unwrap_or_else(|| panic!("unexpected leave detail {:?}", leave.detail))
+            .parse()
+            .expect("the target is a block index");
+        assert!(target < program.blocks.len(), "the target block exists");
+        // The transaction goes on to the block the trace names.
+        let enters = result.trace.iter().enumerate().any(|(later, other)| {
+            later > leave_at
+                && other.event == "enter"
+                && other.block == target
+                && other.xact == event.xact
+        });
+        assert!(
+            enters,
+            "the transaction {} enters the block {target} it left the generator for",
+            event.xact
+        );
+        checked += 1;
+    }
+    assert!(checked > 0, "the model generates transactions");
 }
 
 #[test]

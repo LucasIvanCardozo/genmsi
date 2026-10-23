@@ -25,11 +25,11 @@ expression: stdout(&output)
     {
       "time": 2700.0,
       "xact": 1,
-      "block": 13,
-      "class": "Queue",
-      "label": "A_Queue",
-      "event": "enter",
-      "detail": "qAfuera"
+      "block": 0,
+      "class": "Generate",
+      "label": null,
+      "event": "leave",
+      "detail": "-> 13"
     },
     {
       "time": 2700.0,
@@ -37,8 +37,8 @@ expression: stdout(&output)
       "block": 13,
       "class": "Queue",
       "label": "A_Queue",
-      "event": "leave",
-      "detail": "-> 4"
+      "event": "enter",
+      "detail": "qAfuera"
     }
   ]
 }

@@ -484,7 +484,19 @@ impl<'p> Simulation<'p> {
             self.record_trace(xact, block_index, "generate", String::new());
         }
         match block.next_default() {
-            Some(target) => self.enter_block(xact, target),
+            Some(target) => {
+                // The transaction is born in the generator and goes on to the
+                // next block: the trace says that it left the generator.
+                //
+                // The event is recorded here, and not with `leave`, because
+                // the generator does not hold the transaction: its `current`
+                // counts the transaction that is scheduled, and a generator
+                // without a next block takes no transaction at all.
+                if self.config.trace {
+                    self.record_trace(xact, block_index, "leave", format!("-> {target}"));
+                }
+                self.enter_block(xact, target);
+            }
             None => self.remove_transaction(xact),
         }
 

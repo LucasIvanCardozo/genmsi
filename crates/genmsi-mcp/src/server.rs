@@ -129,9 +129,11 @@ fn source_of(path: &Option<String>, model: &Option<String>) -> Result<ModelSourc
     }
 }
 
-/// The default seed of a run, the same default the CLI uses.
+/// The default seed of a run: one drawn at random, as the CLI does.
+///
+/// The run says which seed it used, so the caller can repeat it.
 fn default_seed() -> u64 {
-    1
+    genmsi_core::random_seed()
 }
 
 /// The default number of trace records, the same default the CLI uses.

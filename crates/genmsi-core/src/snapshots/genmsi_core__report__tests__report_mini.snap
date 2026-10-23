@@ -1,6 +1,5 @@
 ---
 source: crates/genmsi-core/src/report.rs
-assertion_line: 1281
 expression: text
 ---
                              Reporte MicroVisualSIS
@@ -8,7 +7,7 @@ expression: text
  START_TIME    END_TIME     BLOCKS    FACILITIES    STORAGES
         0           10         3           0            0
 
- LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE                                
+ LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE                                 
          COUNT   COUNT   
     1        2       1     0              1  GENERATE        10,,,3                     
     2        1       0     0            A_q  QUEUE           cola                       

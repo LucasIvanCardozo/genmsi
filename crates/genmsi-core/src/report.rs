@@ -17,7 +17,7 @@ use crate::program::{
     AssignOp, BlockKind, ExecBlock, GateCondition, LogicOp, Program, RelOp, SelectMode, SelectState,
     TransferSpec,
 };
-use crate::sim::{BlockStats, GroupStat, LogicSwitchStat, RunResult};
+use crate::sim::{BlockStats, LogicSwitchStat, RunResult};
 
 /// Format a number the way the original report does.
 ///
@@ -68,6 +68,18 @@ pub fn not_computed() -> String {
     "0.000".to_string()
 }
 
+/// The time of a pending event, as the original writes it.
+///
+/// The original's events happen at whole times (its generator draws whole
+/// intervals) and its `BDT` column writes them without decimals
+/// (`3615,334` is ours, `3646` is the original's).
+pub fn event_time(value: f64) -> String {
+    if !value.is_finite() {
+        return "0".to_string();
+    }
+    format!("{}", value.round() as i64)
+}
+
 /// Render the human-readable report.
 pub fn render(result: &RunResult, program: &Program) -> String {
     let mut out = String::with_capacity(8 * 1024);
@@ -90,7 +102,7 @@ pub fn render(result: &RunResult, program: &Program) -> String {
     let _ = writeln!(out);
     let _ = writeln!(
         out,
-        " LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE{:<32}",
+        " LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE{:<33}",
         ""
     );
     let _ = writeln!(out, "         COUNT   COUNT   ");
@@ -255,103 +267,7 @@ pub fn render(result: &RunResult, program: &Program) -> String {
             table.intervals
         );
         let _ = writeln!(out, "{:<16}{:<16}{operands}  ", table.name, "TABLE");
-        let _ = writeln!(out, "    {:<19}: {}", "MEDIA", number(table.mean()));
-        let _ = writeln!(
-            out,
-            "    {:<19}: {}",
-            "DESVIACION ESTANDAR",
-            number(table.stddev())
-        );
-        // The tabulations that had to be retried: the original counts them
-        // apart and none of them happens in a model that runs.
-        let _ = writeln!(out, "    {:<19}: {}", "CANTIDAD EN RETRY", 0);
-        let _ = writeln!(out);
-        let _ = writeln!(
-            out,
-            "    INTERVALO         FRECUENCIA     %     %ACUMULADO     %REMANENTE"
-        );
-        let samples = table.samples.max(1) as f64;
-        let mut cumulative = 0.0;
-        let classes = table.frequencies.len().saturating_sub(1);
-        // The last class of the table is the one of the values that do not
-        // fit in any other: the original writes them apart, as the values
-        // above the last limit.
-        let rows: Vec<(String, String, String, u64)> = (0..table.frequencies.len())
-            .map(|index| {
-                let count = table.frequencies[index];
-                let (low, separator, high) = if index == classes {
-                    (
-                        ">".to_string(),
-                        "a".to_string(),
-                        whole(table.first + (classes.saturating_sub(1) as f64) * table.width),
-                    )
-                } else {
-                    let low = if index == 0 {
-                        table.first
-                    } else {
-                        table.first + (index as f64 - 1.0) * table.width + 1.0
-                    };
-                    let high = table.first + index as f64 * table.width;
-                    (whole(low), "-".to_string(), whole(high))
-                };
-                (low, separator, high, count)
-            })
-            .collect();
-        for (index, (low, separator, high, count)) in rows.iter().enumerate() {
-            let share = *count as f64 / samples * 100.0;
-            cumulative += share;
-            let _ = writeln!(
-                out,
-                "    {:<4}{:<3}{:<3}{:>15}{:>11}{:>12}{:>15}",
-                low,
-                separator,
-                high,
-                count,
-                number(share),
-                number(cumulative),
-                number(100.0 - cumulative)
-            );
-            // The original stops the table when the classes add up to the
-            // whole, and says how many empty classes are left.
-            if cumulative >= 100.0 - 1e-9 && index + 1 < rows.len() {
-                let _ = writeln!(
-                    out,
-                    "    Las frecuencias restantes ({}) son todas cero.",
-                    rows.len() - index - 1
-                );
-                break;
-            }
-        }
-        // The statistics of the values that did not fit: the original writes
-        // them when there are any.
-        if table.overflow > 0 {
-            let _ = writeln!(out);
-            let _ = writeln!(
-                out,
-                "    {:<29} : {}",
-                "MEDIA OVERFLOW",
-                number(table.overflow_mean())
-            );
-            let _ = writeln!(
-                out,
-                "    {:<29} : {}",
-                "DESVIACION ESTANDAR OVERFLOW",
-                number(table.overflow_stddev())
-            );
-        }
-        let _ = writeln!(out);
-        let _ = writeln!(
-            out,
-            "    {:<29} : {}",
-            "CANTIDAD DE VALORES TABULADOS",
-            table.samples
-        );
-        let _ = writeln!(
-            out,
-            "    {:<29} : {}",
-            "VALOR MAXIMO TABULADO",
-            number(table.max_value)
-        );
+        write_table_body(&mut out, table);
     }
 
     for name in &result.qtable_names {
@@ -360,18 +276,29 @@ pub fn render(result: &RunResult, program: &Program) -> String {
         };
         let _ = writeln!(out);
         let _ = writeln!(out, "QTABLES");
-        let _ = writeln!(
-            out,
-            "{:<16} QTABLE          {}, {}, {}",
-            table.name, number(table.first), number(table.width), table.intervals
-        );
-        let _ = writeln!(out, "    MEDIA              : {}", number(table.mean()));
-        let _ = writeln!(
-            out,
-            "    DESVIACION ESTANDAR: {}",
-            number(table.stddev())
-        );
-        let _ = writeln!(out, "    CANTIDAD DE VALORES: {}", table.samples);
+        // The header of the section is the statement of the queue table: its
+        // name, the verb and the operands of the `QTABLE` statement (the
+        // queue whose waiting times are tabulated, the first interval, the
+        // width of the intervals and how many there are). The original writes
+        // them as whole numbers (`QTabla  QTABLE  qRecurso,0,600,60`).
+        let operands = match program.definitions.qtables.get(name) {
+            Some(definition) => format!(
+                "{},{},{},{}",
+                definition.queue,
+                whole(definition.first),
+                whole(definition.width),
+                definition.intervals
+            ),
+            None => format!(
+                "{},{},{},{}",
+                table.name,
+                whole(table.first),
+                whole(table.width),
+                table.intervals
+            ),
+        };
+        let _ = writeln!(out, "{:<16}{:<16}{operands}  ", table.name, "QTABLE");
+        write_table_body(&mut out, table);
     }
 
     if !result.entities.savevalues.is_empty() {
@@ -405,23 +332,32 @@ pub fn render(result: &RunResult, program: &Program) -> String {
     }
 
     for (numeric, section) in [(false, "XACT_GROUP"), (true, "NUMERIC_GROUP")] {
-        let groups: Vec<&GroupStat> = result
+        // The original writes every group a statement names, even the ones
+        // nobody belongs to: the `EXAMINE`, the `EXAMINE NUMBER` and the
+        // `REMOVE` of a group that stays empty still have their row
+        // (`UNGRUPO  0  0`). The groups the run had are the ones the engine
+        // knows; the others come from the statements of the program.
+        let mut groups: std::collections::BTreeMap<String, (u64, u64)> = result
             .groups
             .iter()
             .filter(|group| group.numeric == numeric)
+            .map(|group| (group.name.clone(), (group.size, group.retry)))
             .collect();
+        for name in named_groups(program, numeric) {
+            groups.entry(name).or_insert((0, 0));
+        }
         if groups.is_empty() {
             continue;
         }
         let _ = writeln!(out);
         let _ = writeln!(out, "{:<21}{:>10}{:>11}", section, "GROUP_SIZE", "RETRY");
-        for group in groups {
+        for (name, (size, retry)) in &groups {
             let _ = writeln!(
                 out,
                 "  {:<26}{:>2}{:>11}",
-                group.name.to_uppercase(),
-                group.size,
-                group.retry
+                name.to_uppercase(),
+                size,
+                retry
             );
         }
     }
@@ -439,7 +375,7 @@ pub fn render(result: &RunResult, program: &Program) -> String {
                 "{:>14}{:>7}{:>11}{:>9}{:>8}",
                 event.xact,
                 event.priority,
-                whole(event.time),
+                event_time(event.time),
                 table.numbers.get(event.block).copied().unwrap_or_default(),
                 event
                     .next
@@ -458,6 +394,142 @@ pub fn render(result: &RunResult, program: &Program) -> String {
     }
 
     out
+}
+
+/// Write the body of a table section: its statistics, its histogram and the
+/// two lines that close it.
+///
+/// The `TABLAS` and the `QTABLES` sections of the original have the same
+/// body: the table of a value (`TABLE`) and the table of the waiting times of
+/// a queue (`QTABLE`) are written the same way, and the original prints the
+/// whole histogram of both (the classes and the class of the values that do
+/// not fit, `>   a  34800`).
+fn write_table_body(out: &mut String, table: &crate::stat::Table) {
+    let _ = writeln!(out, "    {:<19}: {}", "MEDIA", number(table.mean()));
+    let _ = writeln!(
+        out,
+        "    {:<19}: {}",
+        "DESVIACION ESTANDAR",
+        number(table.stddev())
+    );
+    // The tabulations that had to be retried: the original counts them
+    // apart and none of them happens in a model that runs.
+    let _ = writeln!(out, "    {:<19}: {}", "CANTIDAD EN RETRY", 0);
+    let _ = writeln!(out);
+    let _ = writeln!(
+        out,
+        "    INTERVALO         FRECUENCIA     %     %ACUMULADO     %REMANENTE"
+    );
+    let samples = table.samples.max(1) as f64;
+    let mut cumulative = 0.0;
+    let classes = table.frequencies.len().saturating_sub(1);
+    // The last class of the table is the one of the values that do not
+    // fit in any other: the original writes them apart, as the values
+    // above the last limit.
+    let rows: Vec<(String, String, String, u64)> = (0..table.frequencies.len())
+        .map(|index| {
+            let count = table.frequencies[index];
+            let (low, separator, high) = if index == classes {
+                (
+                    ">".to_string(),
+                    "a".to_string(),
+                    whole(table.first + (classes.saturating_sub(1) as f64) * table.width),
+                )
+            } else {
+                let low = if index == 0 {
+                    table.first
+                } else {
+                    table.first + (index as f64 - 1.0) * table.width + 1.0
+                };
+                let high = table.first + index as f64 * table.width;
+                (whole(low), "-".to_string(), whole(high))
+            };
+            (low, separator, high, count)
+        })
+        .collect();
+    for (index, (low, separator, high, count)) in rows.iter().enumerate() {
+        let share = *count as f64 / samples * 100.0;
+        cumulative += share;
+        let _ = writeln!(
+            out,
+            "    {:<3} {:<3}{:<3}{:>15}{:>11}{:>12}{:>15}",
+            low,
+            separator,
+            high,
+            count,
+            number(share),
+            number(cumulative),
+            number(100.0 - cumulative)
+        );
+        // The original stops the table when the classes add up to the
+        // whole, and says how many empty classes are left.
+        if cumulative >= 100.0 - 1e-9 && index + 1 < rows.len() {
+            let _ = writeln!(
+                out,
+                "    Las frecuencias restantes ({}) son todas cero.",
+                rows.len() - index - 1
+            );
+            break;
+        }
+    }
+    // The statistics of the values that did not fit: the original writes
+    // them when there are any.
+    if table.overflow > 0 {
+        let _ = writeln!(out);
+        let _ = writeln!(
+            out,
+            "    {:<29} : {}",
+            "MEDIA OVERFLOW",
+            number(table.overflow_mean())
+        );
+        let _ = writeln!(
+            out,
+            "    {:<29} : {}",
+            "DESVIACION ESTANDAR OVERFLOW",
+            number(table.overflow_stddev())
+        );
+    }
+    let _ = writeln!(out);
+    let _ = writeln!(
+        out,
+        "    {:<29} : {}",
+        "CANTIDAD DE VALORES TABULADOS",
+        table.samples
+    );
+    let _ = writeln!(
+        out,
+        "    {:<29} : {}",
+        "VALOR MAXIMO TABULADO",
+        number(table.max_value)
+    );
+}
+
+/// The groups the statements of the program name, of the kind asked for.
+///
+/// The `EXAMINE` of the original examines the transaction (a group of
+/// transactions) and the `EXAMINE NUMBER` examines a number (a group of
+/// numbers); the `REMOVE` takes transactions out of a group of transactions.
+/// The original writes the row of a group even when it stays empty, so the
+/// report cannot only list the groups the run had.
+fn named_groups(program: &Program, numeric: bool) -> Vec<String> {
+    let mut names = Vec::new();
+    for block in &program.blocks {
+        match &block.kind {
+            BlockKind::Examine(spec) => {
+                // The `Examine` class examines the transaction and the
+                // `ExamineNumber` class examines a number.
+                if spec.transaction != numeric {
+                    names.push(spec.group.clone());
+                }
+            }
+            // The `REMOVE` takes transactions out of a group of transactions.
+            BlockKind::Remove(spec) if !numeric => {
+                names.push(spec.group.clone());
+            }
+            _ => {}
+        }
+    }
+    names
 }
 
 /// One row of the block table.
@@ -494,6 +566,7 @@ fn block_table(program: &Program) -> BlockTable {
     let names = crate::gpss::block_names(program);
     let lines = crate::gpss::listing_lines(program);
     let order = crate::gpss::listing_order(program);
+    let compound = compound_modules(program);
     let mut rows = Vec::with_capacity(program.blocks.len());
     let mut numbers = vec![0usize; program.blocks.len()];
     let mut statement = 0usize;
@@ -510,7 +583,7 @@ fn block_table(program: &Program) -> BlockTable {
             block: index,
             line: lines.get(index).copied().unwrap_or_default(),
             loc,
-            text: type_and_operands(&program.blocks[index], &names),
+            text: type_and_operands(&program.blocks[index], &names, &compound),
         });
         if let BlockKind::Counter(spec) = &program.blocks[index].kind
             && let Some(parameter) = &spec.parameter
@@ -526,6 +599,27 @@ fn block_table(program: &Program) -> BlockTable {
         }
     }
     BlockTable { rows, numbers }
+}
+
+/// The modules whose class writes more than one statement.
+///
+/// A class that expands into several statements has a macro code of its own,
+/// and that macro writes the operands that the class does not configure
+/// always: the `StorageUse` writes its `ENTER` and its `LEAVE` without the
+/// units of the storage (`ENTER Almacen`), while the `Enter` class writes
+/// them always (`ENTER AStorage,1`), because its `Cantidad` has a default of
+/// one. The compiled program does not keep the text of the properties, so
+/// the report tells the two apart by the number of statements of the module.
+fn compound_modules(program: &Program) -> std::collections::HashSet<u32> {
+    let mut counts: std::collections::HashMap<u32, usize> = std::collections::HashMap::new();
+    for block in &program.blocks {
+        *counts.entry(block.module_id).or_insert(0) += 1;
+    }
+    counts
+        .into_iter()
+        .filter(|(_, count)| *count > 1)
+        .map(|(id, _)| id)
+        .collect()
 }
 
 /// The order the original writes the entities in.
@@ -568,7 +662,7 @@ pub fn block_type(block: &ExecBlock) -> std::borrow::Cow<'_, str> {
         "GateL" | "GateS" | "GateF" => std::borrow::Cow::Borrowed("GATE"),
         // The `Match` class expands into a `TRANSFER` and a `MATCH`.
         "MatchTransfer" => std::borrow::Cow::Borrowed("TRANSFER"),
-        "Multifurcacion" => std::borrow::Cow::Borrowed("TRANSFER"),
+        "Multifurcacion" | "MultifurcacionP" => std::borrow::Cow::Borrowed("TRANSFER"),
         "SelectF" => std::borrow::Cow::Borrowed("SELECT"),
         "JoinNumber" | "JoinMe" => std::borrow::Cow::Borrowed("JOIN"),
         "ExamineNumber" => std::borrow::Cow::Borrowed("EXAMINE"),
@@ -617,23 +711,29 @@ fn port_target_label(names: &[String], block: &ExecBlock, port: &str) -> Option<
 /// First operand of `TRANSFER`: the probability in thousandths like the
 /// original (`800` for `80%`), the raw expression for function/variable
 /// probabilities (`FN$PValue`), and nothing for the unconditional form.
+///
+/// The original writes the property of the model in thousandths (`100%` is
+/// `1000`) and the transfer that the `MATCH` class writes has no probability
+/// at all (`TRANSFER ,AAA`).
 fn transfer_probability(spec: &TransferSpec) -> String {
-    if spec.thousandths {
-        return spec.probability.to_string();
+    let source = spec.probability.source();
+    if let Ok(value) = source.trim().parse::<f64>() {
+        let per_thousand = if spec.thousandths {
+            value
+        } else {
+            value * 1000.0
+        };
+        return per_thousand.round().to_string();
     }
-    match spec.probability.ast() {
-        // The compiler folds an empty `Prob` into 1.0; the original prints an
-        // empty first operand there (`TRANSFER  ,A_Enter`).
-        Expr::Num(1.0) => String::new(),
-        Expr::Num(probability) => format!("{}", (probability * 1000.0).round() as i64),
-        _ => spec.probability.to_string(),
-    }
+    // A probability that is an expression keeps the text of the model, in the
+    // notation of the original (`X$qValue`).
+    crate::gpss::sna(&spec.probability)
 }
 
 /// Whether an operand is the number one.
 ///
-/// The original writes the units of a queue or a storage only when the model
-/// gives them: `QUEUE qAlmacen,2` has two, `ENTER Migracion` has none.
+/// The original writes the units of a queue only when the model gives them:
+/// `QUEUE qAlmacen,2` has two, and `QUEUE qAlmacen` has none.
 fn is_one_unit(expr: &ProgramExpr) -> bool {
     expr.source().parse::<f64>() == Ok(1.0)
 }
@@ -643,8 +743,8 @@ fn is_one_unit(expr: &ProgramExpr) -> bool {
 /// A percentage literal is the editor's per-mille value (`70%` is the number
 /// 700, see the `percent` rule in `expr/grammar.pest`), and the original prints
 /// that number: `A_Assign43  ASSIGN  pValue,700` in `TP3__aeropuerto`, where the
-/// model stores `70%`. Every other expression keeps its source text, so SNA
-/// operands read back exactly as the model wrote them.
+/// model stores `70%`. Every other expression keeps its text, so the operands
+/// read back exactly as the model wrote them.
 fn expr_operand(expr: &ProgramExpr) -> String {
     if expr.source().trim_end().ends_with('%')
         && let Expr::Num(value) = expr.ast()
@@ -653,7 +753,7 @@ fn expr_operand(expr: &ProgramExpr) -> String {
     }
     // A bare operand that resolves to a parameter is the original's `*name`:
     // `A_Assign6  ASSIGN  cantPAux,*cantP` (`TP3__aeropuerto`), where the model
-    // writes `cantP`. A prefixed form (`P:cantP`) keeps its source text.
+    // writes `cantP`. A prefixed form (`P:cantP`) keeps its own text.
     if let Expr::Ref {
         kind: RefKind::Parameter,
         name: NameSource::Literal(name),
@@ -662,7 +762,10 @@ fn expr_operand(expr: &ProgramExpr) -> String {
     {
         return format!("*{name}");
     }
-    expr.to_string()
+    // The rest of the operands keep the text of the model in the notation of
+    // the original, where the model writes a `:` (`P:Param` becomes `P$Param`,
+    // `X:Count` becomes `X$Count` and `FN:Value` becomes `FN$Value`).
+    crate::gpss::sna(expr)
 }
 
 /// Suffix the original appends to `ASSIGN`/`SAVEVALUE` parameters for the
@@ -683,6 +786,7 @@ fn assign_suffix(op: AssignOp) -> &'static str {
 fn operand_parts(
     block: &ExecBlock,
     names: &[String],
+    compound: &std::collections::HashSet<u32>,
 ) -> (Option<&'static str>, Vec<String>) {
     let mut mode: Option<&'static str> = None;
     let refs: Vec<String> = match &block.kind {
@@ -748,11 +852,15 @@ fn operand_parts(
             ]
         }
         BlockKind::Enter(spec) | BlockKind::Leave(spec) => {
-            // The units are written when the model gives them: the original's
-            // `ENTER Migracion` has none, and its `ENTER almacen,2` has two.
+            // The original writes the units of the storage: the `Enter` and
+            // the `Leave` classes have a `Cantidad` with a default of one and
+            // the original writes it (`ENTER AStorage,1`, `LEAVE AStorage,1`).
+            // The macro of a class that writes several statements (the
+            // `StorageUse`) has no default and the original writes the units
+            // only when the model gives them (`ENTER Almacen`).
             let mut refs = vec![spec.storage.to_string()];
-            if !is_one_unit(&spec.units) {
-                refs.push(spec.units.to_string());
+            if !compound.contains(&block.module_id) || !is_one_unit(&spec.units) {
+                refs.push(expr_operand(&spec.units));
             }
             refs
         }
@@ -779,10 +887,13 @@ fn operand_parts(
             refs
         }
         BlockKind::MultiTransfer(spec) => {
-            // `Multifurcacion` generates a helper function in the original
-            // (`TRANSFER  ,FN$MultifurcacionGO`, TP10); we keep the branch
-            // weights the model actually stores.
-            spec.weights.iter().map(expr_operand).collect()
+            // The original writes the transfer that sends the transaction to
+            // the function that maps the branch to its destination
+            // (`TRANSFER ,FN$MultifurcacionGO`, the bank `Multifurcacion`).
+            match &spec.destination_function {
+                Some(go) => vec![String::new(), format!("FN${go}")],
+                None => spec.weights.iter().map(expr_operand).collect(),
+            }
         }
         BlockKind::Gate(spec) => {
             // `GateL  GATE  LS  Puerta`, `GateL  GATE  LR  Fin,A_Counter1`,
@@ -790,7 +901,14 @@ fn operand_parts(
             // `GateF  GATE  NU  Juan,A_Advance`.
             let (letter, entity) = match &spec.condition {
                 GateCondition::Logic { switch, state } => {
-                    (if *state { "LS" } else { "LR" }, switch.to_string())
+                    if block.class == "Gate" {
+                        // The `GateM` class waits for a label: the original
+                        // writes `M` when the transaction has to match it and
+                        // `NM` when it has not to.
+                        (if *state { "M" } else { "NM" }, switch.to_string())
+                    } else {
+                        (if *state { "LS" } else { "LR" }, switch.to_string())
+                    }
                 }
                 GateCondition::Storage { storage, op } => {
                     (op.letter(), storage.to_string())
@@ -807,10 +925,16 @@ fn operand_parts(
             refs
         }
         BlockKind::Logic(spec) => {
-            // `LOGIC   R       Molinete` / `LOGIC   S       Molinete`.
-            mode = Some(match spec.op {
-                LogicOp::Set => "S",
-                LogicOp::Reset => "R",
+            // `LOGIC   R       Molinete` / `LOGIC   S       Molinete`, and
+            // `LOGIC   I       Molinete` for the third operator of the
+            // original, the one that inverts the state of the switch.
+            mode = Some(if spec.invert {
+                "I"
+            } else {
+                match spec.op {
+                    LogicOp::Set => "S",
+                    LogicOp::Reset => "R",
+                }
             });
             vec![spec.switch.to_string()]
         }
@@ -995,7 +1119,30 @@ fn operand_parts(
             mode = Some(if spec.minimum { "MIN" } else { "E" });
             refs
         }
-        BlockKind::Alter(spec) => vec![spec.group.clone()],
+        BlockKind::Alter(spec) => {
+            // `ALTER    E       ungrupo,1,param,0,otro,1` (the bank `Alter`):
+            // the group, the number of members altered, the parameter altered
+            // and its value, and the parameter compared and its value.
+            mode = Some(rel_op_letter(spec.comparison));
+            let mut refs = vec![
+                spec.group.clone(),
+                expr_operand(&spec.count),
+                spec.altered_parameter.clone().unwrap_or_default(),
+                spec.altered_value.as_ref().map(expr_operand).unwrap_or_default(),
+                spec.compared_parameter.clone().unwrap_or_default(),
+                spec.compared_value.as_ref().map(expr_operand).unwrap_or_default(),
+            ];
+            // The destination of the failure output ("No alteró") is the last
+            // operand of the statement, and only when that output is
+            // connected: the original's report for the probe `AlterMiembro`
+            // is `ALTER    E       UnGrupo,1,Param,99,Param,0,A_Terminate1`
+            // and the one of the bank, whose failure output is unconnected,
+            // is `ALTER    E       ungrupo,1,param,0,otro,1`.
+            if let Some(label) = port_target_label(names, block, "Salida2") {
+                refs.push(label);
+            }
+            refs
+        }
         BlockKind::InitialLogic(spec) => vec![spec.switch.to_string()],
         BlockKind::NoOp | BlockKind::Buffer => Vec::new(),
     };
@@ -1007,7 +1154,8 @@ fn operand_parts(
 /// comma-separated operand list.
 pub fn operands(block: &ExecBlock, program: &Program) -> String {
     let names = crate::gpss::block_names(program);
-    let (mode, refs) = operand_parts(block, &names);
+    let compound = compound_modules(program);
+    let (mode, refs) = operand_parts(block, &names, &compound);
     let list = refs.join(",");
     match mode {
         Some(mode) => format!("{mode} {list}"),
@@ -1022,8 +1170,12 @@ pub fn operands(block: &ExecBlock, program: &Program) -> String {
 /// operand list starts at column 16 (`GATE    LS      Puerta`) or 17
 /// (`REMOVE   E       GPescando,...`). Without a mode the list starts at
 /// column 16 (`TRANSFER  800,A_Advance5,A_Advance2`).
-fn type_and_operands(block: &ExecBlock, names: &[String]) -> String {
-    let (mode, refs) = operand_parts(block, names);
+fn type_and_operands(
+    block: &ExecBlock,
+    names: &[String],
+    compound: &std::collections::HashSet<u32>,
+) -> String {
+    let (mode, refs) = operand_parts(block, names, compound);
     let mut trimmed = refs;
     if !keeps_the_trailing_empty(block) {
         while trimmed.last().is_some_and(|part| part.is_empty()) {
@@ -1034,7 +1186,14 @@ fn type_and_operands(block: &ExecBlock, names: &[String]) -> String {
     let block_type = block_type(block);
     match mode {
         Some(mode) => {
-            let type_width = (block_type.len() + 3).max(8);
+            // The `ALTER` of the original writes its operator in a column of
+            // its own and the verb takes one space more than the other
+            // statements (`ALTER    E       ungrupo,1,param,0,otro,1`).
+            let type_width = if matches!(block.kind, BlockKind::Alter(_)) {
+                9
+            } else {
+                (block_type.len() + 3).max(8)
+            };
             format!("{block_type:<type_width$}{mode:<8}{list}")
         }
         None => format!("{block_type:<16}{list}"),
@@ -1044,11 +1203,14 @@ fn type_and_operands(block: &ExecBlock, names: &[String]) -> String {
 /// Whether the statement of the block ends with an empty operand.
 ///
 /// The `SELECTENT` of the original has one operand more than the other
-/// selections and it is empty: `E param,1,10,*1,Q,`. The other statements
-/// drop the empty operands they end with.
+/// selections and it is empty: `E param,1,10,*1,Q,`. The `LOOP` has always
+/// two operands, the parameter and the destination of the iteration, and the
+/// second one is empty when the model does not connect it (`LOOP Param,`). The
+/// other statements drop the empty operands they end with.
 fn keeps_the_trailing_empty(block: &ExecBlock) -> bool {
     match &block.kind {
         BlockKind::Select(spec) => matches!(spec.state, Some(SelectState::EntityEqual)),
+        BlockKind::Loop(_) => true,
         _ => false,
     }
 }

@@ -618,6 +618,18 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
                 // The class takes the transaction out of its group: the
                 // `REMOVE` without the comparison of the `RemoveTrans` class.
                 statement(out, "REMOVE", &spec.group);
+            } else if let Some(number) = &spec.number {
+                // The `REMOVE` in numeric mode: the group, an empty limit,
+                // the number, and the destination of the failure output as
+                // the seventh operand (`REMOVE E UnGrupo,,0` and
+                // `REMOVE E UnGrupo,,0,,,A_Terminate1`).
+                let mut operands = format!("E {},,{}", spec.group, sna(number));
+                let destination = port_destination(block, names, "Salida2");
+                if !destination.is_empty() {
+                    operands.push_str(",,,");
+                    operands.push_str(&destination);
+                }
+                statement(out, "REMOVE", &operands);
             } else {
                 // The original writes: the group, the number of transactions,
                 // the parameter it compares and its value.

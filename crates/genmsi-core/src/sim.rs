@@ -1305,6 +1305,16 @@ impl<'p> Simulation<'p> {
                     // and the block counts it.
                     self.block_stats[block_index].entries += 1;
                     self.block_stats[block_index].current += 1;
+                    // It leaves the block it was waiting in: the original
+                    // keeps a transaction that waits at a shut gate counted in
+                    // the block it came from, and takes it out when the gate
+                    // finally opens.
+                    if resume
+                        && let Some(previous) = self.previous_block_of(xact)
+                        && self.block_stats[previous].current > 0
+                    {
+                        self.block_stats[previous].current -= 1;
+                    }
                     self.leave(xact, block_index, block.next_named("Salida1"));
                 } else if block.has_failure_port() {
                     // The transaction fails the test and leaves by the
@@ -1320,6 +1330,15 @@ impl<'p> Simulation<'p> {
                     // at zero (`GateL  GATE  LS  1` with `0 0 0`) and the
                     // switch counts the attempts in its `RETRY`.
                     self.count_gate_retry(&spec.condition, xact);
+                    // The transaction that waits for the gate is still in the
+                    // block it came from: the original keeps it there (the
+                    // queue of the `GateL` bench reads `13 13` with the gate
+                    // shut, and the generator of the bench reads `62 62`).
+                    if !resume
+                        && let Some(previous) = self.previous_block_of(xact)
+                    {
+                        self.block_stats[previous].current += 1;
+                    }
                     self.gate_waiters.entry(block_index).or_default().push(xact);
                     if let Some(transaction) = self.xacts.get_mut(&xact) {
                         transaction.transition(XactState::Waiting);
@@ -1787,6 +1806,32 @@ impl<'p> Simulation<'p> {
                         members.retain(|member| *member != xact);
                     }
                     self.leave(xact, block_index, block.next_default());
+                    return Ok(());
+                }
+                if let Some(number) = &spec.number {
+                    // The `REMOVE` in numeric mode takes the number out of a
+                    // numeric group, and the transaction goes to the failure
+                    // output when the number is not a member of it.
+                    let value = {
+                        let mut ctx = CtxView { sim: self, xact, depth: 0 };
+                        number.eval(&mut ctx)
+                    };
+                    let removed = self
+                        .numeric_groups
+                        .get_mut(&spec.group)
+                        .and_then(|members| {
+                            members
+                                .iter()
+                                .position(|member| (member - value).abs() < 1e-9)
+                                .map(|position| members.remove(position))
+                        })
+                        .is_some();
+                    let target = if removed {
+                        block.next_named("Salida1")
+                    } else {
+                        block.next_named("Salida2")
+                    };
+                    self.leave(xact, block_index, target);
                     return Ok(());
                 }
                 let (count, wanted) = {

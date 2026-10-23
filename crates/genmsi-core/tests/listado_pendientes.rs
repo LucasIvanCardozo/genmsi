@@ -124,7 +124,9 @@ fn logic_model(operator: &'static str) -> Program {
             "Generate",
             None,
             &[("Salida1", Some("A_Logic"))],
-            &[("Media", "1"), ("Modificador", "0")],
+            // One transaction: an even number of inversions would leave the
+            // switch as it was.
+            &[("Cantidad", "1"), ("Media", "1"), ("Modificador", "0")],
         ),
         node(
             2,
@@ -159,13 +161,7 @@ fn the_logic_keeps_the_letters_of_the_other_two_operators() {
 
 /// The inversion changes the state of the switch: a switch that starts reset
 /// ends set.
-///
-/// This one is pending: the engine reads the operator in
-/// `crates/genmsi-core/src/sim.rs` (the branch of `BlockKind::Logic`), and
-/// that file belongs to the work unit that is running in parallel, so the
-/// test waits for it. See `odd/tasks/notas-w2-listado.md`.
 #[test]
-#[ignore = "the engine does not invert the switch yet: sim.rs is another work unit's file"]
 fn the_logic_inverts_the_state_of_the_switch() {
     let program = logic_model("Invertir");
     let result = run(&program, 100.0, 1);

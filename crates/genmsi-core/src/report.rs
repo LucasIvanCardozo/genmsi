@@ -1088,6 +1088,19 @@ fn operand_parts(
                 // column empty: `REMOVE           UnGrupo`.
                 return (Some(""), vec![spec.group.clone()]);
             }
+            if let Some(number) = &spec.number {
+                // `A_RemoveNumber  REMOVE  E  UnGrupo,,0`: the group, an
+                // empty limit, the number, and the destination of the
+                // failure output as the seventh operand.
+                let mut refs = vec![spec.group.clone(), String::new(), expr_operand(number)];
+                if let Some(label) = port_target_label(names, block, "Salida2") {
+                    refs.push(String::new());
+                    refs.push(String::new());
+                    refs.push(label);
+                }
+                mode = Some("E");
+                return (mode, refs);
+            }
             let count = if spec.all {
                 "ALL".to_string()
             } else {

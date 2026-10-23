@@ -643,6 +643,12 @@ pub struct RemoveSpec {
     /// group; the `RemoveTrans` class takes the members that match a
     /// comparison.
     pub me: bool,
+    /// The number of the numeric mode (`REMOVE E <grupo>,,<número>`).
+    ///
+    /// The `RemoveNumber` class of the original removes a number from a
+    /// numeric group; the manual says so, and the original's own report
+    /// shows the group empty and with no numeric group row at all.
+    pub number: Option<ProgramExpr>,
 }
 
 /// `SCAN` specification.
@@ -2029,6 +2035,7 @@ impl Compiler<'_> {
                         parameter: None,
                         value: None,
                         me: true,
+                        number: None,
                     }),
                     label,
                     "Remove",
@@ -2058,8 +2065,9 @@ impl Compiler<'_> {
                         count: self.empty_expr(),
                         all: false,
                         parameter: None,
-                        value: Some(number),
+                        value: None,
                         me: false,
+                        number: Some(number),
                     }),
                     label,
                     // The statement is a `REMOVE`: the report names it by
@@ -2083,6 +2091,7 @@ impl Compiler<'_> {
                         parameter: self.name(module, "CompParam"),
                         value: self.sna(module, "CompValue")?,
                         me: false,
+                        number: None,
                     }),
                     label,
                     class,

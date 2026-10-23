@@ -149,7 +149,7 @@ expression: stdout(&output)
       "label": "A_Queue",
       "operands": "qAfuera",
       "entries": 9,
-      "current": 0,
+      "current": 9,
       "retries": 0
     },
     {

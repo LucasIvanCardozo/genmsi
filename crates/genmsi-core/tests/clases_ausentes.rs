@@ -357,16 +357,14 @@ fn removenumber(failure: bool) -> Program {
 fn the_remove_number_writes_a_remove_statement() {
     // The original writes `REMOVE E UnGrupo,,0` (and the destination of the
     // failure output as the seventh operand when that output is
-    // connected). The statement needs an arm of its own in
-    // `crates/genmsi-core/src/gpss.rs`, which is not part of this work: the
-    // listing carries today the shape the `REMOVE` of the `RemoveTrans`
-    // class has (the mode, the group, the empty limit, the empty parameter
-    // and the number). See `odd/tasks/notas-w3-clases.md`.
+    // connected). The statement has an arm of its own in
+    // `crates/genmsi-core/src/gpss.rs`: the mode, the group, an empty limit
+    // and the number.
     assert_eq!(
         statements(&removenumber(false)),
         vec![
             "GENERATE 60,30,,,2",
-            "A_RemoveNumber REMOVE E UnGrupo,,,,0",
+            "A_RemoveNumber REMOVE E UnGrupo,,0",
             "A_Terminate TERMINATE",
             "GENERATE 3600",
             "TERMINATE 1",

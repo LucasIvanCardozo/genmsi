@@ -1,0 +1,43 @@
+                             Reporte MicroVisualSIS
+
+ START_TIME    END_TIME     BLOCKS    FACILITIES    STORAGES
+        0         3600        22           0            1
+
+ LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE                                 
+         COUNT   COUNT   
+    2      361     360     0              1  GENERATE        10,0                       
+    3        1       1     0        A_Enter  ENTER           Almacen,1                  
+    4      121       2     0              3  GENERATE        60,0                       
+    5      119       0     0      GateLleno  GATE    SF      Almacen                    
+    6      119       0     0    A_Terminate  TERMINATE                                  
+    7       61      61     0              6  GENERATE        60,0                       
+    8        0       0     0    GateNoLleno  GATE    SNF     Almacen                    
+    9        0       0     0   A_Terminate1  TERMINATE                                  
+   10       61      61     0              9  GENERATE        60,0                       
+   11        0       0     0      GateVacio  GATE    SE      Almacen                    
+   12        0       0     0   A_Terminate2  TERMINATE                                  
+   13       61       1     0             12  GENERATE        60,0                       
+   14       60       0     0    GateNoVacio  GATE    SNE     Almacen                    
+   15       60       0     0   A_Terminate3  TERMINATE                                  
+   16       61       1     0             15  GENERATE        60,0                       
+   17       60       0     0 GateDisponible  GATE    SV      Almacen                    
+   18       60       0     0   A_Terminate4  TERMINATE                                  
+   19       61      61     0             18  GENERATE        60,0                       
+   20        0       0     0GateNoDisponible  GATE    SNV     Almacen                    
+   21        0       0     0   A_Terminate5  TERMINATE                                  
+   22        2       1     0             21  GENERATE        3600                       
+   23        1       0     0             22  TERMINATE       1                          
+
+STORAGE           CAP. REMAIN. MIN.  MAX. ENTRIES AVL. AVE.C.  UTIL. RETRY DELAY
+  ALMACEN           1      0     0     1       1   1   0,997   0,997  180   359
+
+FEC_XACT_NUMBER    PRI      BDT    CURRENT   NEXT   PARAMETER   VALUE
+           782      0       3610        1       1
+           777      0       3610        3       3
+           788      0       3660       18      18
+           787      0       3660       15      15
+           786      0       3660       12      12
+           785      0       3660        9       9
+           784      0       3660        6       6
+           783      0       3660        3       3
+           789      0       7200       21      21

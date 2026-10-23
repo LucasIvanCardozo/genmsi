@@ -393,6 +393,15 @@ pub struct Chain {
     #[serde(skip)]
     #[cfg_attr(feature = "ts", ts(skip))]
     pub members: Vec<XactId>,
+    /// The indicator of the chain.
+    ///
+    /// The original's chain has an indicator that is off until the first
+    /// transaction reaches it: that one goes on to the destination of the
+    /// `LINK` statement instead of joining the chain. The indicator is not
+    /// part of the report.
+    #[serde(skip)]
+    #[cfg_attr(feature = "ts", ts(skip))]
+    pub indicator: bool,
     #[serde(skip)]
     #[cfg_attr(feature = "ts", ts(skip))]
     pub linked_at: BTreeMap<XactId, f64>,
@@ -413,6 +422,7 @@ impl Chain {
             area: 0.0,
             members: Vec::new(),
             linked_at: BTreeMap::new(),
+            indicator: false,
             last_change: now,
         }
     }
@@ -427,11 +437,16 @@ impl Chain {
     }
 
     /// Average time spent in the chain.
+    ///
+    /// The original divides the chain's integral (its size over the time) by
+    /// the number of entries: `AVE.TIME` in its report. The integral counts
+    /// the transactions that are still waiting, which the sum of the waits of
+    /// the ones that left does not.
     pub fn average_time(&self) -> f64 {
         if self.entries == 0 {
             0.0
         } else {
-            self.total_time / self.entries as f64
+            self.area / self.entries as f64
         }
     }
 

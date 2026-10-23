@@ -9,8 +9,8 @@ expression: stdout(&output)
   "start_time": 0.0,
   "end_time": 3600.0,
   "end_reason": "terminated",
-  "transactions": 11,
-  "events": 31,
+  "transactions": 10,
+  "events": 29,
   "blocks": [
     {
       "line": 1,
@@ -18,7 +18,7 @@ expression: stdout(&output)
       "class": "Generate",
       "label": null,
       "operands": "90,30,2700,,",
-      "entries": 9,
+      "entries": 10,
       "current": 1,
       "retries": 0
     },
@@ -29,7 +29,7 @@ expression: stdout(&output)
       "label": null,
       "operands": "0,,3600,1,",
       "entries": 1,
-      "current": 0,
+      "current": 1,
       "retries": 0
     },
     {
@@ -128,7 +128,7 @@ expression: stdout(&output)
       "class": "Generate",
       "label": null,
       "operands": "3600,,,,",
-      "entries": 1,
+      "entries": 2,
       "current": 1,
       "retries": 0
     },
@@ -168,7 +168,7 @@ expression: stdout(&output)
       "class": "Buffer",
       "label": "A_Buffer",
       "operands": "",
-      "entries": 1,
+      "entries": 0,
       "current": 0,
       "retries": 0
     },

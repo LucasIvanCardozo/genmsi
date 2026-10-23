@@ -342,8 +342,8 @@ A block that has no input port — a generator, the clock — has no name at all
 **The spelling of an expression.** A typed reference is written with a `$`
 where the model writes a `:` (`P:Param` becomes `P$Param`). The operands of
 a `TEST`, a `SELECT` or a `GATE` carry the operator of the original's own
-vocabulary (`E`, `NE`, `L`, `LE`, `G`, `GE`; `MIN`, `MAX`, `NU`; `LS`, `L`,
-`S`, `SNF`, `NU`, `U`).
+vocabulary (`E`, `NE`, `L`, `LE`, `G`, `GE`; `MIN`, `MAX`, `NU`; `LS`, `LR`;
+`SF`, `SNF`, `SE`, `SNE`, `SV`, `SNV`; `NU`, `U`).
 
 **The operands of a class.** Each class writes the operands its own macro
 writes, in the order of that macro: `ALTER E <grupo>,<cantidad>,<parámetro
@@ -360,7 +360,9 @@ alterado>,<valor>,<parámetro comparado>,<valor>`; `REMOVE E <grupo>,<cantidad>
 **The counter and the match write two statements.** The counter increments a
 savevalue and copies it to a parameter (`SAVEVALUE Count+,1` and
 `ASSIGN Nro,X$Count`). The match writes the transfer to its conjugate before
-the match itself (`A_Match TRANSFER ,AAA` and `AAA MATCH AAA`).
+the match itself (`A_Match TRANSFER ,AAA` and `AAA MATCH AAA`), and the report
+lists the two statements: the entries are in the transfer and the transactions
+that wait are in both.
 
 **The definitions come first.** The storages, the queue tables, the tables,
 the functions, the variables and the initial values, and then the blocks. The

@@ -11,7 +11,7 @@ expression: text
 
  LINE    ENTRY CURRENT RETRY            LOC  BLOCK_TYPE
          COUNT   COUNT
-    1        1       1     0              1  GENERATE        10,,,3
+    1        2       1     0              1  GENERATE        10,,,3
     2        1       0     0             L1  QUEUE           cola
     3        1       0     0             L2  TERMINATE       1
 

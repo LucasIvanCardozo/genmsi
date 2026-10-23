@@ -96,10 +96,12 @@ pub fn render(result: &RunResult, program: &Program) -> String {
                 number(facility.average_time()),
                 if facility.available { 1 } else { 0 },
                 facility.owner.unwrap_or(0),
-                facility.waiters.len(),
+                // The original keeps the transactions that wait for the
+                // facility in its `DELAY` column and leaves `PEND` at zero.
+                0,
                 facility.inter,
                 facility.retry,
-                facility.gate_waiters.len(),
+                facility.waiters.len(),
             );
         }
     }
@@ -288,6 +290,8 @@ pub fn render(result: &RunResult, program: &Program) -> String {
 pub fn block_type(block: &ExecBlock) -> std::borrow::Cow<'_, str> {
     match block.class.as_str() {
         "GateL" | "GateS" | "GateF" => std::borrow::Cow::Borrowed("GATE"),
+        // The `Match` class expands into a `TRANSFER` and a `MATCH`.
+        "MatchTransfer" => std::borrow::Cow::Borrowed("TRANSFER"),
         "Multifurcacion" => std::borrow::Cow::Borrowed("TRANSFER"),
         "SelectF" => std::borrow::Cow::Borrowed("SELECT"),
         "JoinNumber" | "JoinMe" => std::borrow::Cow::Borrowed("JOIN"),
@@ -487,9 +491,12 @@ fn operand_parts(block: &ExecBlock, program: &Program) -> (Option<&'static str>,
         BlockKind::Transfer(spec) => {
             // `TRANSFER 800,A_Advance5,A_Advance2` (Parcial 6-11-23): the
             // probability in thousandths, then the LOC of the `Salida2`
-            // target, then the LOC of the `Salida1` target.
+            // target, then the LOC of the `Salida1` target. A transfer with
+            // a single output writes only that one (`TRANSFER ,AAA`).
             let mut refs = vec![transfer_probability(spec)];
-            refs.push(port_target_label(program, block, "Salida2").unwrap_or_default());
+            if block.port_names.iter().any(|port| port == "Salida2") {
+                refs.push(port_target_label(program, block, "Salida2").unwrap_or_default());
+            }
             refs.push(port_target_label(program, block, "Salida1").unwrap_or_default());
             refs
         }
@@ -507,8 +514,8 @@ fn operand_parts(block: &ExecBlock, program: &Program) -> (Option<&'static str>,
                 GateCondition::Logic { switch, state } => {
                     (if *state { "LS" } else { "LR" }, switch.to_string())
                 }
-                GateCondition::Storage { storage, empty } => {
-                    (if *empty { "SE" } else { "SNE" }, storage.to_string())
+                GateCondition::Storage { storage, op } => {
+                    (op.letter(), storage.to_string())
                 }
                 GateCondition::Facility { facility, available } => {
                     (if *available { "NU" } else { "U" }, facility.to_string())

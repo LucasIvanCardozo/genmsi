@@ -1,0 +1,2 @@
+Error en linea     2 -> Operador lógico inválido
+

@@ -23,7 +23,7 @@ genmsi mcp
 
 | Option | Applies to | Meaning |
 |---|---|---|
-| `--seed <n>` | `simulate`, `trace`, `run-all` | Base seed of every random stream. Default `1`. The same seed reproduces the same run, bit for bit. |
+| `--seed <n>` | `simulate`, `trace`, `run-all` | Base seed of every random stream. Without it, a run draws one at random and says which it used, so the run can be repeated by passing that number back. The same seed reproduces the same run, bit for bit. |
 | `--until <time>` | `simulate`, `trace`, `run-all` | Stop once the simulated clock passes `<time>`, instead of running to the model's own termination. The engine stops at the first event after the horizon, so `end_time` can be larger than `<time>`. |
 | `--limit <n>` | `trace` | Maximum number of trace records the engine keeps. Default `100`. |
 | `--json` | all | Emit the versioned JSON document instead of the human-readable form (see [`--json` documents](#json-documents)). |

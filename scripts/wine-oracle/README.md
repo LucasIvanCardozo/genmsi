@@ -11,6 +11,10 @@ Nothing here needs Wine, and nothing here modifies the repository.
 (The two tools of the last section, `make-benches.py` and `run-benches.sh`, do
 need Wine: they run the original.)
 
+Two of the tools read the original's own baseline reports
+(`fixtures/outputs/`) instead of its executable: `first_arrival_evidence.py`
+and `compare_generate.py`, the evidence of the first arrival of a generator.
+
 ## `dfm.py` — extract the forms
 
 ```
@@ -166,6 +170,51 @@ Four benches do not run: `MFunction`, `MFunctionDist`, `MultifurcacionP` and
 existentes en este sistema") and never shows its own window, so the harness
 has nothing to click. The models are accepted by the original; what is missing
 is a way to drive it.
+
+## `first_arrival_evidence.py` — when the first transaction of a generator arrives
+
+```
+python3 scripts/wine-oracle/first_arrival_evidence.py [model-fragment ...]
+```
+
+It reads the original's baseline reports (`fixtures/outputs/*.report.txt`) and
+prints, for every `GENERATE` row, the horizon, the original's entry count and
+what each reading of the first arrival predicts.
+
+The original counts the transaction that is already on its way: the `ENTRY
+COUNT` of a generator row is the arrivals that already happened plus the one
+still pending in the FEC. The script applies that counting model (proved in
+`odd/tasks/notas-primera-llegada.md`), which is what makes the comparison with
+the two readings exact instead of approximate.
+
+The two readings are:
+
+- `media`: the first increment is `A` (the mean), so the first arrival is at
+  `t = A`;
+- `cero`: the first arrival is at `t = 0`.
+
+A row prints `MEDIA` when the original's count is exactly what the first
+reading predicts, `CERO` when it is exactly what the second predicts, and
+`no discrimina` when both predict the same number. Only a `GENERATE` without
+dispersion, without offset and without limit can tell the two readings apart:
+the eighteen models that do are the evidence that the first arrival happens at
+the mean.
+
+With an argument, only the models whose name contains it are printed.
+
+## `compare_generate.py` — our counts next to the original's
+
+```
+python3 scripts/wine-oracle/compare_generate.py [seed]
+```
+
+The same table with our own engine on the side: for every model of
+`fixtures/models` that has a baseline report, it reads the original's report,
+runs our engine with the horizon the original declares and the given seed,
+matches the `GENERATE` rows by their operands and prints both counts next to
+the two readings.
+
+It needs the release binary (`cargo build --release -p genmsi-cli`).
 
 ## `probes/` — experiments that settle a question
 

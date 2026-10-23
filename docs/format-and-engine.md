@@ -100,11 +100,22 @@ text in entity-name positions.
 
 ## 5. Runtime semantics (with the evidence that pinned them)
 
-- **GENERATE A,B,C,D,E**: the first transaction arrives at `C` when given,
-  otherwise at `A`; then interarrivals are drawn. `D` limits the total; an empty
-  `A` means a zero interarrival (models use it with `D` to create one transaction
-  at time 0). Verified against TP10's `GENERATE ,,,1` (one transaction) and
-  TP6's `GENERATE ,,3600,1` (one at 3600).
+- **GENERATE A,B,C,D,E**: the first transaction arrives with the increment `C`
+  when the model brings it, and otherwise with the increment that comes out of
+  `A` and `B` — `A` alone, or the draw of `A±B` when there is a dispersion.
+  It never arrives at time 0 by definition. `D` limits the total; an empty `A`
+  is a zero interarrival, so with it the first transaction does land at time 0
+  (the original does the same: the models use it with `D` to create one
+  transaction at time 0). Verified against the 18 models that carry a `GENERATE`
+  without dispersion, without offset and without limit: `GENERATE 3600` over a
+  horizon of 3600 gives 2 entries (the arrival at 3600 plus the one still
+  pending in the FEC), `GENERATE 900` over 3600 gives 5 and `GENERATE 1800`
+  over 1800 gives 2; with the first arrival at time 0 those same models would
+  give 3, 6 and 3. The table of the eighteen, the counting model of the
+  original that makes the comparison exact and the two rules it rests on are
+  in `odd/tasks/notas-primera-llegada.md`; the table is reproduced from the
+  original's reports by `scripts/wine-oracle/first_arrival_evidence.py`, and
+  `scripts/wine-oracle/compare_generate.py` puts our own counts next to it.
 - **ADVANCE A,B / GENERATE with B**: a numeric `B` is a symmetric spread
   (`uniform(A-B, A+B)`); a **function** `B` multiplies the mean
   (`A * f(u)`), which is the idiom for exponential service
@@ -157,6 +168,25 @@ text in entity-name positions.
   own `RETRY`). A storage the model does not declare has no capacity: the
   original stops the run with "Referencia a una entidad storage inexistente",
   and the compiler refuses the model before it runs.
+
+### Known deviation, not settled: the first interval with a dispersion
+
+With a dispersion (`B` not empty and not zero), the original **draws** the
+first interarrival from `A` and `B`, like every other interarrival, and our
+engine does not: it schedules the first arrival at exactly `A` and starts
+drawing from the second interval on (`crates/genmsi-core/src/sim.rs`,
+`Simulation::init`). The original's manual says the first increment is
+"calculated from the operands A and B"; with `A` alone that is the exact `A`
+our engine uses, but with a dispersion it is a draw.
+
+The consequence shows with several copies of the same generator: ours release
+their first transaction all at the same instant, the original staggers them.
+
+This is **not settled**. No count of entries can separate the two readings,
+because the expected number of arrivals is the same either way — the measured
+difference is 0.01 arrivals over 200,000 samples. The evidence, the models it
+cannot settle and the proposed change are in
+`odd/tasks/notas-primera-llegada.md`.
 
 ## 6. Validation inferred from the five error outputs
 
@@ -241,6 +271,8 @@ The tools in `scripts/wine-oracle/` read the original without running it:
 | `make-benches.py` | Writes a model per class of the original's class library, with the ports and the defaults that library declares |
 | `run-benches.sh` | Runs every bench against the original and keeps its GPSS and its report |
 | `compare-gpss.sh` | Compares our GPSS with the original's, block by block and connection by connection |
+| `first_arrival_evidence.py` | Reads the original's own baseline reports and shows when the first transaction of a generator arrives |
+| `compare_generate.py` | The same evidence with our engine's counts next to the original's |
 
 A bench is the unit of verification: the original's GPSS for it says how a
 class compiles, and the original's report for it says what the class does.

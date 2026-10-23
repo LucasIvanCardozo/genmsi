@@ -40,14 +40,45 @@ sobre el original, no un fallo nuestro: se anota.
 
 | ID | Specs | Qué | Ruta | Commit |
 |----|-------|-----|------|--------|
-| T1 | S1, S3, S4 | El inventario: la ficha de cada clase del primer lote, con su veredicto | solo lectura | — |
-| T2 | S2 | Los arreglos de las clases con diferencias, en tandas | core | — |
-| T3 | S1 | Las clases que faltan: `MFunction`, `MFunctionDist`, `RemoveNumber` | core | — |
-| T4 | S2, S4 | La fila `GENERATE` del reporte, que cuenta una transacción menos que el original | core | — |
-| T5 | S2 | La cola de la `StorageUse`, que no cuenta unidades | core | — |
-| T6 | S1 | El segundo lote de clases, con el mismo método | solo lectura | — |
+| T1 | S1, S3, S4 | El inventario: la ficha de cada clase del primer lote, con su veredicto | solo lectura | `425058f` |
+| T2 | S2 | Los arreglos de las clases con diferencias, en tandas | core | `47d0b8f`, `ff13c32`, `fae9386`, `26b0c55` |
+| T3 | S1 | Las clases que faltan: `MFunction`, `MFunctionDist`, `RemoveNumber` | format + core | pendiente (T10) |
+| T4 | S2, S4 | La fila `GENERATE` del reporte, que cuenta una transacción menos que el original | core | `47d0b8f` |
+| T5 | S2 | La cola de la `StorageUse`, que no cuenta unidades | core | `17a88d5` |
+| T6 | S1 | El segundo lote de clases, con el mismo método | solo lectura | `7641e7c` |
+| T7 | S1 | El tercer lote y el recuento definitivo de las 66 | solo lectura | `328b7f0`, `6172b6d` |
+| T8 | S2 | Las once filas del reporte y las cuatro secciones que faltaban | core | en curso (T11) |
+| T9 | S2 | El destino de salida del `ALTER` en el listado y el operador `Invertir` de la llave | core | en curso (T12) |
+| T10 | S1, S2 | Las tres clases ausentes, en el catálogo y en el motor | format + core | pendiente |
+| T11 | S2 | La puerta que no abre y la primera llegada con dispersión | core | pendiente |
 
 ## Log
+
+### L5 — El cierre de la fase (el recuento definitivo)
+
+Los tres lotes han medido las 66 clases del original una por una. Con el
+núcleo de `26b0c55`:
+
+- **50 verificadas**, **13 con diferencias**, **3 pendientes** (las tres clases
+  que el catálogo no ofrece).
+- **63 de 66** escriben el mismo GPSS que el original, sentencia por
+  sentencia; de los tres que no, dos son clases que ni siquiera tenemos.
+- En las cifras: **60 de los 61** bancos con reporte comparable coinciden en
+  todas las métricas dentro de las tolerancias.
+- **Una sola diferencia de comportamiento** queda en todo el inventario: la
+  puerta del `GateL` que no abre (nuestro motor cuenta el intento fallido
+  como entrada de la puerta; el original no lo cuenta y lo lleva a la llave).
+
+Lo que queda, con su archivo, su función y su prueba, está en las notas de
+cada lote (`notas-fase7-lote1.md`, `notas-fase7-lote2.md`,
+`notas-fase7-lote3.md`), y el recuento por clase, en
+`notas-fase7-lote3.md`.
+
+Dos desviaciones más, ya medidas y pendientes de una decisión: la primera
+llegada de un generador **con dispersión** (el original sortea el primer
+intervalo y el nuestro arranca con la media exacta) y la **granularidad del
+reloj** (el del original es entero: su `FEC_XACT_NUMBER` trae `BDT 3610` y el
+nuestro `3611,344`).
 
 ### L1 — Por qué esta fase
 
@@ -67,8 +98,10 @@ fuente de azar. Corregido (`f905f00`), y con él salieron dos cosas:
 
 ### L2 — Lo que ya está resuelto (no rehacerlo)
 
-- Las 66 clases están en el catálogo, con sus puertos, sus propiedades y sus
-  defaults del original.
+- **63 de las 66** clases están en el catálogo, con sus puertos, sus propiedades y
+  sus defaults del original. Faltan `MFunction`, `MFunctionDist` y
+  `RemoveNumber`: el catálogo no las ofrece y el motor se niega a compilar
+  ellas. (Esta línea decía "las 66"; el tercer lote lo desmintió.)
 - El motor escribe el GPSS igual que el original (`gpss.rs`), y `genmsi gpss`
   lo imprime.
 - La semilla es aleatoria por defecto y cada corrida dice cuál usó.
@@ -76,7 +109,8 @@ fuente de azar. Corregido (`f905f00`), y con él salieron dos cosas:
   dispersión; el almacén sin declarar ya se para con un error claro, como el
   original; el lint de los tres clientes ya coincide.
 - 62 de 66 bancos coinciden en el GPSS con el original y 50 de 55 en las
-  cifras.
+  cifras. (Cifras del momento en que se escribió esta lista; el recuento
+  definitivo está en L5.)
 
 ### L3 — Cómo se hace (el método, en una frase por clase)
 

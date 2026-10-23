@@ -2,11 +2,15 @@
 # Compare our GPSS with the GPSS the original editor produced for the same
 # model.
 #
-# The two files are compared group by group: a group is a block, with the
-# statement that names it and the statements that continue it. The groups are
-# matched by their label, so a block that moved in the model does not look
-# like a difference of behaviour, and the report says which block differs and
-# how.
+# The comparison has two parts, because the program has two things to say:
+#
+# - What each block does: the verb and the operands of every statement,
+#   compared block by block, matched by the block's label.
+# - Where the transaction goes: the connections, compared as a set of pairs
+#   (block, destination). The connections are compared apart from the blocks
+#   because the order of the blocks is a matter of the walk, not of the model:
+#   the same connection is a fall-through in one program and a `TRANSFER` in
+#   the other, and that is not a difference of behaviour.
 #
 # The definitions — the storages and the queue tables — are compared as sets:
 # their order is not part of what the model means.
@@ -36,44 +40,93 @@ WORK="${TMPDIR:-/tmp}/gpss-compare.$$"
 mkdir -p "$WORK"
 trap 'rm -rf "$WORK"' EXIT
 
-# Split a GPSS file into its definitions and its blocks. A definition is a
-# line whose verb is STORAGE or QTABLE; a block starts at a line with a name
-# and continues with the lines that have none.
+# Split a GPSS file into three kinds of line:
+#
+#   D <definition>            a storage or a queue table
+#   B <label> <statements>    a block, with the statements that are not a
+#                             connection
+#   C <source> <destination>  a connection, with the block it leaves from
+#
+# A block starts at a statement with a name; the statements that continue it
+# have none. A `TRANSFER` is never part of a block's statements: it says where
+# the transaction goes, and that is a connection.
 split() {
     awk '
         function flush() {
-            if (label != "" || count > 0) {
-                if (label == "") { label = "(sin nombre)" }
-                printf "B\t%s\t%s\n", label, body
+            if (count > 0) {
+                printf "B\t%s\t%s\n", cur, body
             }
             body = ""
+            count = 0
+        }
+        function connection(source, operands, first, rest, dest) {
+            # The first operand is the probability; the rest are the
+            # destinations, and an empty one is a port with no link.
+            first = 1
+            rest = operands
+            while (rest != "") {
+                if (index(rest, ",") > 0) {
+                    dest = substr(rest, 1, index(rest, ",") - 1)
+                    rest = substr(rest, index(rest, ",") + 1)
+                } else {
+                    dest = rest
+                    rest = ""
+                }
+                if (first) {
+                    first = 0
+                } else if (dest != "") {
+                    printf "C\t%s\t%s\n", source, dest
+                }
+            }
         }
         {
             sub(/\r$/, "")
             sub(/[ \t]+$/, "")
             if ($0 == "") { next }
-            name = $1
-            verb = $2
-            rest = ""
-            for (i = 3; i <= NF; i++) {
-                rest = rest (rest == "" ? "" : " ") $i
+            # The name of a block is in the first column; a statement that
+            # continues a block leaves that column empty, so the verb is the
+            # first thing on the line.
+            if ($0 ~ /^[^ ]/) {
+                name = $1
+                verb = $2
+                first_operand = 3
+            } else {
+                name = ""
+                verb = $1
+                first_operand = 2
+            }
+            text = ""
+            for (i = first_operand; i <= NF; i++) {
+                text = text (text == "" ? "" : " ") $i
             }
             if (verb == "STORAGE" || verb == "QTABLE") {
                 flush()
-                printf "D\t%s %s\n", verb, rest
+                printf "D\t%s %s\n", verb, text
                 next
             }
             # The units of an ENTER or a LEAVE are the same whether the
             # original writes them or not, so they do not make a difference.
             if (verb == "ENTER" || verb == "LEAVE") {
-                sub(/,1$/, "", rest)
+                sub(/,1$/, "", text)
+            }
+            if (verb == "TRANSFER") {
+                # A TRANSFER says where the transaction goes: it is a
+                # connection, not something a block does.
+                if (name != "") {
+                    flush()
+                    cur = name
+                }
+                connection(cur, text)
+                next
             }
             if (name != "") {
                 flush()
-                label = name
+                cur = name
+            } else if (count == 0) {
+                cur = "(" verb " " text ")"
             }
-            if (label == "") { label = "(sin nombre)" }
-            body = body (body == "" ? "" : " ; ") verb " " rest
+            body = body (body == "" ? "" : " ; ") verb " " text
+            count++
         }
         END { flush() }
     ' "$1"
@@ -81,6 +134,8 @@ split() {
 
 split "$OURS" > "$WORK/ours"
 split "$THEIRS" > "$WORK/theirs"
+
+problems=0
 
 # The definitions, sorted: their order is not part of the model.
 grep '^D' "$WORK/ours" | sort > "$WORK/ours.def"
@@ -90,7 +145,9 @@ grep '^D' "$WORK/theirs" | sort > "$WORK/theirs.def"
 awk -F'\t' '$1 == "B" { print $2 "\t" $3 }' "$WORK/ours" | sort > "$WORK/ours.blocks"
 awk -F'\t' '$1 == "B" { print $2 "\t" $3 }' "$WORK/theirs" | sort > "$WORK/theirs.blocks"
 
-problems=0
+# The connections, as a set of pairs.
+awk -F'\t' '$1 == "C" { print $2 " -> " $3 }' "$WORK/ours" | sort > "$WORK/ours.conn"
+awk -F'\t' '$1 == "C" { print $2 " -> " $3 }' "$WORK/theirs" | sort > "$WORK/theirs.conn"
 
 definitions=$(diff "$WORK/ours.def" "$WORK/theirs.def" || true)
 if [ -n "$definitions" ]; then
@@ -106,9 +163,17 @@ if [ -n "$blocks" ]; then
     printf '%s\n' "$blocks" | sed 's/^/  /'
 fi
 
+connections=$(diff "$WORK/ours.conn" "$WORK/theirs.conn" || true)
+if [ -n "$connections" ]; then
+    problems=$((problems + 1))
+    echo "las conexiones difieren:"
+    printf '%s\n' "$connections" | sed 's/^/  /'
+fi
+
 if [ "$problems" -eq 0 ]; then
     count=$(wc -l < "$WORK/ours.blocks")
-    echo "el GPSS coincide: $count bloques con las mismas sentencias"
+    connections=$(wc -l < "$WORK/ours.conn")
+    echo "el GPSS coincide: $count bloques y $connections conexiones"
     exit 0
 fi
 

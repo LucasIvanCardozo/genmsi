@@ -9,8 +9,8 @@ test("a queue that a transaction enters and leaves", () => {
   // seconds it was in the queue. The area is the content times the time: the
   // content was 0 until the entry and 1 from then on, so the area is 1 * 10.
   let figures = emptyFigures();
-  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 0 });
-  figures = applyChange(figures, { kind: "queue-dequeue", name: "cola", time: 10, waited: 10 });
+  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 0, units: 1 });
+  figures = applyChange(figures, { kind: "queue-dequeue", name: "cola", time: 10, waited: 10, units: 1 });
   const queue = figures.queues["cola"];
   assert.equal(queue.content, 0);
   assert.equal(queue.max, 1);
@@ -22,8 +22,8 @@ test("a queue that a transaction enters and leaves", () => {
 
 test("a transaction that waits no time at all", () => {
   let figures = emptyFigures();
-  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 5 });
-  figures = applyChange(figures, { kind: "queue-dequeue", name: "cola", time: 5, waited: 0 });
+  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 5, units: 1 });
+  figures = applyChange(figures, { kind: "queue-dequeue", name: "cola", time: 5, waited: 0, units: 1 });
   const queue = figures.queues["cola"];
   assert.equal(queue.zeroEntries, 1, "the wait was zero");
   assert.equal(queue.totalTime, 0);
@@ -34,14 +34,28 @@ test("the area of a queue is the integral of its content", () => {
   // One transaction enters at 0 and another at 2. The first leaves at 4.
   // The content is 1 from 0 to 2, 2 from 2 to 4: the area is 1*2 + 2*2 = 6.
   let figures = emptyFigures();
-  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 0 });
-  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 2 });
-  figures = applyChange(figures, { kind: "queue-dequeue", name: "cola", time: 4, waited: 4 });
+  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 0, units: 1 });
+  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 2, units: 1 });
+  figures = applyChange(figures, { kind: "queue-dequeue", name: "cola", time: 4, waited: 4, units: 1 });
   const queue = figures.queues["cola"];
   assert.equal(queue.content, 1);
   assert.equal(queue.max, 2);
   assert.equal(queue.entries, 2);
   assert.equal(queue.area, 6);
+});
+
+test("a queue counts the units its transactions carry", () => {
+  // A transaction that takes two units in the queue holds two places: the
+  // original's `StorageUse` queues `Cantidad` units per transaction.
+  let figures = emptyFigures();
+  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 0, units: 2 });
+  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 2, units: 2 });
+  figures = applyChange(figures, { kind: "queue-dequeue", name: "cola", time: 4, waited: 4, units: 2 });
+  const queue = figures.queues["cola"];
+  assert.equal(queue.content, 2, "the queue holds the places, not the transactions");
+  assert.equal(queue.max, 4);
+  assert.equal(queue.entries, 2, "the entries are the transactions that arrived");
+  assert.equal(queue.area, 2 * 2 + 4 * 2, "the area counts the units over the time");
 });
 
 test("a facility that is taken and released", () => {
@@ -198,7 +212,7 @@ test("closing the figures closes the integrals that are open", () => {
   // A queue that still holds a transaction and a facility that is still
   // held: at the end of the run both close their integral.
   let figures = emptyFigures();
-  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 0 });
+  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 0, units: 1 });
   figures = applyChange(figures, { kind: "facility-seize", name: "recepcion", time: 0, xact: 7 });
   const closed = closeFigures(figures, 10);
   assert.equal(closed.queues["cola"].area, 10, "the queue held one for ten seconds");
@@ -209,17 +223,17 @@ test("closing the figures closes the integrals that are open", () => {
 
 test("the figures that did not change keep their identity", () => {
   let figures = emptyFigures();
-  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 0 });
-  figures = applyChange(figures, { kind: "queue-enqueue", name: "otra", time: 0 });
+  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 0, units: 1 });
+  figures = applyChange(figures, { kind: "queue-enqueue", name: "otra", time: 0, units: 1 });
   const before = figures.queues["cola"];
-  figures = applyChange(figures, { kind: "queue-dequeue", name: "otra", time: 1, waited: 1 });
+  figures = applyChange(figures, { kind: "queue-dequeue", name: "otra", time: 1, waited: 1, units: 1 });
   assert.equal(figures.queues["cola"], before, "the queue that did not move is the same one");
   assert.notEqual(figures.queues["otra"], before);
 });
 
 test("the figures that were given are not changed", () => {
   const figures = emptyFigures();
-  const after = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 0 });
+  const after = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 0, units: 1 });
   assert.equal(figures.queues["cola"], undefined, "the original has no queue yet");
   assert.equal(after.queues["cola"].entries, 1);
 });
@@ -228,8 +242,8 @@ test("a time that goes backwards is not counted", () => {
   // The engine never does this, but the arithmetic is the engine's: the
   // difference is never negative.
   let figures = emptyFigures();
-  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 10 });
-  figures = applyChange(figures, { kind: "queue-dequeue", name: "cola", time: 5, waited: 0 });
+  figures = applyChange(figures, { kind: "queue-enqueue", name: "cola", time: 10, units: 1 });
+  figures = applyChange(figures, { kind: "queue-dequeue", name: "cola", time: 5, waited: 0, units: 1 });
   assert.equal(figures.queues["cola"].area, 0, "the area does not go back");
 });
 

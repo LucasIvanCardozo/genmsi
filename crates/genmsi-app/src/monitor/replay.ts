@@ -352,12 +352,14 @@ function declaredName(properties: Record<string, string>, className: string): st
 /**
  * The units a block takes, as the model declares them.
  *
- * Only the storages count units; a queue counts the transactions it holds.
- * The property is a plain number in every reference model; an expression is
- * not evaluated by the frontend, and one unit is used instead.
+ * A queue counts the units its transactions occupy, and so does a storage:
+ * the original compiles the `StorageUse` as `ARRIVE [Queue],[Cantidad]`, and
+ * a `Queue` class has its own `Cantidad` too. The property is a plain number
+ * in every reference model; an expression is not evaluated by the frontend,
+ * and one unit is used instead.
  */
 function declaredUnits(properties: Record<string, string>, className: string): number {
-  if (className !== "Enter" && className !== "Leave") {
+  if (className !== "Enter" && className !== "Leave" && className !== "Queue" && className !== "Depart") {
     return 1;
   }
   const raw = properties["Cantidad"]?.trim();
@@ -487,10 +489,12 @@ export function buildIndex(
 
     switch (className) {
       case "Queue":
-        // A transaction that enters a queue block is enqueued there.
+        // A transaction that enters a queue block is enqueued there, and it
+        // takes as many places in the queue as units it carries.
         if (event.event === "enter" && entity !== null) {
-          change.queue = { name: entity, delta: 1 };
-          change.figure = { kind: "queue-enqueue", name: entity, time: event.time };
+          const given = units.get(index) ?? 1;
+          change.queue = { name: entity, delta: given };
+          change.figure = { kind: "queue-enqueue", name: entity, time: event.time, units: given };
           // The engine remembers when each transaction entered the queue:
           // that is what the wait of its departure is measured from.
           remember(enqueuedAt, entity, event.xact, event.time);
@@ -501,15 +505,18 @@ export function buildIndex(
         }
         break;
       case "Depart":
-        // A transaction that enters a depart block leaves the queue.
+        // A transaction that enters a depart block leaves the queue, and it
+        // frees as many places as it took.
         if (event.event === "enter" && entity !== null) {
-          change.queue = { name: entity, delta: -1 };
+          const given = units.get(index) ?? 1;
+          change.queue = { name: entity, delta: -given };
           const entered = recall(enqueuedAt, entity, event.xact, event.time);
           change.figure = {
             kind: "queue-dequeue",
             name: entity,
             time: event.time,
             waited: event.time - entered,
+            units: given,
           };
           forget(enqueuedAt, entity, event.xact);
           if (!seen.queue.has(entity)) {

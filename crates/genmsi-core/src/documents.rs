@@ -24,6 +24,10 @@ pub const EXPLAIN_SCHEMA: &str = "genmsi.explain/1";
 pub const MODEL_SCHEMA: &str = "genmsi.model/1";
 /// Schema id of the catalogue document.
 pub const CATALOGUE_SCHEMA: &str = "genmsi.catalogue/1";
+/// Schema id of the list of the classes.
+pub const CLASSLIST_SCHEMA: &str = "genmsi.classlist/1";
+/// Schema id of the document of one class.
+pub const CLASS_SCHEMA: &str = "genmsi.class/1";
 /// Schema id of the `gpss` document.
 pub const GPSS_SCHEMA: &str = "genmsi.gpss/1";
 
@@ -407,6 +411,36 @@ pub struct CatalogueDocument {
     pub classes: Vec<CatalogueClass>,
 }
 
+/// The ports of a class, as the catalogue declares them.
+fn catalogue_ports(ports: &[genmsi_format::PortSpec]) -> Vec<CataloguePort> {
+    ports
+        .iter()
+        .map(|port| CataloguePort {
+            ioid: port.ioid,
+            name: port.name.to_string(),
+            caption: port.caption.to_string(),
+        })
+        .collect()
+}
+
+/// The properties of a class, as the catalogue declares them.
+fn catalogue_properties(properties: &[genmsi_format::PropertySpec]) -> Vec<CatalogueProperty> {
+    properties
+        .iter()
+        .map(|property| CatalogueProperty {
+            name: property.name.to_string(),
+            hint: property.hint.to_string(),
+            ty: property.ty.to_string(),
+            subtype: property.subtype.to_string(),
+            unique: property.unique,
+            options: genmsi_format::catalogue::listed_options(property.subtype)
+                .iter()
+                .map(|option| option.to_string())
+                .collect(),
+        })
+        .collect()
+}
+
 /// Build the `genmsi.catalogue/1` body: the block classes an editor needs to
 /// create a block.
 ///
@@ -420,42 +454,92 @@ pub fn catalogue_document() -> CatalogueDocument {
         .map(|class| CatalogueClass {
             class: class.class.to_string(),
             title: class.title.to_string(),
-            inputs: class
-                .inputs
-                .iter()
-                .map(|port| CataloguePort {
-                    ioid: port.ioid,
-                    name: port.name.to_string(),
-                    caption: port.caption.to_string(),
-                })
-                .collect(),
-            outputs: class
-                .outputs
-                .iter()
-                .map(|port| CataloguePort {
-                    ioid: port.ioid,
-                    name: port.name.to_string(),
-                    caption: port.caption.to_string(),
-                })
-                .collect(),
-            properties: class
-                .properties
-                .iter()
-                .map(|property| CatalogueProperty {
-                    name: property.name.to_string(),
-                    hint: property.hint.to_string(),
-                    ty: property.ty.to_string(),
-                    subtype: property.subtype.to_string(),
-                    unique: property.unique,
-                    options: genmsi_format::catalogue::listed_options(property.subtype)
-                        .iter()
-                        .map(|option| option.to_string())
-                        .collect(),
-                })
-                .collect(),
+            inputs: catalogue_ports(class.inputs),
+            outputs: catalogue_ports(class.outputs),
+            properties: catalogue_properties(class.properties),
         })
         .collect();
     CatalogueDocument { classes }
+}
+
+/// One class of the catalogue, as the list names it.
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct ClassListEntry {
+    /// `moduleclass` the blocks of this class carry.
+    pub class: String,
+    /// What the class does, in the words of the interface.
+    pub title: String,
+}
+
+/// Body of the `genmsi.classlist/1` document: the classes there are, and the
+/// skeleton of a model.
+///
+/// The document is what an agent reads before it writes a model: it says
+/// which classes exist and it gives the smallest `.gmdl` document the format
+/// reads, so the agent starts from a file the engine accepts instead of
+/// guessing an element name.
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct ClassListDocument {
+    /// The classes the editor offers, in catalogue order.
+    pub classes: Vec<ClassListEntry>,
+    /// The skeleton of a model: the root container every model starts from.
+    pub skeleton: String,
+}
+
+/// Build the `genmsi.classlist/1` body.
+pub fn class_list_document() -> ClassListDocument {
+    ClassListDocument {
+        classes: genmsi_format::catalogue::CLASSES
+            .iter()
+            .map(|class| ClassListEntry {
+                class: class.class.to_string(),
+                title: class.title.to_string(),
+            })
+            .collect(),
+        skeleton: genmsi_format::SKELETON_MODEL.to_string(),
+    }
+}
+
+/// Body of the `genmsi.class/1` document: everything a client needs to write
+/// a block of one class.
+///
+/// The template is the XML of a minimal, valid block of the class: the
+/// ports, the properties and the default value of each property, exactly as
+/// the file stores them.
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct ClassDocument {
+    /// `moduleclass` the blocks of this class carry.
+    pub class: String,
+    /// What the class does, in the words of the interface.
+    pub title: String,
+    /// Input ports, in file order.
+    pub inputs: Vec<CataloguePort>,
+    /// Output ports, in file order.
+    pub outputs: Vec<CataloguePort>,
+    /// Properties, in schema order.
+    pub properties: Vec<CatalogueProperty>,
+    /// The XML of a minimal, valid block of this class.
+    pub template: String,
+}
+
+/// Build the `genmsi.class/1` body of a class, or `None` when the catalogue
+/// does not offer that class.
+pub fn class_document(class: &str) -> Option<ClassDocument> {
+    let spec = genmsi_format::catalogue::class_spec(class)?;
+    Some(ClassDocument {
+        class: spec.class.to_string(),
+        title: spec.title.to_string(),
+        inputs: catalogue_ports(spec.inputs),
+        outputs: catalogue_ports(spec.outputs),
+        properties: catalogue_properties(spec.properties),
+        template: spec.template(),
+    })
 }
 
 /// Body of the `genmsi.trace/1` document.

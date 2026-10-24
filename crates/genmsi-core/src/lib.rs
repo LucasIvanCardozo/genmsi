@@ -38,12 +38,12 @@ pub mod stat;
 pub mod xact;
 
 pub use documents::{
-    CatalogueClass, CatalogueDocument, CataloguePort, CatalogueProperty, CATALOGUE_SCHEMA,
+    CATALOGUE_SCHEMA, CLASSLIST_SCHEMA, CLASS_SCHEMA, CatalogueClass, CatalogueDocument,
+    CataloguePort, CatalogueProperty, ClassDocument, ClassListDocument, ClassListEntry,
     DefinitionCounts, EXPLAIN_SCHEMA, Envelope, LINT_SCHEMA, LintDocument, MODEL_SCHEMA,
     ModelBlock, ModelDocument, ModelEdge, ModelPort, ModelProperty, ModelRect, REPORT_SCHEMA,
-    TRACE_SCHEMA, TraceDocument, catalogue_document, lint_diagnostics, lint_document, model_document,
-    to_pretty_json,
-    trace_document,
+    TRACE_SCHEMA, TraceDocument, catalogue_document, class_document, class_list_document,
+    lint_diagnostics, lint_document, model_document, to_pretty_json, trace_document,
 };
 pub use error::EngineError;
 pub use program::{Program, compile, known_classes};

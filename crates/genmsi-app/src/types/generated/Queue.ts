@@ -9,11 +9,15 @@ export type Queue = {
  */
 name: string, 
 /**
- * Current content.
+ * Current content, in units.
+ *
+ * A queue counts units, not transactions: the original compiles the
+ * `StorageUse` as `ARRIVE [Queue],[Cantidad]` and its queue holds one
+ * place per unit (`QUEUE qAlmacen,2` puts two places in the queue).
  */
 content: number, 
 /**
- * Maximum content observed.
+ * Maximum content observed, in units.
  */
 max: number, 
 /**

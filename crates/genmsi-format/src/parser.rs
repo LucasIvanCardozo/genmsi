@@ -100,7 +100,10 @@ pub fn parse_str(text: &str) -> Result<GmdlModel, FormatError> {
                 return Err(structural(
                     text,
                     child,
-                    format!("unexpected element <{other}> inside <gmodel>"),
+                    format!(
+                        "unexpected element <{other}> inside <gmodel>; the valid elements are \
+                         <gclasses> and <modules>"
+                    ),
                 ));
             }
         }
@@ -209,7 +212,10 @@ fn parse_block(text: &str, node: Node<'_, '_>) -> Result<Block, FormatError> {
                 return Err(structural(
                     text,
                     section,
-                    format!("unknown element <{other}> inside <module>"),
+                    format!(
+                        "unknown element <{other}> inside <module>; the valid elements are \
+                         <inputs>, <outputs>, <links> and <props>"
+                    ),
                 ));
             }
         }
@@ -501,6 +507,7 @@ fn trailing_text(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SKELETON_MODEL;
 
     const MINIMAL: &str = r#"<gmodel versioncode="1.00.2008.03.23"><gclasses/><modules><module moduleid="0" moduleclass="main" owner="0" caption="Modelo" name="Modelo1" kind="C" genprefer="1,1,1,1,1,0,0,0,0,0,0,0,0" exehead="" nonexehead="" exefoot="" nonexefoot=""><links><link frommoduleid="1" fromioid="1" tomoduleid="2" toioid="1"/></links><inputs/><outputs/></module><module moduleid="1" moduleclass="Generate" owner="0" caption="Generate" name="Generate" kind="A" width="120" height="63" x="330" y="39"><outputs><output ioid="1" name="Salida1" caption="" mylabel="A_Queue"/></outputs><props><property name="Media" hint="media" value="60" type="TSNA" subType="SNA" visible="1" unique="0"/></props></module><module moduleid="2" moduleclass="Terminate" owner="0" caption="Terminate" name="Terminate" kind="A" width="84" height="64" x="315" y="377"><inputs><input ioid="1" name="Entrada1" caption="Ingreso" mylabel="A_Queue"/></inputs><props><property name="Unidades" hint="" value="1" type="TSNA" subType="SNA" visible="1" unique="0"/></props></module></modules></gmodel>"#;
 
@@ -549,6 +556,46 @@ mod tests {
             .replacen("</props>", "</weird></props>", 1);
         let err = parse_str(&broken).expect_err("must fail");
         assert!(err.to_string().contains("weird"), "{err}");
+    }
+
+    #[test]
+    fn the_error_of_an_unknown_element_names_the_valid_ones() {
+        // The agent that writes a model has to learn the element names from
+        // the failure, not from a second attempt.
+        let broken = MINIMAL.replacen("</module>", "<blocks/></module>", 1);
+        let err = parse_str(&broken).expect_err("must fail");
+        let text = err.to_string();
+        assert!(text.contains("<blocks>"), "{text}");
+        for valid in ["<inputs>", "<outputs>", "<links>", "<props>"] {
+            assert!(text.contains(valid), "the failure does not name {valid}: {text}");
+        }
+    }
+
+    #[test]
+    fn the_error_of_an_unexpected_element_names_the_valid_ones() {
+        let broken = MINIMAL.replacen("<gclasses/>", "<gclasses/><statements/>", 1);
+        let err = parse_str(&broken).expect_err("must fail");
+        let text = err.to_string();
+        assert!(text.contains("<statements>"), "{text}");
+        for valid in ["<gclasses>", "<modules>"] {
+            assert!(text.contains(valid), "the failure does not name {valid}: {text}");
+        }
+    }
+
+    #[test]
+    fn the_skeleton_is_the_root_of_this_example() {
+        // The skeleton the core publishes is the root of this very example,
+        // waiting for the blocks: the two cannot drift.
+        let skeleton = parse_str(SKELETON_MODEL).expect("the skeleton parses");
+        assert_eq!(skeleton.blocks.len(), 1, "the skeleton has no blocks");
+        let root = skeleton.root().expect("the skeleton has a root");
+        let example = parse_str(MINIMAL).expect("the example parses");
+        let example_root = example.root().expect("the example has a root");
+        assert_eq!(root.id, example_root.id);
+        assert_eq!(root.class, example_root.class);
+        assert_eq!(root.name, example_root.name);
+        assert_eq!(root.caption, example_root.caption);
+        assert_eq!(root.kind, example_root.kind);
     }
 
     #[test]

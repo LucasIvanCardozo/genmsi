@@ -9,7 +9,7 @@ export type Storage = {
  */
 name: string, 
 /**
- * Declared capacity.
+ * Declared capacity, in units.
  */
 capacity: number, 
 /**
@@ -34,9 +34,15 @@ max_use: number,
 entries: number, 
 /**
  * Failed ENTER attempts.
+ *
+ * The original never counts a refusal here: its storage rows show
+ * `RETRY` 0 and the transactions that wait in a `DELAY` column.
  */
 retry: number, 
 /**
- * Transactions delayed by a GATE test on this storage.
+ * Transactions waiting for the storage.
+ *
+ * This is the original's `DELAY` column: the transactions that are
+ * waiting for units the storage does not have.
  */
 delay: number, };

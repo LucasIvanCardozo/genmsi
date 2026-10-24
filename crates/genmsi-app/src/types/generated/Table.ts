@@ -38,9 +38,20 @@ sum_squares: number,
 max_value: number, 
 /**
  * Frequency per interval.
+ *
+ * The last one is the class of the values that do not fit in any
+ * other: the original keeps it apart (`>   a  80`).
  */
 frequencies: Array<number>, 
 /**
  * Values beyond the last interval.
  */
-overflow: number, };
+overflow: number, 
+/**
+ * Sum of the values that did not fit.
+ */
+overflow_sum: number, 
+/**
+ * Sum of the squares of the values that did not fit.
+ */
+overflow_sum_squares: number, };

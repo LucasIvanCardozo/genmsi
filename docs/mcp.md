@@ -1,12 +1,13 @@
 # genmsi MCP server
 
 `genmsi-mcp` is the MCP server of the GenMSI engine (ROADMAP Phase 3): it serves
-the engine to an AI agent over stdio with the five tools of decision D7 —
+the engine to an AI agent over stdio with the six tools of decision D7 —
 `simulate`, `lint`, `get_trace` and `explain_model`, plus `save_model`, which
-writes a model the agent built. The binary is a thin layer
-over `genmsi-core` and `genmsi-format`; it carries no simulation logic
-(decision D2), and the documents it returns are the ones the CLI publishes
-(decision D13).
+writes a model the agent built, and `catalogue`, which tells the agent which
+block classes exist and what the XML of a block of each one looks like. The
+binary is a thin layer over `genmsi-core` and `genmsi-format`; it carries no
+simulation logic (decision D2), and the documents it returns are the ones the
+CLI publishes (decision D13).
 
 ```
 genmsi-mcp            # speaks MCP on stdin/stdout
@@ -16,17 +17,18 @@ Standard output belongs to the protocol: the server writes nothing else there.
 A failure that stops the server goes to standard error and the process exits
 with `1`.
 
-## The five tools
+## The six tools
 
 | Tool | What it does | Returns |
 |---|---|---|
+| `catalogue` | Says which block classes exist and what a block of one of them looks like: its ports, its properties and the XML of the block. | `genmsi.classlist/1` or `genmsi.class/1` |
 | `lint` | Loads the model, validates it and compiles it. It does not simulate. It reports what it found. | `genmsi.lint/1` |
 | `simulate` | Runs the model once and returns its GPSS report. | `genmsi.report/1` |
 | `get_trace` | Runs the model with the event trace enabled and returns the records. | `genmsi.trace/1` |
 | `explain_model` | Describes the model: its blocks, its operands and what each statement does. | `genmsi.explain/1` |
 | `save_model` | Writes a model the agent built to a file, after checking that it compiles. | `genmsi.lint/1` |
 
-Every tool takes the model in one of two ways:
+Every tool but `catalogue` takes the model in one of two ways:
 
 - `path`: the path of a `.gmdl` file on disk.
 - `model`: the `.gmdl` document as text, for a model an agent is building and
@@ -34,6 +36,62 @@ Every tool takes the model in one of two ways:
 
 Exactly one of them is required; giving both, or neither, is an
 `invalid_arguments` error.
+
+### `catalogue`
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `class` | string or null | — | Name of the class to describe (`Generate`, `Queue`, ...). |
+
+**Call this tool before writing a model.** It is the one that saves the agent
+from guessing: it says which classes exist, which ports (`ioid`) and which
+properties (`name`, `type`, `value`) each class declares, and it gives the
+XML of a block of the class, exactly as the file stores it.
+
+Without `class` it returns the `genmsi.classlist/1` document:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema` | string | `genmsi.classlist/1` |
+| `classes` | array | Every class the editor offers: `class` (`moduleclass`) and `title` (what the class does). |
+| `skeleton` | string | The skeleton of a model: the smallest `.gmdl` document the format reads, with the model root and nothing else. |
+
+With `class` it returns the `genmsi.class/1` document of that class:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema` | string | `genmsi.class/1` |
+| `class` | string | `moduleclass` the blocks of this class carry. |
+| `title` | string | What the class does. |
+| `inputs` | array | Input ports: `ioid`, `name`, `caption`. |
+| `outputs` | array | Output ports: `ioid`, `name`, `caption`. |
+| `properties` | array | The properties the class declares: `name`, `hint`, `ty`, `subtype`, `unique` and the `options` of a listed property. |
+| `template` | string | The XML of a minimal, valid block of this class. |
+
+A class the catalogue does not offer is a `class_not_found` failure.
+
+**How a model is written with the templates.** The template is a `<module>`
+element with the ports, the properties and the default value of each property
+the class declares. Three things the agent has to do with it:
+
+1. **Renumber the block.** The template carries `moduleid="0"`, the id of the
+   model root: every block of the model needs its own id.
+2. **Drop the block into the skeleton's `<modules>` section.** The skeleton is
+   the model root; the blocks are its children, and they name it in `owner`.
+3. **Fill in the operands the class declares no default for.** The `Terminate`
+   class, for instance, declares no default for its operand A, and the run
+   never ends without it.
+
+The links between the blocks live in the `<links>` section of the model root,
+and each one names the two ends of the connection: the module and the port it
+leaves from, and the module and the port it arrives at.
+
+```xml
+<link frommoduleid="1" fromioid="1" tomoduleid="2" toioid="1"/>
+```
+
+With that, the model is one the engine reads, compiles and runs: `lint` says
+`"status": "ok"` and `simulate` returns the report.
 
 ### `lint`
 
@@ -170,6 +228,7 @@ The classes:
 | Class | When |
 |---|---|
 | `invalid_arguments` | The call itself is wrong: no model, or both `path` and `model`. |
+| `class_not_found` | The class named in `catalogue` is not one of the classes the catalogue lists. The `class` field carries the name that was asked for. |
 | `model_not_found` | The file named by `path` does not exist. |
 | `model_unreadable` | Reserved for a file the tool cannot read outside the model load path; a model the server loads goes through the same `parse_file` call the CLI uses, so its read failures are `invalid_model` (a missing file is still `model_not_found`). |
 | `model_unwritable` | The file could not be written: the permissions, the disk, or the path. A model that does not compile is never written at all, so this class means the write itself failed. |
@@ -207,6 +266,14 @@ and are recorded as `D14` in [`DECISIONS.md`](DECISIONS.md):
    counterpart and publishes `genmsi.explain/1`.
 3. Every tool takes the model as `path` or as an inline `model` document.
 4. `explain_model` is the engine's `program_json` plus the GPSS glossary.
+
+The `catalogue` tool is the one the agent calls **before** it writes a model:
+the engine already knows every block class (`genmsi-format`: the catalogue),
+and a client that cannot see it has to guess the element names of the file.
+It publishes two documents of its own, `genmsi.classlist/1` and
+`genmsi.class/1`; the catalogue the desktop application uses
+(`genmsi.catalogue/1`) is left alone, so the application does not download
+the templates it does not use.
 
 ## Not in this phase
 

@@ -6,6 +6,10 @@
 export type TraceEvent = { 
 /**
  * Simulation time.
+ *
+ * A whole number of simulated time, like the clock of the original: the
+ * published contract of the document does not change, the value it
+ * carries is whole.
  */
 time: number, 
 /**
@@ -25,10 +29,19 @@ class: string,
  */
 label: string | null, 
 /**
- * What happened (`enter`, `leave`, `wait`, `terminate`).
+ * What happened (`enter`, `leave`, `wait`, `backup`, `terminate`,
+ * `generate`, `table`, `logic`, `value`, `unlink`).
+ *
+ * The `backup` event says that the transaction backs up to the block it
+ * is counted in: it is recorded in the block that waits and its detail
+ * names the block the transaction goes back to (`-> 13`).
  */
 event: string, 
 /**
  * Detail (entity name, target block, ...).
+ *
+ * The events that carry a name and a value (`table`, `logic`, `value`)
+ * separate the two by the *last* space: the name may contain spaces, the
+ * value never does.
  */
 detail: string, };

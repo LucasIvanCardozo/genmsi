@@ -13,7 +13,7 @@
 //! the model's own identifier and is never translated.
 
 use crate::error::FormatError;
-use crate::model::{Block, Layout, Port, Property, SectionKind};
+use crate::model::{Block, GmdlModel, Layout, Port, Property, SectionKind};
 
 /// One connection point of a catalogue class.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,6 +54,46 @@ pub struct ClassSpec {
     pub outputs: &'static [PortSpec],
     /// Declared properties, in schema order.
     pub properties: &'static [PropertySpec],
+}
+
+impl ClassSpec {
+    /// The XML of a minimal, valid block of this class.
+    ///
+    /// The template is the `<module>` element the file uses, with the ports
+    /// the class declares (`ioid`, `name`, `caption` and an empty `mylabel`)
+    /// and the properties the class declares (`name`, `hint`, `value`, `type`,
+    /// `subType`, `visible` and `unique`). The `value` of a property is the
+    /// default value the class carries (see [`DEFAULTS`]); a property the
+    /// class declares no default for comes with an empty value.
+    ///
+    /// The block belongs to the model root (`owner="0"`) and its `moduleid`
+    /// is `0`: the caller renumbers it when it drops the block into a model.
+    /// The canvas geometry is left out: the editor places a block when it
+    /// opens the model.
+    ///
+    /// The text is the one the writer would write: the template is a block
+    /// the file accepts as it is, so a model built out of templates is a
+    /// model the format reads without a repair.
+    pub fn template(&self) -> String {
+        let mut block = build_block(self.class, 0, None).expect("the class is in the catalogue");
+        // The original names a new block after its class, both in the caption
+        // and in the name.
+        block.caption = self.class.to_string();
+        let model = GmdlModel {
+            version: "1".to_string(),
+            has_classes: false,
+            classes_self_closing: false,
+            spaced_self_closing: false,
+            classes: Vec::new(),
+            blocks: vec![block],
+            trailing: String::new(),
+        };
+        let text = crate::writer::to_string(&model);
+        text.strip_prefix("<gmodel versioncode=\"1\"><modules>")
+            .and_then(|rest| rest.strip_suffix("</modules></gmodel>"))
+            .expect("the writer writes one model with one block")
+            .to_string()
+    }
 }
 
 /// Every class the editor offers, in catalogue order.

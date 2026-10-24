@@ -39,6 +39,7 @@ impl ToolError {
     /// Every class the tools can emit, sorted; an agent switching on `error`
     /// depends on these exact strings, and the tests pin the set.
     pub const CLASSES: &'static [&'static str] = &[
+        "class_not_found",
         "invalid_arguments",
         "invalid_block",
         "invalid_expression",
@@ -76,6 +77,24 @@ impl ToolError {
             column: None,
             node: None,
             class: None,
+        }
+    }
+
+    /// The class the agent asked about is not in the catalogue.
+    ///
+    /// The catalogue is the list of the classes the editor offers; a class
+    /// outside it is not a class of the format, so the agent has to name one
+    /// of the classes the catalogue lists.
+    pub fn class_not_found(class: impl Into<String>) -> Self {
+        let class = class.into();
+        Self {
+            error: "class_not_found",
+            message: format!("unknown block class: {class}"),
+            path: None,
+            line: None,
+            column: None,
+            node: None,
+            class: Some(class),
         }
     }
 

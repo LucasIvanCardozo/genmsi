@@ -49,6 +49,20 @@ pub use writer::{to_string, write_file};
 
 use std::path::Path;
 
+/// The skeleton of a model: the smallest `.gmdl` document the format reads.
+///
+/// It is the root container the original writes for every model, and nothing
+/// else: the blocks a model needs are added to it, one `<module>` element
+/// each, with the links between them inside the root's `<links>` section.
+///
+/// The catalogue has the template of every block class
+/// ([`ClassSpec::template`]), so a model can be written out of the skeleton
+/// and the templates without guessing an element name or an attribute.
+pub const SKELETON_MODEL: &str = "<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules>\
+<module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" \
+genprefer=\"1,1,1,1,1,0,0,0,0,0,0,0,0\" exehead=\"\" nonexehead=\"\" exefoot=\"\" nonexefoot=\"\">\
+<links/><inputs/><outputs/></module></modules></gmodel>";
+
 /// Read, parse and structurally validate a model file.
 pub fn load(path: impl AsRef<Path>) -> Result<GmdlModel, FormatError> {
     let model = parse_file(path)?;

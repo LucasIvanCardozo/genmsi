@@ -141,6 +141,17 @@ pub struct SaveInput {
     pub model: String,
 }
 
+/// The class the agent asks about.
+#[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
+pub struct CatalogueInput {
+    /// Name of the class to describe (`Generate`, `Queue`, ...).
+    ///
+    /// Without it the tool returns the list of the classes and the skeleton
+    /// of a model.
+    #[serde(default)]
+    pub class: Option<String>,
+}
+
 /// The model the agent asked for: a file on disk or the document itself.
 fn source_of(path: &Option<String>, model: &Option<String>) -> Result<ModelSource, ToolError> {
     match (path, model) {
@@ -234,6 +245,20 @@ impl GenmsiServer {
         finish(explain_document(&input))
     }
 
+    /// Describe the block classes a model is built from.
+    ///
+    /// Returns the `genmsi.classlist/1` document (the classes there are and
+    /// the skeleton of a model) or, when the agent names a class, the
+    /// `genmsi.class/1` document of that class: its ports, its properties and
+    /// the XML of a block of it.
+    #[tool(
+        name = "catalogue",
+        description = "Describe the block classes a GenMSI model is built from. Call it BEFORE writing a model: it tells you which classes exist, which ports (ioid) and properties (name, type, value) each class declares, and the exact XML of a block of that class, so you never have to guess an element name. Without arguments it returns the genmsi.classlist/1 document (every class plus the skeleton of a model); with `class` (for example \"Generate\") it returns the genmsi.class/1 document of that class."
+    )]
+    pub fn catalogue(&self, Parameters(input): Parameters<CatalogueInput>) -> CallToolResult {
+        finish(catalogue_document(input.class.as_deref()))
+    }
+
     /// Write a model to a file.
     ///
     /// The model is checked first: a model that does not load, does not
@@ -268,6 +293,24 @@ fn explain_document(input: &ModelInput) -> Result<String, ToolError> {
         genmsi_core::EXPLAIN_SCHEMA,
         &body,
     ))
+}
+
+/// The catalogue document: the list of the classes, or the class asked about.
+fn catalogue_document(class: Option<&str>) -> Result<String, ToolError> {
+    match class {
+        None => Ok(genmsi_core::to_pretty_json(
+            genmsi_core::CLASSLIST_SCHEMA,
+            &genmsi_core::class_list_document(),
+        )),
+        Some(name) => {
+            let document = genmsi_core::class_document(name)
+                .ok_or_else(|| ToolError::class_not_found(name))?;
+            Ok(genmsi_core::to_pretty_json(
+                genmsi_core::CLASS_SCHEMA,
+                &document,
+            ))
+        }
+    }
 }
 
 /// The lint document of a model.
@@ -334,6 +377,8 @@ impl ServerHandler for GenmsiServer {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
             "GenMSI: a discrete-event simulation engine for GPSS-style models. \
+             Call `catalogue` before you write a model: it says which block classes \
+             exist and what the XML of a block of each class looks like. \
              Use `lint` to validate a model, `simulate` to run it, `get_trace` to read \
              its events and `explain_model` to describe it. Give the model either as \
              `path` (a .gmdl file) or as `model` (the .gmdl document as text).",

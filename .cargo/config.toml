@@ -1,0 +1,15 @@
+# La memoria de la máquina manda sobre los núcleos.
+#
+# Esta máquina tiene 15 GiB de RAM y el workspace tiene cuarenta y nueve
+# binarios de test, cada uno con su información de depuración. Cargo compila
+# en paralelo, un `rustc` por núcleo: con doce núcleos, doce procesos
+# `rustc` al mismo tiempo se llevan la memoria entera, el sistema empieza a
+# paginar en zram y el kernel cierra servicios por falta de memoria (eso
+# cortó una sesión de trabajo entera y se llevó por delante la unidad que
+# estaba corriendo).
+#
+# Cuatro a la vez alcanzan de sobra para el tiempo de compilación y
+# mantienen la memoria bajo control. Se puede subir con `CARGO_BUILD_JOBS`
+# o con `-j` en el comando, si la máquina está libre.
+[build]
+jobs = 4

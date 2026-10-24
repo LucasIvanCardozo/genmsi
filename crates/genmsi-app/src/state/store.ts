@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { engine } from "../engine";
 import { files } from "../engine/files";
 import { adviceFor } from "../engine/reasons";
-import type { ModelRef } from "../engine/adapter";
+import type { FileFingerprint, ModelRef } from "../engine/adapter";
 import { relayout } from "../edit/layout";
 import {
   buildIndex,
@@ -63,6 +63,26 @@ export const DEFAULT_START = 1;
  * needs the whole trace, and the document says when the bound cut it.
  */
 export const TRACE_LIMIT = 200_000;
+
+/**
+ * How often the app asks for the fingerprint of the file it has open.
+ *
+ * Half a second: not faster —the app must not spend its time on a file that
+ * did not change— and not slower —the reader has to see the change of the
+ * agent soon—.
+ */
+export const WATCH_INTERVAL_MS = 500;
+
+/**
+ * The timer of the watcher of the open file.
+ *
+ * The watcher lives outside the state: it is a clock, not something the app
+ * draws.
+ */
+let watchTimer: ReturnType<typeof setInterval> | null = null;
+
+/** The file the watcher is watching. */
+let watchedPath: string | null = null;
 
 /** How far a pasted copy is moved, so it does not sit on the original. */
 const PASTE_OFFSET = { dx: 180, dy: 90 };
@@ -149,6 +169,13 @@ export interface AppState {
   savedMessage: string | null;
   /** The models opened lately, the most recent first. */
   recentModels: string[];
+  /**
+   * The fingerprint of the file the app has open.
+   *
+   * `undefined` means the app has not looked at the file yet; `null` means
+   * the file is not there.
+   */
+  fingerprint: FileFingerprint | null | undefined;
   /** Ask the engine for the models the app offers. */
   loadModels: () => Promise<void>;
   /** Ask the engine for the block classes the editor offers. */
@@ -207,6 +234,15 @@ export interface AppState {
   clearSavedMessage: () => void;
   /** Ask the host for the models opened lately. */
   loadRecentModels: () => Promise<void>;
+  /** Watch the file the app has open, and reload the model when it changes. */
+  watchModel: (path: string) => void;
+  /** Stop watching the file. */
+  stopWatching: () => void;
+  /** Ask for the fingerprint of the open file, and reload the model if it
+   * changed. */
+  checkModelFile: () => Promise<void>;
+  /** Reload the model of the disk and run it again. */
+  reloadFromDisk: () => Promise<void>;
 }
 
 /** The message of a failure the engine reported. */
@@ -215,6 +251,41 @@ function messageOf(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+/**
+ * Whether two fingerprints are the same.
+ *
+ * The date of the modification is in nanoseconds, so two writes in the same
+ * millisecond are two different fingerprints.
+ */
+function sameFingerprint(
+  a: FileFingerprint | null,
+  b: FileFingerprint | null,
+): boolean {
+  if (a === null || b === null) {
+    return a === b;
+  }
+  return a.modifiedNanos === b.modifiedNanos && a.size === b.size;
+}
+
+/**
+ * The fingerprint of a file, or nothing when it cannot be read.
+ *
+ * `undefined` is "the app does not know": the file could not be read, and
+ * the next look will ask again.
+ */
+async function fingerprintOf(
+  path: string | null,
+): Promise<FileFingerprint | null | undefined> {
+  if (path === null) {
+    return undefined;
+  }
+  try {
+    return await engine().fingerprint(path);
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -329,6 +400,7 @@ export const useApp = create<AppState>((set, get) => ({
   pendingSave: null,
   savedMessage: null,
   recentModels: [],
+  fingerprint: undefined,
 
   loadModels: async () => {
     // The list of the models of the repository: the development server's
@@ -543,6 +615,10 @@ export const useApp = create<AppState>((set, get) => ({
         savedMessage: `Se guardó ${result.path} (${result.bytes} bytes).`,
         error: null,
       });
+      // The app wrote the file: the watcher has to remember the file it
+      // just wrote, or the model the reader saved would be reloaded as if
+      // somebody else had changed it.
+      set({ fingerprint: await fingerprintOf(result.state.path) });
     } catch (error) {
       set({ error: `No se pudo guardar el modelo: ${messageOf(error)}` });
     }
@@ -565,6 +641,126 @@ export const useApp = create<AppState>((set, get) => ({
     } catch (error) {
       set({ error: `No se pudieron leer los modelos recientes: ${messageOf(error)}` });
     }
+  },
+
+  /**
+   * Watch the file the app has open.
+   *
+   * The watcher asks for the fingerprint of the file every half second: when
+   * the fingerprint changes, the file changed, and the model is reloaded and
+   * run again. The first look is right away, so the change that happens
+   * after the model was opened is the one the app sees.
+   */
+  watchModel: (path: string) => {
+    if (watchedPath !== path) {
+      // Another file: the app looks at it from scratch.
+      watchedPath = path;
+      set({ fingerprint: undefined });
+    }
+    if (watchTimer !== null) {
+      return;
+    }
+    watchTimer = setInterval(() => {
+      void get().checkModelFile();
+    }, WATCH_INTERVAL_MS);
+    // The timer of Node keeps the process alive: the watcher must not.
+    (watchTimer as unknown as { unref?: () => void }).unref?.();
+    void get().checkModelFile();
+  },
+
+  stopWatching: () => {
+    if (watchTimer !== null) {
+      clearInterval(watchTimer);
+      watchTimer = null;
+    }
+    watchedPath = null;
+  },
+
+  /**
+   * Ask for the fingerprint of the open file, and reload the model when the
+   * file changed.
+   *
+   * A file that cannot be read is not a reason to stop watching: the next
+   * look asks again.
+   */
+  checkModelFile: async () => {
+    const path = get().currentPath;
+    if (path === null) {
+      return;
+    }
+    let fingerprint: FileFingerprint | null;
+    try {
+      fingerprint = await engine().fingerprint(path);
+    } catch {
+      return;
+    }
+    const previous = get().fingerprint;
+    set({ fingerprint });
+    if (previous === undefined) {
+      // The first look: the app learns what the file looks like.
+      return;
+    }
+    if (sameFingerprint(previous, fingerprint)) {
+      return;
+    }
+    if (fingerprint === null) {
+      // The file is not there any more: there is nothing to reload.
+      set({ notice: "El archivo del modelo ya no está en disco." });
+      return;
+    }
+    await get().reloadFromDisk();
+  },
+
+  /**
+   * Reload the model of the disk and run it again.
+   *
+   * The model of the disk goes over the one in memory only when the reader
+   * has nothing pending: his work is not thrown away by a change somebody
+   * else made. A model that does not compile leaves the app as it was, with
+   * the message of the compiler.
+   */
+  reloadFromDisk: async () => {
+    const state = get();
+    const path = state.currentPath;
+    if (path === null || state.model === null) {
+      return;
+    }
+    if (state.dirty) {
+      set({
+        notice:
+          "El modelo del disco cambió y tenés cambios sin guardar: no se recargó. Guardá el modelo para ver el del disco.",
+      });
+      return;
+    }
+    try {
+      const reloaded = await engine().reload(path);
+      set({
+        model: reloaded.model,
+        diagnostics: reloaded.diagnostics,
+        dirty: reloaded.dirty,
+        canUndo: reloaded.canUndo,
+        canRedo: reloaded.canRedo,
+        currentPath: reloaded.path ?? path,
+        // The run that was on the screen is the run of the model that was
+        // there: the run of the model that arrived replaces it.
+        report: null,
+        trace: null,
+        monitor: null,
+        transitions: null,
+        playhead: 0,
+        playing: false,
+        error: null,
+        status: "ready",
+      });
+    } catch (error) {
+      // The model of the disk does not compile: the app keeps the model it
+      // had, and says what the compiler said.
+      set({ error: `El modelo del disco no se pudo cargar: ${messageOf(error)}` });
+      return;
+    }
+    // The model that arrived runs again, by the same path as the button
+    // "Ejecutar": in the thread of the work, with its cancellation.
+    await get().runMonitor();
   },
 
   saveAs: async () => {

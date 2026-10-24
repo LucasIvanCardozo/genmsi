@@ -30,6 +30,7 @@ export default function App() {
     pendingSave,
     savedMessage,
     notice,
+    currentPath,
     clearNotice,
     loadModels,
     loadCatalogue,
@@ -49,6 +50,8 @@ export default function App() {
     confirmSave,
     dismissSave,
     clearSavedMessage,
+    watchModel,
+    stopWatching,
   } = useApp();
 
   useEffect(() => {
@@ -75,6 +78,19 @@ export default function App() {
     const handle = window.setTimeout(() => clearNotice(), NOTICE_MS);
     return () => window.clearTimeout(handle);
   }, [notice, clearNotice]);
+
+  // The app watches the file it has open: when the file changes in the
+  // disk —an agent that is building the model writes it— the model is
+  // reloaded and run again, so the agent and the reader see the same
+  // thing.
+  useEffect(() => {
+    if (currentPath === null) {
+      stopWatching();
+      return;
+    }
+    watchModel(currentPath);
+    return () => stopWatching();
+  }, [currentPath, watchModel, stopWatching]);
 
   // The keyboard of the editor: undo, redo, copy and paste.
   useEffect(() => {

@@ -77,6 +77,12 @@ pub struct SaveOutcome {
 pub struct Session {
     /// The model and its undo stack.
     editor: EditSession,
+    /// The sessions the reloads left behind.
+    ///
+    /// A reload is an operation of the session, like an edit: undoing it
+    /// brings the session back, with the undo stack it had. The reader's
+    /// work is therefore not lost when the model of the disk arrives.
+    previous: Vec<EditSession>,
     /// Where the model was opened from, as the caller named it.
     name: Option<String>,
     /// Where the model is written when it is saved.
@@ -92,6 +98,7 @@ impl Session {
         let model = genmsi_format::load(path).map_err(|error| model_error(path, error))?;
         Ok(Session {
             editor: EditSession::new(model),
+            previous: Vec::new(),
             name: Some(name.to_string()),
             path: Some(path.to_path_buf()),
         })
@@ -135,9 +142,29 @@ impl Session {
         };
         Session {
             editor: EditSession::new(model),
+            previous: Vec::new(),
             name: None,
             path: None,
         }
+    }
+
+    /// Reload the model from the disk.
+    ///
+    /// The model is read and **compiled** before it replaces the one in
+    /// memory: a model that does not compile leaves the session as it was,
+    /// so the app keeps the model it had and shows the compiler's message.
+    ///
+    /// The session that was there does not go away: it goes to the history
+    /// of the session, and undoing the reload brings it back with the undo
+    /// stack it had. The reload does not take the reader's work away.
+    pub fn reload(&mut self, path: &Path) -> Result<SessionState, AppError> {
+        let model = genmsi_format::load(path).map_err(|error| model_error(path, error))?;
+        genmsi_core::compile_model(&model).map_err(|error| model_error(path, error))?;
+        let editor = std::mem::replace(&mut self.editor, EditSession::new(model));
+        self.previous.push(editor);
+        self.name = Some(path.display().to_string());
+        self.path = Some(path.to_path_buf());
+        Ok(self.state())
     }
 
     /// The model in memory.
@@ -153,9 +180,17 @@ impl Session {
             model: model_document(self.editor.model(), &path),
             diagnostics: diagnostics_of(self.editor.model()),
             dirty: self.editor.dirty(),
-            can_undo: self.editor.can_undo(),
+            can_undo: self.can_undo(),
             can_redo: self.editor.can_redo(),
         }
+    }
+
+    /// Whether an operation can be undone.
+    ///
+    /// A reload is an operation: undoing it brings the session back, with
+    /// the undo stack it had.
+    pub fn can_undo(&self) -> bool {
+        self.editor.can_undo() || !self.previous.is_empty()
     }
 
     /// Apply one editing command.
@@ -173,7 +208,17 @@ impl Session {
     }
 
     /// Undo the last operation.
+    ///
+    /// When the model in memory has nothing to undo, the last reload is
+    /// what comes undone: the session it left behind comes back, with the
+    /// model and the undo stack it had.
     pub fn undo(&mut self) -> Result<SessionState, AppError> {
+        if !self.editor.can_undo()
+            && let Some(previous) = self.previous.pop()
+        {
+            self.editor = previous;
+            return Ok(self.state());
+        }
         self.editor.undo().map_err(|error| AppError::Model {
             path: self.name.clone().unwrap_or_default(),
             message: error.to_string(),

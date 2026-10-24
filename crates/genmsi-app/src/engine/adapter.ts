@@ -16,6 +16,20 @@ export interface ModelRef {
   path: string;
 }
 
+/**
+ * The fingerprint of a file on disk.
+ *
+ * The date of the modification is in **nanoseconds** and travels as a
+ * string: two writes in the same millisecond have to look different, and a
+ * JavaScript number cannot hold nanoseconds since the epoch exactly.
+ */
+export interface FileFingerprint {
+  /** The date of the last modification, in nanoseconds since the epoch. */
+  modifiedNanos: string;
+  /** How many bytes the file has. */
+  size: number;
+}
+
 /** The options of one simulation. */
 export interface SimulationOptions {
   /** Base seed of every random stream. */
@@ -73,12 +87,27 @@ export interface EngineAdapter {
   loadModel(path: string): Promise<ModelDocument>;
   /** The model's lint (`genmsi.lint/1`). */
   lint(path: string): Promise<LintDocument>;
+  /**
+   * The fingerprint of a file on disk, or null when the file is not there.
+   *
+   * The app watches the fingerprint of the model it has open: when it
+   * changes, the file changed.
+   */
+  fingerprint(path: string): Promise<FileFingerprint | null>;
   /** The run's report (`genmsi.report/1`). */
   simulate(path: string, options?: SimulationOptions): Promise<ReportDocument>;
   /** The run's trace (`genmsi.trace/1`). */
   trace(path: string, options?: SimulationOptions): Promise<TraceDocument>;
   /** Open a model for editing. */
   openModel(path: string): Promise<SessionState>;
+  /**
+   * Reload the model of the disk into the session.
+   *
+   * The model is compiled before it replaces the one in memory: a model that
+   * does not compile leaves the session as it was, and the failure says what
+   * the compiler said.
+   */
+  reload(path: string): Promise<SessionState>;
   /** Start a new, empty model. */
   newModel(): Promise<SessionState>;
   /** Apply one editing command. */

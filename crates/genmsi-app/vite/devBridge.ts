@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, statSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -59,6 +59,27 @@ export function run(bin: string, args: string[]): Promise<RunResult> {
       resolve({ code: code ?? 1, stdout, stderr });
     });
   });
+}
+
+/**
+ * The fingerprint of a file: its date of modification, in nanoseconds, and
+ * its size.
+ *
+ * The date is in nanoseconds because two writes in the same millisecond
+ * have to look different: the app watches this number to know that the file
+ * it has open changed.
+ */
+export function fingerprintOf(file: string): {
+  modifiedNanos: string;
+  size: number;
+} | null {
+  try {
+    const stats = statSync(file, { bigint: true });
+    return { modifiedNanos: stats.mtimeNs.toString(), size: Number(stats.size) };
+  } catch {
+    // The file is not there: the app has nothing to reload.
+    return null;
+  }
 }
 
 /**
@@ -225,6 +246,15 @@ export function devBridge(): Plugin {
               resolveInsideRepo(modelPath);
               const result = await run(genmsiBin, ["lint", modelPath, "--json"]);
               return send(res, result);
+            }
+            case "fingerprint": {
+              // The fingerprint of the file the app has open: the same
+              // answer the desktop shell gives.
+              const resolved = resolveInsideRepo(modelPath);
+              res.statusCode = 200;
+              res.setHeader("content-type", "application/json; charset=utf-8");
+              res.end(JSON.stringify({ fingerprint: fingerprintOf(resolved) }));
+              return;
             }
             case "simulate": {
               resolveInsideRepo(modelPath);

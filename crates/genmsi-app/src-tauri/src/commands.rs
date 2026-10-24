@@ -155,6 +155,57 @@ pub fn list_models() -> Result<Vec<ModelFile>, String> {
     Ok(models)
 }
 
+/// The fingerprint of a file on disk.
+///
+/// The date of the modification is in **nanoseconds** and travels as a
+/// string: two writes in the same millisecond have to look different, and
+/// a JavaScript number cannot hold nanoseconds since the epoch exactly.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileFingerprint {
+    /// The date of the last modification, in nanoseconds since the epoch.
+    pub modified_nanos: String,
+    /// How many bytes the file has.
+    pub size: u64,
+}
+
+/// The fingerprint of the model file, or nothing when the file is not there.
+///
+/// The app watches this: when the fingerprint of the file it has open
+/// changes, the file changed, and the app reloads the model and runs it
+/// again.
+#[tauri::command]
+pub fn model_fingerprint(path: String) -> Result<Option<FileFingerprint>, String> {
+    let path = Path::new(&path);
+    let metadata = match std::fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            log(&format!("model_fingerprint: {} no está", path.display()));
+            return Ok(None);
+        }
+        Err(error) => {
+            log(&format!("model_fingerprint: {} no se pudo leer", path.display()));
+            return Err(error.to_string());
+        }
+    };
+    let modified = metadata.modified().map_err(|error| error.to_string())?;
+    let modified_nanos = match modified.duration_since(std::time::UNIX_EPOCH) {
+        Ok(duration) => duration.as_nanos().to_string(),
+        // A file from before the epoch is rare, but it is a date like any
+        // other: it is published with its sign.
+        Err(error) => format!("-{}", error.duration().as_nanos()),
+    };
+    log(&format!(
+        "model_fingerprint: {} ({modified_nanos} ns, {} bytes)",
+        path.display(),
+        metadata.len()
+    ));
+    Ok(Some(FileFingerprint {
+        modified_nanos,
+        size: metadata.len(),
+    }))
+}
+
 /// The model's graph (`genmsi.model/1`).
 #[tauri::command]
 pub fn load_model(path: String) -> Result<String, String> {
@@ -572,6 +623,55 @@ mod tests {
     /// The run in flight and the session are globals of the shell: the
     /// tests that use them run one after the other.
     static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    /// A directory of its own for the files the tests write.
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("genmsi-app-{name}-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("the scratch directory is created");
+        dir
+    }
+
+    #[test]
+    fn the_fingerprint_of_a_file_is_its_date_in_nanoseconds_and_its_size() {
+        let dir = scratch("fingerprint");
+        let path = dir.join("modelo.gmdl");
+        std::fs::write(&path, "contenido").expect("the file is written");
+
+        let fingerprint = model_fingerprint(path.display().to_string())
+            .expect("the shell answers")
+            .expect("the file is there");
+        assert_eq!(fingerprint.size, "contenido".len() as u64);
+        // The date is in nanoseconds: the epoch in nanoseconds is bigger
+        // than a thousand billion, and the epoch in milliseconds is not.
+        let nanos: u128 = fingerprint
+            .modified_nanos
+            .parse()
+            .expect("the date is a number");
+        assert!(
+            nanos > 1_000_000_000_000_000_000,
+            "the date is not in nanoseconds: {nanos}"
+        );
+
+        // A file that is not there has no fingerprint: the app has nothing
+        // to reload.
+        let missing = model_fingerprint(dir.join("no.gmdl").display().to_string())
+            .expect("the shell answers");
+        assert!(missing.is_none(), "a file that is not there has a fingerprint");
+
+        // Another write is another fingerprint: the date is in nanoseconds,
+        // so two writes in the same millisecond look different.
+        std::fs::write(&path, "otro contenido").expect("the file is written again");
+        let again = model_fingerprint(path.display().to_string())
+            .expect("the shell answers")
+            .expect("the file is there");
+        assert_ne!(
+            again.modified_nanos, fingerprint.modified_nanos,
+            "two writes look the same"
+        );
+        assert_ne!(again.size, fingerprint.size, "the size did not move");
+
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
+    }
 
     /// Take the lock of the globals.
     ///

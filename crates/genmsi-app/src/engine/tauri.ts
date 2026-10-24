@@ -11,6 +11,7 @@ import type {
 import { EngineError } from "./adapter";
 import type {
   EngineAdapter,
+  FileFingerprint,
   ModelRef,
   RunOutcome,
   SaveResult,
@@ -74,6 +75,8 @@ export const tauri: EngineAdapter = {
     parsed<ModelDocument>(await invoke<string>("load_model", { path })),
   lint: async (path: string) =>
     parsed<LintDocument>(await invoke<string>("lint_model", { path })),
+  fingerprint: (path: string) =>
+    invoke<FileFingerprint | null>("model_fingerprint", { path }),
   simulate: async (path: string, options?: SimulationOptions) =>
     parsed<ReportDocument>(
       await invoke<string>("simulate_model", {
@@ -94,6 +97,7 @@ export const tauri: EngineAdapter = {
       }),
     ),
   openModel: async (path: string) => stateOf(await session({ op: "open", path })),
+  reload: async (path: string) => stateOf(await session({ op: "reload", path })),
   newModel: async () => stateOf(await session({ op: "new" })),
   apply: async (command: EditCommand) => stateOf(await session({ op: "apply", command })),
   undo: async () => stateOf(await session({ op: "undo" })),

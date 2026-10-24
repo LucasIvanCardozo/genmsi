@@ -28,6 +28,15 @@ pub enum SessionRequest {
     },
     /// Start a new, empty model.
     New,
+    /// Reload the model from the disk.
+    ///
+    /// The model is compiled before it replaces the one in memory: a model
+    /// that does not compile leaves the session as it was, and the answer
+    /// says what the compiler said.
+    Reload {
+        /// Path of the model.
+        path: String,
+    },
     /// Apply one editing command.
     Apply {
         /// The command to apply.
@@ -238,6 +247,9 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
             let state = opened.state();
             *session = Some(opened);
             SessionResponse::state(state)
+        }
+        SessionRequest::Reload { path } => {
+            with_session(session, |session| session.reload(Path::new(&path)))
         }
         SessionRequest::Apply { command } => with_session(session, |session| session.apply(command)),
         SessionRequest::Undo => with_session(session, |session| session.undo()),

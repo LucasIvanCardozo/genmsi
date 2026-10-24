@@ -11,6 +11,7 @@ import type {
 import { EngineError } from "./adapter";
 import type {
   EngineAdapter,
+  FileFingerprint,
   ModelRef,
   RunOutcome,
   SaveResult,
@@ -20,6 +21,11 @@ import type {
 /** The list document of the app (`genmsi.models/1`). */
 interface ModelsDocument {
   models: ModelRef[];
+}
+
+/** The answer of the bridge to a question about a file. */
+interface FingerprintDocument {
+  fingerprint: FileFingerprint | null;
 }
 
 /**
@@ -57,6 +63,23 @@ function messageOf(text: string): string {
     // The body is not JSON: the raw text is the message.
   }
   return text;
+}
+
+/**
+ * Ask the dev bridge for the fingerprint of a file.
+ *
+ * The bridge answers with the same shape the desktop shell answers with:
+ * the date of the modification in nanoseconds and the size of the file, or
+ * nothing when the file is not there.
+ */
+async function fingerprintOf(path: string): Promise<FileFingerprint | null> {
+  const response = await fetch(`/api/fingerprint?path=${encodeURIComponent(path)}`);
+  const text = await response.text();
+  if (!response.ok) {
+    throw new EngineError(messageOf(text));
+  }
+  const document = JSON.parse(text) as FingerprintDocument;
+  return document.fingerprint;
 }
 
 /**
@@ -99,6 +122,7 @@ export const devBridge: EngineAdapter = {
   listModels: async () => (await get<ModelsDocument>("models", {})).models,
   loadModel: (path: string) => get<ModelDocument>("model", { path }),
   lint: (path: string) => get<LintDocument>("lint", { path }),
+  fingerprint: (path: string) => fingerprintOf(path),
   simulate: (path: string, options?: SimulationOptions) =>
     get<ReportDocument>("simulate", {
       path,
@@ -115,6 +139,7 @@ export const devBridge: EngineAdapter = {
       limit: options?.limit,
     }),
   openModel: async (path: string) => stateOf(await session({ op: "open", path })),
+  reload: async (path: string) => stateOf(await session({ op: "reload", path })),
   newModel: async () => stateOf(await session({ op: "new" })),
   apply: async (command: EditCommand) => stateOf(await session({ op: "apply", command })),
   undo: async () => stateOf(await session({ op: "undo" })),

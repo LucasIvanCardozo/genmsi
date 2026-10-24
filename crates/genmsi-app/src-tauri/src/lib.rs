@@ -44,6 +44,7 @@ pub fn run() {
             commands::list_models,
             commands::load_model,
             commands::lint_model,
+            commands::model_fingerprint,
             commands::simulate_model,
             commands::trace_model,
             commands::session,

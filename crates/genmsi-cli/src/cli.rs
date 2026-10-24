@@ -61,6 +61,31 @@ pub struct RunArgs {
     /// the model's own termination.
     #[arg(long, value_name = "TIME")]
     pub until: Option<f64>,
+    /// The `START` of the run: how many termination units end it.
+    ///
+    /// The original has the same field in the panel of its simulator ("Start:",
+    /// one by default) and the model does not declare it: it is a parameter of
+    /// the run, like the horizon. The `Terminate` with its operand A takes
+    /// that many units from the counter for every transaction that arrives,
+    /// the `Clock` takes one per tick, and the run ends when the counter
+    /// reaches zero or goes below it.
+    #[arg(long, value_name = "N", value_parser = parse_start)]
+    pub start: Option<u64>,
+}
+
+/// The value of the `--start` option.
+///
+/// The original refuses a `Start` of zero ("El Start debe ser mayor a
+/// cero."), and so does this: a run that starts with a counter of zero would
+/// end before it begins.
+fn parse_start(value: &str) -> Result<u64, String> {
+    let start: u64 = value
+        .parse()
+        .map_err(|_| format!("the start must be a whole number: {value}"))?;
+    if start == 0 {
+        return Err("the start must be greater than zero".to_string());
+    }
+    Ok(start)
 }
 
 /// Output form of every subcommand.

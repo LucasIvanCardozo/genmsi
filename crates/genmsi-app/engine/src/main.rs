@@ -48,6 +48,9 @@ enum Command {
         /// Stop the run at this simulation time.
         #[arg(long)]
         until: Option<f64>,
+        /// The `START` of the run: how many termination units end it.
+        #[arg(long, default_value_t = 1)]
+        start: u64,
     },
     /// The `genmsi.trace/1` document of a finished run.
     Trace {
@@ -59,6 +62,9 @@ enum Command {
         /// Stop the run at this simulation time.
         #[arg(long)]
         until: Option<f64>,
+        /// The `START` of the run: how many termination units end it.
+        #[arg(long, default_value_t = 1)]
+        start: u64,
         /// Maximum number of trace records kept.
         #[arg(long, default_value_t = 100)]
         limit: usize,
@@ -128,13 +134,15 @@ fn run(command: Command) -> Result<String, AppError> {
             path,
             seed,
             until,
-        } => engine::simulate_document_bytes(&path, seed, until, None),
+            start,
+        } => engine::simulate_document_bytes(&path, seed, until, start, None),
         Command::Trace {
             path,
             seed,
             until,
+            start,
             limit,
-        } => engine::trace_document_bytes(&path, seed, until, limit, None),
+        } => engine::trace_document_bytes(&path, seed, until, start, limit, None),
         Command::Models { dir } => {
             let dir = dir.unwrap_or_else(|| PathBuf::from("."));
             engine::models_document_bytes(&[dir])

@@ -237,6 +237,10 @@ export function devBridge(): Plugin {
               if (until !== null && until !== "") {
                 args.push("--until", until);
               }
+              const start = url.searchParams.get("start");
+              if (start !== null && start !== "") {
+                args.push("--start", start);
+              }
               const result = await run(genmsiBin, args);
               return send(res, result);
             }
@@ -250,6 +254,10 @@ export function devBridge(): Plugin {
               const until = url.searchParams.get("until");
               if (until !== null && until !== "") {
                 args.push("--until", until);
+              }
+              const start = url.searchParams.get("start");
+              if (start !== null && start !== "") {
+                args.push("--start", start);
               }
               const limit = url.searchParams.get("limit");
               if (limit !== null && limit !== "") {

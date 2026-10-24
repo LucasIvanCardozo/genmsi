@@ -46,6 +46,17 @@ export const STOPPED_NOTICE =
 export const DEFAULT_UNTIL = 3600;
 
 /**
+ * The `START` of the run when the reader does not choose one.
+ *
+ * The `START` is the counter of terminations of the run: the original has it
+ * in the panel of its simulator ("Start:", one by default) and the model does
+ * not declare it anywhere, so it is a parameter of the run, like the
+ * horizon. One is the default of the original, and with it the runs of the
+ * app are the runs of the original.
+ */
+export const DEFAULT_START = 1;
+
+/**
  * How many trace records the monitor asks the engine for.
  *
  * The CLI keeps 100 by default, which is a sample and not a run: the replay
@@ -109,6 +120,8 @@ export interface AppState {
   seedIsAuto: boolean;
   /** The horizon the next run uses, in simulated time. */
   until: number | null;
+  /** The `START` of the next run: how many termination units end it. */
+  start: number;
   /** The commands that were applied, so the app knows whether the change it
    * is undoing moved the blocks or changed the program. */
   history: EditCommand[];
@@ -184,6 +197,8 @@ export interface AppState {
   setSeed: (seed: number) => void;
   /** Set the horizon of the next run. */
   setUntil: (until: number | null) => void;
+  /** Set the `START` of the next run. */
+  setStart: (start: number) => void;
   /** Answer the confirmation of a save with yes. */
   confirmSave: () => Promise<void>;
   /** Answer the confirmation of a save with no. */
@@ -300,6 +315,7 @@ export const useApp = create<AppState>((set, get) => ({
   seed: randomSeed(),
   seedIsAuto: true,
   until: DEFAULT_UNTIL,
+  start: DEFAULT_START,
   status: "idle",
   cancelling: false,
   notice: null,
@@ -571,6 +587,7 @@ export const useApp = create<AppState>((set, get) => ({
     try {
       const report = await engine().simulateCurrent({
         seed,
+        start: get().start,
         until: get().until ?? undefined,
       });
       set({
@@ -609,6 +626,7 @@ export const useApp = create<AppState>((set, get) => ({
     try {
       const options = {
         seed,
+        start: get().start,
         until: get().until ?? undefined,
         limit: TRACE_LIMIT,
       };
@@ -757,6 +775,14 @@ export const useApp = create<AppState>((set, get) => ({
   setSeed: (seed: number) => set({ seed, seedIsAuto: false }),
 
   setUntil: (until: number | null) => set({ until }),
+
+  // The `START` of the run is a whole number of one or more: the original
+  // refuses a `Start` of zero ("El Start debe ser mayor a cero."), and the
+  // app does not let the run start with a counter of zero.
+  setStart: (start: number) =>
+    set({
+      start: Number.isFinite(start) ? Math.max(1, Math.trunc(start)) : DEFAULT_START,
+    }),
 }));
 
 // El store se ve desde la consola del navegador mientras se desarrolla.

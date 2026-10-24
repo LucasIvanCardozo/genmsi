@@ -940,8 +940,6 @@ pub struct Definitions {
 pub struct Program {
     /// Model name (file stem or main block name).
     pub title: String,
-    /// Start counter (units the `START` statement requires).
-    pub start_counter: f64,
     /// Executable statements.
     pub blocks: Vec<ExecBlock>,
     /// Definitions.
@@ -1137,7 +1135,6 @@ impl Compiler<'_> {
 
         Ok(Program {
             title,
-            start_counter: 1.0,
             declared_blocks: blocks.len(),
             blocks,
             definitions,

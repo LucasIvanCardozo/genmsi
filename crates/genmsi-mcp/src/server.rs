@@ -79,6 +79,13 @@ pub struct RunInput {
     /// Stop once the simulated clock passes this time.
     #[serde(default)]
     pub until: Option<f64>,
+    /// The `START` of the run: how many termination units end it.
+    ///
+    /// The original has the same field in the panel of its simulator ("Start:",
+    /// one by default) and the model does not declare it: it is a parameter of
+    /// the run, like the horizon. It has to be greater than zero.
+    #[serde(default = "default_start")]
+    pub start: u64,
 }
 
 impl RunInput {
@@ -103,6 +110,13 @@ pub struct TraceInput {
     /// Stop once the simulated clock passes this time.
     #[serde(default)]
     pub until: Option<f64>,
+    /// The `START` of the run: how many termination units end it.
+    ///
+    /// The original has the same field in the panel of its simulator ("Start:",
+    /// one by default) and the model does not declare it: it is a parameter of
+    /// the run, like the horizon. It has to be greater than zero.
+    #[serde(default = "default_start")]
+    pub start: u64,
     /// Maximum number of trace records to keep.
     #[serde(default = "default_limit")]
     pub limit: usize,
@@ -136,6 +150,23 @@ fn default_seed() -> u64 {
     genmsi_core::random_seed()
 }
 
+/// The default `START` of a run: one, as the original's panel shows.
+fn default_start() -> u64 {
+    genmsi_core::DEFAULT_START
+}
+
+/// The `START` of a run, checked.
+///
+/// The original refuses a `Start` of zero ("El Start debe ser mayor a
+/// cero."), and so does the server: a run whose counter of terminations
+/// starts at zero would end before it begins.
+fn checked_start(start: u64) -> Result<u64, ToolError> {
+    if start == 0 {
+        return Err(ToolError::arguments("the start must be greater than zero"));
+    }
+    Ok(start)
+}
+
 /// The default number of trace records, the same default the CLI uses.
 fn default_limit() -> usize {
     100
@@ -161,7 +192,7 @@ impl GenmsiServer {
     /// --json` prints.
     #[tool(
         name = "simulate",
-        description = "Simulate a GenMSI model and return its report. Takes `path` or `model`, plus the optional `seed` and `until`, and returns the genmsi.report/1 document."
+        description = "Simulate a GenMSI model and return its report. Takes `path` or `model`, plus the optional `seed`, `until` and `start`, and returns the genmsi.report/1 document."
     )]
     pub fn simulate(&self, Parameters(input): Parameters<RunInput>) -> CallToolResult {
         finish(report_document(&input))
@@ -173,7 +204,7 @@ impl GenmsiServer {
     /// --json` prints.
     #[tool(
         name = "get_trace",
-        description = "Simulate a GenMSI model and return its event trace. Takes `path` or `model`, plus the optional `seed`, `until` and `limit`, and returns the genmsi.trace/1 document."
+        description = "Simulate a GenMSI model and return its event trace. Takes `path` or `model`, plus the optional `seed`, `until`, `start` and `limit`, and returns the genmsi.trace/1 document."
     )]
     pub fn get_trace(&self, Parameters(input): Parameters<TraceInput>) -> CallToolResult {
         finish(trace_document(&input))
@@ -227,7 +258,8 @@ fn lint_document(input: &ModelInput) -> Result<String, ToolError> {
 /// The report document of a run.
 fn report_document(input: &RunInput) -> Result<String, ToolError> {
     let loaded = engine::load(&input.source()?)?;
-    let config = engine::config(input.seed, input.until, false, 0);
+    let start = checked_start(input.start)?;
+    let config = engine::config(input.seed, input.until, start, false, 0);
     let result = engine::run(&loaded, config)?;
     let document = genmsi_core::json_report(&result, &loaded.program);
     Ok(genmsi_core::to_pretty_json(
@@ -239,7 +271,8 @@ fn report_document(input: &RunInput) -> Result<String, ToolError> {
 /// The trace document of a run.
 fn trace_document(input: &TraceInput) -> Result<String, ToolError> {
     let loaded = engine::load(&input.source()?)?;
-    let config = engine::config(input.seed, input.until, true, input.limit);
+    let start = checked_start(input.start)?;
+    let config = engine::config(input.seed, input.until, start, true, input.limit);
     let result = engine::run(&loaded, config)?;
     let document = genmsi_core::trace_document(&result, input.limit);
     Ok(genmsi_core::to_pretty_json(
@@ -295,6 +328,7 @@ mod tests {
             model: Some(MINI.to_string()),
             seed: 1,
             until: None,
+            start: 1,
         }
     }
 
@@ -304,6 +338,7 @@ mod tests {
             model: Some(MINI.to_string()),
             seed: 1,
             until: None,
+            start: 1,
             limit: 100,
         }
     }

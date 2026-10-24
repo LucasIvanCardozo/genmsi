@@ -136,6 +136,31 @@ fn write_model(name: &str, text: &str) -> PathBuf {
     path
 }
 
+/// A model whose run ends with the counter of terminations.
+///
+/// A generator makes one transaction every hundred units and the terminate
+/// takes one unit from the `START` of the run for every transaction that
+/// arrives, so the run ends with the transaction that empties the counter.
+const START_MODEL: &str = "<gmodel versioncode=\"1\"><gclasses/><modules>
+  <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"m\" name=\"m\" kind=\"C\">
+    <links><link frommoduleid=\"1\" fromioid=\"2\" tomoduleid=\"2\" toioid=\"1\"/></links><inputs/><outputs/>
+  </module>
+  <module moduleid=\"1\" moduleclass=\"Generate\" owner=\"0\" caption=\"c\" name=\"n\" kind=\"A\">
+    <inputs/>
+    <outputs><output ioid=\"2\" name=\"Salida1\" caption=\"\" mylabel=\"T1\"/></outputs>
+    <props>
+      <property name=\"Media\" hint=\"\" value=\"100\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/>
+      <property name=\"Modificador\" hint=\"\" value=\"0\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/>
+    </props>
+  </module>
+  <module moduleid=\"2\" moduleclass=\"Terminate\" owner=\"0\" caption=\"c\" name=\"n\" kind=\"A\">
+    <inputs><input ioid=\"1\" name=\"Entrada1\" caption=\"\" mylabel=\"T1\"/></inputs><outputs/>
+    <props>
+      <property name=\"Unidades\" hint=\"\" value=\"1\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/>
+    </props>
+  </module>
+</modules></gmodel>";
+
 #[test]
 fn lint_says_the_warning_of_the_format() {
     let path = write_model("undeclared-storage", UNDECLARED_STORAGE);
@@ -227,6 +252,49 @@ fn simulate_honours_the_seed_and_the_horizon() {
     let end_time = bounded["end_time"].as_f64().expect("end_time");
     assert!(end_time >= 600.0, "{end_time}");
     assert!(end_time < 700.0, "{end_time}");
+}
+
+#[test]
+fn el_start_de_la_corrida_cambia_el_end_time_del_reporte() {
+    let model = write_model("start", START_MODEL);
+    let path = model.to_str().expect("a path");
+
+    // The default of the original: the run ends with the first transaction.
+    let one = genmsi(&["simulate", path, "--json"]);
+    assert_eq!(code(&one), 0, "{}", stderr(&one));
+    assert_eq!(json(&one)["end_time"], 100.0);
+    assert_eq!(json(&one)["end_reason"], "terminated");
+
+    // A `START` of five: the run ends with the fifth transaction, at the
+    // fifth hundred.
+    let five = genmsi(&["simulate", path, "--json", "--start", "5"]);
+    assert_eq!(code(&five), 0, "{}", stderr(&five));
+    assert_eq!(json(&five)["end_time"], 500.0);
+    assert_eq!(json(&five)["end_reason"], "terminated");
+
+    // The scratch directory of the test is not left behind.
+    let dir = model.parent().expect("the directory of the model");
+    std::fs::remove_dir_all(dir).expect("the scratch directory is removed");
+}
+
+#[test]
+fn un_start_de_cero_se_rechaza() {
+    // The original refuses it too ("El Start debe ser mayor a cero."): a run
+    // whose counter of terminations starts at zero would end before it
+    // begins.
+    let output = genmsi(&[
+        "simulate",
+        "fixtures/models/TP2__problema1.gmdl",
+        "--start",
+        "0",
+    ]);
+    assert_eq!(code(&output), 2);
+    assert!(stdout(&output).is_empty());
+    let message = stderr(&output);
+    assert!(
+        message.contains("the start must be greater than zero"),
+        "{message}"
+    );
 }
 
 #[test]

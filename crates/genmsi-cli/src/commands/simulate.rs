@@ -10,7 +10,7 @@ use crate::output::{self, REPORT_SCHEMA};
 /// Run `genmsi simulate`.
 pub fn run(args: SimulateArgs) -> Result<ExitCode, CliError> {
     let loaded = model::load(&args.model.path)?;
-    let config = model::config(args.run.seed, args.run.until);
+    let config = model::config(args.run.seed, args.run.until, args.run.start);
     let result = Simulation::new(&loaded.program, config)
         .run()
         .map_err(|error| CliError::model(&args.model.path, error))?;

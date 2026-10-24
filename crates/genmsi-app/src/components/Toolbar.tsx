@@ -12,11 +12,13 @@ import { useApp } from "../state/store";
  * opened lately— are here, with the editing actions: they are commands of
  * the model, like the others, and the toolbar has the room for them.
  *
- * The seed and the horizon of the run live here too: they are the two
- * numbers the next run takes, and the seed is a 64-bit one, so its field is
- * wide enough to read it whole. The horizon comes with the 3600 of the
- * original: a run without a horizon lasts until the engine runs out of
- * patience.
+ * The seed, the horizon and the `START` of the run live here too: they are
+ * the three numbers the next run takes, and the seed is a 64-bit one, so its
+ * field is wide enough to read it whole. The horizon comes with the 3600 of
+ * the original: a run without a horizon lasts until the engine runs out of
+ * patience. The `START` comes with the one of the original: it is the
+ * counter of terminations of the run, and the original has it in the panel
+ * of its simulator, next to the clock of the run.
  */
 export default function Toolbar({
   dirty,
@@ -71,8 +73,10 @@ export default function Toolbar({
   // the toolbar.
   const seed = useApp((state) => state.seed);
   const until = useApp((state) => state.until);
+  const start = useApp((state) => state.start);
   const setSeed = useApp((state) => state.setSeed);
   const setUntil = useApp((state) => state.setUntil);
+  const setStart = useApp((state) => state.setStart);
 
   const button =
     "flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300";
@@ -104,6 +108,19 @@ export default function Toolbar({
           title="El horizonte de la corrida, en tiempo simulado. Por defecto 3600, como el reloj del original; vacío es una corrida sin tope."
           value={until ?? ""}
           onChange={(event) => setUntil(event.target.value === "" ? null : Number(event.target.value))}
+          className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-mono text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+        />
+        <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+          Inicio
+        </label>
+        <input
+          aria-label="Inicio"
+          type="number"
+          min={1}
+          step={1}
+          value={start}
+          title="El START de la corrida: cuántas unidades de terminación la terminan. Por defecto 1, como el campo «Start» del simulador del original."
+          onChange={(event) => setStart(Number(event.target.value) || 1)}
           className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-mono text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
         />
       </div>

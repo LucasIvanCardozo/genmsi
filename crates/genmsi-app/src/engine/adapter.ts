@@ -20,6 +20,8 @@ export interface ModelRef {
 export interface SimulationOptions {
   /** Base seed of every random stream. */
   seed?: number;
+  /** The `START` of the run: how many termination units end it. */
+  start?: number;
   /** Horizon of the run, in simulated time. */
   until?: number;
   /** How many trace records the run keeps. */

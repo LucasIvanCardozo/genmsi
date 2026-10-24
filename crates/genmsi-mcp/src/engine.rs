@@ -85,11 +85,19 @@ pub fn load(source: &ModelSource) -> Result<Loaded, ToolError> {
 /// The configuration of a run.
 ///
 /// `trace` and `limit` decide whether the run keeps its event trace and how
-/// many records it keeps; the seed makes the run reproducible.
-pub fn config(seed: u64, until: Option<f64>, trace: bool, limit: usize) -> SimConfig {
+/// many records it keeps; the seed makes the run reproducible; `start` is the
+/// `START` of the original, the counter of terminations of the run.
+pub fn config(
+    seed: u64,
+    until: Option<f64>,
+    start: u64,
+    trace: bool,
+    limit: usize,
+) -> SimConfig {
     SimConfig {
         seed,
         stop_time: until,
+        start,
         trace,
         trace_limit: limit,
         ..SimConfig::default()
@@ -130,9 +138,10 @@ mod tests {
 
     #[test]
     fn the_configuration_carries_the_knobs() {
-        let config = config(7, Some(120.0), true, 25);
+        let config = config(7, Some(120.0), 5, true, 25);
         assert_eq!(config.seed, 7);
         assert_eq!(config.stop_time, Some(120.0));
+        assert_eq!(config.start, 5);
         assert!(config.trace);
         assert_eq!(config.trace_limit, 25);
     }

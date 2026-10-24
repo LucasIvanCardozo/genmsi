@@ -103,12 +103,14 @@ export const devBridge: EngineAdapter = {
     get<ReportDocument>("simulate", {
       path,
       seed: options?.seed,
+      start: options?.start,
       until: options?.until,
     }),
   trace: (path: string, options?: SimulationOptions) =>
     get<TraceDocument>("trace", {
       path,
       seed: options?.seed,
+      start: options?.start,
       until: options?.until,
       limit: options?.limit,
     }),
@@ -130,6 +132,7 @@ export const devBridge: EngineAdapter = {
       await session({
         op: "simulateCurrent",
         seed: options?.seed ?? null,
+        start: options?.start ?? null,
         until: options?.until ?? null,
       }),
     ),
@@ -138,6 +141,7 @@ export const devBridge: EngineAdapter = {
       await session({
         op: "traceCurrent",
         seed: options?.seed ?? null,
+        start: options?.start ?? null,
         until: options?.until ?? null,
         limit: options?.limit ?? null,
       }),
@@ -146,6 +150,7 @@ export const devBridge: EngineAdapter = {
     const answer = await session({
       op: "runCurrent",
       seed: options?.seed ?? null,
+      start: options?.start ?? null,
       until: options?.until ?? null,
       limit: options?.limit ?? null,
     });

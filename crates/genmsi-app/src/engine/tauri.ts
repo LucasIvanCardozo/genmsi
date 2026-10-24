@@ -79,6 +79,7 @@ export const tauri: EngineAdapter = {
       await invoke<string>("simulate_model", {
         path,
         seed: options?.seed ?? 1,
+        start: options?.start ?? 1,
         until: options?.until ?? null,
       }),
     ),
@@ -87,6 +88,7 @@ export const tauri: EngineAdapter = {
       await invoke<string>("trace_model", {
         path,
         seed: options?.seed ?? 1,
+        start: options?.start ?? 1,
         until: options?.until ?? null,
         limit: options?.limit ?? null,
       }),
@@ -109,6 +111,7 @@ export const tauri: EngineAdapter = {
       await session({
         op: "simulateCurrent",
         seed: options?.seed ?? null,
+        start: options?.start ?? null,
         until: options?.until ?? null,
       }),
     ),
@@ -117,6 +120,7 @@ export const tauri: EngineAdapter = {
       await session({
         op: "traceCurrent",
         seed: options?.seed ?? null,
+        start: options?.start ?? null,
         until: options?.until ?? null,
         limit: options?.limit ?? null,
       }),
@@ -125,6 +129,7 @@ export const tauri: EngineAdapter = {
     const answer = await session({
       op: "runCurrent",
       seed: options?.seed ?? null,
+      start: options?.start ?? null,
       until: options?.until ?? null,
       limit: options?.limit ?? null,
     });

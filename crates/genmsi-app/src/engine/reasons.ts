@@ -77,15 +77,17 @@ export function adviceFor(message: string): string | null {
  * How a run ended, in the words of the app.
  *
  * The engine names the reason in English (`terminated`, `no_events`,
- * `time_limit`, `cancelled`) and the report shows it raw. A reason the app
- * does not know is shown as it comes: the app does not hide what it does
- * not understand.
+ * `time_limit`, `cancelled`, `event_limit`) and the report shows it raw.
+ * A reason the app does not know is shown as it comes: the app does not
+ * hide what it does not understand.
  */
 const END_REASONS: Readonly<Record<string, string>> = {
   terminated: "terminada",
   no_events: "sin eventos: la cadena de eventos se agotó",
   time_limit: "por el tope de tiempo",
   cancelled: "cancelada",
+  event_limit:
+    "cortada por el guard de eventos: el modelo sigue haciendo eventos sin terminar",
 };
 
 /** How a run ended, in the words of the app. */

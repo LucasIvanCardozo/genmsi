@@ -46,7 +46,7 @@ fn a_run_with_the_flag_ends_with_the_reason_of_the_cancellation() {
 
     // The whole run: how long the engine takes when nobody stops it.
     let whole_start = Instant::now();
-    let whole = simulate_model_bytes(&model, 1, None, None).expect("runs");
+    let whole = simulate_model_bytes(&model, 1, None, 1, None).expect("runs");
     let whole_elapsed = whole_start.elapsed();
     let whole_report: serde_json::Value = serde_json::from_str(&whole).expect("parses");
     assert_eq!(whole_report["end_reason"], "terminated");
@@ -54,7 +54,7 @@ fn a_run_with_the_flag_ends_with_the_reason_of_the_cancellation() {
     // The same run, with the reader raising the flag in the middle of it.
     let (flag, handle) = raiser(Duration::from_millis(20));
     let cancelled_start = Instant::now();
-    let cancelled = simulate_model_bytes(&model, 1, None, Some(flag)).expect("runs");
+    let cancelled = simulate_model_bytes(&model, 1, None, 1, Some(flag)).expect("runs");
     let cancelled_elapsed = cancelled_start.elapsed();
     handle.join().expect("the flag is raised");
 
@@ -89,7 +89,7 @@ fn the_documents_of_a_run_with_the_flag_say_the_run_was_cancelled() {
     let model = busy();
 
     let (flag, handle) = raiser(Duration::from_millis(20));
-    let documents = run_model_documents_bytes(&model, 1, None, 100, Some(flag)).expect("runs");
+    let documents = run_model_documents_bytes(&model, 1, None, 1, 100, Some(flag)).expect("runs");
     handle.join().expect("the flag is raised");
 
     let report: serde_json::Value = serde_json::from_str(&documents.report).expect("parses");
@@ -104,9 +104,9 @@ fn a_run_without_the_flag_is_the_run_it_was() {
 
     // The run without a flag, and the run with a flag nobody raises: the two
     // are the same run, byte for byte.
-    let plain = simulate_model_bytes(&model, 1, None, None).expect("runs");
+    let plain = simulate_model_bytes(&model, 1, None, 1, None).expect("runs");
     let flag = Arc::new(AtomicBool::new(false));
-    let with_flag = simulate_model_bytes(&model, 1, None, Some(flag)).expect("runs");
+    let with_flag = simulate_model_bytes(&model, 1, None, 1, Some(flag)).expect("runs");
 
     assert_eq!(plain, with_flag, "the flag changed the run");
 }

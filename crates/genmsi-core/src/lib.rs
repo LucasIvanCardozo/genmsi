@@ -51,7 +51,10 @@ pub use report::{json_report, program_json, render, to_csv, to_json};
 pub use replication::{
     MetricSummary, ReplicationConfig, ReplicationResult, render_summary, replicate,
 };
-pub use sim::{BlockStats, EndReason, RunResult, SimConfig, Simulation, TraceEvent};
+pub use sim::{
+    BlockStats, DEFAULT_MAX_EVENTS, DEFAULT_START, EndReason, RunResult, SimConfig, Simulation,
+    TraceEvent,
+};
 
 use genmsi_format::GmdlModel;
 

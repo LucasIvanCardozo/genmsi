@@ -40,7 +40,7 @@ pub fn render(events: &[TraceEvent], limit: usize, truncated: bool) -> String {
 /// Run `genmsi trace`.
 pub fn run(args: TraceArgs) -> Result<ExitCode, CliError> {
     let loaded = model::load(&args.model.path)?;
-    let mut config = model::config(args.run.seed, args.run.until);
+    let mut config = model::config(args.run.seed, args.run.until, args.run.start);
     config.trace = true;
     config.trace_limit = args.limit;
     let result = Simulation::new(&loaded.program, config)

@@ -39,6 +39,13 @@ use tauri::async_runtime::{Sender, channel};
 /// The directory the shell offers as models.
 const MODELS_DIR: &str = "fixtures/models";
 
+/// The `START` of a run when the reader does not choose one.
+///
+/// The `START` is the counter of terminations of the run: the original has it
+/// in the panel of its simulator ("Start:", one by default) and the model
+/// does not declare it, so it travels with the request.
+const DEFAULT_START: u64 = 1;
+
 /// How many models the list of recents keeps.
 const RECENT_MODELS: usize = 8;
 
@@ -171,12 +178,19 @@ pub async fn simulate_model(
     path: String,
     seed: Option<u64>,
     until: Option<f64>,
+    start: Option<u64>,
 ) -> Result<String, String> {
     log(&format!("simulate_model: {path}"));
     let path = PathBuf::from(path);
     run_off_thread(move |control| {
-        simulate_document_bytes(&path, seed.unwrap_or(1), until, Some(control.flag()))
-            .map_err(|error| error.to_string())
+        simulate_document_bytes(
+            &path,
+            seed.unwrap_or(1),
+            until,
+            start.unwrap_or(DEFAULT_START),
+            Some(control.flag()),
+        )
+        .map_err(|error| error.to_string())
     })
     .await
 }
@@ -191,6 +205,7 @@ pub async fn trace_model(
     seed: Option<u64>,
     until: Option<f64>,
     limit: Option<usize>,
+    start: Option<u64>,
 ) -> Result<String, String> {
     log(&format!("trace_model: {path}"));
     let path = PathBuf::from(path);
@@ -199,6 +214,7 @@ pub async fn trace_model(
             &path,
             seed.unwrap_or(1),
             until,
+            start.unwrap_or(DEFAULT_START),
             limit.unwrap_or(100),
             Some(control.flag()),
         )
@@ -254,8 +270,8 @@ async fn answer_request(request: SessionRequest) -> Result<String, String> {
             return Err(STOPPED_MESSAGE.to_string());
         }
         let response = match run {
-            RunRequest::Report { seed, until } => {
-                match simulate_model_bytes(&model, seed, until, Some(control.flag())) {
+            RunRequest::Report { seed, until, start } => {
+                match simulate_model_bytes(&model, seed, until, start, Some(control.flag())) {
                     Ok(document) => SessionResponse::document(document),
                     Err(error) => SessionResponse::error(error),
                 }
@@ -264,7 +280,8 @@ async fn answer_request(request: SessionRequest) -> Result<String, String> {
                 seed,
                 until,
                 limit,
-            } => match trace_model_bytes(&model, seed, until, limit, Some(control.flag())) {
+                start,
+            } => match trace_model_bytes(&model, seed, until, start, limit, Some(control.flag())) {
                 Ok(document) => SessionResponse::document(document),
                 Err(error) => SessionResponse::error(error),
             },
@@ -272,10 +289,12 @@ async fn answer_request(request: SessionRequest) -> Result<String, String> {
                 seed,
                 until,
                 limit,
+                start,
             } => match run_model_documents_bytes(
                 &model,
                 seed,
                 until,
+                start,
                 limit,
                 Some(control.flag()),
             ) {
@@ -308,6 +327,8 @@ enum RunRequest {
         seed: u64,
         /// Stop the run at this simulation time.
         until: Option<f64>,
+        /// The `START` of the run: how many termination units end it.
+        start: u64,
     },
     /// The trace of the model in memory.
     Trace {
@@ -317,6 +338,8 @@ enum RunRequest {
         until: Option<f64>,
         /// Maximum number of trace records kept.
         limit: usize,
+        /// The `START` of the run: how many termination units end it.
+        start: u64,
     },
     /// The report and the trace of one run.
     Both {
@@ -326,37 +349,44 @@ enum RunRequest {
         until: Option<f64>,
         /// Maximum number of trace records kept.
         limit: usize,
+        /// The `START` of the run: how many termination units end it.
+        start: u64,
     },
 }
 
 impl RunRequest {
     /// The run the request asks for, if it asks for one.
     ///
-    /// The defaults are the ones of the protocol: the seed one and a
-    /// hundred records of trace.
+    /// The defaults are the ones of the protocol: the seed one, a hundred
+    /// records of trace and the `START` of the original, one.
     fn of(request: &SessionRequest) -> Option<Self> {
         match request {
-            SessionRequest::SimulateCurrent { seed, until } => Some(RunRequest::Report {
+            SessionRequest::SimulateCurrent { seed, until, start } => Some(RunRequest::Report {
                 seed: seed.unwrap_or(1),
                 until: *until,
+                start: start.unwrap_or(DEFAULT_START),
             }),
             SessionRequest::TraceCurrent {
                 seed,
                 until,
                 limit,
+                start,
             } => Some(RunRequest::Trace {
                 seed: seed.unwrap_or(1),
                 until: *until,
                 limit: limit.unwrap_or(100),
+                start: start.unwrap_or(DEFAULT_START),
             }),
             SessionRequest::RunCurrent {
                 seed,
                 until,
                 limit,
+                start,
             } => Some(RunRequest::Both {
                 seed: seed.unwrap_or(1),
                 until: *until,
                 limit: limit.unwrap_or(100),
+                start: start.unwrap_or(DEFAULT_START),
             }),
             _ => None,
         }
@@ -557,6 +587,7 @@ mod tests {
             seed: Some(1),
             until: None,
             limit: Some(100),
+            start: None,
         }
     }
 
@@ -669,9 +700,10 @@ mod tests {
             path.display().to_string(),
             Some(1),
             None,
+            None,
         ))
         .expect("the command answers");
-        let facade = simulate_document_bytes(&path, 1, None, None).expect("the facade answers");
+        let facade = simulate_document_bytes(&path, 1, None, 1, None).expect("the facade answers");
         assert_eq!(command, facade, "the command gave another report");
     }
 
@@ -684,10 +716,11 @@ mod tests {
             Some(1),
             None,
             Some(100),
+            None,
         ))
         .expect("the command answers");
         let facade =
-            trace_document_bytes(&path, 1, None, 100, None).expect("the facade answers");
+            trace_document_bytes(&path, 1, None, 1, 100, None).expect("the facade answers");
         assert_eq!(command, facade, "the command gave another trace");
     }
 
@@ -698,7 +731,7 @@ mod tests {
 
         // The whole run: how long the engine takes when nobody stops it.
         let whole_start = Instant::now();
-        let whole = run_documents_bytes(&path, 1, None, 100, None).expect("the engine runs");
+        let whole = run_documents_bytes(&path, 1, None, 1, 100, None).expect("the engine runs");
         let whole_elapsed = whole_start.elapsed();
         let whole_report: serde_json::Value =
             serde_json::from_str(&whole.report).expect("the report parses");
@@ -719,7 +752,7 @@ mod tests {
         let answer_of_the_shell = tauri::async_runtime::block_on(run_off_thread(move |control| {
             started.send(()).ok();
             let engine_start = Instant::now();
-            let documents = run_documents_bytes(&model_path, 1, None, 100, Some(control.flag()))
+            let documents = run_documents_bytes(&model_path, 1, None, 1, 100, Some(control.flag()))
                 .map_err(|error| error.to_string())?;
             sender
                 .send((documents, engine_start.elapsed()))

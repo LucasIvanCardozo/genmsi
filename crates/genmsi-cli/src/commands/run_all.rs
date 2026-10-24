@@ -115,7 +115,7 @@ impl RunAllReport {
 /// Run `genmsi run-all`.
 pub fn run(args: RunAllArgs) -> Result<ExitCode, CliError> {
     let paths = scan(&args.dir)?;
-    let config = model::config(args.run.seed, args.run.until);
+    let config = model::config(args.run.seed, args.run.until, args.run.start);
     let models: Vec<ModelOutcome> = paths
         .iter()
         .map(|path| sweep(path, config.clone()))

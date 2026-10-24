@@ -111,6 +111,11 @@ pub enum EndReason {
     /// the engine stops at the next event and gives the partial result of the
     /// run it managed to do.
     Cancelled,
+    /// The guard of the number of events cut the run.
+    ///
+    /// The model kept making events without ending: the guard stops it, and
+    /// the report says that the run was cut and not that it ended.
+    EventLimit,
 }
 
 impl EndReason {
@@ -125,9 +130,31 @@ impl EndReason {
             Self::NoEvents => "no_events",
             Self::TimeLimit => "time_limit",
             Self::Cancelled => "cancelled",
+            Self::EventLimit => "event_limit",
         }
     }
 }
+
+/// The `START` a run has when nobody chooses one.
+///
+/// One is the default of the original's panel ("Start:"), and with it the
+/// runs of this engine are the runs of the original: with a `START` of one,
+/// the run ends with the first transaction that reaches a `Terminate` with
+/// its operand A.
+pub const DEFAULT_START: u64 = 1;
+
+/// The number of events a run may process when nobody chooses a limit.
+///
+/// The limit is the net under a model that does not end: a model with a
+/// zero-delay loop —or one whose clock never reaches its horizon— keeps
+/// making events, and every one of them costs memory (the pending events
+/// and the transactions that wait for them).
+///
+/// Two million events is far above the biggest legitimate run of the
+/// repository (the reference models use less than fifty thousand events) and
+/// keeps the memory of a runaway run in the hundreds of megabytes, instead
+/// of the gigabytes that fifty million events cost.
+pub const DEFAULT_MAX_EVENTS: u64 = 2_000_000;
 
 /// Configuration of one run.
 #[derive(Debug, Clone)]
@@ -135,6 +162,10 @@ pub struct SimConfig {
     /// Base seed of every random stream.
     pub seed: u64,
     /// Safety limit: abort instead of looping forever.
+    ///
+    /// The run that reaches it ends with the reason `event_limit`: the
+    /// report says that the guard cut the run, and not that the model
+    /// ended.
     pub max_events: u64,
     /// Whether to record the structured event trace.
     pub trace: bool,
@@ -142,6 +173,18 @@ pub struct SimConfig {
     pub trace_limit: usize,
     /// Optional simulated-time horizon: stop once the clock passes it.
     pub stop_time: Option<f64>,
+    /// The `START` of the run: how many termination units end it.
+    ///
+    /// The original's `START` is the counter of terminations of the run, and
+    /// whoever launches the run sets it (the "Start:" field of its
+    /// Simulador panel, one by default): the model does not declare it
+    /// anywhere, so it is a parameter of the run, like the horizon.
+    ///
+    /// The `Terminate` with its operand A takes that many units from the
+    /// counter for every transaction that arrives, and the `Clock` takes one
+    /// per tick; a `Terminate` without operand A takes nothing. The run
+    /// ends when the counter reaches zero or goes below it.
+    pub start: u64,
     /// The flag that asks the run to stop.
     ///
     /// It is the same kind of thing as the horizon: a way to end the run
@@ -161,10 +204,11 @@ impl Default for SimConfig {
     fn default() -> Self {
         Self {
             seed: 1,
-            max_events: 50_000_000,
+            max_events: DEFAULT_MAX_EVENTS,
             trace: false,
             trace_limit: 100_000,
             stop_time: None,
+            start: DEFAULT_START,
             stop: None,
         }
     }
@@ -475,6 +519,9 @@ impl<'p> Simulation<'p> {
     /// Prepare a run of `program` with `config`.
     pub fn new(program: &'p Program, config: SimConfig) -> Self {
         let seed = config.seed;
+        // The `START` of the run is a parameter of the run, not of the
+        // program: the counter of terminations starts with it.
+        let start = config.start;
         let mut sim = Self {
             program,
             config,
@@ -488,7 +535,7 @@ impl<'p> Simulation<'p> {
             entities: Entities::default(),
             block_stats: vec![BlockStats::default(); program.blocks.len()],
             generators: vec![None; program.blocks.len()],
-            terminations_left: program.start_counter,
+            terminations_left: start as f64,
             ended: false,
             end_reason: None,
             events: 0,
@@ -706,33 +753,12 @@ impl<'p> Simulation<'p> {
             };
             self.events += 1;
             if self.events > self.config.max_events {
-                let mut hottest: Vec<(u64, usize)> = self
-                    .block_stats
-                    .iter()
-                    .enumerate()
-                    .map(|(index, stats)| (stats.entries, index))
-                    .collect();
-                hottest.sort_unstable_by(|left, right| right.cmp(left));
-                let detail: Vec<String> = hottest
-                    .iter()
-                    .take(5)
-                    .map(|(entries, index)| {
-                        let block = &self.program.blocks[*index];
-                        format!(
-                            "{}#{} {} ({} entries)",
-                            block.label.clone().unwrap_or_default(),
-                            block.module_id,
-                            block.class,
-                            entries
-                        )
-                    })
-                    .collect();
-                return Err(EngineError::Runtime(format!(
-                    "event limit ({}) exceeded at time {}; the model has a zero-delay loop; hottest blocks: {}",
-                    self.config.max_events,
-                    self.now,
-                    detail.join(", ")
-                )));
+                // The guard: the model keeps making events without ending,
+                // so the run is cut here and the report says that it was
+                // cut, and not that the model ended.
+                self.diagnostics.push(self.event_limit_detail());
+                self.finish(EndReason::EventLimit);
+                break;
             }
             // The clock of the run is whole: the exact time of the event
             // carries the fractions of the delays, and the clock that
@@ -907,6 +933,40 @@ impl<'p> Simulation<'p> {
             self.ended = true;
             self.end_reason = Some(reason);
         }
+    }
+
+    /// What the guard says when it cuts a run that does not end.
+    ///
+    /// The message names the blocks that made the most events: they are
+    /// where the loop is.
+    fn event_limit_detail(&self) -> String {
+        let mut hottest: Vec<(u64, usize)> = self
+            .block_stats
+            .iter()
+            .enumerate()
+            .map(|(index, stats)| (stats.entries, index))
+            .collect();
+        hottest.sort_unstable_by(|left, right| right.cmp(left));
+        let detail: Vec<String> = hottest
+            .iter()
+            .take(5)
+            .map(|(entries, index)| {
+                let block = &self.program.blocks[*index];
+                format!(
+                    "{}#{} {} ({} entries)",
+                    block.label.clone().unwrap_or_default(),
+                    block.module_id,
+                    block.class,
+                    entries
+                )
+            })
+            .collect();
+        format!(
+            "the guard cut the run at {} events (time {}): the model keeps making events without ending; hottest blocks: {}",
+            self.config.max_events,
+            self.now,
+            detail.join(", ")
+        )
     }
 
     /// Handle a generator tick.

@@ -50,6 +50,9 @@ pub enum SessionRequest {
         seed: Option<u64>,
         /// Stop the run at this simulation time.
         until: Option<f64>,
+        /// The `START` of the run: how many termination units end it.
+        #[serde(default)]
+        start: Option<u64>,
     },
     /// The lint of a file on disk.
     Lint {
@@ -64,6 +67,9 @@ pub enum SessionRequest {
         seed: Option<u64>,
         /// Stop the run at this simulation time.
         until: Option<f64>,
+        /// The `START` of the run: how many termination units end it.
+        #[serde(default)]
+        start: Option<u64>,
     },
     /// The trace of a run of a file on disk.
     Trace {
@@ -73,6 +79,9 @@ pub enum SessionRequest {
         seed: Option<u64>,
         /// Stop the run at this simulation time.
         until: Option<f64>,
+        /// The `START` of the run: how many termination units end it.
+        #[serde(default)]
+        start: Option<u64>,
         /// Maximum number of trace records kept.
         limit: Option<usize>,
     },
@@ -82,6 +91,9 @@ pub enum SessionRequest {
         seed: Option<u64>,
         /// Stop the run at this simulation time.
         until: Option<f64>,
+        /// The `START` of the run: how many termination units end it.
+        #[serde(default)]
+        start: Option<u64>,
         /// Maximum number of trace records kept.
         limit: Option<usize>,
     },
@@ -94,6 +106,9 @@ pub enum SessionRequest {
         seed: Option<u64>,
         /// Stop the run at this simulation time.
         until: Option<f64>,
+        /// The `START` of the run: how many termination units end it.
+        #[serde(default)]
+        start: Option<u64>,
         /// Maximum number of trace records kept.
         limit: Option<usize>,
     },
@@ -235,9 +250,15 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
             },
             None => SessionResponse::error(AppError::Usage("no model is open".to_string())),
         },
-        SessionRequest::SimulateCurrent { seed, until } => match session.as_mut() {
+        SessionRequest::SimulateCurrent { seed, until, start } => match session.as_mut() {
             Some(session) => {
-                match crate::simulate_model_bytes(session.model(), seed.unwrap_or(1), until, None) {
+                match crate::simulate_model_bytes(
+                    session.model(),
+                    seed.unwrap_or(1),
+                    until,
+                    start_of(start),
+                    None,
+                ) {
                     Ok(document) => SessionResponse::document(document),
                     Err(error) => SessionResponse::error(error),
                 }
@@ -248,8 +269,14 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
             Ok(document) => SessionResponse::document(document),
             Err(error) => SessionResponse::error(error),
         },
-        SessionRequest::Simulate { path, seed, until } => {
-            match simulate_document_bytes(Path::new(&path), seed.unwrap_or(1), until, None) {
+        SessionRequest::Simulate { path, seed, until, start } => {
+            match simulate_document_bytes(
+                Path::new(&path),
+                seed.unwrap_or(1),
+                until,
+                start_of(start),
+                None,
+            ) {
                 Ok(document) => SessionResponse::document(document),
                 Err(error) => SessionResponse::error(error),
             }
@@ -258,11 +285,13 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
             path,
             seed,
             until,
+            start,
             limit,
         } => match trace_document_bytes(
             Path::new(&path),
             seed.unwrap_or(1),
             until,
+            start_of(start),
             limit.unwrap_or(100),
             None,
         ) {
@@ -272,12 +301,14 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
         SessionRequest::TraceCurrent {
             seed,
             until,
+            start,
             limit,
         } => match session.as_mut() {
             Some(session) => match trace_model_bytes(
                 session.model(),
                 seed.unwrap_or(1),
                 until,
+                start_of(start),
                 limit.unwrap_or(100),
                 None,
             ) {
@@ -289,12 +320,14 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
         SessionRequest::RunCurrent {
             seed,
             until,
+            start,
             limit,
         } => match session.as_mut() {
             Some(session) => match run_model_documents_bytes(
                 session.model(),
                 seed.unwrap_or(1),
                 until,
+                start_of(start),
                 limit.unwrap_or(100),
                 None,
             ) {
@@ -316,6 +349,15 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
         }
         SessionRequest::Catalogue => SessionResponse::document(catalogue_document_bytes()),
     }
+}
+
+/// The `START` of a run, or the default when the request does not name one.
+///
+/// The `START` is the counter of terminations of the run: the original has it
+/// in the panel of its simulator ("Start:", one by default) and the model
+/// does not declare it, so it travels with the request.
+fn start_of(start: Option<u64>) -> u64 {
+    start.unwrap_or(genmsi_core::DEFAULT_START)
 }
 
 /// Run one operation of the session, or say that no model is open.

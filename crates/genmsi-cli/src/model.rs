@@ -37,10 +37,14 @@ pub fn load(path: &Path) -> Result<Loaded, CliError> {
 ///
 /// The seed is random when the caller does not choose one, and the run says
 /// which it used: the reader can repeat it with the same number.
-pub fn config(seed: Option<u64>, until: Option<f64>) -> SimConfig {
+///
+/// The `start` is the `START` of the original: the counter of terminations of
+/// the run, one by default.
+pub fn config(seed: Option<u64>, until: Option<f64>, start: Option<u64>) -> SimConfig {
     SimConfig {
         seed: seed.unwrap_or_else(genmsi_core::random_seed),
         stop_time: until,
+        start: start.unwrap_or(genmsi_core::DEFAULT_START),
         ..SimConfig::default()
     }
 }
@@ -77,9 +81,15 @@ mod tests {
 
     #[test]
     fn configuration_carries_seed_and_horizon() {
-        let config = config(Some(7), Some(120.0));
+        let config = config(Some(7), Some(120.0), None);
         assert_eq!(config.seed, 7);
         assert_eq!(config.stop_time, Some(120.0));
         assert!(!config.trace);
+    }
+
+    #[test]
+    fn the_start_of_a_run_is_one_when_nobody_chooses_one() {
+        assert_eq!(config(Some(7), None, None).start, 1);
+        assert_eq!(config(Some(7), None, Some(5)).start, 5);
     }
 }

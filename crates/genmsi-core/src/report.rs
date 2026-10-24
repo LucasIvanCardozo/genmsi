@@ -1567,7 +1567,12 @@ fn csv_escape(value: &str) -> String {
 pub fn program_json(program: &Program) -> serde_json::Value {
     json!({
         "title": program.title,
-        "start_counter": program.start_counter,
+        // The `START` is a parameter of the run, not of the program: the
+        // model does not declare it anywhere, and the original has no place
+        // where to declare it either. What the program publishes here is
+        // the default of the run, the one the original's panel shows. It
+        // stays a float, so this document does not change.
+        "start_counter": crate::sim::DEFAULT_START as f64,
         "blocks": program.blocks.iter().map(|block| json!({
             "node": block.module_id,
             "class": block.class,

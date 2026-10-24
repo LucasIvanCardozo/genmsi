@@ -205,6 +205,44 @@ async fn an_inline_model_needs_no_file() {
 }
 
 #[tokio::test]
+async fn el_start_de_la_corrida_llega_al_motor() {
+    let (client, _server) = pair().await;
+    // A generator of one transaction every ten units and a terminate that
+    // takes one unit from the `START` of the run.
+    let document = "<gmodel versioncode=\"1\"><gclasses/><modules>\
+        <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"m\" name=\"m\" kind=\"C\"><links>\
+        <link frommoduleid=\"1\" fromioid=\"1\" tomoduleid=\"2\" toioid=\"1\"/>\
+        </links><inputs/><outputs/></module>\
+        <module moduleid=\"1\" moduleclass=\"Generate\" owner=\"0\" caption=\"g\" name=\"g\" kind=\"A\"><outputs><output ioid=\"1\" name=\"Salida1\" caption=\"\" mylabel=\"L1\"/></outputs>\
+        <props><property name=\"Media\" hint=\"\" value=\"10\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/></props></module>\
+        <module moduleid=\"2\" moduleclass=\"Terminate\" owner=\"0\" caption=\"t\" name=\"t\" kind=\"A\"><inputs><input ioid=\"1\" name=\"i\" caption=\"\" mylabel=\"L1\"/></inputs>\
+        <props><property name=\"Unidades\" hint=\"\" value=\"1\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/></props></module>\
+        </modules></gmodel>";
+
+    // The default of the original: the run ends with the first transaction.
+    let one = call(&client, "simulate", json!({ "model": document })).await;
+    assert_eq!(one["end_reason"], "terminated");
+    assert_eq!(one["end_time"], 10.0);
+
+    // A `START` of three: the run ends with the third transaction.
+    let three = call(&client, "simulate", json!({ "model": document, "start": 3 })).await;
+    assert_eq!(three["end_reason"], "terminated");
+    assert_eq!(three["end_time"], 30.0);
+
+    // The original refuses a `Start` of zero ("El Start debe ser mayor a
+    // cero."), and so does the server.
+    let zero = call(&client, "simulate", json!({ "model": document, "start": 0 })).await;
+    assert_eq!(zero["error"], "invalid_arguments");
+    assert!(
+        zero["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("the start must be greater than zero"),
+        "{zero}"
+    );
+}
+
+#[tokio::test]
 async fn the_lint_says_the_warning_of_the_format() {
     let (client, _server) = pair().await;
     // A model that uses a storage no block declares: the original opens it, so

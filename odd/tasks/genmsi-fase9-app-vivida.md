@@ -233,6 +233,28 @@ sus bloques, o tener un vector de índices ordenado), y que el test que fija el
 determinismo cubra un modelo con `Gate` (hoy `TP6__Clase 6_2_UltimoCliente`
 es el que lo muestra).
 
+- **S13** — El `START` es un parámetro de la corrida, como en el original. La
+  medición (`odd/tasks/notas-start.md`, commit `2e8be61`) lo dejó medido:
+  - el `START` del original es el **contador de terminaciones** de la corrida y
+    lo fija **quien la lanza** (el campo "Start" de su panel Simulador, 1 por
+    defecto). El modelo **no** lo declara: no hay clase `START` entre las 66,
+    el módulo raíz no tiene props y el listing GPSS no lleva sentencia
+    `START`; por lo tanto **no se guarda en el modelo**;
+  - lo baja el `Terminate` **con operando A** (su operando A unidades por
+    transacción que llega) y el `Clock` (una unidad por tic); un `Terminate`
+    **sin** operando A no baja nada;
+  - la corrida termina cuando el contador llega a **cero o por debajo** (el
+    original termina en −1);
+  - con el `Start` del original en 1, que es su defecto, nuestros reportes salen
+    **byte a byte idénticos** a los del original; con `Start`=5 el nuestro
+    termina en la primera transacción y el original en la quinta.
+  La corrección: `Program.start_counter` deja de compilarse y pasa a
+  `SimConfig.start` (junto a `stop_time`); `terminations_left` se inicializa con
+  `config.start`; la regla (`terminations_left <= 0.0`), el `Clock` como
+  `GENERATE` + `TERMINATE 1` y `validate_runnable` **no se tocan**. Y de ahí
+  al CLI (`--start`), al motor de la app, al comando de Tauri, al MCP, y a un
+  campo en la app al lado del horizonte (que es donde lo tenía el original).
+
 ## Tasks
 
 | ID | Specs | Qué | Ruta | Commit |
@@ -246,7 +268,8 @@ es el que lo muestra).
 | T10 | S12 | El recorrido de los espereros de las puertas, que hoy depende del orden del hash | core | uno |
 | T2 | S2 | La simulación corre en un hilo de trabajo: la ventana sigue viva, con progreso y cancelación | app | uno |
 | T3 | S3 | Horizonte por defecto y aviso cuando el modelo no tiene forma de terminar | app + core | uno |
-| T4 | S4 | Medir el `START` del original y corregir el motor | core + docs | uno |
+| T4a | S4 | Medir el `START` del original (nota `notas-start.md`) | docs | `2e8be61` |
+| T4b | S13 | El `START` pasa a ser un parámetro de la corrida: el motor, el CLI, la app y el MCP | core + cli + app | — |
 
 El orden importa: **T1 va primero** (es la causa del costo). T5, T6 y T7 no
 tocan el motor y pueden ir en paralelo. T2 y T3 pueden venir después. T4 es

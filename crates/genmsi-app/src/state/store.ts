@@ -22,6 +22,17 @@ import type { EditCommand } from "../types/generated/EditCommand";
 export type Status = "idle" | "loading" | "ready" | "running";
 
 /**
+ * The notice of a run that was stopped.
+ *
+ * The engine cannot be interrupted yet: what the app does is stop waiting
+ * for the run and throw its answer away. The notice says exactly that,
+ * because a button that says "cancel" and does not cancel is a lie.
+ */
+export const STOPPED_NOTICE =
+  "La corrida se canceló y su resultado se descartó. El motor todavía no puede " +
+  "interrumpir una simulación en marcha: sigue trabajando hasta que termina.";
+
+/**
  * How many trace records the monitor asks the engine for.
  *
  * The CLI keeps 100 by default, which is a sample and not a run: the replay
@@ -92,6 +103,10 @@ export interface AppState {
   redoStack: EditCommand[];
   /** What the app is doing. */
   status: Status;
+  /** Whether the reader asked for the run in flight to stop. */
+  cancelling: boolean;
+  /** The message of the last notice, if any. */
+  notice: string | null;
   /** The message of the last failure, if any. */
   error: string | null;
   /** Whether the model has changes that were not saved. */
@@ -130,6 +145,10 @@ export interface AppState {
   simulate: () => Promise<void>;
   /** Run the open model and prepare its replay. */
   runMonitor: () => Promise<void>;
+  /** Ask the engine to stop the run in flight. */
+  cancelRun: () => Promise<void>;
+  /** Take the last notice away. */
+  clearNotice: () => void;
   /** Move the replay to a frame. */
   setPlayhead: (frame: number) => void;
   /** Play or pause the replay. */
@@ -250,6 +269,8 @@ export const useApp = create<AppState>((set, get) => ({
   seedIsAuto: true,
   until: null,
   status: "idle",
+  cancelling: false,
+  notice: null,
   history: [],
   redoStack: [],
   error: null,
@@ -511,7 +532,7 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   simulate: async () => {
-    set({ status: "running", error: null });
+    set({ status: "running", error: null, notice: null, cancelling: false });
     // A run that draws its own seed is a new experiment every time; a run
     // with the reader's seed is the same one, so it can be repeated.
     const seed = get().seedIsAuto ? randomSeed() : get().seed;
@@ -531,8 +552,15 @@ export const useApp = create<AppState>((set, get) => ({
         playhead: 0,
         playing: false,
         status: "ready",
+        cancelling: false,
       });
     } catch (error) {
+      // The reader stopped the run: the app does not wait for it any more
+      // and says what happened.
+      if (get().cancelling) {
+        set({ status: "ready", cancelling: false, notice: STOPPED_NOTICE });
+        return;
+      }
       set({ status: "ready", error: `No se pudo simular el modelo: ${messageOf(error)}` });
     }
   },
@@ -543,7 +571,7 @@ export const useApp = create<AppState>((set, get) => ({
       set({ error: "No hay ningún modelo abierto para reproducir." });
       return;
     }
-    set({ status: "running", error: null });
+    set({ status: "running", error: null, notice: null, cancelling: false });
     const seed = get().seedIsAuto ? randomSeed() : get().seed;
     try {
       const options = {
@@ -574,14 +602,39 @@ export const useApp = create<AppState>((set, get) => ({
         // the run faster asks for it.
         speed: 1,
         status: "ready",
+        cancelling: false,
       });
     } catch (error) {
+      // The reader stopped the run: the app does not wait for it any more
+      // and says what happened.
+      if (get().cancelling) {
+        set({ status: "ready", cancelling: false, notice: STOPPED_NOTICE });
+        return;
+      }
       set({
         status: "ready",
         error: `No se pudo reproducir la simulación: ${messageOf(error)}`,
       });
     }
   },
+
+  /**
+   * Ask the engine to stop the run in flight.
+   *
+   * The engine cannot be interrupted yet: the host stops waiting for the
+   * run and throws its answer away. The flag tells the store that the run
+   * that ends is a run the reader stopped, and not a failure.
+   */
+  cancelRun: async () => {
+    try {
+      const stopped = await engine().cancelRun();
+      set({ cancelling: stopped });
+    } catch (error) {
+      set({ error: `No se pudo cancelar la corrida: ${messageOf(error)}` });
+    }
+  },
+
+  clearNotice: () => set({ notice: null }),
 
   setPlayhead: (frame: number) => set({ playhead: frame }),
 

@@ -8,6 +8,9 @@ import { useApp } from "./state/store";
 /** How long the notice of a save stays on the screen. */
 const SAVED_NOTICE_MS = 4000;
 
+/** How long the notice of a stopped run stays on the screen. */
+const NOTICE_MS = 8000;
+
 /**
  * The app's shell.
  *
@@ -26,6 +29,8 @@ export default function App() {
     canRedo,
     pendingSave,
     savedMessage,
+    notice,
+    clearNotice,
     loadModels,
     loadCatalogue,
     loadRecentModels,
@@ -61,6 +66,15 @@ export default function App() {
     const handle = window.setTimeout(() => clearSavedMessage(), SAVED_NOTICE_MS);
     return () => window.clearTimeout(handle);
   }, [savedMessage, clearSavedMessage]);
+
+  // The notice of a stopped run goes away on its own too.
+  useEffect(() => {
+    if (notice === null) {
+      return;
+    }
+    const handle = window.setTimeout(() => clearNotice(), NOTICE_MS);
+    return () => window.clearTimeout(handle);
+  }, [notice, clearNotice]);
 
   // The keyboard of the editor: undo, redo, copy and paste.
   useEffect(() => {
@@ -154,6 +168,11 @@ export default function App() {
         {savedMessage !== null && (
           <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-900">
             {savedMessage}
+          </p>
+        )}
+        {notice !== null && (
+          <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs text-sky-900">
+            {notice}
           </p>
         )}
 

@@ -158,4 +158,15 @@ export const devBridge: EngineAdapter = {
     };
   },
   catalogue: async () => documentOf<CatalogueDocument>(await session({ op: "catalogue" })),
+  /**
+   * The bridge of the development server cannot stop a run.
+   *
+   * The bridge answers with the engine's bytes and the run happens in the
+   * process of the bridge, not in the browser: the window of the browser
+   * keeps painting all the same. What the bridge cannot do is throw the
+   * answer of a run away, so it says so instead of pretending.
+   */
+  cancelRun: async () => {
+    throw new EngineError("el puente de desarrollo no puede cancelar una corrida");
+  },
 };

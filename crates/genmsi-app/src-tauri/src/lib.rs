@@ -47,6 +47,7 @@ pub fn run() {
             commands::simulate_model,
             commands::trace_model,
             commands::session,
+            commands::cancel_run,
             commands::recent_models,
             commands::remember_model,
         ])

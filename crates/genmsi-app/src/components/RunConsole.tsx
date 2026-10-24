@@ -1,9 +1,29 @@
 import { useState } from "react";
-import { Pause, Play, RotateCcw } from "lucide-react";
+import { Pause, Play, RotateCcw, Square } from "lucide-react";
 import { chronometer } from "../format";
 import { useLive } from "../monitor/live";
 import { SPEEDS, frameAt } from "../monitor/replay";
 import { useApp } from "../state/store";
+import { isTauri } from "../engine";
+
+/**
+ * What the cancel button says about what it can do.
+ *
+ * The engine cannot be interrupted yet: the app stops waiting for the run
+ * and throws its answer away. The button says so, because a button that
+ * says "cancel" and does not cancel is a lie.
+ */
+const CANCEL_EXPLANATION =
+  "La app deja de esperar la corrida y descarta su resultado. El motor todavía no puede " +
+  "interrumpir una simulación en marcha: sigue trabajando hasta que termina.";
+
+/**
+ * The note next to the cancel button.
+ *
+ * It is short enough to sit in the header and says the whole truth: the
+ * engine cannot stop the run yet.
+ */
+const CANCEL_NOTE = "el motor no puede interrumpirla todavía";
 
 /**
  * The console of the run: the tools that drive a run, in one row.
@@ -28,6 +48,8 @@ export default function RunConsole() {
   const loading = status === "loading";
   const simulate = useApp((state) => state.simulate);
   const runMonitor = useApp((state) => state.runMonitor);
+  const cancelRun = useApp((state) => state.cancelRun);
+  const cancelling = useApp((state) => state.cancelling);
   const setPlayhead = useApp((state) => state.setPlayhead);
   const setPlaying = useApp((state) => state.setPlaying);
   const setSpeed = useApp((state) => state.setSpeed);
@@ -40,6 +62,9 @@ export default function RunConsole() {
   // and the reader has to see which one is busy.
   const [busy, setBusy] = useState<"simular" | "ejecutar" | null>(null);
   const running = status === "running";
+  // Only the desktop shell can stop a run: the bridge of the development
+  // server cannot throw the answer of a run away.
+  const canCancel = isTauri();
 
   // The run: its times are the ends of the slider and the span that says
   // how long the playback lasts.
@@ -112,6 +137,27 @@ export default function RunConsole() {
         <Play className="size-3.5" aria-hidden />
         {busy === "ejecutar" ? "Ejecutando…" : "Ejecutar"}
       </button>
+
+      {/* The cancel button is there while the engine works: the run does not
+          hold the window hostage any more, and the reader can say that he
+          does not want the answer. */}
+      {running && (
+        <span className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => void cancelRun()}
+            disabled={!canCancel || cancelling}
+            title={CANCEL_EXPLANATION}
+            className="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+          >
+            <Square className="size-3" aria-hidden />
+            {cancelling ? "Cancelando…" : "Cancelar"}
+          </button>
+          <span className="text-[11px] text-slate-500" title={CANCEL_EXPLANATION}>
+            {CANCEL_NOTE}
+          </span>
+        </span>
+      )}
 
       <button
         type="button"

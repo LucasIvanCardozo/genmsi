@@ -137,4 +137,12 @@ export const tauri: EngineAdapter = {
     };
   },
   catalogue: async () => documentOf<CatalogueDocument>(await session({ op: "catalogue" })),
+  /**
+   * Ask the shell to stop waiting for the run in flight.
+   *
+   * The engine cannot be interrupted yet: the shell stops waiting for the
+   * run and throws its answer away. The answer says whether there was a run
+   * to stop.
+   */
+  cancelRun: () => invoke<boolean>("cancel_run"),
 };

@@ -14,7 +14,7 @@ use crate::rng::mix_u64;
 use crate::sim::{RunResult, SimConfig, Simulation};
 
 /// Settings of a replication study.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ReplicationConfig {
     /// Number of independent runs.
     pub runs: usize,
@@ -118,7 +118,7 @@ pub fn replicate(
     let mut results = Vec::with_capacity(config.runs);
     for index in 0..config.runs {
         let seed = mix_u64(config.base_seed, index as u32);
-        let mut run = config.run;
+        let mut run = config.run.clone();
         run.seed = seed;
         run.trace = false;
         results.push(Simulation::new(program, run).run()?);

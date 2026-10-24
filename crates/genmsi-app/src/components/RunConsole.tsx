@@ -14,8 +14,8 @@ import { isTauri } from "../engine";
  * says "cancel" and does not cancel is a lie.
  */
 const CANCEL_EXPLANATION =
-  "La app deja de esperar la corrida y descarta su resultado. El motor todavía no puede " +
-  "interrumpir una simulación en marcha: sigue trabajando hasta que termina.";
+  "La simulación se corta en el siguiente evento del motor y su resultado se " +
+  "descarta. La app vuelve a estar lista enseguida.";
 
 /**
  * The note next to the cancel button.
@@ -23,7 +23,7 @@ const CANCEL_EXPLANATION =
  * It is short enough to sit in the header and says the whole truth: the
  * engine cannot stop the run yet.
  */
-const CANCEL_NOTE = "el motor no puede interrumpirla todavía";
+const CANCEL_NOTE = "corta la simulación en el siguiente evento";
 
 /**
  * The console of the run: the tools that drive a run, in one row.

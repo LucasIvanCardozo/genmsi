@@ -237,7 +237,7 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
         },
         SessionRequest::SimulateCurrent { seed, until } => match session.as_mut() {
             Some(session) => {
-                match crate::simulate_model_bytes(session.model(), seed.unwrap_or(1), until) {
+                match crate::simulate_model_bytes(session.model(), seed.unwrap_or(1), until, None) {
                     Ok(document) => SessionResponse::document(document),
                     Err(error) => SessionResponse::error(error),
                 }
@@ -249,7 +249,7 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
             Err(error) => SessionResponse::error(error),
         },
         SessionRequest::Simulate { path, seed, until } => {
-            match simulate_document_bytes(Path::new(&path), seed.unwrap_or(1), until) {
+            match simulate_document_bytes(Path::new(&path), seed.unwrap_or(1), until, None) {
                 Ok(document) => SessionResponse::document(document),
                 Err(error) => SessionResponse::error(error),
             }
@@ -264,6 +264,7 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
             seed.unwrap_or(1),
             until,
             limit.unwrap_or(100),
+            None,
         ) {
             Ok(document) => SessionResponse::document(document),
             Err(error) => SessionResponse::error(error),
@@ -278,6 +279,7 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
                 seed.unwrap_or(1),
                 until,
                 limit.unwrap_or(100),
+                None,
             ) {
                 Ok(document) => SessionResponse::document(document),
                 Err(error) => SessionResponse::error(error),
@@ -294,6 +296,7 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
                 seed.unwrap_or(1),
                 until,
                 limit.unwrap_or(100),
+                None,
             ) {
                 Ok(documents) => SessionResponse::documents(documents),
                 Err(error) => SessionResponse::error(error),

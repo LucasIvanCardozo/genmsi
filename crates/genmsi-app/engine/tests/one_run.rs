@@ -43,7 +43,7 @@ fn the_two_documents_of_one_run_are_the_two_runs_documents() {
 
     // One run, not two.
     let before = runs_made();
-    let documents = run_documents_bytes(&path, seed, None, limit).expect("runs");
+    let documents = run_documents_bytes(&path, seed, None, limit, None).expect("runs");
     let after = runs_made();
     assert_eq!(
         after - before,
@@ -53,15 +53,15 @@ fn the_two_documents_of_one_run_are_the_two_runs_documents() {
     );
 
     // The same documents the two separate runs used to give.
-    let report = simulate_document_bytes(&path, seed, None).expect("runs");
-    let trace = trace_document_bytes(&path, seed, None, limit).expect("runs");
+    let report = simulate_document_bytes(&path, seed, None, None).expect("runs");
+    let trace = trace_document_bytes(&path, seed, None, limit, None).expect("runs");
     assert_eq!(documents.report, report, "the report changed");
     assert_eq!(documents.trace, trace, "the trace changed");
 
     // The two separate runs are two runs: that is what the app used to do.
     let before_two = runs_made();
-    let _ = simulate_document_bytes(&path, seed, None).expect("runs");
-    let _ = trace_document_bytes(&path, seed, None, limit).expect("runs");
+    let _ = simulate_document_bytes(&path, seed, None, None).expect("runs");
+    let _ = trace_document_bytes(&path, seed, None, limit, None).expect("runs");
     assert_eq!(
         runs_made() - before_two,
         2,

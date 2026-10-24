@@ -177,14 +177,14 @@ test("the reader can stop the run: the app says what the cancel does and does no
 
     // The run ends: the app says the truth about what the cancel did.
     shell.failWith(
-      "la corrida se canceló: la app dejó de esperarla y descartó su resultado.",
+      "la corrida se canceló: el motor cortó la simulación en el siguiente evento y la app descartó su resultado.",
     );
     await running;
     assert.equal(useApp.getState().status, "ready", "the app did not go back to its quiet state");
     assert.equal(useApp.getState().error, null, "a stopped run is not a failure");
     const notice = useApp.getState().notice;
     assert.ok(notice !== null, "the app did not say what the cancel did");
-    assert.match(notice, /motor todavía no puede interrumpir/, notice);
+    assert.match(notice, /el motor la cortó/, notice);
   } finally {
     await close();
   }

@@ -18,6 +18,11 @@
 //! async runtime, and the main thread keeps answering the events of the
 //! window: the reader sees "Ejecutando…", can close the app and can ask for
 //! the run to stop.
+//!
+//! **The cancel is a real one.** The flag the reader raises is the flag the
+//! engine reads: the engine stops the run at the next event and gives the
+//! partial result, so the processor is freed. The shell stops waiting for
+//! the run and throws its answer away.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -43,12 +48,11 @@ const RECENTS_FILE: &str = "recent-models.json";
 
 /// The message the shell sends when the reader stops a run.
 ///
-/// The engine cannot be interrupted yet: what the shell can do is stop
-/// waiting for the run and throw its answer away. The message says exactly
-/// that, because a button that says "cancel" and does not cancel is a lie.
-const STOPPED_MESSAGE: &str = "la corrida se canceló: la app dejó de esperarla y descartó su \
-resultado. El motor todavía no puede interrumpir una simulación en marcha: sigue trabajando \
-hasta que termina.";
+/// The engine reads the flag of the cancellation and stops the run at the
+/// next event, so the cancel is a real one: the processor is freed and the
+/// result of the run is thrown away.
+const STOPPED_MESSAGE: &str = "la corrida se canceló: el motor cortó la simulación en el \
+siguiente evento y la app descartó su resultado.";
 
 /// Say what the shell did.
 ///
@@ -93,17 +97,13 @@ enum RunEnd {
 /// What the reader can ask of a run in flight.
 ///
 /// This is the seam of the cancellation: the flag lives here, in the shell,
-/// and the engine will read it when it learns to stop. Today the engine
-/// cannot be interrupted, so the flag only says "the reader is not waiting
-/// for this run any more".
+/// and the engine reads it. The shell hands the flag to the facade with the
+/// run, and the engine's loop of events looks at it: the run ends with the
+/// reason of the cancellation, and the shell stops waiting for it.
 ///
-/// **What the engine has to add** for the cancel to be a real one: the
-/// facade takes the flag with the run —`run_model_documents_bytes` and its
-/// two sisters gain a `stop`— and the engine's loop of events reads it
-/// (`SimConfig` gains the same flag) and ends the run with a "cancelled"
-/// reason when it is set. The shell already holds the flag, already checks
-/// it before the work begins and already stops waiting for the run: nothing
-/// else has to move.
+/// The flag is the same one the reader raises: the shell holds it, checks it
+/// before the work begins and raises it when the reader asks for the run to
+/// stop.
 #[derive(Clone)]
 struct RunControl(Arc<AtomicBool>);
 
@@ -121,6 +121,14 @@ impl RunControl {
     /// Ask the run to stop.
     fn stop(&self) {
         self.0.store(true, Ordering::Relaxed);
+    }
+
+    /// The flag the engine reads.
+    ///
+    /// The engine works on another thread, so it gets the flag itself: the
+    /// one the reader raises is the one the engine looks at.
+    fn flag(&self) -> Arc<AtomicBool> {
+        self.0.clone()
     }
 }
 
@@ -166,8 +174,9 @@ pub async fn simulate_model(
 ) -> Result<String, String> {
     log(&format!("simulate_model: {path}"));
     let path = PathBuf::from(path);
-    run_off_thread(move |_| {
-        simulate_document_bytes(&path, seed.unwrap_or(1), until).map_err(|error| error.to_string())
+    run_off_thread(move |control| {
+        simulate_document_bytes(&path, seed.unwrap_or(1), until, Some(control.flag()))
+            .map_err(|error| error.to_string())
     })
     .await
 }
@@ -185,12 +194,13 @@ pub async fn trace_model(
 ) -> Result<String, String> {
     log(&format!("trace_model: {path}"));
     let path = PathBuf::from(path);
-    run_off_thread(move |_| {
+    run_off_thread(move |control| {
         trace_document_bytes(
             &path,
             seed.unwrap_or(1),
             until,
             limit.unwrap_or(100),
+            Some(control.flag()),
         )
         .map_err(|error| error.to_string())
     })
@@ -245,7 +255,7 @@ async fn answer_request(request: SessionRequest) -> Result<String, String> {
         }
         let response = match run {
             RunRequest::Report { seed, until } => {
-                match simulate_model_bytes(&model, seed, until) {
+                match simulate_model_bytes(&model, seed, until, Some(control.flag())) {
                     Ok(document) => SessionResponse::document(document),
                     Err(error) => SessionResponse::error(error),
                 }
@@ -254,7 +264,7 @@ async fn answer_request(request: SessionRequest) -> Result<String, String> {
                 seed,
                 until,
                 limit,
-            } => match trace_model_bytes(&model, seed, until, limit) {
+            } => match trace_model_bytes(&model, seed, until, limit, Some(control.flag())) {
                 Ok(document) => SessionResponse::document(document),
                 Err(error) => SessionResponse::error(error),
             },
@@ -262,7 +272,13 @@ async fn answer_request(request: SessionRequest) -> Result<String, String> {
                 seed,
                 until,
                 limit,
-            } => match run_model_documents_bytes(&model, seed, until, limit) {
+            } => match run_model_documents_bytes(
+                &model,
+                seed,
+                until,
+                limit,
+                Some(control.flag()),
+            ) {
                 Ok(documents) => SessionResponse::documents(documents),
                 Err(error) => SessionResponse::error(error),
             },
@@ -354,9 +370,9 @@ impl RunRequest {
 /// window keeps answering the events of the app, so the window repaints and
 /// the app can be closed while the engine works.
 ///
-/// The reader can ask for the run to stop: the shell stops waiting for it and
-/// says so. The engine, which cannot be interrupted yet, finishes on its own
-/// and its answer is thrown away.
+/// The reader can ask for the run to stop: the shell raises the flag of the
+/// cancellation, the engine stops at the next event and the shell stops
+/// waiting for the run.
 async fn run_off_thread<F>(work: F) -> Result<String, String>
 where
     F: FnOnce(&RunControl) -> Result<String, String> + Send + 'static,
@@ -401,8 +417,8 @@ fn clear_active_run(id: u64) {
 
 /// Ask the run in flight to stop.
 ///
-/// The engine cannot be interrupted yet: what the shell does is stop waiting
-/// for the run and throw its answer away. The command says whether there was
+/// The flag of the cancellation goes up, so the engine stops the run at the
+/// next event and the processor is freed. The command says whether there was
 /// a run to stop.
 #[tauri::command]
 pub fn cancel_run() -> Result<bool, String> {
@@ -417,7 +433,7 @@ pub fn cancel_run() -> Result<bool, String> {
     // The answer of the run is dropped: the waiting command reads this and
     // says the run was cancelled.
     let _ = active.end.try_send(RunEnd::Stopped);
-    log("cancel_run: la corrida deja de esperarse");
+    log("cancel_run: la corrida se canceló");
     Ok(true)
 }
 
@@ -485,9 +501,26 @@ pub fn remember_model(app: tauri::AppHandle, path: String) -> Result<Vec<String>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use genmsi_app_engine::run_documents_bytes;
     use std::sync::mpsc as std_mpsc;
     use std::thread;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
+
+    /// A model that keeps the engine busy for a while.
+    ///
+    /// A generator that makes a transaction every hundredth of a second, and
+    /// a clock of half an hour: the model has no `Terminate` operand, so the
+    /// run lasts until the clock ends it. The engine has hundreds of
+    /// thousands of events to work on, and the flag has time to be raised in
+    /// the middle of them.
+    const BUSY_MODEL: &str = r#"<gmodel versioncode="1"><gclasses/><modules>
+<module moduleid="0" moduleclass="main" owner="0" caption="m" name="m" kind="C"><links>
+<link frommoduleid="1" fromioid="2" tomoduleid="2" toioid="1"/>
+</links><inputs/><outputs/></module>
+<module moduleid="1" moduleclass="Generate" owner="0" caption="Generate" name="Generate" kind="A" width="10" height="10" x="0" y="0"><inputs/><outputs><output ioid="2" name="Salida1" caption="" mylabel="T1"/></outputs><props><property name="Media" hint="" value="0.01" type="TSNA" subType="SNA" visible="1" unique="0"/></props></module>
+<module moduleid="2" moduleclass="Terminate" owner="0" caption="Terminate" name="Terminate" kind="A" width="10" height="10" x="0" y="0"><inputs><input ioid="1" name="Entrada1" caption="" mylabel="T1"/></inputs><outputs/><props><property name="Unidades" hint="" value="0" type="TSNA" subType="SNA" visible="1" unique="0"/></props></module>
+<module moduleid="3" moduleclass="Clock" owner="0" caption="Clock" name="Clock" kind="A" width="10" height="10" x="0" y="0"><props><property name="Frecuencia" hint="" value="1800" type="TSNA" subType="SNA" visible="1" unique="0"/></props></module>
+</modules></gmodel>"#;
 
     /// The model the tests run.
     ///
@@ -560,7 +593,8 @@ mod tests {
         });
         let answer = tauri::async_runtime::block_on(run_off_thread(move |_| {
             started.send(()).ok();
-            // The engine keeps working: the reader does not wait for it.
+            // The work of the test stands for the run of the engine: the
+            // reader does not wait for it.
             thread::sleep(Duration::from_secs(2));
             Ok("the engine answered".to_string())
         }));
@@ -613,5 +647,118 @@ mod tests {
             !cancel_run().expect("the shell answers"),
             "the stopped run is still in flight"
         );
+    }
+
+    /// The busy model of the tests, in a directory of its own.
+    ///
+    /// The directory is outside the repository and the test removes it when
+    /// it is done.
+    fn busy_model(name: &str) -> (PathBuf, PathBuf) {
+        let dir = std::env::temp_dir().join(format!("genmsi-app-{name}-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("the scratch directory is created");
+        let path = dir.join("pesado.gmdl");
+        std::fs::write(&path, BUSY_MODEL).expect("the model is written");
+        (dir, path)
+    }
+
+    #[test]
+    fn the_simulate_command_gives_the_report_of_the_facade() {
+        let _globals = globals();
+        let path = reference();
+        let command = tauri::async_runtime::block_on(simulate_model(
+            path.display().to_string(),
+            Some(1),
+            None,
+        ))
+        .expect("the command answers");
+        let facade = simulate_document_bytes(&path, 1, None, None).expect("the facade answers");
+        assert_eq!(command, facade, "the command gave another report");
+    }
+
+    #[test]
+    fn the_trace_command_gives_the_trace_of_the_facade() {
+        let _globals = globals();
+        let path = reference();
+        let command = tauri::async_runtime::block_on(trace_model(
+            path.display().to_string(),
+            Some(1),
+            None,
+            Some(100),
+        ))
+        .expect("the command answers");
+        let facade =
+            trace_document_bytes(&path, 1, None, 100, None).expect("the facade answers");
+        assert_eq!(command, facade, "the command gave another trace");
+    }
+
+    #[test]
+    fn the_flag_of_the_reader_kills_the_run_of_the_engine() {
+        let _globals = globals();
+        let (dir, path) = busy_model("cancel");
+
+        // The whole run: how long the engine takes when nobody stops it.
+        let whole_start = Instant::now();
+        let whole = run_documents_bytes(&path, 1, None, 100, None).expect("the engine runs");
+        let whole_elapsed = whole_start.elapsed();
+        let whole_report: serde_json::Value =
+            serde_json::from_str(&whole.report).expect("the report parses");
+        assert_eq!(whole_report["end_reason"], "terminated");
+
+        // The same run, with the reader raising the flag in the middle of it.
+        let (started, wait) = std_mpsc::channel();
+        let (sender, receiver) = std_mpsc::channel();
+        let stopper = thread::spawn(move || {
+            wait.recv().expect("the run starts");
+            thread::sleep(Duration::from_millis(20));
+            assert!(
+                cancel_run().expect("the shell answers"),
+                "there was a run to stop"
+            );
+        });
+        let model_path = path.clone();
+        let answer_of_the_shell = tauri::async_runtime::block_on(run_off_thread(move |control| {
+            started.send(()).ok();
+            let engine_start = Instant::now();
+            let documents = run_documents_bytes(&model_path, 1, None, 100, Some(control.flag()))
+                .map_err(|error| error.to_string())?;
+            sender
+                .send((documents, engine_start.elapsed()))
+                .expect("the test receives the answer");
+            Ok("the engine answered".to_string())
+        }));
+        stopper.join().expect("the reader finishes");
+        let (documents, engine_elapsed) = receiver.recv().expect("the engine answers");
+
+        // The engine stopped: the run ends with the reason of the
+        // cancellation, and it ends much earlier than the whole run.
+        let report: serde_json::Value =
+            serde_json::from_str(&documents.report).expect("the report parses");
+        assert_eq!(
+            report["end_reason"], "cancelled",
+            "the engine did not stop for the reason of the cancellation"
+        );
+        assert!(
+            whole_elapsed > Duration::from_millis(50),
+            "the whole run is too short to be cancelled in the middle: {whole_elapsed:?}"
+        );
+        assert!(
+            engine_elapsed * 2 < whole_elapsed,
+            "the engine did not stop much earlier: {engine_elapsed:?} against {whole_elapsed:?}"
+        );
+        assert!(
+            report["transactions"].as_u64() < whole_report["transactions"].as_u64(),
+            "the cancelled run holds the whole run: {:?}",
+            report["transactions"]
+        );
+
+        // The shell stopped waiting for the run: the answer of the run is
+        // thrown away.
+        assert_eq!(
+            answer_of_the_shell.expect_err("the run was stopped"),
+            STOPPED_MESSAGE,
+            "the shell did not say the run was stopped"
+        );
+
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
     }
 }

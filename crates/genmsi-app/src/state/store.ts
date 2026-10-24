@@ -29,8 +29,7 @@ export type Status = "idle" | "loading" | "ready" | "running";
  * because a button that says "cancel" and does not cancel is a lie.
  */
 export const STOPPED_NOTICE =
-  "La corrida se canceló y su resultado se descartó. El motor todavía no puede " +
-  "interrumpir una simulación en marcha: sigue trabajando hasta que termina.";
+  "La corrida se canceló: el motor la cortó y su resultado se descartó.";
 
 /**
  * How many trace records the monitor asks the engine for.

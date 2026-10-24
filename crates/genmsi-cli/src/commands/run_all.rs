@@ -118,7 +118,7 @@ pub fn run(args: RunAllArgs) -> Result<ExitCode, CliError> {
     let config = model::config(args.run.seed, args.run.until);
     let models: Vec<ModelOutcome> = paths
         .iter()
-        .map(|path| sweep(path, config))
+        .map(|path| sweep(path, config.clone()))
         .collect();
     let models_ok = models.iter().filter(|model| model.status == "ok").count();
     let report = RunAllReport {

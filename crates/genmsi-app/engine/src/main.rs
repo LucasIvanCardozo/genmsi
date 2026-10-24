@@ -128,13 +128,13 @@ fn run(command: Command) -> Result<String, AppError> {
             path,
             seed,
             until,
-        } => engine::simulate_document_bytes(&path, seed, until),
+        } => engine::simulate_document_bytes(&path, seed, until, None),
         Command::Trace {
             path,
             seed,
             until,
             limit,
-        } => engine::trace_document_bytes(&path, seed, until, limit),
+        } => engine::trace_document_bytes(&path, seed, until, limit, None),
         Command::Models { dir } => {
             let dir = dir.unwrap_or_else(|| PathBuf::from("."));
             engine::models_document_bytes(&[dir])

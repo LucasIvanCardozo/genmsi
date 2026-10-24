@@ -12,6 +12,8 @@
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 
 use serde::Serialize;
 
@@ -95,25 +97,32 @@ pub enum EndReason {
     NoEvents,
     /// The configured simulated-time horizon was reached.
     TimeLimit,
+    /// The reader asked for the run to stop.
+    ///
+    /// The flag of the cancellation was raised while the run was in flight:
+    /// the engine stops at the next event and gives the partial result of the
+    /// run it managed to do.
+    Cancelled,
 }
 
 impl EndReason {
     /// Stable identifier of the reason.
     ///
     /// Reported by the JSON documents (`terminated`, `no_events`,
-    /// `time_limit`) and by the CLI trace summary, so consumers can rely on the
-    /// spelling.
+    /// `time_limit`, `cancelled`) and by the CLI trace summary, so consumers
+    /// can rely on the spelling.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Terminated => "terminated",
             Self::NoEvents => "no_events",
             Self::TimeLimit => "time_limit",
+            Self::Cancelled => "cancelled",
         }
     }
 }
 
 /// Configuration of one run.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct SimConfig {
     /// Base seed of every random stream.
     pub seed: u64,
@@ -125,7 +134,20 @@ pub struct SimConfig {
     pub trace_limit: usize,
     /// Optional simulated-time horizon: stop once the clock passes it.
     pub stop_time: Option<f64>,
+    /// The flag that asks the run to stop.
+    ///
+    /// It is the same kind of thing as the horizon: a way to end the run
+    /// before it ends by itself. The reader of the app raises it and the run
+    /// ends in the event that follows, with the reason `cancelled` and a
+    /// partial result. `None` means that nobody can stop the run.
+    pub stop: Option<StopFlag>,
 }
+
+/// The flag that asks a run to stop.
+///
+/// The reader of the app and the run share it: the reader raises it and the
+/// engine reads it.
+pub type StopFlag = Arc<AtomicBool>;
 
 impl Default for SimConfig {
     fn default() -> Self {
@@ -135,6 +157,7 @@ impl Default for SimConfig {
             trace: false,
             trace_limit: 100_000,
             stop_time: None,
+            stop: None,
         }
     }
 }
@@ -407,6 +430,7 @@ pub struct Simulation<'p> {
 impl<'p> Simulation<'p> {
     /// Prepare a run of `program` with `config`.
     pub fn new(program: &'p Program, config: SimConfig) -> Self {
+        let seed = config.seed;
         let mut sim = Self {
             program,
             config,
@@ -423,7 +447,7 @@ impl<'p> Simulation<'p> {
             ended: false,
             end_reason: None,
             events: 0,
-            streams: Streams::new(config.seed),
+            streams: Streams::new(seed),
             trace: Vec::new(),
             label_index: program.label_index(),
             passed: HashMap::new(),
@@ -449,6 +473,17 @@ impl<'p> Simulation<'p> {
         sim.connection_entries = vec![0; sim.connections.len()];
         sim.install_definitions();
         sim
+    }
+
+    /// Whether the reader asked for the run to stop.
+    ///
+    /// The load is relaxed: the flag carries no data, it only says "stop",
+    /// and the run has to see it soon, not at once.
+    fn stopped(&self) -> bool {
+        self.config
+            .stop
+            .as_ref()
+            .is_some_and(|flag| flag.load(AtomicOrdering::Relaxed))
     }
 
     fn install_definitions(&mut self) {
@@ -604,6 +639,15 @@ impl<'p> Simulation<'p> {
     /// Run until the termination counter reaches zero (or the model deadlocks).
     pub fn run(mut self) -> Result<RunResult, EngineError> {
         while !self.ended {
+            // The flag of the cancellation is read once per event: the loop
+            // already compares the count of events with the limit on every
+            // event, so one relaxed load costs the same order of magnitude as
+            // that comparison, and the run stops at the first event after the
+            // flag goes up.
+            if self.stopped() {
+                self.finish(EndReason::Cancelled);
+                break;
+            }
             let Some(std::cmp::Reverse(event)) = self.heap.pop() else {
                 self.finish(EndReason::NoEvents);
                 break;

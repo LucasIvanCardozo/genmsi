@@ -11,7 +11,8 @@
 //! `genmsi-format`, so the app never touches the XML of a model.
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 /// The protocol the app's backends speak with the facade.
 pub mod protocol;
@@ -50,6 +51,14 @@ pub struct RunDocuments {
 /// Schema id of the app's own model list; an application document, not an
 /// engine document.
 pub const MODELS_SCHEMA: &str = "genmsi.models/1";
+
+/// The flag that stops a run.
+///
+/// The reader raises it and the engine reads it, once per event: the run
+/// ends with the reason of the cancellation and gives the partial result of
+/// the work it managed to do. A run without the flag is the ordinary run, the
+/// one the CLI and the oracle make: it cannot be stopped.
+pub type StopFlag = Arc<AtomicBool>;
 
 /// A failure of the facade.
 #[derive(Debug, thiserror::Error)]
@@ -175,13 +184,17 @@ pub fn lint_document_bytes(path: &Path) -> Result<String, AppError> {
 }
 
 /// The `genmsi.report/1` document of a finished run.
+///
+/// The flag, when there is one, is the flag of the cancellation: the reader
+/// raises it and the engine stops the run.
 pub fn simulate_document_bytes(
     path: &Path,
     seed: u64,
     until: Option<f64>,
+    stop: Option<StopFlag>,
 ) -> Result<String, AppError> {
     let model = genmsi_format::load(path).map_err(|error| model_error(path, error))?;
-    simulate_bytes(&model, path, seed, until)
+    simulate_bytes(&model, path, seed, until, stop)
 }
 
 /// The `genmsi.report/1` document of a run of a model that is in memory.
@@ -192,8 +205,9 @@ pub fn simulate_model_bytes(
     model: &genmsi_format::GmdlModel,
     seed: u64,
     until: Option<f64>,
+    stop: Option<StopFlag>,
 ) -> Result<String, AppError> {
-    simulate_bytes(model, Path::new(""), seed, until)
+    simulate_bytes(model, Path::new(""), seed, until, stop)
 }
 
 /// The report of a run, with the path the failure names.
@@ -202,6 +216,7 @@ fn simulate_bytes(
     path: &Path,
     seed: u64,
     until: Option<f64>,
+    stop: Option<StopFlag>,
 ) -> Result<String, AppError> {
     let program = genmsi_core::compile_model(model).map_err(|error| model_error(path, error))?;
     let config = genmsi_core::SimConfig {
@@ -209,7 +224,7 @@ fn simulate_bytes(
         stop_time: until,
         ..genmsi_core::SimConfig::default()
     };
-    let result = run_once(&program, config, path)?;
+    let result = run_once(&program, config, path, stop)?;
     let body = genmsi_core::json_report(&result, &program);
     Ok(document_bytes(genmsi_core::documents::REPORT_SCHEMA, &body))
 }
@@ -225,8 +240,9 @@ pub fn run_model_documents_bytes(
     seed: u64,
     until: Option<f64>,
     limit: usize,
+    stop: Option<StopFlag>,
 ) -> Result<RunDocuments, AppError> {
-    run_documents_of(model, Path::new(""), seed, until, limit)
+    run_documents_of(model, Path::new(""), seed, until, limit, stop)
 }
 
 /// The report and the trace of one run of a model on disk.
@@ -238,9 +254,10 @@ pub fn run_documents_bytes(
     seed: u64,
     until: Option<f64>,
     limit: usize,
+    stop: Option<StopFlag>,
 ) -> Result<RunDocuments, AppError> {
     let model = genmsi_format::load(path).map_err(|error| model_error(path, error))?;
-    run_documents_of(&model, path, seed, until, limit)
+    run_documents_of(&model, path, seed, until, limit, stop)
 }
 
 /// The report and the trace of one run, with the path the failure names.
@@ -250,6 +267,7 @@ fn run_documents_of(
     seed: u64,
     until: Option<f64>,
     limit: usize,
+    stop: Option<StopFlag>,
 ) -> Result<RunDocuments, AppError> {
     let program = genmsi_core::compile_model(model).map_err(|error| model_error(path, error))?;
     let config = genmsi_core::SimConfig {
@@ -259,7 +277,7 @@ fn run_documents_of(
         trace_limit: limit,
         ..genmsi_core::SimConfig::default()
     };
-    let result = run_once(&program, config, path)?;
+    let result = run_once(&program, config, path, stop)?;
     let report = genmsi_core::json_report(&result, &program);
     let trace = genmsi_core::documents::trace_document(&result, limit);
     Ok(RunDocuments {
@@ -272,12 +290,19 @@ fn run_documents_of(
 ///
 /// Every run of the facade goes through here: the counter of the runs is the
 /// number of times the engine ran.
+///
+/// The flag, when there is one, is the flag of the cancellation: the engine
+/// reads it once per event and stops the run when it finds it up.
 fn run_once(
     program: &genmsi_core::Program,
-    config: genmsi_core::SimConfig,
+    mut config: genmsi_core::SimConfig,
     path: &Path,
+    stop: Option<StopFlag>,
 ) -> Result<genmsi_core::RunResult, AppError> {
     RUNS.fetch_add(1, Ordering::Relaxed);
+    // The flag that stops the run travels with the configuration, next to the
+    // horizon that ends it: the two are the same kind of thing.
+    config.stop = stop;
     genmsi_core::Simulation::new(program, config)
         .run()
         .map_err(|error| model_error(path, error))
@@ -289,9 +314,10 @@ pub fn trace_document_bytes(
     seed: u64,
     until: Option<f64>,
     limit: usize,
+    stop: Option<StopFlag>,
 ) -> Result<String, AppError> {
     let model = genmsi_format::load(path).map_err(|error| model_error(path, error))?;
-    trace_bytes(&model, path, seed, until, limit)
+    trace_bytes(&model, path, seed, until, limit, stop)
 }
 
 /// The `genmsi.trace/1` document of a run of a model that is in memory.
@@ -303,8 +329,9 @@ pub fn trace_model_bytes(
     seed: u64,
     until: Option<f64>,
     limit: usize,
+    stop: Option<StopFlag>,
 ) -> Result<String, AppError> {
-    trace_bytes(model, Path::new(""), seed, until, limit)
+    trace_bytes(model, Path::new(""), seed, until, limit, stop)
 }
 
 /// The trace of a run, with the path the failure names.
@@ -314,6 +341,7 @@ fn trace_bytes(
     seed: u64,
     until: Option<f64>,
     limit: usize,
+    stop: Option<StopFlag>,
 ) -> Result<String, AppError> {
     let program = genmsi_core::compile_model(model).map_err(|error| model_error(path, error))?;
     let config = genmsi_core::SimConfig {
@@ -323,7 +351,7 @@ fn trace_bytes(
         trace_limit: limit,
         ..genmsi_core::SimConfig::default()
     };
-    let result = run_once(&program, config, path)?;
+    let result = run_once(&program, config, path, stop)?;
     Ok(document_bytes(
         genmsi_core::documents::TRACE_SCHEMA,
         &genmsi_core::documents::trace_document(&result, limit),
@@ -416,7 +444,7 @@ mod tests {
             )
         );
         assert_eq!(
-            simulate_document_bytes(&path, 1, None).expect("runs"),
+            simulate_document_bytes(&path, 1, None, None).expect("runs"),
             expected
         );
     }
@@ -431,7 +459,7 @@ mod tests {
     #[test]
     fn a_refused_model_is_a_model_error_naming_it_once() {
         let path = fixtures().join("TP9__tp9.gmdl");
-        let error = simulate_document_bytes(&path, 1, None).expect_err("the engine refuses it");
+        let error = simulate_document_bytes(&path, 1, None, None).expect_err("the engine refuses it");
         let text = error.to_string();
         let path_text = path.display().to_string();
         assert!(matches!(error, AppError::Model { .. }), "{text}");
@@ -447,7 +475,7 @@ mod tests {
     #[test]
     fn the_trace_bytes_parse_and_name_their_schema() {
         let bytes =
-            trace_document_bytes(&reference(), 1, None, 100).expect("runs");
+            trace_document_bytes(&reference(), 1, None, 100, None).expect("runs");
         let document: serde_json::Value = serde_json::from_str(&bytes).expect("parses");
         assert_eq!(document["schema"], "genmsi.trace/1");
     }
@@ -455,21 +483,21 @@ mod tests {
     #[test]
     fn the_same_model_seed_and_limit_give_the_same_trace_bytes() {
         let path = reference();
-        let first = trace_document_bytes(&path, 7, None, 100).expect("runs");
-        let second = trace_document_bytes(&path, 7, None, 100).expect("runs");
+        let first = trace_document_bytes(&path, 7, None, 100, None).expect("runs");
+        let second = trace_document_bytes(&path, 7, None, 100, None).expect("runs");
         assert_eq!(first, second);
     }
 
     #[test]
     fn a_small_limit_truncates_and_a_big_one_does_not() {
         let path = reference();
-        let small = trace_document_bytes(&path, 1, None, 5).expect("runs");
+        let small = trace_document_bytes(&path, 1, None, 5, None).expect("runs");
         let small: serde_json::Value = serde_json::from_str(&small).expect("parses");
         assert_eq!(small["limit"], 5);
         assert!(small["records"].as_u64().is_some_and(|r| r <= 5));
         assert_eq!(small["truncated"], true);
 
-        let big = trace_document_bytes(&path, 1, None, 200_000).expect("runs");
+        let big = trace_document_bytes(&path, 1, None, 200_000, None).expect("runs");
         let big: serde_json::Value = serde_json::from_str(&big).expect("parses");
         assert_eq!(big["truncated"], false);
         assert!(
@@ -482,8 +510,8 @@ mod tests {
     fn the_trace_of_the_model_in_memory_is_the_trace_of_its_file() {
         let path = reference();
         let model = genmsi_format::load(&path).expect("the reference model loads");
-        let from_file = trace_document_bytes(&path, 1, None, 100).expect("runs");
-        let from_memory = trace_model_bytes(&model, 1, None, 100).expect("runs");
+        let from_file = trace_document_bytes(&path, 1, None, 100, None).expect("runs");
+        let from_memory = trace_model_bytes(&model, 1, None, 100, None).expect("runs");
         assert_eq!(from_file, from_memory);
     }
 

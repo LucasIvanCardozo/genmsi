@@ -33,6 +33,7 @@ fn run_with_trace(program: &Program) -> RunResult {
             trace: true,
             trace_limit: 100_000,
             max_events: 5_000_000,
+            stop: None,
         },
     )
     .run()

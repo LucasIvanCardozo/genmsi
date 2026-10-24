@@ -10,6 +10,20 @@ binary is a thin layer over `genmsi-core` and `genmsi-format`; it carries no
 simulation logic (decision D2), and the documents it returns are the ones the
 CLI publishes (decision D13).
 
+## The agent's guide
+
+The tools carry the facts of a class (`catalogue`) and the structure of a
+model (`explain_model`); the procedure — how a model is written, which
+entities it has to declare, what the expression language is and what the
+engine does with them — lives in the agent's guide:
+[`skills/genmsi-modeling/SKILL.md`](../skills/genmsi-modeling/SKILL.md).
+
+The guide travels with the product: `scripts/install-linux.sh --with-mcp`
+installs it in `~/.agents/skills/genmsi-modeling`, where the harness of an
+agent finds it. It is the sanctioned place to learn the format: an agent that
+reads the guide does not read the engine's source, and it does not spend
+twenty calls discovering what a link looks like.
+
 ```
 genmsi-mcp            # speaks MCP on stdin/stdout
 ```
@@ -44,10 +58,11 @@ Exactly one of them is required; giving both, or neither, is an
 | Field | Type | Default | Meaning |
 |---|---|---|---|
 | `class` | string or null | — | Name of the class to describe (`Generate`, `Queue`, ...). |
+| `classes` | array of strings or null | — | Names of several classes to describe, in one call. Give `class` or `classes`, not both. |
 
 **Call this tool before writing a model.** It is the one that saves the agent
 from guessing: it says which classes exist, what each one does, which ports
-(`ioid`) and which properties (`name`, `type`, `value`) each class declares,
+(`ioid`) and which properties (`name`, `ty`, `value`) each class declares,
 and it gives the XML of a block of the class, exactly as the file stores it.
 
 Without `class` it returns the `genmsi.classlist/1` document:
@@ -69,10 +84,18 @@ With `class` it returns the `genmsi.class/1` document of that class:
 | `inputs` | array | Input ports: `ioid`, `name`, `caption`. |
 | `outputs` | array | Output ports: `ioid`, `name`, `caption`. |
 | `properties` | array | The properties the class declares: `name`, `hint`, `ty`, `subtype`, `unique` and the `options` of a listed property. |
+| `declares` | array | The entities the class **declares**: the storages, functions, tables, variables and logic switches a model has to define before it uses them. Each entry carries the `property` that names the entity and its `kind`. |
+| `uses` | array | The entities the class **uses**: the facilities, queues and labels a model creates by using them. Each entry carries the `property` that names the entity and its `kind`. |
 | `template` | string | The XML of a minimal, valid block of this class. |
 
 The `description` is empty for a class the glossary does not cover: the
 document never invents one.
+
+With `classes` it returns the `genmsi.classes/1` document: the body of every
+class asked for, in the order they were asked for, under one `classes` key.
+An agent that needs eight classes asks for the eight in one call, instead of
+calling the tool once per class. A class the catalogue does not offer fails
+the call with the same `class_not_found` failure a single class fails with.
 
 The `hint` of a property is **decoded**: the catalogue stores it
 percent-encoded, the way the file does, and the document hands it over as the
@@ -161,7 +184,14 @@ Returns the `genmsi.explain/1` document:
 |---|---|---|
 | `schema` | string | `genmsi.explain/1` |
 | `program` | object | The engine's description of the compiled program: `title`, `start_counter`, `blocks[]` (`node`, `class`, `label`, `operands`, `ports`), `storages`, `functions`, `variables`, `random_variables`, `tables`, `qtables` and `diagnostics`. |
+| `model` | object | The model as the document writes it: `path`, `title`, `blocks[]` (`id`, `class`, `kind`, `name`, `caption`, `label`, `container`, `layout`, `properties[]` (`name`, `value`, `ty`, `subtype`, `hint`, `unique`, `visible`), `inputs[]` and `outputs[]` (`ioid`, `name`, `caption`, `label`)) and `edges[]` (`from_module`, `from_ioid`, `from_port`, `to_module`, `to_ioid`, `to_port`, `label`, `container`). It is the `genmsi.model/1` document the desktop app reads. |
 | `glossary` | object | What each GPSS statement of the model does, keyed by class. Only the classes the model uses appear. |
+
+The `program` is the compiled GPSS: its `operands` are positional, in the
+order the original's listing uses. The `model` is the document itself: every
+property carries its name and its value, and every edge names the two ends of
+a connection. An agent reads a model — and writes the next one — from the
+`model`, not from the positions of an operand string.
 
 The glossary is the vocabulary an agent needs to write a model: it says what
 each statement does and which operands it takes (`Media`, `Cantidad`,

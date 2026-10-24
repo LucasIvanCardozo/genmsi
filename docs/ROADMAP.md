@@ -47,6 +47,10 @@ Goal: agents create, validate, simulate and inspect models.
 
 - rmcp stdio server; tools: `simulate`, `lint`, `get_trace`, `explain_model`.
 - Errors returned with line/column so agents can fix their own models.
+- The catalogue answers for a list of classes, the class document says which
+  entities the class declares and which it uses, and the explain document
+  publishes the structure of the model; the procedure lives in the agent's
+  guide (`skills/genmsi-modeling/`), installed with the product.
 
 Exit criteria: an agent can build and simulate a model end to end via MCP.
 

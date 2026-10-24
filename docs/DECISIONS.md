@@ -164,3 +164,31 @@ that is the point of the change. A `/2` version would leave every consumer of
 A finding the compiler already reported is not said twice: the compiler's
 wording wins, because it carries what the run does about it (a storage nobody
 declares has no capacity, and the run stops when a transaction reaches it).
+
+## D17 — The agent's knowledge: facts in the catalogue, structure in the explain document, procedure in the guide
+
+The tools answer three different questions and each one has its own home. The
+facts of a class — its ports, its properties, the entities it declares and
+uses, the XML of a block — live in `catalogue`: they are read from the class
+specification, so they cannot drift from it, and the classes an agent needs
+come back whole in one call. The structure of a model — every block with its
+properties by name, every edge naming the two ends of a connection — lives in
+`genmsi.explain/1`, next to the compiled program, in the `genmsi.model/1`
+document the desktop app already reads. The procedure — how a model is
+written, which entities it declares, what the expression language is, what
+the engine does with a class — lives in the agent's guide,
+`skills/genmsi-modeling/SKILL.md`, which the installer puts where the harness
+of an agent finds it.
+
+The alternative was to publish more in the tools: a table of the compiled
+operand order of every class, and a tool that mutates a model. The first is
+57 rows written by hand next to the compiler that decides the order, and it
+drifts the day the compiler changes; the model's own XML already carries every
+property with its name, and the explain document publishes it. The second
+changes the tool surface, and it waits for the measurement that says the
+agent needs it.
+
+Rationale: the cold agent that built a nine-block model spent 61 tool batches
+and read the engine's source, and what it lacked was information, not tools.
+D11's guard applies: every addition here answers a question the agent could
+not answer with what the tools already said.

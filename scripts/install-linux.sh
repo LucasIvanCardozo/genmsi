@@ -123,4 +123,15 @@ if [[ $with_mcp -eq 1 ]]; then
       echo "  pi mcp add genmsi -- ${HOME}/.local/bin/genmsi mcp"
     fi
   fi
+
+  # La guía del agente: el archivo que enseña a construir un modelo con el
+  # MCP sin leer el código del motor. Viaja con el producto, en el
+  # directorio de skills del usuario.
+  skill_src="${repo}/skills/genmsi-modeling"
+  if [[ -d "${skill_src}" ]]; then
+    skill_dir="${HOME}/.agents/skills/genmsi-modeling"
+    mkdir -p "${skill_dir}"
+    install -m 644 "${skill_src}/SKILL.md" "${skill_dir}/SKILL.md"
+    echo "Guía del agente instalada en ${skill_dir}"
+  fi
 fi

@@ -134,3 +134,31 @@ Phase 3b session of genmsi-rs. Coordinator: "GenMSI-rs: sesión principal coordi
   app generates from the engine's documents were regenerated with it
   (`crates/genmsi-app/scripts/generate-types.sh`): `ClassDocument` gained `declares`
   and `uses`, and `CatalogueEntity` is a new type. The app's `tsc --noEmit` passes.
+- L8 (measurement, the first run): a cold agent — no access to the repository, the guide
+  as its only file — built the cafeteria model (50 modules, 36 links) with **26 MCP
+  calls** and **one** file read: the guide. The model lints clean, runs and produces a
+  report with 242 transactions, 12 lots and the line of 44 students at noon. The calls
+  were 3 `catalogue` (the list and two batches), 6 `lint`, 6 `simulate`, 3 `get_trace`,
+  4 `save_model`, 2 `explain_model` and one handshake. The evidence is in
+  `odd/tasks/medida/`.
+  The comparison with the session that started this phase: that agent spent about 400
+  MCP calls (57 `catalogue`, 182 `simulate`, 131 `lint`, 119 `get_trace`) and read the
+  engine's source to learn the format.
+- L9 (verification of the guide, against the engine): the cold agent reported seven
+  semantic findings. Checked one by one against the engine (`crates/genmsi-core/src/sim.rs`
+  and four probes through the MCP): **one was a real error of the guide** — a `Queue`
+  block joins the queue and continues, and only a `Depart` takes the transaction out of
+  it; the guide said it joined and left. **Three were thin** — `OffSet` moves the first
+  arrival, `StorageUse` holds a unit instead of consuming it, and the trace numbers the
+  statements of the compiled program instead of the modules of the document. **Three were
+  the guide being right and the agent reading it wrong** — the gate with a connected
+  failure output does not block, `Leave` never waits (the `Enter` is the one that waits
+  for room), and `Terminate.Unidades` takes its units from the counter for every
+  transaction that arrives. The guide was corrected (`ecee374`).
+- L10 (decision, coordinator): the mutation tools (`add_block`, `connect`,
+  `set_property`) are **not** the next step. The calls of the cold run were 15 of 26
+  `lint`/`simulate`/`get_trace`: the cost was the semantics of the classes, not the XML
+  the agent had to write (it wrote the whole document in one call). The lever that would
+  move the number is semantic: a class that carries a worked example — a minimal model
+  and its trace — so the agent sees the behaviour instead of probing it. That is a
+  decision for a later phase, and it is recorded here as the finding, not as work.

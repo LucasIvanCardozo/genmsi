@@ -119,6 +119,35 @@ async fn a_class_carries_its_ports_its_properties_and_its_template() {
     assert!(template.contains("value=\"60\""), "{template}");
 }
 
+/// The class says which entities it declares and which it uses.
+///
+/// The format tells the two apart: a property of type `EntityDef` declares
+/// an entity, so the model has to carry the block that defines it, and a
+/// property of type `EntityUse` uses one, so the model creates it by using
+/// it.
+#[tokio::test]
+async fn a_class_says_which_entities_it_declares_and_which_it_uses() {
+    let (client, _server) = pair().await;
+    let storage = call(&client, "catalogue", json!({ "class": "StorageDef" })).await;
+    assert_eq!(
+        storage["declares"],
+        json!([{ "property": "Storage", "kind": "Storage" }]),
+        "{storage}"
+    );
+    assert_eq!(storage["uses"], json!([]), "{storage}");
+
+    let facility = call(&client, "catalogue", json!({ "class": "FacilityUse" })).await;
+    assert_eq!(facility["declares"], json!([]), "{facility}");
+    assert_eq!(
+        facility["uses"],
+        json!([
+            { "property": "Facility", "kind": "Facility" },
+            { "property": "Queue", "kind": "Queue" }
+        ]),
+        "{facility}"
+    );
+}
+
 #[tokio::test]
 async fn the_catalogue_says_what_every_class_does() {
     let (client, _server) = pair().await;

@@ -29,6 +29,8 @@ pub const CATALOGUE_SCHEMA: &str = "genmsi.catalogue/1";
 pub const CLASSLIST_SCHEMA: &str = "genmsi.classlist/1";
 /// Schema id of the document of one class.
 pub const CLASS_SCHEMA: &str = "genmsi.class/1";
+/// Schema id of the document of a list of classes.
+pub const CLASSES_SCHEMA: &str = "genmsi.classes/1";
 /// Schema id of the `gpss` document.
 pub const GPSS_SCHEMA: &str = "genmsi.gpss/1";
 /// Schema id of the document that says which model the app has open.
@@ -539,14 +541,44 @@ pub struct ClassDocument {
     pub outputs: Vec<CataloguePort>,
     /// Properties, in schema order.
     pub properties: Vec<CatalogueProperty>,
+    /// The entities the class declares: the storages, functions, tables,
+    /// variables and logic switches a model has to define before it uses
+    /// them.
+    pub declares: Vec<CatalogueEntity>,
+    /// The entities the class uses: the facilities, queues and labels a
+    /// model creates by using them.
+    pub uses: Vec<CatalogueEntity>,
     /// The XML of a minimal, valid block of this class.
     pub template: String,
+}
+
+/// An entity a class declares or uses.
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct CatalogueEntity {
+    /// The property that carries the entity.
+    pub property: String,
+    /// The kind of entity (`Storage`, `Function`, `Facility`, `Queue`, ...).
+    pub kind: String,
+}
+
+/// Body of the `genmsi.classes/1` document: the detail of every class asked
+/// for, in the order they were asked for.
+///
+/// An agent that needs eight classes asks for the eight in one call, instead
+/// of calling the catalogue once per class.
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ClassesDocument {
+    /// The class asked for, in the order they were asked for.
+    pub classes: Vec<ClassDocument>,
 }
 
 /// Build the `genmsi.class/1` body of a class, or `None` when the catalogue
 /// does not offer that class.
 pub fn class_document(class: &str) -> Option<ClassDocument> {
     let spec = genmsi_format::catalogue::class_spec(class)?;
+    let (declares, uses) = class_entities(spec);
     Some(ClassDocument {
         class: spec.class.to_string(),
         title: spec.title.to_string(),
@@ -554,8 +586,33 @@ pub fn class_document(class: &str) -> Option<ClassDocument> {
         inputs: catalogue_ports(spec.inputs),
         outputs: catalogue_ports(spec.outputs),
         properties: catalogue_properties(spec.properties),
+        declares,
+        uses,
         template: spec.template(),
     })
+}
+
+/// The entities a class declares and the ones it uses.
+///
+/// A property of type `EntityDef` (or of a list of them) declares an entity:
+/// the model has to carry the block that defines it. A property of type
+/// `EntityUse` uses one: the model creates it by using it, and the format
+/// only warns when a model uses an entity that nothing declares.
+fn class_entities(spec: &genmsi_format::catalogue::ClassSpec) -> (Vec<CatalogueEntity>, Vec<CatalogueEntity>) {
+    let mut declares = Vec::new();
+    let mut uses = Vec::new();
+    for property in spec.properties {
+        let entity = CatalogueEntity {
+            property: property.name.to_string(),
+            kind: property.subtype.to_string(),
+        };
+        match property.ty {
+            "EntityDef" | "TEntityDefList" => declares.push(entity),
+            "EntityUse" => uses.push(entity),
+            _ => {}
+        }
+    }
+    (declares, uses)
 }
 
 /// What the glossary says about a class, empty when it says nothing.

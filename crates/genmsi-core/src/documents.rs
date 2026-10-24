@@ -8,6 +8,7 @@
 
 use serde::Serialize;
 
+use crate::glossary;
 use crate::program::Program;
 use crate::sim::{RunResult, TraceEvent};
 use genmsi_format::{GmdlModel, percent_decode};
@@ -374,7 +375,7 @@ pub struct CataloguePort {
 pub struct CatalogueProperty {
     /// Property name (`Media`, `Queue`, ...).
     pub name: String,
-    /// Tooltip the editor shows.
+    /// Tooltip the editor shows, decoded.
     pub hint: String,
     /// Declared type (`TSNA`, `EntityUse`, `Listed`, ...).
     pub ty: String,
@@ -424,12 +425,15 @@ fn catalogue_ports(ports: &[genmsi_format::PortSpec]) -> Vec<CataloguePort> {
 }
 
 /// The properties of a class, as the catalogue declares them.
+///
+/// The tooltip is decoded: the catalogue stores it percent-encoded, the way
+/// the file does, and a client reads it.
 fn catalogue_properties(properties: &[genmsi_format::PropertySpec]) -> Vec<CatalogueProperty> {
     properties
         .iter()
         .map(|property| CatalogueProperty {
             name: property.name.to_string(),
-            hint: property.hint.to_string(),
+            hint: percent_decode(property.hint),
             ty: property.ty.to_string(),
             subtype: property.subtype.to_string(),
             unique: property.unique,
@@ -471,6 +475,10 @@ pub struct ClassListEntry {
     pub class: String,
     /// What the class does, in the words of the interface.
     pub title: String,
+    /// What the class does, in the words of the engine's glossary.
+    ///
+    /// Empty for a class the glossary does not cover.
+    pub description: String,
 }
 
 /// Body of the `genmsi.classlist/1` document: the classes there are, and the
@@ -498,6 +506,7 @@ pub fn class_list_document() -> ClassListDocument {
             .map(|class| ClassListEntry {
                 class: class.class.to_string(),
                 title: class.title.to_string(),
+                description: description_of(class.class),
             })
             .collect(),
         skeleton: genmsi_format::SKELETON_MODEL.to_string(),
@@ -518,6 +527,10 @@ pub struct ClassDocument {
     pub class: String,
     /// What the class does, in the words of the interface.
     pub title: String,
+    /// What the class does, in the words of the engine's glossary.
+    ///
+    /// Empty for a class the glossary does not cover.
+    pub description: String,
     /// Input ports, in file order.
     pub inputs: Vec<CataloguePort>,
     /// Output ports, in file order.
@@ -535,11 +548,20 @@ pub fn class_document(class: &str) -> Option<ClassDocument> {
     Some(ClassDocument {
         class: spec.class.to_string(),
         title: spec.title.to_string(),
+        description: description_of(spec.class),
         inputs: catalogue_ports(spec.inputs),
         outputs: catalogue_ports(spec.outputs),
         properties: catalogue_properties(spec.properties),
         template: spec.template(),
     })
+}
+
+/// What the glossary says about a class, empty when it says nothing.
+///
+/// The glossary covers the classes the engine implements; a class it does
+/// not cover gets no description, and none is made up for it.
+fn description_of(class: &str) -> String {
+    glossary::describe(class).unwrap_or_default().to_string()
 }
 
 /// Body of the `genmsi.trace/1` document.

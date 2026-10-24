@@ -20,6 +20,12 @@ class: string,
  */
 title: string, 
 /**
+ * What the class does, in the words of the engine's glossary.
+ *
+ * Empty for a class the glossary does not cover.
+ */
+description: string, 
+/**
  * Input ports, in file order.
  */
 inputs: Array<CataloguePort>, 

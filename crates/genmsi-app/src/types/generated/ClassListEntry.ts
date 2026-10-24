@@ -11,4 +11,10 @@ class: string,
 /**
  * What the class does, in the words of the interface.
  */
-title: string, };
+title: string, 
+/**
+ * What the class does, in the words of the engine's glossary.
+ *
+ * Empty for a class the glossary does not cover.
+ */
+description: string, };

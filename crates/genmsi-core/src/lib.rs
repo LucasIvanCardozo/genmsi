@@ -27,6 +27,7 @@
 pub mod documents;
 pub mod error;
 pub mod expr;
+pub mod glossary;
 pub mod oracle;
 pub mod gpss;
 pub mod program;

@@ -120,6 +120,34 @@ async fn a_class_carries_its_ports_its_properties_and_its_template() {
 }
 
 #[tokio::test]
+async fn the_catalogue_says_what_every_class_does() {
+    let (client, _server) = pair().await;
+    let listed = call(&client, "catalogue", json!({})).await;
+    let classes = listed["classes"].as_array().expect("the classes");
+    let generate = classes
+        .iter()
+        .find(|class| class["class"] == "Generate")
+        .expect("the Generate class");
+    let description = generate["description"].as_str().expect("the description");
+    assert!(!description.is_empty(), "the class says what it does");
+
+    let detail = call(&client, "catalogue", json!({ "class": "Generate" })).await;
+    assert_eq!(
+        detail["description"], description,
+        "the list and the detail say the same thing"
+    );
+
+    let properties = detail["properties"].as_array().expect("the properties");
+    for property in properties {
+        let hint = property["hint"].as_str().unwrap_or_default();
+        assert!(
+            !hint.contains('%'),
+            "the tooltip is still encoded: {hint}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn a_class_that_does_not_exist_is_its_own_failure() {
     let (client, _server) = pair().await;
     let error = call(&client, "catalogue", json!({ "class": "NotAClass" })).await;

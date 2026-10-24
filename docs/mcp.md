@@ -21,7 +21,7 @@ with `1`.
 
 | Tool | What it does | Returns |
 |---|---|---|
-| `catalogue` | Says which block classes exist and what a block of one of them looks like: its ports, its properties and the XML of the block. | `genmsi.classlist/1` or `genmsi.class/1` |
+| `catalogue` | Says which block classes exist and what a block of one of them looks like: what the class does, its ports, its properties and the XML of the block. | `genmsi.classlist/1` or `genmsi.class/1` |
 | `lint` | Loads the model, validates it and compiles it. It does not simulate. It reports what it found. | `genmsi.lint/1` |
 | `simulate` | Runs the model once and returns its GPSS report. | `genmsi.report/1` |
 | `get_trace` | Runs the model with the event trace enabled and returns the records. | `genmsi.trace/1` |
@@ -44,16 +44,16 @@ Exactly one of them is required; giving both, or neither, is an
 | `class` | string or null | — | Name of the class to describe (`Generate`, `Queue`, ...). |
 
 **Call this tool before writing a model.** It is the one that saves the agent
-from guessing: it says which classes exist, which ports (`ioid`) and which
-properties (`name`, `type`, `value`) each class declares, and it gives the
-XML of a block of the class, exactly as the file stores it.
+from guessing: it says which classes exist, what each one does, which ports
+(`ioid`) and which properties (`name`, `type`, `value`) each class declares,
+and it gives the XML of a block of the class, exactly as the file stores it.
 
 Without `class` it returns the `genmsi.classlist/1` document:
 
 | Field | Type | Meaning |
 |---|---|---|
 | `schema` | string | `genmsi.classlist/1` |
-| `classes` | array | Every class the editor offers: `class` (`moduleclass`) and `title` (what the class does). |
+| `classes` | array | Every class the editor offers: `class` (`moduleclass`), `title` (what the class does, in the words of the interface) and `description` (what the class does, in the words of the engine's glossary). |
 | `skeleton` | string | The skeleton of a model: the smallest `.gmdl` document the format reads, with the model root and nothing else. |
 
 With `class` it returns the `genmsi.class/1` document of that class:
@@ -63,10 +63,20 @@ With `class` it returns the `genmsi.class/1` document of that class:
 | `schema` | string | `genmsi.class/1` |
 | `class` | string | `moduleclass` the blocks of this class carry. |
 | `title` | string | What the class does. |
+| `description` | string | What the class does, in the words of the engine's glossary: the same text the list carries. |
 | `inputs` | array | Input ports: `ioid`, `name`, `caption`. |
 | `outputs` | array | Output ports: `ioid`, `name`, `caption`. |
 | `properties` | array | The properties the class declares: `name`, `hint`, `ty`, `subtype`, `unique` and the `options` of a listed property. |
 | `template` | string | The XML of a minimal, valid block of this class. |
+
+The `description` is empty for a class the glossary does not cover: the
+document never invents one.
+
+The `hint` of a property is **decoded**: the catalogue stores it
+percent-encoded, the way the file does, and the document hands it over as the
+text a reader reads (`"Cantidad de Transacciones a generar"`, not
+`"Cantidad%20de%20Transacciones%20a%20generar"`). The `template` keeps the
+encoded text, because the template is the text the file stores.
 
 A class the catalogue does not offer is a `class_not_found` failure.
 
@@ -154,7 +164,8 @@ Returns the `genmsi.explain/1` document:
 The glossary is the vocabulary an agent needs to write a model: it says what
 each statement does and which operands it takes (`Media`, `Cantidad`,
 `Parametro`, ...). It covers the classes the engine implements; the wording
-follows the semantics of `genmsi-core`.
+follows the semantics of `genmsi-core`. The same descriptions travel with the
+catalogue: `catalogue` says what a class does without asking for a model.
 
 ### `save_model`
 
@@ -272,8 +283,8 @@ the engine already knows every block class (`genmsi-format`: the catalogue),
 and a client that cannot see it has to guess the element names of the file.
 It publishes two documents of its own, `genmsi.classlist/1` and
 `genmsi.class/1`; the catalogue the desktop application uses
-(`genmsi.catalogue/1`) is left alone, so the application does not download
-the templates it does not use.
+(`genmsi.catalogue/1`) keeps its own shape, so the application does not
+download the templates it does not use.
 
 ## Not in this phase
 

@@ -9,7 +9,7 @@ export type CatalogueProperty = {
  */
 name: string, 
 /**
- * Tooltip the editor shows.
+ * Tooltip the editor shows, decoded.
  */
 hint: string, 
 /**

@@ -46,7 +46,7 @@ Phase 3b session of genmsi-rs. Coordinator: "GenMSI-rs: sesión principal coordi
   class asked for, in one call. A class the catalogue does not have is an error that
   names the class. Tests: the batch returns every class asked for; the single-class
   answer stays byte-identical; an unknown class fails.
-  Commit: `feat(mcp): the catalogue answers for a list of classes`.
+  Commit: `feat(mcp): the catalogue answers for a list of classes` (`32ec13e`).
 - T2 (S2, S9) `genmsi-core` + `genmsi-mcp`: the class document says which entities the
   class **declares** (`EntityDef` properties: the storages, functions, tables, variables
   and logic switches a model has to declare) and which it **uses** (`EntityUse`
@@ -54,7 +54,7 @@ Phase 3b session of genmsi-rs. Coordinator: "GenMSI-rs: sesión principal coordi
   two lists are read from the class's own properties, so they cannot drift from it.
   Tests: `StorageDef` declares a `Storage`; `FacilityUse` uses a `Facility`; the
   catalogue of every class carries both lists.
-  Commit: `feat(mcp): every class says which entities it declares and uses`.
+  Commit: `feat(mcp): every class says which entities it declares and uses` (`99b0b10`).
 - T3 (S2, S3, S5) `genmsi-core` + `genmsi-mcp`: `explain_model` publishes the model's
   structure next to the compiled program: every block of the document with its class,
   its name, its properties **by name** and its ports, and the links that say how the
@@ -62,26 +62,29 @@ Phase 3b session of genmsi-rs. Coordinator: "GenMSI-rs: sesión principal coordi
   Tests: the links of a model with two blocks and one link are published; the
   properties of a block carry their names and values; the compiled program is still
   there.
-  Commit: `feat(mcp): the model an agent reads says how it is wired`.
+  Commit: `feat(mcp): the model an agent reads says how it is wired` (`13c10a5`).
 - T4 (S2, S3) `genmsi-mcp`: the server's `instructions` orient a cold agent in four
   lines: how two blocks are connected, that the class catalogue is the one source of
   the block schema, and that the skill carries the procedure.
-  Commit: `feat(mcp): the server tells the agent how a model is wired`.
+  Commit: `feat(mcp): the server tells the agent how a model is wired` (`13c10a5`, same commit as
+  T3: the instructions and the structure of the model are the same orientation).
 - T5 (S1, S2, S3) `skills/genmsi-modeling/SKILL.md`: the guide an agent follows to
   build a model: the grammar of the document, how two blocks are connected, the
   expression language, which entities a model declares and which it creates by using
   them, the runtime semantics that are not obvious, the workflow with the tools, one
   worked example and the traps. It never repeats the per-class schema: that is the
   catalogue's job.
-  Commit: `docs(skill): the guide an agent follows to build a model`.
+  Commit: `feat(skill): the guide an agent follows to build a model` (`ee94923`).
 - T6 (S1) `scripts/install-linux.sh`: `--with-mcp` installs the skill into
   `~/.agents/skills/genmsi-modeling`, so the guide travels with the product.
-  Commit: `feat(install): the installer ships the agent's guide`.
+  Commit: `feat(install): the installer ships the agent's guide` (`ee94923`, same commit as T5: the
+  guide and the installer that ships it are one unit).
 - T7 (S1, S4, S5) `docs/`: `docs/mcp.md` documents the new tools and the new fields;
   `docs/DECISIONS.md` appends the entry that says where each kind of knowledge lives
   (the catalogue holds the facts of a class, the explain document holds the structure
   of a model, the skill holds the procedure).
-  Commit: `docs(mcp): the contract of the tools an agent uses`.
+  Commit: `docs(mcp): the contract of the tools an agent uses` (`ee94923`, same commit as T5: the
+  guide, the installer and the contract of the tools are one unit).
 - T8 (S7, S8) measurement: a cold agent, with only the MCP and the skill, builds the
   cafeteria food-delivery model (nine blocks) and the count of tool calls and of
   repository reads is written in the Log of this document.
@@ -123,3 +126,11 @@ Phase 3b session of genmsi-rs. Coordinator: "GenMSI-rs: sesión principal coordi
 - L6 (decision, coordinator): the skill is written in English, the language of the
   repository's technical documents and of the engine's glossary; the code comments of
   the shell installer follow the file's own Spanish.
+- L7 (delivery): the phase landed in five commits on `feature/fase3b-mcp-agente`: the
+  plan (`f8acc13`), the entities of a class (`99b0b10`), the catalogue's batch
+  (`32ec13e`), the structure of the model and the server's instructions (`13c10a5`), and
+  the guide with the installer and the contract of the tools (`ee94923`). The slice
+  passed the ~400 lines mark at the last commit; the boundary is here. The types the
+  app generates from the engine's documents were regenerated with it
+  (`crates/genmsi-app/scripts/generate-types.sh`): `ClassDocument` gained `declares`
+  and `uses`, and `CatalogueEntity` is a new type. The app's `tsc --noEmit` passes.

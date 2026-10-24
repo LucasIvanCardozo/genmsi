@@ -276,3 +276,29 @@ tocan `sim.rs`, así que van seguidos).
     Lo que sí cambia es la **forma**: los tiempos del reporte y de la traza
     son enteros ✓, como los del original ✓ → las cifras de los dos son
     comparables ✓✓.
+- **L16** — **La medición final** (spec S6, nota `odd/tasks/notas-medicion-final.md`):
+  - **Las 66 clases están** ✓ (un banco por clase ✓): coinciden en todas las
+    métricas ✓, sus **192 tiempos coinciden exactamente** (desviación 0,0 % ✓)
+    y su listing GPSS es idéntico ✓ (66 de 66 ✓). Las sondas del orden: 10 de
+    10 ✓.
+  - La paridad con los 25 modelos: **902 de 958** a 3 corridas ✓, 821 a 10 ✓ y
+    799 a 20 ✓ → **el ruido de la medida (±20 métricas) es mayor que el
+    efecto** ✓ → el reloj entero no mejora la paridad de forma medible ✓;
+    lo que cambia es la forma ✓ (los tiempos enteros, comparables con los del
+    original ✓✓).
+  - **Las desviaciones que permanezcen**: 13 modelos no coinciden del todo ✓
+    (el mayor, `Parcial 6-11-23`, con 128 de 150 ✓) y uno no carga (`Parcial
+    8-11-21` ✓: el `QTable` con un espacio en el nombre ✓). Los cinco que
+    fallan con error ✓ son los que **el original también rechaza** ✓ con el
+    mismo error ✓.
+  - **La tasa de cuadros, medida por primera vez** ✓: con la traza por
+    defecto el trabajo por cuadro es de **0,127 ms** ✓ (el 0,8 % del cuadro de
+    60 Hz ✓) y con diez mil cuadros de 3,57 ms ✓ → **la animación no pierde
+    cuadros** ✓✓.
+  - **La app instalada, con el motor definitivo** ✓: la ventana abre ✓, tiene
+    el campo **«Inicio»** ✓ al lado de «Hasta» ✓, y el modelo del usuario
+    corre en ella ✓ (END_TIME 3600 ✓, la cola con 3.236 esperando ✓, tiempos
+    enteros ✓).
+  - Queda fuera, por decisión del usuario: publicar ✓ (push, PR, versionado,
+    firma ✓), el AppImage ✓ (no funciona ✓) y la diferencia del `QTable` con
+    espacios en el nombre ✓ (es del formato ✓, no del motor ✓ → otra unidad ✓).

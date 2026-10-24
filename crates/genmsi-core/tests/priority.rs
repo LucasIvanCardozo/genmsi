@@ -122,17 +122,27 @@ fn higher_priority_number_is_served_first() {
     .expect("runs");
     let low = support::block(&program, "L2");
     let high = support::block(&program, "H2");
-    let first_leave = |block: usize| {
-        result
-            .trace
+    // The instant a waiter is admitted is the instant it leaves the block it
+    // is counted in, and not the seize it waited in: a transaction that
+    // waits is counted in the block it came from, and the trace says so
+    // with the `backup` event. The leave of the transaction that waited is
+    // the one that follows its wait.
+    let admission = |block: usize| {
+        let events = &result.trace;
+        let position = events
             .iter()
-            .filter(|event| event.block == block && event.event == "leave")
+            .position(|event| event.block == block && event.event == "wait")
+            .unwrap_or_else(|| panic!("no wait event for block {block}"));
+        let waiter = events[position].xact;
+        events
+            .iter()
+            .skip(position)
+            .find(|event| event.xact == waiter && event.event == "leave")
             .map(|event| event.time)
-            .next()
-            .unwrap_or_else(|| panic!("no leave event for block {block}"))
+            .unwrap_or_else(|| panic!("no leave event for the waiter of block {block}"))
     };
-    let low_time = first_leave(low);
-    let high_time = first_leave(high);
+    let low_time = admission(low);
+    let high_time = admission(high);
     assert!(
         high_time < low_time,
         "the priority-1 waiter must be admitted first (high {high_time}, low {low_time})"

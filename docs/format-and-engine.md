@@ -213,9 +213,13 @@ All errors carry a `Location` with file, 1-based source line and `moduleid`.
 - `replicate` runs `N` replications with seeds derived by `mix_u64(base_seed, i)`
   and reports mean, standard deviation and the 95% Student-t interval per metric
   (`t_critical` uses the exact table up to 30 degrees of freedom).
-- When the trace is enabled, every entry, leave, wait and termination is
-  recorded with time, transaction, block, label and detail. The trace also
-  says what the run did to the things the report counts and the events
+- When the trace is enabled, every entry, leave, wait, backup and termination
+  is recorded with time, transaction, block, label and detail. The `backup`
+  event says that the transaction backs up to the block it is counted in: it
+  is recorded in the block that waits (a gate that does not open, a facility
+  that is busy, a storage that is full, a match without a partner) and its
+  detail names the block the transaction goes back to (`-> 13`). The trace
+  also says what the run did to the things the report counts and the events
   cannot say on their own: the name of the entity a block touches, the
   samples of a table, the state of a logic switch, the value of a savevalue
   and the members that leave a chain.
@@ -226,8 +230,12 @@ These are deliberate and do not change the simulation:
 
 - one report row per module (the original expands compound blocks into several
   rows); statistics are identical for the labelled first statement;
-- blocked transactions are counted as current in the blocking block (the
-  original leaves them in the previous block);
+- blocked transactions are counted as current in the block they came from, the
+  way the original counts them (`A_Queue  QUEUE  qAfuera  13 13` with the gate
+  shut, and the trace says the same with its `backup` event); the exception
+  is the `MATCH`, whose waiting transaction the original counts in the match
+  as well (`A_Match  TRANSFER  ,PIENSA  43 3 0` and `PIENSA  MATCH  ESPERA
+  40 3 0`), and we count it only in the transfer;
 - queue content and facility utilization are integrals over the run, so they do
   not depend on where a blocked transaction is displayed;
 - `TABULATE` records one observation per execution (`Peso` is accepted but not

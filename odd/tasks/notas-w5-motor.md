@@ -374,3 +374,77 @@ dos salidas posibles:
 Ninguna de las dos se aplica aquí: la primera cambia un contrato publicado y la
 segunda cambia lo que la reproducción enseña. La decisión es de quien
 coordina.
+
+## 6. La decisión: lo publica el motor (resuelto)
+
+La decisión la tomó quien coordina: **el motor publica dónde está contada la
+transacción que retrocede**. No es la app la que reimprime la regla del motor,
+ni se publica con el test en rojo.
+
+### Por qué un evento nuevo y no un par `leave` + `enter`
+
+El reproductor de la app tiene **dos** contabilidades: la ocupación por bloque
+(`enter` suma, `leave` resta) y la de las entidades (entrar a un bloque
+`Queue` encola, entrar a un bloque `Depart` desencola). Si el retroceso se
+escribiera como `leave` en la puerta y `enter` en la cola, la cola se contaría
+**dos veces**: la app informaría 18 clientes en una cola de 9. Un evento
+propio mueve la ocupación sin tocar las entidades.
+
+El evento es `backup`, se registra en el bloque que **espera** y su detalle
+nombra el bloque al que retrocede (`-> 13`), con la convención que ya usan
+los `leave` y que la app ya sabe leer (`targetOf`).
+
+### Lo que cambió en el motor (`crates/genmsi-core/src/sim.rs`)
+
+- `Simulation` tiene un `counted_at: HashMap<XactId, usize>`: el bloque donde
+  está contada cada transacción que espera. No se tocó el `struct
+  Transaction`, que vive en otro archivo.
+- `leave` se partió en `leave` y `leave_counted_at`: la contabilidad del
+  **reporte** sigue en el bloque del que sale la transacción, y sólo el
+  **evento de traza** se registra en el bloque donde está contada. Los ~40
+  llamados a `leave` quedan intactos.
+- Los **cuatro** bloques que retroceden emiten el `backup` después del `wait`
+  (en el `MATCH`, que no registra `wait`, sólo el `backup`): la puerta que no
+  abre, la facilidad que no se toma, el almacenamiento lleno y el match sin
+  pareja. Los cuatro caminos de `resume` registran el `leave` de la traza en
+  el bloque contado.
+
+### La traza del cliente trabado en la puerta (modelo de referencia)
+
+```
+ANTES                                   DESPUÉS
+generate                                generate
+leave      -> 13                        leave      -> 13
+Queue          enter      qAfuera       Queue          enter      qAfuera
+Queue          leave      -> 4          Queue          leave      -> 4
+GateL          enter                    GateL          enter
+GateL          wait       gate          GateL          wait       gate
+                                        GateL          backup     -> 13
+```
+
+La ocupación que ve la app pasa de "cola 0, puerta 9" a "cola 9, puerta 0",
+que es lo que dice el reporte (`A_Queue 9 9 0`, `GateL 0 0 0`).
+
+### Verificación
+
+- `cargo test --workspace`: en verde (412 pruebas, 0 fallos).
+- `cargo clippy --workspace --all-targets -- -D warnings`: en verde.
+- `node --test tests/*.test.ts`: 101 en verde, incluido "the replay of the
+  reference model ends in the state the report publishes", que estaba en rojo.
+- Los **45** reportes de `fixtures/models/` salen **idénticos byte a byte**
+  contra el código de antes: el reporte no cambió ni un número.
+- Los 66 bancos del oráculo coinciden en todas sus métricas: 66 de 66.
+
+### Lo que queda medido y sin arreglar: el `MATCH`
+
+El original cuenta la transacción que espera en el match **en los dos
+bloques**: `A_Match  TRANSFER  ,PIENSA  43 3 0` y `PIENSA  MATCH  ESPERA
+40 3 0`. Un solo evento `backup` sólo puede nombrar un bloque. La fidelidad
+de la app para `TP5__burgerShop` sigue nombrando **un** bloque que no
+cuadra, pero cambia cuál: antes el 15 (`MatchTransfer A_Match1`), ahora el 16
+(`Match ESPERA`). El número de bloques que no cuadran es el mismo, y los
+desajustes de entradas, colas y figuras no cambian.
+
+Es una diferencia del **reporte** (nuestro `MATCH` no cuenta al que espera),
+no de la traza, y es anterior a este trabajo. Lo que decide el `MATCH` (que
+no retroceda, o que retroceda sin mover la ocupación) es de quien coordina.

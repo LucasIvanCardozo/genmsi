@@ -182,6 +182,85 @@ test("the rows of a chart carry the value each entity had at that instant", () =
   ]);
 });
 
+test("a transaction that backs up is counted in the block it came from", () => {
+  // The trace of a transaction that waits at a shut gate: the engine counts
+  // it in the queue it came from, and the replay counts it there too.
+  const report: ReportDocumentLike = {
+    blocks: [
+      { line: 1, node: 1, class: "Queue", current: 1, entries: 1 },
+      { line: 2, node: 3, class: "Gate", current: 0, entries: 0 },
+    ],
+    entities: { queues: { qA: { name: "qA", content: 1 } } },
+  };
+  const trace: TraceDocumentLike = {
+    start_time: 0,
+    end_time: 10,
+    limit: 100,
+    records: 5,
+    truncated: false,
+    events: [
+      event(0, 1, 0, "Queue", "enter", "qA"),
+      event(1, 1, 0, "Queue", "leave", "-> 1"),
+      event(1, 1, 1, "Gate", "enter"),
+      event(1, 1, 1, "Gate", "wait", "gate"),
+      event(1, 1, 1, "Gate", "backup", "-> 0"),
+    ],
+  };
+  const index = buildIndex(trace, report, smallModel);
+  const state = stateAt(index, index.frames.length - 1);
+  assert.equal(state.blocks[0], 1, "the transaction is counted in the queue");
+  assert.equal(state.blocks[1], 0, "and not in the gate");
+  // The entities are not touched: the transaction neither entered a queue
+  // nor left one when it backed up.
+  assert.equal(state.queues["qA"], 1, "the queue kept its content");
+  // The backup is a change of the occupation, and not an entry.
+  const backup = index.frames[index.frames.length - 1];
+  assert.equal(backup.event, "backup");
+  assert.equal(backup.change?.left, 1, "the gate loses the transaction");
+  assert.equal(backup.change?.entered, 0, "the queue gains it");
+  assert.equal(backup.change?.entered_count, undefined, "and no entry is counted");
+});
+
+test("a transaction that waits for a facility takes it when it leaves", () => {
+  // The transaction waits at the seize: the engine counts it in the block it
+  // came from, and the trace says so with the `backup` event. When the
+  // facility is released, the transaction leaves the block it is counted in,
+  // and it took the facility: the entity belongs to the block it waited in.
+  const report: ReportDocumentLike = {
+    blocks: [
+      { line: 1, node: 1, class: "Queue", current: 0, entries: 1 },
+      { line: 2, node: 3, class: "Seize", current: 0, entries: 1 },
+      { line: 3, node: 4, class: "Release", current: 0, entries: 1 },
+    ],
+    entities: { queues: { qA: { name: "qA", content: 1 } } },
+  };
+  const trace: TraceDocumentLike = {
+    start_time: 0,
+    end_time: 10,
+    limit: 100,
+    records: 7,
+    truncated: false,
+    events: [
+      event(0, 1, 0, "Queue", "enter", "qA"),
+      event(1, 1, 0, "Queue", "leave", "-> 1"),
+      event(1, 1, 1, "Seize", "enter", "F"),
+      event(1, 1, 1, "Seize", "wait", "F"),
+      event(1, 1, 1, "Seize", "backup", "-> 0"),
+      event(5, 1, 0, "Queue", "leave", "-> 2"),
+      event(5, 1, 2, "Release", "enter", "F"),
+    ],
+  };
+  const index = buildIndex(trace, report, smallModel);
+  // The leave of the queue is the moment the transaction takes the facility.
+  const taken = stateAt(index, 5);
+  assert.equal(taken.facilities["F"], 1, "the transaction owns the facility");
+  assert.equal(taken.blocks[0], 0, "the queue holds nobody");
+  assert.equal(taken.blocks[1], 0, "and the seize holds nobody");
+  // The release frees the facility again.
+  const state = stateAt(index, index.frames.length - 1);
+  assert.equal(state.facilities["F"], null, "the release frees the facility");
+});
+
 test("the replay of the reference model ends in the state the report publishes", { timeout: 300_000 }, () => {
   const documentsOf = documents(model, 200_000);
   const index = buildIndex(documentsOf.trace, documentsOf.report, documentsOf.model);

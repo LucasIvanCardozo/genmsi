@@ -436,6 +436,11 @@ export function buildIndex(
   // comes from a parameter is not the same for every transaction, so it is
   // remembered per transaction.
   const names = new Map<number, Map<number, string>>();
+  // The block every transaction waits in, when it waits for an entity: the
+  // transaction backs up to the block it came from, and it leaves that
+  // block, not the one it waits in. The entity it was waiting for belongs
+  // to the block it waits in.
+  const waiting = new Map<number, number>();
   const seen = {
     queue: new Set<string>(),
     facility: new Set<string>(),
@@ -449,6 +454,15 @@ export function buildIndex(
     const className = block?.class ?? event.class;
     const node = block?.node ?? null;
     const change: StateChange = {};
+
+    // The block the entity of the event belongs to.
+    //
+    // A transaction that waits in a block that could not take it backs up
+    // to the block it came from, and it leaves that block: the entity it
+    // was waiting for is the one of the block it waits in.
+    const waited = event.event === "leave" ? waiting.get(event.xact) : undefined;
+    const entityBlock = waited ?? index;
+    const entityClass = program[entityBlock]?.class ?? className;
 
     // The name of the entity: what the engine published in the detail of
     // the event, or what the model declares.
@@ -466,13 +480,13 @@ export function buildIndex(
     if (entity === null && (event.event === "leave" || event.event === "unlink")) {
       // The name the transaction had when it was in the block: a name that
       // comes from a parameter is not the same for every transaction.
-      entity = recall(names, index, event.xact, null);
+      entity = recall(names, entityBlock, event.xact, null);
     }
     if (entity === null) {
-      entity = entities.get(index) ?? null;
+      entity = entities.get(entityBlock) ?? null;
     }
     if (entity === null) {
-      entity = learned.get(index) ?? null;
+      entity = learned.get(entityBlock) ?? null;
     }
     if (published !== null) {
       remember(names, index, event.xact, published);
@@ -481,18 +495,25 @@ export function buildIndex(
         entities.set(index, published);
       }
     }
+    if (event.event === "wait") {
+      // The transaction waits in this block: it will leave the block it
+      // came from, and the entity it waits for is the one of this block.
+      waiting.set(event.xact, index);
+    }
     if (event.event === "leave" || event.event === "unlink") {
       // The transaction left the block: the name it had there is of no use
       // any more.
       forget(names, index, event.xact);
+      forget(names, entityBlock, event.xact);
+      waiting.delete(event.xact);
     }
 
-    switch (className) {
+    switch (entityClass) {
       case "Queue":
         // A transaction that enters a queue block is enqueued there, and it
         // takes as many places in the queue as units it carries.
         if (event.event === "enter" && entity !== null) {
-          const given = units.get(index) ?? 1;
+          const given = units.get(entityBlock) ?? 1;
           change.queue = { name: entity, delta: given };
           change.figure = { kind: "queue-enqueue", name: entity, time: event.time, units: given };
           // The engine remembers when each transaction entered the queue:
@@ -508,7 +529,7 @@ export function buildIndex(
         // A transaction that enters a depart block leaves the queue, and it
         // frees as many places as it took.
         if (event.event === "enter" && entity !== null) {
-          const given = units.get(index) ?? 1;
+          const given = units.get(entityBlock) ?? 1;
           change.queue = { name: entity, delta: -given };
           const entered = recall(enqueuedAt, entity, event.xact, event.time);
           change.figure = {
@@ -592,7 +613,7 @@ export function buildIndex(
       case "Enter":
         // A transaction that leaves an enter block took the units.
         if (event.event === "leave" && entity !== null) {
-          const taken = units.get(index) ?? 1;
+          const taken = units.get(entityBlock) ?? 1;
           change.storage = { name: entity, delta: taken };
           change.figure = {
             kind: "storage-enter",
@@ -612,7 +633,7 @@ export function buildIndex(
         break;
       case "Leave":
         if (event.event === "enter" && entity !== null) {
-          const given = units.get(index) ?? 1;
+          const given = units.get(entityBlock) ?? 1;
           change.storage = { name: entity, delta: -given };
           change.figure = {
             kind: "storage-leave",
@@ -712,6 +733,18 @@ export function buildIndex(
       if (!seen.block.has(index)) {
         seen.block.add(index);
         blocks.push(index);
+      }
+    } else if (event.event === "backup") {
+      // The transaction backs up to the block it came from: the engine
+      // counts it there, and the replay counts it there too. The block it
+      // waits in loses it, and the block the detail names gains it.
+      //
+      // The entities are not touched: the transaction did not enter a queue
+      // and did not leave one.
+      change.left = index;
+      const target = targetOf(event.detail);
+      if (target !== null) {
+        change.entered = target;
       }
     } else if (event.event === "wait") {
       // A transaction that could not enter the block: the engine counts it
@@ -1022,6 +1055,20 @@ export function buildTransitions(
       if (node !== null && inside.get(event.xact) !== node) {
         enteredAt.set(event.xact, event.time);
         inside.set(event.xact, node);
+      }
+      continue;
+    }
+    if (event.event === "backup") {
+      // The transaction backs up to the block it came from: the engine
+      // counts it there, and the ball of the move goes back to the block of
+      // the model it is counted in. It is not a move: the transaction does
+      // not go anywhere, it is counted in another block.
+      const target = targetOf(event.detail);
+      if (target !== null) {
+        const node = nodeOf(target);
+        if (node !== null) {
+          inside.set(event.xact, node);
+        }
       }
       continue;
     }

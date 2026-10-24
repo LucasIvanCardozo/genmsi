@@ -128,8 +128,12 @@ pub struct TraceEvent {
     pub class: String,
     /// Block label.
     pub label: Option<String>,
-    /// What happened (`enter`, `leave`, `wait`, `terminate`, `generate`,
-    /// `table`, `logic`, `value`, `unlink`).
+    /// What happened (`enter`, `leave`, `wait`, `backup`, `terminate`,
+    /// `generate`, `table`, `logic`, `value`, `unlink`).
+    ///
+    /// The `backup` event says that the transaction backs up to the block it
+    /// is counted in: it is recorded in the block that waits and its detail
+    /// names the block the transaction goes back to (`-> 13`).
     pub event: &'static str,
     /// Detail (entity name, target block, ...).
     ///
@@ -301,6 +305,13 @@ pub struct Simulation<'p> {
     heap: BinaryHeap<std::cmp::Reverse<Event>>,
     seq: u64,
     xacts: HashMap<XactId, Transaction>,
+    /// The block every waiting transaction is counted in.
+    ///
+    /// A transaction that waits in a block that could not take it is counted
+    /// in the block it came from, as the original counts it: the trace says
+    /// it with the `backup` event, and the transaction leaves the block it is
+    /// counted in, not the one it waits in.
+    counted_at: HashMap<XactId, usize>,
     next_xact: XactId,
     entities: Entities,
     block_stats: Vec<BlockStats>,
@@ -347,6 +358,7 @@ impl<'p> Simulation<'p> {
             heap: BinaryHeap::new(),
             seq: 0,
             xacts: HashMap::new(),
+            counted_at: HashMap::new(),
             next_xact: 0,
             entities: Entities::default(),
             block_stats: vec![BlockStats::default(); program.blocks.len()],
@@ -806,6 +818,7 @@ impl<'p> Simulation<'p> {
             transaction.transition(XactState::Terminated);
         }
         self.xacts.remove(&id);
+        self.counted_at.remove(&id);
     }
 
     fn enter_block(&mut self, xact: XactId, block: usize) {
@@ -1042,7 +1055,11 @@ impl<'p> Simulation<'p> {
                     {
                         self.block_stats[previous].current -= 1;
                     }
-                    self.leave(xact, block_index, block.next_default());
+                    // The trace says the transaction leaves the block it is
+                    // counted in, and not the one it was waiting in.
+                    let counted = self.counted_at_of(xact);
+                    self.counted_at.remove(&xact);
+                    self.leave_counted_at(xact, block_index, block.next_default(), counted);
                 } else {
                     let mut waiters = {
                         let facility = self.entities.facility(&name, self.now);
@@ -1059,13 +1076,24 @@ impl<'p> Simulation<'p> {
                     if self.block_stats[block_index].current > 0 {
                         self.block_stats[block_index].current -= 1;
                     }
-                    if !resume
-                        && let Some(previous) = self.previous_block_of(xact)
-                    {
+                    // The block the transaction is counted in while it waits:
+                    // the one it came from.
+                    let counted = if resume {
+                        None
+                    } else {
+                        self.previous_block_of(xact)
+                    };
+                    if let Some(previous) = counted {
                         self.block_stats[previous].current += 1;
                     }
                     if self.config.trace {
                         self.record_trace(xact, block_index, "wait", name);
+                    }
+                    // The trace says the transaction backs up to the block it
+                    // is counted in, so the replay counts it where the report
+                    // counts it.
+                    if let Some(previous) = counted {
+                        self.backup_to(xact, block_index, previous);
                     }
                 }
             }
@@ -1167,7 +1195,11 @@ impl<'p> Simulation<'p> {
                     }
                     self.release_storage_waiters(&name);
                     self.retry_gates();
-                    self.leave(xact, block_index, block.next_default());
+                    // The trace says the transaction leaves the block it is
+                    // counted in, and not the one it was waiting in.
+                    let counted = self.counted_at_of(xact);
+                    self.counted_at.remove(&xact);
+                    self.leave_counted_at(xact, block_index, block.next_default(), counted);
                 } else {
                     let mut waiters = {
                         let storage = self.entities.storage(&name, capacity, self.now);
@@ -1185,13 +1217,24 @@ impl<'p> Simulation<'p> {
                     if self.block_stats[block_index].current > 0 {
                         self.block_stats[block_index].current -= 1;
                     }
-                    if !resume
-                        && let Some(previous) = self.previous_block_of(xact)
-                    {
+                    // The block the transaction is counted in while it waits:
+                    // the one it came from.
+                    let counted = if resume {
+                        None
+                    } else {
+                        self.previous_block_of(xact)
+                    };
+                    if let Some(previous) = counted {
                         self.block_stats[previous].current += 1;
                     }
                     if self.config.trace {
                         self.record_trace(xact, block_index, "wait", name);
+                    }
+                    // The trace says the transaction backs up to the block it
+                    // is counted in, so the replay counts it where the report
+                    // counts it.
+                    if let Some(previous) = counted {
+                        self.backup_to(xact, block_index, previous);
                     }
                 }
             }
@@ -1320,7 +1363,11 @@ impl<'p> Simulation<'p> {
                     {
                         self.block_stats[previous].current -= 1;
                     }
-                    self.leave(xact, block_index, block.next_named("Salida1"));
+                    // The trace says the transaction leaves the block it is
+                    // counted in, and not the gate it was waiting in.
+                    let counted = self.counted_at_of(xact);
+                    self.counted_at.remove(&xact);
+                    self.leave_counted_at(xact, block_index, block.next_named("Salida1"), counted);
                 } else if block.has_failure_port() {
                     // The transaction fails the test and leaves by the
                     // failure output: it enters the block and the block
@@ -1339,9 +1386,15 @@ impl<'p> Simulation<'p> {
                     // block it came from: the original keeps it there (the
                     // queue of the `GateL` bench reads `13 13` with the gate
                     // shut, and the generator of the bench reads `62 62`).
-                    if !resume
-                        && let Some(previous) = self.previous_block_of(xact)
-                    {
+                    //
+                    // The block the transaction is counted in while it waits:
+                    // the one it came from.
+                    let counted = if resume {
+                        None
+                    } else {
+                        self.previous_block_of(xact)
+                    };
+                    if let Some(previous) = counted {
                         self.block_stats[previous].current += 1;
                     }
                     self.gate_waiters.entry(block_index).or_default().push(xact);
@@ -1350,6 +1403,12 @@ impl<'p> Simulation<'p> {
                     }
                     if self.config.trace {
                         self.record_trace(xact, block_index, "wait", "gate".to_string());
+                    }
+                    // The trace says the transaction backs up to the block it
+                    // is counted in, so the replay counts it where the report
+                    // counts it.
+                    if let Some(previous) = counted {
+                        self.backup_to(xact, block_index, previous);
                     }
                 }
             }
@@ -1615,7 +1674,16 @@ impl<'p> Simulation<'p> {
                         // The partner was waiting: it was counted in the
                         // transfer that brought it, and it leaves it now.
                         let partner_transfer = self.previous_block_of(partner);
-                        self.leave(partner, conjugate, partner_target);
+                        // The trace says the partner leaves the block it is
+                        // counted in, and not the match it was waiting in.
+                        let partner_counted = self.counted_at_of(partner);
+                        self.counted_at.remove(&partner);
+                        self.leave_counted_at(
+                            partner,
+                            conjugate,
+                            partner_target,
+                            partner_counted,
+                        );
                         if let Some(transfer) = partner_transfer
                             && self.block_stats[transfer].current > 0
                         {
@@ -1630,7 +1698,8 @@ impl<'p> Simulation<'p> {
                     None => {
                         // The transaction waits in the match: the original
                         // keeps it counted in the transfer that brought it.
-                        if let Some(previous) = self.previous_block_of(xact) {
+                        let counted = self.previous_block_of(xact);
+                        if let Some(previous) = counted {
                             self.block_stats[previous].current += 1;
                         }
                         self.match_waiters
@@ -1639,6 +1708,12 @@ impl<'p> Simulation<'p> {
                             .push_back(xact);
                         if let Some(transaction) = self.xacts.get_mut(&xact) {
                             transaction.transition(XactState::Waiting);
+                        }
+                        // The trace says the transaction backs up to the block
+                        // it is counted in, so the replay counts it where the
+                        // report counts it.
+                        if let Some(previous) = counted {
+                            self.backup_to(xact, block_index, previous);
                         }
                     }
                 }
@@ -1942,7 +2017,45 @@ impl<'p> Simulation<'p> {
             .and_then(|transaction| transaction.previous_block)
     }
 
+    /// The block a waiting transaction is counted in, when it is still known.
+    ///
+    /// It is the block the transaction came from: the original counts a
+    /// transaction that waits in a block that could not take it there, and
+    /// not in the block that waits.
+    fn counted_at_of(&self, xact: XactId) -> Option<usize> {
+        self.counted_at.get(&xact).copied()
+    }
+
+    /// A transaction backs up to the block it is counted in.
+    ///
+    /// The event is recorded in the block that waits, and its detail names
+    /// the block the transaction backs up to (`-> 13`), the same convention
+    /// the `leave` event follows.
+    fn backup_to(&mut self, xact: XactId, block_index: usize, previous: usize) {
+        if self.config.trace {
+            self.record_trace(xact, block_index, "backup", format!("-> {previous}"));
+        }
+        self.counted_at.insert(xact, previous);
+    }
+
     fn leave(&mut self, xact: XactId, from: usize, target: Option<usize>) {
+        self.leave_counted_at(xact, from, target, None);
+    }
+
+    /// Leave a block, and say it in the block the transaction is counted in.
+    ///
+    /// The report counts the transaction in the block it leaves, and the
+    /// trace says it in the same block. A transaction that waited in a block
+    /// it backed up from is counted in another block: the report's count and
+    /// the trace's event are told apart, and the event is recorded in the
+    /// block the transaction is counted in.
+    fn leave_counted_at(
+        &mut self,
+        xact: XactId,
+        from: usize,
+        target: Option<usize>,
+        counted_at: Option<usize>,
+    ) {
         if self.block_stats[from].current > 0 {
             self.block_stats[from].current -= 1;
         }
@@ -1951,16 +2064,17 @@ impl<'p> Simulation<'p> {
             // for a storage is counted there.
             transaction.previous_block = Some(from);
         }
+        let block = counted_at.unwrap_or(from);
         match target {
             Some(target) => {
                 if self.config.trace {
-                    self.record_trace(xact, from, "leave", format!("-> {target}"));
+                    self.record_trace(xact, block, "leave", format!("-> {target}"));
                 }
                 self.enter_block(xact, target);
             }
             None => {
                 if self.config.trace {
-                    self.record_trace(xact, from, "terminate", "no output".to_string());
+                    self.record_trace(xact, block, "terminate", "no output".to_string());
                 }
                 self.remove_transaction(xact);
             }

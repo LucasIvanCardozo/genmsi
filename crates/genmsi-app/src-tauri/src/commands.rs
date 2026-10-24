@@ -286,10 +286,126 @@ pub async fn trace_model(
 /// keeps painting while the engine works and the reader can stop waiting for
 /// it.
 #[tauri::command]
-pub async fn session(request: String) -> Result<String, String> {
+pub async fn session(app: tauri::AppHandle, request: String) -> Result<String, String> {
     let request: SessionRequest =
         serde_json::from_str(&request).map_err(|error| error.to_string())?;
-    answer_request(request).await
+    log(&format!("session: {}", describe(&request)));
+    let changes = changes_the_open_model(&request);
+    let answered = answer_request(request).await?;
+    if changes {
+        publish_open_model(&app, &answered);
+    }
+    Ok(answered)
+}
+
+/// What the request does, for the log of the shell.
+///
+/// The shell has no console of its own: the line goes to the log the smoke
+/// check reads, and it says what the session did.
+fn describe(request: &SessionRequest) -> String {
+    match request {
+        SessionRequest::Open { path } => format!("open {path}"),
+        SessionRequest::New => "new".to_string(),
+        SessionRequest::Reload { path } => format!("reload {path}"),
+        SessionRequest::Apply { .. } => "apply".to_string(),
+        SessionRequest::Undo => "undo".to_string(),
+        SessionRequest::Redo => "redo".to_string(),
+        SessionRequest::State => "state".to_string(),
+        SessionRequest::Save { path } => match path {
+            Some(path) => format!("save {path}"),
+            None => "save".to_string(),
+        },
+        SessionRequest::SimulateCurrent { .. } => "simulate_current".to_string(),
+        SessionRequest::TraceCurrent { .. } => "trace_current".to_string(),
+        SessionRequest::RunCurrent { .. } => "run_current".to_string(),
+        SessionRequest::Lint { path } => format!("lint {path}"),
+        SessionRequest::Simulate { path, .. } => format!("simulate {path}"),
+        SessionRequest::Trace { path, .. } => format!("trace {path}"),
+        SessionRequest::Model { path } => format!("model {path}"),
+        SessionRequest::Models { .. } => "models".to_string(),
+        SessionRequest::Catalogue => "catalogue".to_string(),
+    }
+}
+
+/// Whether the request changes the model the app has open.
+///
+/// Only the requests that open, reload, create or save a model change it:
+/// the others leave the session as it was, and the file the app publishes
+/// is not touched.
+fn changes_the_open_model(request: &SessionRequest) -> bool {
+    matches!(
+        request,
+        SessionRequest::Open { .. }
+            | SessionRequest::New
+            | SessionRequest::Reload { .. }
+            | SessionRequest::Save { .. }
+    )
+}
+
+/// Publish the model the app has open, so an agent can find it.
+///
+/// The file lives in the app's data directory, beside the recents: it says
+/// which file the app has open and which process has it open. An agent that
+/// writes the model there is seen by the app, which watches the file it has
+/// open.
+///
+/// The path comes from the answer of the session: it is the model the
+/// session has after the request. A request that failed leaves the session
+/// as it was, and the file is not touched.
+///
+/// A model that is not open is not published: the file goes away, so nobody
+/// reads it and believes there is a model open.
+fn publish_open_model(app: &tauri::AppHandle, answer: &str) {
+    let Ok(answer) = serde_json::from_str::<serde_json::Value>(answer) else {
+        log("publish_open_model: la respuesta no se pudo leer");
+        return;
+    };
+    if answer.get("ok").and_then(serde_json::Value::as_bool) != Some(true) {
+        // The request failed: the session is as it was, and so is the file.
+        return;
+    }
+    let path = answer
+        .get("state")
+        .and_then(|state| state.get("path"))
+        .and_then(serde_json::Value::as_str);
+    let Some(directory) = app.path().app_data_dir().ok() else {
+        log("publish_open_model: no hay directorio de datos");
+        return;
+    };
+    // The core owns the format: the shell and the MCP server go through
+    // the same writer, so the bytes they read and write are the same.
+    let path = path.map(|path| {
+        std::path::absolute(path).unwrap_or_else(|_| PathBuf::from(path))
+    });
+    match genmsi_app_engine::write_open_model(
+        &directory,
+        path.as_deref(),
+        std::process::id(),
+    ) {
+        Ok(()) => match &path {
+            Some(path) => log(&format!("publish_open_model: {}", path.display())),
+            None => log("publish_open_model: no hay modelo abierto"),
+        },
+        Err(error) => log(&format!("publish_open_model: {error}")),
+    }
+}
+
+/// Write the file that says which model the app has open.
+///
+/// The write is atomic: the text goes to a temporary file next to the target
+/// and that file is renamed over it, so a reader never sees half of one.
+/// Forget the model the app has open, when the app is closing.
+///
+/// The app is not there any more: the file that says it has a model open
+/// goes away, so nobody reads it and believes there is one.
+pub fn forget_open_model(app: &tauri::AppHandle) {
+    let Some(directory) = app.path().app_data_dir().ok() else {
+        return;
+    };
+    if let Err(error) = genmsi_app_engine::write_open_model(&directory, None, std::process::id())
+    {
+        log(&format!("forget_open_model: {error}"));
+    }
 }
 
 /// Answer one request of the protocol.
@@ -629,6 +745,58 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("genmsi-app-{name}-{}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("the scratch directory is created");
         dir
+    }
+
+    /// The file the app publishes: the model it has open.
+    #[test]
+    fn the_file_the_app_publishes_says_which_model_it_has_open() {
+        let dir = scratch("open-model");
+        let model = dir.join("modelo.gmdl");
+        genmsi_app_engine::write_open_model(&dir, Some(&model), std::process::id())
+            .expect("the file is written");
+
+        let file = dir.join(genmsi_app_engine::OPEN_MODEL_FILE);
+        let text = std::fs::read_to_string(&file).expect("the file is there");
+        // The bytes are the ones the core of the engine writes for the
+        // `genmsi.openmodel/1` document: the MCP server reads them.
+        let expected = format!(
+            "{{\n  \"schema\": \"genmsi.openmodel/1\",\n  \"path\": \"{}\",\n  \"pid\": {}\n}}",
+            model.display(),
+            std::process::id()
+        );
+        assert_eq!(text, expected, "the file is not the document of the core");
+        // The write is atomic: no temporary file is left behind.
+        let leftovers: Vec<PathBuf> = std::fs::read_dir(&dir)
+            .expect("the directory is readable")
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|path| path != &file)
+            .collect();
+        assert!(leftovers.is_empty(), "the write left files behind: {leftovers:?}");
+
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
+    }
+
+    /// A model that is not open is not published.
+    #[test]
+    fn a_model_that_is_not_open_removes_the_file() {
+        let dir = scratch("open-model-closed");
+        let model = dir.join("modelo.gmdl");
+        genmsi_app_engine::write_open_model(&dir, Some(&model), std::process::id())
+            .expect("the file is written");
+        assert!(
+            dir.join(genmsi_app_engine::OPEN_MODEL_FILE).is_file(),
+            "the file is there"
+        );
+
+        genmsi_app_engine::write_open_model(&dir, None, std::process::id()).expect("the file is removed");
+        assert!(
+            !dir.join(genmsi_app_engine::OPEN_MODEL_FILE).exists(),
+            "the file is still there"
+        );
+        // A file that is not there is not a failure.
+        genmsi_app_engine::write_open_model(&dir, None, std::process::id()).expect("there is nothing to remove");
+
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
     }
 
     #[test]

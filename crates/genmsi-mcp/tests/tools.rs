@@ -89,7 +89,7 @@ async fn call(
 }
 
 #[tokio::test]
-async fn the_server_offers_the_six_tools() {
+async fn the_server_offers_the_seven_tools() {
     let (client, _server) = pair().await;
     let listed = client.list_tools(None).await.expect("tools are listed");
     let mut names: Vec<String> = listed
@@ -105,11 +105,13 @@ async fn the_server_offers_the_six_tools() {
             "explain_model",
             "get_trace",
             "lint",
+            "open_model",
             "save_model",
             "simulate"
         ],
-        "the four tools of the roadmap plus the one that writes and the one \
-         that describes the classes, and nothing else"
+        "the four tools of the roadmap plus the one that writes, the one that \
+         describes the classes and the one that says which model the app has \
+         open, and nothing else"
     );
     // Every tool tells the agent what it takes and what it returns.
     for tool in &listed.tools {

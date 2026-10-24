@@ -259,6 +259,17 @@ impl GenmsiServer {
         finish(catalogue_document(input.class.as_deref()))
     }
 
+    /// Say which model the app has open.
+    ///
+    /// Returns the `genmsi.openmodel/1` document.
+    #[tool(
+        name = "open_model",
+        description = "Say which model the GenMSI desktop app has open, so you do not have to guess where to write it. It returns the genmsi.openmodel/1 document: `path` is the absolute path of the file the app has open and `pid` is the process that has it open; both are null when the app is not running. Write the model to that path (with save_model) and the app, which watches the file it has open, reloads it and runs it again, so the reader sees the change."
+    )]
+    pub fn open_model(&self) -> CallToolResult {
+        finish(Ok(genmsi_core::open_model_document()))
+    }
+
     /// Write a model to a file.
     ///
     /// The model is checked first: a model that does not load, does not
@@ -381,7 +392,9 @@ impl ServerHandler for GenmsiServer {
              exist and what the XML of a block of each class looks like. \
              Use `lint` to validate a model, `simulate` to run it, `get_trace` to read \
              its events and `explain_model` to describe it. Give the model either as \
-             `path` (a .gmdl file) or as `model` (the .gmdl document as text).",
+             `path` (a .gmdl file) or as `model` (the .gmdl document as text). \
+             Call `open_model` to learn which file the desktop app has open: write \
+             the model there and the app reloads it and runs it again.",
         )
     }
 }

@@ -109,6 +109,39 @@ through the MCP's `save_model` (which writes it atomically, so a reader that
 watches the file never sees half of one), and the app, which is watching,
 picks it up by itself.
 
+### The app publishes the model it has open
+
+For the cycle to close, the agent has to know **which file** the app has
+open. The app says it, in a file of its own data directory: `open-model.json`,
+beside `recent-models.json`. The file carries the `genmsi.openmodel/1`
+document:
+
+| Field | Meaning |
+|---|---|
+| `path` | The **absolute path** of the file the app has open. |
+| `pid` | The pid of the process that has it open. |
+
+The app writes the file when it opens a model, replaces it when the session
+reloads or saves another file, and **removes it** when the session starts a
+new model (a model that is not open is not published) and when the app
+closes. The write is atomic, like every other write of the app: a reader
+never sees half of a document.
+
+The MCP server reads that file and publishes it as the `open_model` tool, so
+an agent asks the server instead of guessing where the app writes or asking
+the reader which file is open. When the app is not running, the file is not
+there (or the process it names is gone), and the tool answers with the same
+document with `path` and `pid` empty: that is an answer, not a failure.
+
+The directory is the one the shell of the app resolves with Tauri, and the
+one the engine's core computes for the platform:
+
+| Platform | The directory |
+|---|---|
+| Linux | `$XDG_DATA_HOME/org.gensmi.desktop` (or `$HOME/.local/share/org.gensmi.desktop`) |
+| macOS | `$HOME/Library/Application Support/org.gensmi.desktop` |
+| Windows | `%APPDATA%\org.gensmi.desktop` |
+
 ### The commands
 
 The commands are the editing API of `genmsi-format`, and their types are

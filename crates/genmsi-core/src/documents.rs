@@ -31,6 +31,8 @@ pub const CLASSLIST_SCHEMA: &str = "genmsi.classlist/1";
 pub const CLASS_SCHEMA: &str = "genmsi.class/1";
 /// Schema id of the `gpss` document.
 pub const GPSS_SCHEMA: &str = "genmsi.gpss/1";
+/// Schema id of the document that says which model the app has open.
+pub const OPEN_MODEL_SCHEMA: &str = "genmsi.openmodel/1";
 
 /// A versioned document: the schema id followed by the body fields.
 #[derive(Debug, Serialize)]

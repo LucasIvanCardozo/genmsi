@@ -1,10 +1,11 @@
 # genmsi MCP server
 
 `genmsi-mcp` is the MCP server of the GenMSI engine (ROADMAP Phase 3): it serves
-the engine to an AI agent over stdio with the six tools of decision D7 —
+the engine to an AI agent over stdio with the seven tools of decision D7 —
 `simulate`, `lint`, `get_trace` and `explain_model`, plus `save_model`, which
-writes a model the agent built, and `catalogue`, which tells the agent which
-block classes exist and what the XML of a block of each one looks like. The
+writes a model the agent built, `catalogue`, which tells the agent which
+block classes exist and what the XML of a block of each one looks like, and
+`open_model`, which tells the agent which model the desktop app has open. The
 binary is a thin layer over `genmsi-core` and `genmsi-format`; it carries no
 simulation logic (decision D2), and the documents it returns are the ones the
 CLI publishes (decision D13).
@@ -17,7 +18,7 @@ Standard output belongs to the protocol: the server writes nothing else there.
 A failure that stops the server goes to standard error and the process exits
 with `1`.
 
-## The six tools
+## The seven tools
 
 | Tool | What it does | Returns |
 |---|---|---|
@@ -27,8 +28,9 @@ with `1`.
 | `get_trace` | Runs the model with the event trace enabled and returns the records. | `genmsi.trace/1` |
 | `explain_model` | Describes the model: its blocks, its operands and what each statement does. | `genmsi.explain/1` |
 | `save_model` | Writes a model the agent built to a file, after checking that it compiles. | `genmsi.lint/1` |
+| `open_model` | Says which model the desktop app has open: the file it has open and the process that has it. | `genmsi.openmodel/1` |
 
-Every tool but `catalogue` takes the model in one of two ways:
+Every tool but `catalogue` and `open_model` takes the model in one of two ways:
 
 - `path`: the path of a `.gmdl` file on disk.
 - `model`: the `.gmdl` document as text, for a model an agent is building and
@@ -187,6 +189,44 @@ application does) never sees half of one.
 The tool writes the **whole document**, not a patch: read the model with
 `explain_model`, change the text and hand the complete document back.
 
+### `open_model`
+
+The tool takes no arguments.
+
+It returns the `genmsi.openmodel/1` document:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema` | string | `genmsi.openmodel/1` |
+| `path` | string or null | The **absolute path** of the file the app has open; null when there is none. |
+| `pid` | number or null | The pid of the process that has the model open; null when there is none. |
+
+**The answer is never a failure.** When the app is not running, or it is
+running with no model open, the answer is the same document with `path` and
+`pid` null: the question has an answer either way, and the agent reads it as
+"nobody has a model open" and writes wherever it wants.
+
+**Why the agent asks for it.** The desktop app watches the file it has open:
+when the file changes, the app reloads the model and runs it again, and the
+reader sees the change without touching anything. An agent that writes the
+model to the path the app has open is inside that cycle: it does not have to
+guess where the app writes, and it does not have to ask the reader which file
+is open.
+
+The file the app publishes lives in the **data directory of the app**, in
+`open-model.json`:
+
+| Platform | The directory |
+|---|---|
+| Linux | `$XDG_DATA_HOME/org.gensmi.desktop` (or `$HOME/.local/share/org.gensmi.desktop`) |
+| macOS | `$HOME/Library/Application Support/org.gensmi.desktop` |
+| Windows | `%APPDATA%\org.gensmi.desktop` |
+
+The app writes it when it opens a model and removes it when it creates a new
+one or closes; the pid of the document says whether the app that wrote it is
+still running, so a file left behind by an app that is gone is read as "no
+model open".
+
 ## Errors
 
 A model that does not work is a **tool error**: the call succeeds as a call
@@ -285,6 +325,10 @@ It publishes two documents of its own, `genmsi.classlist/1` and
 `genmsi.class/1`; the catalogue the desktop application uses
 (`genmsi.catalogue/1`) keeps its own shape, so the application does not
 download the templates it does not use.
+
+The `open_model` tool has no CLI counterpart either, for the same reason: the
+file that says which model the app has open belongs to the app, not to the
+engine. It publishes one document of its own, `genmsi.openmodel/1`.
 
 ## Not in this phase
 

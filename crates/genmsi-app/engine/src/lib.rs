@@ -22,6 +22,16 @@ pub mod session;
 pub use protocol::{SessionRequest, SessionResponse, answer};
 pub use session::{Diagnostics, SaveOutcome, Session, SessionState};
 
+// The document that says which model the desktop application has open.
+//
+// The core owns the format: the shell publishes the file and the MCP
+// server reads it, and both go through these functions, so the two sides
+// cannot write different bytes.
+pub use genmsi_core::documents::OPEN_MODEL_SCHEMA;
+pub use genmsi_core::open_model::{
+    APP_IDENTIFIER, OPEN_MODEL_FILE, OpenModelDocument, app_data_dir, write_open_model,
+};
+
 /// How many runs the facade has made.
 ///
 /// Every run of the engine goes through [`run_once`], so this number is the

@@ -30,6 +30,7 @@ pub mod expr;
 pub mod glossary;
 pub mod oracle;
 pub mod gpss;
+pub mod open_model;
 pub mod program;
 pub mod report;
 pub mod replication;
@@ -42,11 +43,16 @@ pub use documents::{
     CATALOGUE_SCHEMA, CLASSLIST_SCHEMA, CLASS_SCHEMA, CatalogueClass, CatalogueDocument,
     CataloguePort, CatalogueProperty, ClassDocument, ClassListDocument, ClassListEntry,
     DefinitionCounts, EXPLAIN_SCHEMA, Envelope, LINT_SCHEMA, LintDocument, MODEL_SCHEMA,
-    ModelBlock, ModelDocument, ModelEdge, ModelPort, ModelProperty, ModelRect, REPORT_SCHEMA,
-    TRACE_SCHEMA, TraceDocument, catalogue_document, class_document, class_list_document,
-    lint_diagnostics, lint_document, model_document, to_pretty_json, trace_document,
+    ModelBlock, ModelDocument, ModelEdge, ModelPort, ModelProperty, ModelRect, OPEN_MODEL_SCHEMA,
+    REPORT_SCHEMA, TRACE_SCHEMA, TraceDocument, catalogue_document, class_document,
+    class_list_document, lint_diagnostics, lint_document, model_document, to_pretty_json,
+    trace_document,
 };
 pub use error::EngineError;
+pub use open_model::{
+    APP_IDENTIFIER, OPEN_MODEL_FILE, OpenModelDocument, OpenModelError, app_data_dir,
+    current_open_model, open_model_document, process_is_running, read_open_model, write_open_model,
+};
 pub use program::{Program, compile, known_classes};
 pub use report::{json_report, program_json, render, to_csv, to_json};
 pub use replication::{

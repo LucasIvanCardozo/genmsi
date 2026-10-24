@@ -52,6 +52,14 @@ pub fn run() {
             commands::recent_models,
             commands::remember_model,
         ])
-        .run(tauri::generate_context!())
-        .expect("the GenMSI application could not start");
+        .build(tauri::generate_context!())
+        .expect("the GenMSI application could not start")
+        .run(|app, event| {
+            // The app is closing: the file that says which model it has
+            // open goes away with it, so nobody reads it and believes
+            // there is a model open.
+            if let tauri::RunEvent::Exit = event {
+                commands::forget_open_model(app);
+            }
+        });
 }

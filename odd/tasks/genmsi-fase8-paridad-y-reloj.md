@@ -197,3 +197,45 @@ tocan `sim.rs`, así que van seguidos).
     selector);
   - el desplegable de `ModelPicker.tsx` desaparece de la app final; el modo
     navegador puede conservar su lista para el desarrollo.
+- **L9** — "de nuevo paso! reinicie la pc por si era eso" — la unidad del reloj
+  entero se interrumpió **tres veces** y la sesión con ella. La causa no era el
+  código sino la memoria de la máquina (15 GiB), medida:
+  - una sola invocación de cargo compilaba **49 binarios de test** con **12
+    `rustc` en paralelo** (el limitador de trabajos no existía en el repo);
+  - el worker copiaba el repositorio y su `target` (de 518 MB a 1,4 GB) a
+    `/tmp`, que es un **tmpfs**: un archivo que vive en la memoria RAM;
+  - `/tmp` además arrastraba el andamiaje de las unidades anteriores (7,5 GB);
+  - la sesión en sí ocupa ~600 MB con el contexto completo.
+  Decisiones:
+  - `.cargo/config.toml` en el repo: cargo con **4 trabajos** (`edc58aa`);
+  - el andamiaje de las corridas va a **`~/genmsi-scratch`** (disco), nunca a
+    `/tmp` (`e393028`), y para comparar el "antes" se usa `git worktree` y no
+    una copia del repositorio;
+  - un watcher vigila la memoria libre, el uso de `/tmp` y el proceso más
+    grande, para frenar la carrera **antes** de que el kernel cierre servicios.
+- **L10** — "es que vos no estabas haciendo nada! nose porque decis que estabas
+  corriendo algo en paralelo" — **corrección**: las verificaciones del padre sí
+  corrían en segundo plano, pero **no en paralelo** con la compilación del
+  worker: cargo toma un cerrojo sobre el directorio `target` y una espera a la
+  otra. La causa real del agotamiento de memoria eran los **12 `rustc` de una
+  sola invocación** más el scratch en el tmpfs, no dos compilaciones al mismo
+  tiempo.
+- **L11** — "pero como 12 gb de compilacion, tanto necesita?? es una locura" —
+  no era una compilación de 12 GB: eran doce procesos a la vez, cada uno con la
+  información de depuración del crate más grande del proyecto (800 MB a más de
+  1 GB cada uno), más el enlazado. Con 4 trabajos, el pico es de unos 4 GB.
+  Queda pendiente decidir si el limitador vive en el repo (afecta a quien clonee)
+  o en `~/.cargo/config.toml` (sólo esta máquina).
+- **L12** — El trunc del instante destapa un caso que con tiempos fraccionales no
+  existía: un retardo que trunca a **0** hace que el evento dispare en el
+  mismo instante, y si el bloque se reprograma a sí mismo **el reloj nunca
+  avanza** (el horizonte, que se comprueba al avanzar el reloj, nunca se
+  dispara): la corrida no termina y la cola de eventos crece sin límite (el test
+  `cancelacion` llegó a 6,8 GB de RSS). La regla **no se inventa**: hay que
+  medir qué hace el original con un retardo de 0 y copying esa semántica.
+- **L13** — La instalación de la app para Linux pasa a ser un comando:
+  `scripts/install-linux.sh` (`6a746c7`) compila con `-j 2` e instala el
+  binario, el lanzador y el icono en las carpetas del usuario, con
+  `crates/genmsi-app/LEEME.txt` como texto de la carpeta instalada
+  (`989f421`). La instalación anterior era a mano y quedó una copia vieja del
+  motor: los números que mostraba la app no eran los de la última versión.

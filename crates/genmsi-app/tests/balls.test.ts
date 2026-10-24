@@ -42,6 +42,53 @@ const nodeOf = (block: number) => {
   return block;
 };
 
+test("the move of a transaction born in a block flies the whole flight", () => {
+  // A transaction born in a generator never entered a block: it appears and
+  // leaves in the same instant, so it has no time in the block it came from.
+  // Its ball leaves the block the whole flight before the instance reaches
+  // the next one, so every ball crosses in the same time.
+  const born: TraceDocumentLike = {
+    start_time: 0,
+    end_time: 100,
+    limit: 100,
+    records: 3,
+    truncated: false,
+    events: [
+      { time: 10, xact: 1, block: 0, class: "Generate", label: null, event: "generate", detail: "" },
+      { time: 10, xact: 1, block: 0, class: "Generate", label: null, event: "leave", detail: "-> 1" },
+      { time: 10, xact: 1, block: 1, class: "Queue", label: "A", event: "enter", detail: "" },
+    ],
+  };
+  const index = buildTransitions(born, nodeOf);
+  assert.equal(index.moves.length, 1);
+  assert.equal(index.moves[0].flight, FLIGHT_SECONDS);
+  // And the ball is on screen the whole flight before the instance arrives:
+  // it left the generator two seconds before the instance reached the queue.
+  const travellers = travellersAt(index.moves, index.times, 9);
+  assert.equal(travellers.length, 1);
+  assert.equal(travellers[0].progress, 0.5);
+});
+
+test("a move of a transaction that waited less than the flight flies that wait", () => {
+  // The instance was in the block for a second and a half: its ball takes
+  // that time and no more.
+  const waited: TraceDocumentLike = {
+    start_time: 0,
+    end_time: 100,
+    limit: 100,
+    records: 4,
+    truncated: false,
+    events: [
+      { time: 0, xact: 1, block: 1, class: "Queue", label: "A", event: "enter", detail: "" },
+      { time: 1.5, xact: 1, block: 1, class: "Queue", label: "A", event: "leave", detail: "-> 2" },
+      { time: 1.5, xact: 1, block: 2, class: "Advance", label: "B", event: "enter", detail: "" },
+    ],
+  };
+  const index = buildTransitions(waited, nodeOf);
+  assert.equal(index.moves.length, 1);
+  assert.equal(index.moves[0].flight, 1.5);
+});
+
 test("the moves of the run are read from the trace", () => {
   const index = buildTransitions(trace, nodeOf);
   // The queue to the advance, and the advance to the seize.

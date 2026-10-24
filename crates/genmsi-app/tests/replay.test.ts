@@ -17,6 +17,7 @@ import {
   type TraceDocumentLike,
   type TraceEventLike,
 } from "../src/monitor/replay.ts";
+import { FLIGHT_SECONDS } from "../src/monitor/balls.ts";
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = path.resolve(appDir, "../..");
@@ -517,9 +518,12 @@ test("two consecutive moves of the same transaction do not overlap", () => {
   assert.equal(first.time, second.time - second.flight);
 });
 
-test("a move whose entry is not known has no flight", () => {
-  // The trace does not say when the transaction entered the block: the
-  // flight is zero, and the ball flies the shortest flight there is.
+test("a move whose entry is not known flies the whole flight", () => {
+  // The trace does not say when the transaction entered the block: it was
+  // born there (a generator creates it and sends it on in the same
+  // instant), so it has no time in that block. Its ball leaves the block
+  // the whole flight before the instance reaches the next one, so every
+  // ball crosses in the same time.
   const trace: TraceDocumentLike = {
     start_time: 0,
     end_time: 10,
@@ -530,7 +534,7 @@ test("a move whose entry is not known has no flight", () => {
   };
   const index = buildTransitions(trace, (block) => block);
   assert.equal(index.moves.length, 1);
-  assert.equal(index.moves[0].flight, 0);
+  assert.equal(index.moves[0].flight, FLIGHT_SECONDS);
 });
 
 test("the slider is a clock: a time selects the last record at or before it", () => {

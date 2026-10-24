@@ -17,6 +17,12 @@
  * transaction spent in that block, so the ball crosses the link in the time
  * the transaction was really there.
  *
+ * A transaction **born** in that block was not there at all: it appears and
+ * leaves in the same instant. Its ball leaves the block the whole flight
+ * before the instance reaches the next one, so every ball crosses in the
+ * same time and the illusion holds: when the ball arrives, the instance
+ * passes.
+ *
  * The flight is bounded on both sides: a transaction that passes through a
  * block in no time still shows a ball (`MIN_FLIGHT`), and a transaction that
  * waits an hour in a queue does not make the ball crawl (`FLIGHT_SECONDS`).
@@ -166,8 +172,12 @@ export function travellersAt(
  * The flight of a move, within the bounds of the module.
  *
  * The flight of the move is the time the transaction spent in the block it
- * came from: a move whose entry the trace does not know has no flight at
- * all, and the ball still flies the shortest flight there is.
+ * came from: the ball leaves the block that long before the instance reaches
+ * the next one, so the reader sees the transaction travel. A transaction
+ * born in that block has no time in it, and its move carries the whole
+ * flight (`FLIGHT_SECONDS`), so every ball crosses in the same time. A
+ * transaction that passed through a block in no time still shows a ball
+ * (`MIN_FLIGHT`).
  */
 function flightOf(move: Move, ceiling: number): number {
   const raw = Number.isFinite(move.flight) ? move.flight : 0;

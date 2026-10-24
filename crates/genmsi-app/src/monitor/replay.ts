@@ -32,6 +32,7 @@
  * them.
  */
 import { applyChange, closeFigures, emptyFigures, type FigureChange, type Figures } from "./stats.ts";
+import { FLIGHT_SECONDS } from "./balls.ts";
 
 /** One event of the trace, as the replay reads it. */
 export interface TraceEventLike {
@@ -1035,8 +1036,17 @@ export function buildTransitions(
         // A move that stays inside the same block of the model is invisible.
         if (to !== null && to !== from) {
           const entered = enteredAt.get(event.xact);
-          // A move whose entry is not known has no flight at all.
-          const flight = entered === undefined ? 0 : Math.max(0, event.time - entered);
+          // The flight of a move is the time the transaction spent in the
+          // block it came from, and the ball arrives at the instant of the
+          // move. A transaction **born** in that block has no time there at
+          // all: it appears and leaves in the same instant. Its ball leaves
+          // the block the whole flight before the instance reaches the next
+          // one, so every ball crosses in the same time and the illusion
+          // holds: when the ball arrives, the instance passes.
+          const flight =
+            entered === undefined
+              ? FLIGHT_SECONDS
+              : Math.max(0, event.time - entered);
           moves.push({ xact: event.xact, from, to, time: event.time, flight });
           // The transaction leaves the block of the model it was in: the
           // block it enters next is another one, and the flight of the move

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import ErrorNotice from "./components/ErrorNotice";
-import ModelBar from "./components/ModelBar";
 import MonitorView from "./components/MonitorView";
 import RunConsole from "./components/RunConsole";
 import Toolbar from "./components/Toolbar";
@@ -12,18 +11,16 @@ const SAVED_NOTICE_MS = 4000;
 /**
  * The app's shell.
  *
- * The header opens a model and carries the console of the run; the toolbar
- * holds the editing actions; the body is the window of the simulation: the
- * graph of the model, the reproduction of the run and its report, all in one
- * place.
+ * The header carries the console of the run; the toolbar holds the commands
+ * of the model —the ones that open it and the ones that edit it—; the body
+ * is the window of the simulation: the graph of the model, the reproduction of
+ * the run and its report, all in one place.
  */
 export default function App() {
   const {
     model,
     status,
     error,
-    seed,
-    until,
     dirty,
     canUndo,
     canRedo,
@@ -44,8 +41,6 @@ export default function App() {
     relayout,
     addBlock,
     deleteSelection,
-    setSeed,
-    setUntil,
     confirmSave,
     dismissSave,
     clearSavedMessage,
@@ -140,34 +135,6 @@ export default function App() {
         <div className="flex items-baseline gap-2">
           <span className="text-base font-semibold tracking-tight">GenMSI</span>
           <span className="text-[11px] text-slate-500">Simulación GPSS</span>
-        </div>
-
-        <ModelBar />
-
-        <div className="flex items-center gap-1.5">
-          <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-            Semilla
-          </label>
-          <input
-            aria-label="Semilla"
-            type="number"
-            min={1}
-            value={seed}
-            onChange={(event) => setSeed(Number(event.target.value) || 1)}
-            className="w-16 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-mono text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-          />
-          <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-            Hasta
-          </label>
-          <input
-            aria-label="Hasta"
-            type="number"
-            min={0}
-            placeholder="—"
-            value={until ?? ""}
-            onChange={(event) => setUntil(event.target.value === "" ? null : Number(event.target.value))}
-            className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-mono text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-          />
         </div>
 
         {/* The console of the run: it hugs the right side of the header, and

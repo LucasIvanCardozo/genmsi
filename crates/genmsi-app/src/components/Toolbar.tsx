@@ -1,10 +1,20 @@
 import { Eraser, LayoutGrid, Redo2, Save, Scan, Undo2 } from "lucide-react";
+import ModelBar from "./ModelBar";
+import { useApp } from "../state/store";
 
 /**
- * The editing actions of the app.
+ * The commands of the app.
  *
  * Every button is one operation: the undo stack takes one entry per press,
  * and the button is disabled when the operation is not possible.
+ *
+ * The controls of the model —the one that is open, «Abrir…» and the ones
+ * opened lately— are here, with the editing actions: they are commands of
+ * the model, like the others, and the toolbar has the room for them.
+ *
+ * The seed and the horizon of the run live here too: they are the two
+ * numbers the next run takes, and the seed is a 64-bit one, so its field is
+ * wide enough to read it whole.
  */
 export default function Toolbar({
   dirty,
@@ -54,11 +64,49 @@ export default function Toolbar({
   /** Answer the confirmation of a save with no. */
   onDismissSave: () => void;
 }) {
+  // The two numbers of the next run: the seed and the horizon. They are read
+  // from the store with selectors, so a change of the run does not redraw
+  // the toolbar.
+  const seed = useApp((state) => state.seed);
+  const until = useApp((state) => state.until);
+  const setSeed = useApp((state) => state.setSeed);
+  const setUntil = useApp((state) => state.setUntil);
+
   const button =
     "flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300";
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+      <ModelBar />
+
+      <div className="flex items-center gap-1.5">
+        <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+          Semilla
+        </label>
+        <input
+          aria-label="Semilla"
+          type="number"
+          min={1}
+          value={seed}
+          onChange={(event) => setSeed(Number(event.target.value) || 1)}
+          className="w-48 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-mono text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+        />
+        <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+          Hasta
+        </label>
+        <input
+          aria-label="Hasta"
+          type="number"
+          min={0}
+          placeholder="—"
+          value={until ?? ""}
+          onChange={(event) => setUntil(event.target.value === "" ? null : Number(event.target.value))}
+          className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-mono text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+        />
+      </div>
+
+      <span className="mx-1 h-5 w-px bg-slate-200" aria-hidden />
+
       <button type="button" className={button} onClick={onNew}>
         Nuevo
       </button>

@@ -254,14 +254,6 @@ export default function MonitorView({
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden">
-      {monitor === null && (
-        // Without a run there is nothing to reproduce: the console that
-        // starts it lives in the header, not in the body.
-        <p className="rounded-lg border border-dashed border-slate-300 bg-white/60 px-3 py-2 text-xs text-slate-500">
-          Pulsa «Ejecutar» en la cabecera para reproducir la corrida.
-        </p>
-      )}
-
       {truncated && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900">
           La traza se cortó en el límite de {monitor?.limit} registros: la

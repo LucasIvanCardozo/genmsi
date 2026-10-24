@@ -10,8 +10,11 @@ import { useApp } from "../state/store";
  * with the dialog of the system, and the ones opened lately are in a menu,
  * so the reader comes back to them without looking for them.
  *
- * The name of the open model is a state, not a control: the bar says which
+ * The name of the open model is a state, not a control: the group says which
  * model is on screen.
+ *
+ * These controls live in the toolbar of the app: they are commands of the
+ * model, like the ones that edit it, and the toolbar has the room for them.
  */
 export default function ModelBar() {
   const { currentPath, recentModels, status, openModel } = useApp();

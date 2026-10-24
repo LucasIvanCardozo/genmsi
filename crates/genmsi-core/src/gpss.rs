@@ -136,6 +136,127 @@ pub fn listing_order(program: &Program) -> Vec<usize> {
     flow_order(program)
 }
 
+/// A statement of the listing, with what the report needs to write its row.
+#[derive(Debug, Clone)]
+pub struct ListingStatement {
+    /// The line of the listing where the statement stands.
+    pub line: usize,
+    /// The block the statement belongs to; a connection has none.
+    pub block: Option<usize>,
+    /// The name the listing writes in the first column of the statement.
+    ///
+    /// It is empty when the statement carries no name of its own: the
+    /// connections the listing writes and the second statement of a counter.
+    pub name: String,
+    /// What the statement is.
+    pub kind: StatementKind,
+}
+
+/// What a statement of the listing is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatementKind {
+    /// The statement of a block: the one that carries its name.
+    Block,
+    /// The second statement of a counter: the `ASSIGN` that copies the
+    /// counter into the parameter.
+    CounterAssign,
+    /// A connection: the `TRANSFER` the listing writes when the flow does
+    /// not fall through to the next block.
+    Connection {
+        /// The block the connection routes the transaction to.
+        target: usize,
+    },
+}
+
+/// A connection of the listing: the `TRANSFER` that reconnects the flow.
+#[derive(Debug, Clone, Copy)]
+pub struct Connection {
+    /// The block the connection leaves.
+    pub block: usize,
+    /// The block the connection routes the transaction to.
+    pub target: usize,
+}
+
+/// The connections of the listing, in the order the listing writes them.
+///
+/// The original writes the blocks of the program in the order the
+/// transaction walks them, so a transaction goes to the next block by
+/// itself. The connections that break that order are written as a
+/// `TRANSFER` with no name of its own, and they are statements of the
+/// listing: the report writes a row for each of them.
+pub fn connections(program: &Program) -> Vec<Connection> {
+    let names = Names::new(program);
+    let order = flow_order(program);
+    let mut out = Vec::new();
+    for (position, index) in order.iter().enumerate() {
+        let following = order.get(position + 1).copied();
+        if let Some(target) = connection_target(*index, following, program, &names) {
+            out.push(Connection {
+                block: *index,
+                target,
+            });
+        }
+    }
+    out
+}
+
+/// The statements of the listing, in the order the listing writes them.
+///
+/// The report writes one row per statement of the listing, and the
+/// statements that carry no name of their own are rows too: the connections
+/// the listing writes when the flow breaks, and the second statement of a
+/// counter.
+pub fn listing_statements(program: &Program) -> Vec<ListingStatement> {
+    let names = Names::new(program);
+    let order = flow_order(program);
+    let mut out = Vec::new();
+    // The definitions come first in the listing, and they are not statements
+    // of the program: the line of the first block is the one that follows
+    // them.
+    let mut head = String::new();
+    definitions(&mut head, &program.definitions);
+    destination_functions(&mut head, program, &names);
+    let mut line = head.lines().count() + 1;
+    for (position, index) in order.iter().enumerate() {
+        let mut text = String::new();
+        block_statements(&mut text, *index, program, &names);
+        let written = text.lines().count();
+        for offset in 0..written {
+            let name = if offset == 0 {
+                names.get(*index).to_string()
+            } else {
+                String::new()
+            };
+            let kind = if offset == 0 {
+                StatementKind::Block
+            } else {
+                // The only block that writes two statements is the counter:
+                // the `SAVEVALUE` that counts and the `ASSIGN` that copies
+                // the counter into the parameter.
+                StatementKind::CounterAssign
+            };
+            out.push(ListingStatement {
+                line: line + offset,
+                block: Some(*index),
+                name,
+                kind,
+            });
+        }
+        line += written;
+        let following = order.get(position + 1).copied();
+        if let Some(target) = connection_target(*index, following, program, &names) {
+            out.push(ListingStatement {
+                line,
+                block: None,
+                name: String::new(),
+                kind: StatementKind::Connection { target },
+            });
+            line += 1;
+        }
+    }
+    out
+}
+
 /// The line of the listing where each block's first statement stands.
 ///
 /// The line counts every line of the listing: the definitions come first,
@@ -511,34 +632,49 @@ fn connection(
     program: &Program,
     names: &Names,
 ) {
+    let Some(target) = connection_target(index, following, program, names) else {
+        return;
+    };
+    line(out, "", "TRANSFER", &format!(",{}", names.get(target)));
+}
+
+/// The block a connection routes the transaction to, when the block needs
+/// one.
+///
+/// The connection is written when the transaction does not fall through to
+/// the next block of the listing, and it names the destination the
+/// transaction takes: the first output of the block. The other outputs of
+/// the block are named by the statement of the block itself (the `EXAMINE`
+/// names the destination of its failure output, the `GATE` the one of its
+/// else branch), so the connection names one destination only: the
+/// original's own report of the `TP10` writes `TRANSFER ,A_Assign6` after
+/// the `EXAMINE`, whose failure output goes to the `A_Assign7`.
+///
+/// A transfer block is never followed by a connection: its own statement
+/// already says where the transaction goes.
+fn connection_target(
+    index: usize,
+    following: Option<usize>,
+    program: &Program,
+    names: &Names,
+) -> Option<usize> {
     let block = &program.blocks[index];
     if matches!(
         block.kind,
         BlockKind::Transfer(_) | BlockKind::MultiTransfer(_)
     ) {
-        // The block's own statement already says where the transaction goes.
-        return;
+        return None;
     }
-    let Some(target) = block.next.first().copied().flatten() else {
-        return;
-    };
+    let target = block.next.first().copied().flatten()?;
     if following == Some(target) {
         // The flow falls through to the next block.
-        return;
+        return None;
     }
-    let mut operands = String::new();
-    for destination in block.next.iter().flatten() {
-        let name = names.get(*destination);
-        if name.is_empty() {
-            continue;
-        }
-        operands.push(',');
-        operands.push_str(name);
+    if names.get(target).is_empty() {
+        // The connection has no name to write.
+        return None;
     }
-    if operands.is_empty() {
-        return;
-    }
-    line(out, "", "TRANSFER", &operands);
+    Some(target)
 }
 
 /// How the statement of a selection carries the destination of its failure
@@ -569,14 +705,16 @@ fn block_statements(out: &mut String, index: usize, program: &Program, names: &N
 
     match &block.kind {
         BlockKind::Generate(spec) => {
+            // The operands of the statement, in the order the original
+            // writes them: the mean, the deviation, the offset, the limit
+            // (the `Cantidad` of the model) and the priority. The mean the
+            // model does not set is empty, not zero (`GENERATE ,,,1`).
             let operands = operands([
                 sna(&spec.mean),
                 spec.modifier.as_ref().map(sna).unwrap_or_default(),
                 spec.offset.as_ref().map(sna).unwrap_or_default(),
+                spec.limit.map(|limit| limit.to_string()).unwrap_or_default(),
                 spec.priority.as_ref().map(sna).unwrap_or_default(),
-                spec.limit
-                    .map(|limit| limit.to_string())
-                    .unwrap_or_default(),
             ]);
             statement(out, "GENERATE", &operands);
         }

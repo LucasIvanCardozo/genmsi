@@ -910,6 +910,15 @@ pub struct Definitions {
     pub random_variables: HashMap<String, RandomVariable>,
     /// `StorageDef` capacities, in units.
     pub storages: HashMap<String, i64>,
+    /// The names of the `StorageDef` definitions, in the order the model
+    /// declares them.
+    ///
+    /// The original writes the storages of its report in the order the
+    /// program finishes with them, and the ones the program never touches
+    /// keep the order of the declaration (the fifty storages of the model
+    /// `Problema 1__semaforo-1` go from `1` to `50`, the order the model
+    /// declares them).
+    pub storage_order: Vec<String>,
     /// `Table` definitions.
     pub tables: HashMap<String, TableDef>,
     /// The names of the `Table` definitions, in the order the model declares
@@ -1197,9 +1206,11 @@ impl Compiler<'_> {
                 Ok(Some(generate))
             }
             "Generate" => {
-                let mean = self
-                    .sna(module, "Media")?
-                    .unwrap_or_else(|| self.number_expr(0.0));
+                // The mean the model does not set is empty, not zero: the
+                // original writes `GENERATE ,,,1` for a generator whose
+                // `Media` is empty (the `TP10` report, row 52). The value of
+                // the mean is still zero, so the engine behaves the same.
+                let mean = self.sna(module, "Media")?.unwrap_or_else(|| self.empty_expr());
                 let spec = GenerateSpec {
                     limit: self.number(module, "Cantidad"),
                     mean,
@@ -2343,6 +2354,9 @@ impl Compiler<'_> {
                     // The `Tamaño` is the capacity of the storage, in units:
                     // how many units it holds at a time.
                     let capacity = self.number(module, "Tamaño").unwrap_or(0.0) as i64;
+                    if !definitions.storage_order.contains(&name) {
+                        definitions.storage_order.push(name.clone());
+                    }
                     definitions.storages.insert(name, capacity.max(0));
                 }
                 "InitiaSV" => {

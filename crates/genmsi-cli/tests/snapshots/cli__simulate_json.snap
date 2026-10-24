@@ -27,7 +27,7 @@ expression: stdout(&output)
       "node": 7,
       "class": "Generate",
       "label": null,
-      "operands": "0,,3600,1,",
+      "operands": ",,3600,1,",
       "entries": 1,
       "current": 1,
       "retries": 0

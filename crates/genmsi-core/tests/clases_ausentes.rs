@@ -360,15 +360,33 @@ fn the_remove_number_writes_a_remove_statement() {
     // connected). The statement has an arm of its own in
     // `crates/genmsi-core/src/gpss.rs`: the mode, the group, an empty limit
     // and the number.
+    //
+    // The generator of the model writes `GENERATE 60,30,,2`: the limit (the
+    // `Cantidad` of the model) is the fourth operand of the statement, the
+    // way the original writes it.
     assert_eq!(
         statements(&removenumber(false)),
         vec![
-            "GENERATE 60,30,,,2",
+            "GENERATE 60,30,,2",
             "A_RemoveNumber REMOVE E UnGrupo,,0",
             "A_Terminate TERMINATE",
             "GENERATE 3600",
             "TERMINATE 1",
         ]
+    );
+}
+
+#[test]
+fn the_remove_number_writes_the_destination_of_its_failure_output() {
+    // The original writes the destination of the failure output ("No existe
+    // el Nº") as the seventh operand of the statement, when that output is
+    // connected: `REMOVE E UnGrupo,,0,,,A_Terminate1`.
+    let listing = statements(&removenumber(true));
+    assert!(
+        listing
+            .iter()
+            .any(|line| line == "A_RemoveNumber REMOVE E UnGrupo,,0,,,A_Terminate1"),
+        "the listing writes the destination of the failure output: {listing:?}"
     );
 }
 

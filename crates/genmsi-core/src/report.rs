@@ -83,7 +83,7 @@ pub fn event_time(value: f64) -> String {
 /// Render the human-readable report.
 pub fn render(result: &RunResult, program: &Program) -> String {
     let mut out = String::with_capacity(8 * 1024);
-    let table = block_table(program);
+    let table = block_table(program, &result.connection_entries);
     let _ = writeln!(out, "                             Reporte MicroVisualSIS");
     let _ = writeln!(out);
     let _ = writeln!(
@@ -107,7 +107,18 @@ pub fn render(result: &RunResult, program: &Program) -> String {
     );
     let _ = writeln!(out, "         COUNT   COUNT   ");
     for row in table.rows.iter() {
-        let stats = result.blocks.get(row.block).cloned().unwrap_or_default();
+        // A connection is a statement of the listing with no block of its
+        // own: its row counts the transactions that go through it.
+        let stats = row
+            .block
+            .and_then(|block| result.blocks.get(block))
+            .cloned()
+            .unwrap_or_default();
+        let entries = if row.block.is_some() {
+            stats.entries
+        } else {
+            row.entries
+        };
         // The `LOC` column is a field of fifteen columns, right-aligned and
         // starting right behind the `RETRY` one. A name that does not fit
         // eats the space that separates it from the `RETRY` column, the way
@@ -123,7 +134,7 @@ pub fn render(result: &RunResult, program: &Program) -> String {
             out,
             "{:>5} {:>8} {:>7} {:>5}{}  {:<43}",
             row.line,
-            stats.entries,
+            entries,
             stats.current,
             stats.retries,
             loc,
@@ -207,7 +218,14 @@ pub fn render(result: &RunResult, program: &Program) -> String {
             "STORAGE           CAP. REMAIN. MIN.  MAX. ENTRIES AVL. AVE.C.  UTIL. RETRY DELAY"
         );
         let elapsed = result.elapsed().max(1e-9);
-        for storage in result.entities.storages.values() {
+        // The storages come in the order the program finishes with them: the
+        // original writes `MIGRACION`, `ENTREGAEQUIPAJE` and `SALIDA` in the
+        // `TP3` report, and the storages the program never touches keep the
+        // order of the declaration.
+        for name in storage_order(program, &result.entities.storages) {
+            let Some(storage) = result.entities.storages.get(&name) else {
+                continue;
+            };
             let _ = writeln!(
                 out,
                 "  {:<17}{:>2}{:>7}{:>6}{:>6}{:>8}{:>4}{:>8}{:>8}{:>5}{:>6}",
@@ -254,13 +272,23 @@ pub fn render(result: &RunResult, program: &Program) -> String {
         }
     }
 
+    // The label of the section is written once, at the beginning of it: the
+    // original writes `TABLAS` once and the tables of the section follow,
+    // one after the other, with two blank lines between them (the `TP3`
+    // report has two queue tables and one `QTABLES`).
+    let mut first_table = true;
     for name in &result.table_names {
         let Some(table) = result.entities.tables.get(name) else {
             continue;
         };
         let _ = writeln!(out);
-        let _ = writeln!(out, "TABLAS");
-        let _ = writeln!(out);
+        if first_table {
+            let _ = writeln!(out, "TABLAS");
+            let _ = writeln!(out);
+            first_table = false;
+        } else {
+            let _ = writeln!(out);
+        }
         // The header of the section is the statement of the table: its name,
         // the verb and the operands of the `TABLE` statement, the attribute
         // the table tabulates among them.
@@ -281,12 +309,18 @@ pub fn render(result: &RunResult, program: &Program) -> String {
         write_table_body(&mut out, table);
     }
 
+    let mut first_qtable = true;
     for name in &result.qtable_names {
         let Some(table) = result.entities.qtables.get(name) else {
             continue;
         };
         let _ = writeln!(out);
-        let _ = writeln!(out, "QTABLES");
+        if first_qtable {
+            let _ = writeln!(out, "QTABLES");
+            first_qtable = false;
+        } else {
+            let _ = writeln!(out);
+        }
         // The header of the section is the statement of the queue table: its
         // name, the verb and the operands of the `QTABLE` statement (the
         // queue whose waiting times are tabulated, the first interval, the
@@ -515,8 +549,63 @@ fn write_table_body(out: &mut String, table: &crate::stat::Table) {
     );
 }
 
-/// The groups the statements of the program name, of the kind asked for.
+/// The storages of the report, in the order the report writes them.
 ///
+/// The original writes the storages of its report in the order the program
+/// finishes with them: the `TP2` report writes `ACREDITACION`, `VACUNACION`,
+/// `SALAESPERA` and `EXIT`, the order the listing of the original leaves
+/// them in (its listing is in `fixtures/outputs/TP2__problema1.gpss.txt`).
+/// The storages the program never touches keep the order of the declaration:
+/// the fifty storages of the model `Problema 1__semaforo-1` go from `1` to
+/// `50`, the order the model declares them.
+fn storage_order(
+    program: &Program,
+    storages: &std::collections::BTreeMap<String, crate::stat::Storage>,
+) -> Vec<String> {
+    let mut order: Vec<String> = Vec::new();
+    let push = |order: &mut Vec<String>, name: &str| {
+        if !order.iter().any(|known| known == name) {
+            order.push(name.to_string());
+        }
+    };
+    // The storages the program uses, in the order the listing finishes with
+    // them.
+    for index in crate::gpss::listing_order(program) {
+        let Some(storage) = block_storage(&program.blocks[index]) else {
+            continue;
+        };
+        order.retain(|known| known != storage);
+        order.push(storage.to_string());
+    }
+    // The storages the model declares and the program never touches.
+    for name in &program.definitions.storage_order {
+        push(&mut order, name);
+    }
+    // The storages the run created and the model does not declare.
+    for name in storages.keys() {
+        push(&mut order, name);
+    }
+    order
+}
+
+/// The storage a block touches, when it touches one.
+///
+/// The name of an indirect storage (`*Cuadra`) is the name of a parameter
+/// and the storage it names is only known at run time, so the block does not
+/// name a storage of the program.
+fn block_storage(block: &ExecBlock) -> Option<&str> {
+    let name = match &block.kind {
+        BlockKind::Enter(spec) => &spec.storage,
+        BlockKind::Leave(spec) => &spec.storage,
+        _ => return None,
+    };
+    match &name.source {
+        crate::expr::NameSource::Literal(name) => Some(name.as_str()),
+        crate::expr::NameSource::Indirect(_) => None,
+    }
+}
+
+/// The groups the statements of the program name, of the kind asked for.
 /// The `EXAMINE` of the original examines the transaction (a group of
 /// transactions) and the `EXAMINE NUMBER` examines a number (a group of
 /// numbers); the `REMOVE` takes transactions out of a group of transactions.
@@ -545,14 +634,16 @@ fn named_groups(program: &Program, numeric: bool) -> Vec<String> {
 
 /// One row of the block table.
 struct BlockRow {
-    /// The block the row counts.
-    block: usize,
+    /// The block the row counts; a connection has none.
+    block: Option<usize>,
     /// The line of the listing the row stands for.
     line: usize,
     /// The `LOC` of the row.
     loc: String,
     /// The `BLOCK_TYPE` cell and the operand column.
     text: String,
+    /// The transactions that go through the row, when it is a connection.
+    entries: u64,
 }
 
 /// The rows of the block table and the number of each statement.
@@ -569,44 +660,79 @@ struct BlockTable {
 /// listing writes them, and its `LOC` column holds the name of the statement
 /// or, when the statement has none, the number it has in the listing.
 ///
-/// The `Counter` class writes two statements (its macro code is a `SV` and an
-/// `ASSI`): the `SAVEVALUE` that counts and the `ASSIGN` that copies the
-/// counter into the parameter. The counter takes two rows, and the header
-/// counts the rows.
-fn block_table(program: &Program) -> BlockTable {
+/// The statements that carry no name of their own are rows too: the
+/// connections the listing writes when the flow breaks (`TRANSFER ,A_Assign6`
+/// in the `TP10` report) and the second statement of the `Counter` class
+/// (its macro code is a `SV` and an `ASSI`): the `SAVEVALUE` that counts and
+/// the `ASSIGN` that copies the counter into the parameter. The counter takes
+/// two rows, and the header counts the rows.
+fn block_table(program: &Program, connection_entries: &[u64]) -> BlockTable {
     let names = crate::gpss::block_names(program);
-    let lines = crate::gpss::listing_lines(program);
-    let order = crate::gpss::listing_order(program);
     let compound = compound_modules(program);
-    let mut rows = Vec::with_capacity(program.blocks.len());
+    let statements = crate::gpss::listing_statements(program);
+    let mut rows = Vec::with_capacity(statements.len());
     let mut numbers = vec![0usize; program.blocks.len()];
-    let mut statement = 0usize;
-    for index in order {
-        statement += 1;
-        let name = names.get(index).cloned().unwrap_or_default();
-        numbers[index] = statement;
-        let loc = if name.is_empty() {
-            statement.to_string()
-        } else {
-            name
-        };
-        rows.push(BlockRow {
-            block: index,
-            line: lines.get(index).copied().unwrap_or_default(),
-            loc,
-            text: type_and_operands(&program.blocks[index], &names, &compound),
-        });
-        if let BlockKind::Counter(spec) = &program.blocks[index].kind
-            && let Some(parameter) = &spec.parameter
-        {
-            // The second statement of the counter has no name of its own.
-            statement += 1;
-            rows.push(BlockRow {
-                block: index,
-                line: lines.get(index).copied().unwrap_or_default() + 1,
-                loc: statement.to_string(),
-                text: format!("{:<16}{},X${}", "ASSIGN", parameter, spec.savevalue),
-            });
+    let mut connections = 0usize;
+    for (position, statement) in statements.iter().enumerate() {
+        // The number the statement has in the listing: the `LOC` column
+        // holds it when the statement carries no name of its own.
+        let number = position + 1;
+        match statement.kind {
+            crate::gpss::StatementKind::Connection { target } => {
+                // The connection is a statement of the listing with no name
+                // of its own, and the transactions that go through it are
+                // counted in its row.
+                let entries = connection_entries.get(connections).copied().unwrap_or(0);
+                connections += 1;
+                rows.push(BlockRow {
+                    block: None,
+                    line: statement.line,
+                    loc: number.to_string(),
+                    text: format!(
+                        "{:<16},{}",
+                        "TRANSFER",
+                        names.get(target).cloned().unwrap_or_default()
+                    ),
+                    entries,
+                });
+            }
+            crate::gpss::StatementKind::Block => {
+                let index = statement.block.expect("a statement of a block has a block");
+                if numbers[index] == 0 {
+                    numbers[index] = number;
+                }
+                let loc = if statement.name.is_empty() {
+                    number.to_string()
+                } else {
+                    statement.name.clone()
+                };
+                rows.push(BlockRow {
+                    block: Some(index),
+                    line: statement.line,
+                    loc,
+                    text: type_and_operands(&program.blocks[index], &names, &compound),
+                    entries: 0,
+                });
+            }
+            crate::gpss::StatementKind::CounterAssign => {
+                let index = statement.block.expect("a statement of a block has a block");
+                let BlockKind::Counter(spec) = &program.blocks[index].kind else {
+                    continue;
+                };
+                // The second statement of the counter has no name of its own.
+                rows.push(BlockRow {
+                    block: Some(index),
+                    line: statement.line,
+                    loc: number.to_string(),
+                    text: format!(
+                        "{:<16}{},X${}",
+                        "ASSIGN",
+                        spec.parameter.clone().unwrap_or_default(),
+                        spec.savevalue
+                    ),
+                    entries: 0,
+                });
+            }
         }
     }
     BlockTable { rows, numbers }

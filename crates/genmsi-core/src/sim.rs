@@ -218,6 +218,13 @@ pub struct RunResult {
     pub events: u64,
     /// Per-statement statistics.
     pub blocks: Vec<BlockStats>,
+    /// The transactions that go through each connection of the listing, in the
+    /// order the listing writes them.
+    ///
+    /// The connections are the `TRANSFER` statements the listing writes when
+    /// the flow does not fall through to the next block: the report writes a
+    /// row for each of them.
+    pub connection_entries: Vec<u64>,
     /// Entity statistics and savevalues.
     pub entities: Entities,
     /// Structured event trace, when enabled.
@@ -345,6 +352,17 @@ pub struct Simulation<'p> {
     match_waiters: HashMap<usize, VecDeque<XactId>>,
     gate_waiters: HashMap<usize, Vec<XactId>>,
     cancelled_resumes: HashSet<(XactId, usize)>,
+    /// The connections of the listing, and the block each one leaves.
+    ///
+    /// The original writes the blocks of the program in the order the
+    /// transaction walks them, and the connections that break that order are
+    /// statements of the listing of their own: the report writes a row for
+    /// each of them, and the row counts the transactions that go through it.
+    connections: Vec<crate::gpss::Connection>,
+    /// The connection each block leaves, by the index of the block.
+    connection_of: HashMap<usize, usize>,
+    /// The transactions that go through each connection.
+    connection_entries: Vec<u64>,
     diagnostics: Vec<String>,
 }
 
@@ -380,8 +398,18 @@ impl<'p> Simulation<'p> {
             match_waiters: HashMap::new(),
             gate_waiters: HashMap::new(),
             cancelled_resumes: HashSet::new(),
+            connections: crate::gpss::connections(program),
+            connection_of: HashMap::new(),
+            connection_entries: Vec::new(),
             diagnostics: Vec::new(),
         };
+        sim.connection_of = sim
+            .connections
+            .iter()
+            .enumerate()
+            .map(|(index, connection)| (connection.block, index))
+            .collect();
+        sim.connection_entries = vec![0; sim.connections.len()];
         sim.install_definitions();
         sim
     }
@@ -635,6 +663,7 @@ impl<'p> Simulation<'p> {
             transactions: self.next_xact,
             events: self.events,
             blocks: self.block_stats,
+            connection_entries: self.connection_entries,
             entities: self.entities,
             trace: self.trace,
             diagnostics,
@@ -2058,6 +2087,14 @@ impl<'p> Simulation<'p> {
     ) {
         if self.block_stats[from].current > 0 {
             self.block_stats[from].current -= 1;
+        }
+        // The transaction goes through the connection the listing writes when
+        // the flow does not fall through to the next block: the report counts
+        // it in the row of the connection.
+        if let Some(index) = self.connection_of.get(&from)
+            && Some(self.connections[*index].target) == target
+        {
+            self.connection_entries[*index] += 1;
         }
         if let Some(transaction) = self.xacts.get_mut(&xact) {
             // The block the transaction comes from: a transaction that waits

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { chronometer, number } from "../format";
+import { number } from "../format";
 import { advance, advanceClock, frameAt, stateAt, type ReplayState } from "../monitor/replay";
 import { useApp } from "../state/store";
 import { FLIGHT_SECONDS, travellersAt, type Move } from "../monitor/balls";
@@ -243,7 +243,7 @@ export default function MonitorView({
   if (model === null) {
     return (
       <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-white/60 text-sm text-slate-500">
-        Selecciona un modelo para ver su reproducción.
+        Abre un modelo para ver su reproducción.
       </div>
     );
   }
@@ -254,30 +254,12 @@ export default function MonitorView({
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden">
-      {monitor === null ? (
+      {monitor === null && (
         // Without a run there is nothing to reproduce: the console that
         // starts it lives in the header, not in the body.
         <p className="rounded-lg border border-dashed border-slate-300 bg-white/60 px-3 py-2 text-xs text-slate-500">
           Pulsa «Ejecutar» en la cabecera para reproducir la corrida.
         </p>
-      ) : (
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs">
-          <span className="text-sm font-semibold text-slate-800">{report?.title ?? ""}</span>
-          <span className="text-slate-500">
-            Tiempos{" "}
-            <span className="font-mono text-slate-800">
-              {number(monitor.startTime)} → {number(monitor.endTime)}
-            </span>
-          </span>
-          <span className="text-slate-500">
-            Registros <span className="font-mono text-slate-800">{monitor.records}</span>
-          </span>
-          {/* How long the playback lasts at this speed: the one thing the
-              speed does not say on its own. */}
-          <span className="text-slate-500">
-            Dura <span className="font-mono text-slate-800">{chronometer((monitor.endTime - monitor.startTime) / speed)}</span>
-          </span>
-        </div>
       )}
 
       {truncated && (

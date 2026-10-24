@@ -11,6 +11,7 @@
 //! `genmsi-format`, so the app never touches the XML of a model.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// The protocol the app's backends speak with the facade.
 pub mod protocol;
@@ -19,6 +20,32 @@ pub mod session;
 
 pub use protocol::{SessionRequest, SessionResponse, answer};
 pub use session::{Diagnostics, SaveOutcome, Session, SessionState};
+
+/// How many runs the facade has made.
+///
+/// Every run of the engine goes through [`run_once`], so this number is the
+/// number of times the engine ran: a test can prove that the app's run is
+/// one run of the engine and not two.
+static RUNS: AtomicUsize = AtomicUsize::new(0);
+
+/// How many runs the facade has made since the process started.
+pub fn runs_made() -> usize {
+    RUNS.load(Ordering::Relaxed)
+}
+
+/// The two documents of one run: the report and the trace.
+///
+/// One run with the trace on gives both: the report comes from the result
+/// and the trace from the events of the same run. The engine is
+/// deterministic, so the trace is the one a run without the trace records.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunDocuments {
+    /// The `genmsi.report/1` document, byte for byte.
+    pub report: String,
+    /// The `genmsi.trace/1` document, byte for byte.
+    pub trace: String,
+}
 
 /// Schema id of the app's own model list; an application document, not an
 /// engine document.
@@ -182,11 +209,78 @@ fn simulate_bytes(
         stop_time: until,
         ..genmsi_core::SimConfig::default()
     };
-    let result = genmsi_core::Simulation::new(&program, config)
-        .run()
-        .map_err(|error| model_error(path, error))?;
+    let result = run_once(&program, config, path)?;
     let body = genmsi_core::json_report(&result, &program);
     Ok(document_bytes(genmsi_core::documents::REPORT_SCHEMA, &body))
+}
+
+/// The report and the trace of one run of a model that is in memory.
+///
+/// The engine runs **once**, with the trace on: the report comes from the
+/// result of that run and the trace from its events. The engine is
+/// deterministic, so the two documents are the ones the two separate runs
+/// used to give.
+pub fn run_model_documents_bytes(
+    model: &genmsi_format::GmdlModel,
+    seed: u64,
+    until: Option<f64>,
+    limit: usize,
+) -> Result<RunDocuments, AppError> {
+    run_documents_of(model, Path::new(""), seed, until, limit)
+}
+
+/// The report and the trace of one run of a model on disk.
+///
+/// The engine runs **once**, with the trace on: the report comes from the
+/// result of that run and the trace from its events.
+pub fn run_documents_bytes(
+    path: &Path,
+    seed: u64,
+    until: Option<f64>,
+    limit: usize,
+) -> Result<RunDocuments, AppError> {
+    let model = genmsi_format::load(path).map_err(|error| model_error(path, error))?;
+    run_documents_of(&model, path, seed, until, limit)
+}
+
+/// The report and the trace of one run, with the path the failure names.
+fn run_documents_of(
+    model: &genmsi_format::GmdlModel,
+    path: &Path,
+    seed: u64,
+    until: Option<f64>,
+    limit: usize,
+) -> Result<RunDocuments, AppError> {
+    let program = genmsi_core::compile_model(model).map_err(|error| model_error(path, error))?;
+    let config = genmsi_core::SimConfig {
+        seed,
+        stop_time: until,
+        trace: true,
+        trace_limit: limit,
+        ..genmsi_core::SimConfig::default()
+    };
+    let result = run_once(&program, config, path)?;
+    let report = genmsi_core::json_report(&result, &program);
+    let trace = genmsi_core::documents::trace_document(&result, limit);
+    Ok(RunDocuments {
+        report: document_bytes(genmsi_core::documents::REPORT_SCHEMA, &report),
+        trace: document_bytes(genmsi_core::documents::TRACE_SCHEMA, &trace),
+    })
+}
+
+/// Run the program once and give its result.
+///
+/// Every run of the facade goes through here: the counter of the runs is the
+/// number of times the engine ran.
+fn run_once(
+    program: &genmsi_core::Program,
+    config: genmsi_core::SimConfig,
+    path: &Path,
+) -> Result<genmsi_core::RunResult, AppError> {
+    RUNS.fetch_add(1, Ordering::Relaxed);
+    genmsi_core::Simulation::new(program, config)
+        .run()
+        .map_err(|error| model_error(path, error))
 }
 
 /// The `genmsi.trace/1` document of a finished run.
@@ -229,9 +323,7 @@ fn trace_bytes(
         trace_limit: limit,
         ..genmsi_core::SimConfig::default()
     };
-    let result = genmsi_core::Simulation::new(&program, config)
-        .run()
-        .map_err(|error| model_error(path, error))?;
+    let result = run_once(&program, config, path)?;
     Ok(document_bytes(
         genmsi_core::documents::TRACE_SCHEMA,
         &genmsi_core::documents::trace_document(&result, limit),

@@ -12,8 +12,9 @@ use genmsi_format::edit::EditCommand;
 
 use crate::session::{SaveOutcome, Session, SessionState};
 use crate::{
-    AppError, catalogue_document_bytes, lint_document_bytes, model_document_bytes,
-    models_document_bytes, simulate_document_bytes, trace_document_bytes, trace_model_bytes,
+    AppError, RunDocuments, catalogue_document_bytes, lint_document_bytes, model_document_bytes,
+    models_document_bytes, run_model_documents_bytes, simulate_document_bytes, trace_document_bytes,
+    trace_model_bytes,
 };
 
 /// One request of the protocol.
@@ -84,6 +85,18 @@ pub enum SessionRequest {
         /// Maximum number of trace records kept.
         limit: Option<usize>,
     },
+    /// The report **and** the trace of one run of the model in memory.
+    ///
+    /// The engine runs once, with the trace on: the two documents come from
+    /// the same run.
+    RunCurrent {
+        /// Seed of the run.
+        seed: Option<u64>,
+        /// Stop the run at this simulation time.
+        until: Option<f64>,
+        /// Maximum number of trace records kept.
+        limit: Option<usize>,
+    },
     /// The graph of a file on disk.
     Model {
         /// Path of the model.
@@ -113,6 +126,9 @@ pub struct SessionResponse {
     /// A document of the engine, byte for byte as the CLI prints it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub document: Option<String>,
+    /// The two documents of one run: the report and the trace.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub documents: Option<RunDocuments>,
     /// Where a model was written.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
@@ -129,6 +145,7 @@ impl SessionResponse {
             error: None,
             state: Some(state),
             document: None,
+            documents: None,
             path: None,
             bytes: None,
         }
@@ -141,6 +158,20 @@ impl SessionResponse {
             error: None,
             state: None,
             document: Some(document),
+            documents: None,
+            path: None,
+            bytes: None,
+        }
+    }
+
+    /// The answer that carries the two documents of one run.
+    pub fn documents(documents: RunDocuments) -> Self {
+        Self {
+            ok: true,
+            error: None,
+            state: None,
+            document: None,
+            documents: Some(documents),
             path: None,
             bytes: None,
         }
@@ -153,6 +184,7 @@ impl SessionResponse {
             error: None,
             state: Some(state),
             document: None,
+            documents: None,
             path: Some(outcome.path),
             bytes: Some(outcome.bytes),
         }
@@ -165,6 +197,7 @@ impl SessionResponse {
             error: Some(error.to_string()),
             state: None,
             document: None,
+            documents: None,
             path: None,
             bytes: None,
         }
@@ -247,6 +280,22 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
                 limit.unwrap_or(100),
             ) {
                 Ok(document) => SessionResponse::document(document),
+                Err(error) => SessionResponse::error(error),
+            },
+            None => SessionResponse::error(AppError::Usage("no model is open".to_string())),
+        },
+        SessionRequest::RunCurrent {
+            seed,
+            until,
+            limit,
+        } => match session.as_mut() {
+            Some(session) => match run_model_documents_bytes(
+                session.model(),
+                seed.unwrap_or(1),
+                until,
+                limit.unwrap_or(100),
+            ) {
+                Ok(documents) => SessionResponse::documents(documents),
                 Err(error) => SessionResponse::error(error),
             },
             None => SessionResponse::error(AppError::Usage("no model is open".to_string())),

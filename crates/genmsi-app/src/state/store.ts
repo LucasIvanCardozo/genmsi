@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { engine } from "../engine";
+import { files } from "../engine/files";
 import type { ModelRef } from "../engine/adapter";
 import { relayout } from "../edit/layout";
 import {
@@ -30,6 +31,12 @@ export const TRACE_LIMIT = 200_000;
 
 /** How far a pasted copy is moved, so it does not sit on the original. */
 const PASTE_OFFSET = { dx: 180, dy: 90 };
+
+/** How many models the list of recents keeps. */
+const RECENT_LIMIT = 8;
+
+/** The name the app suggests when the model has no path yet. */
+const DEFAULT_MODEL_NAME = "modelo.gmdl";
 
 /**
  * A seed for a run.
@@ -99,6 +106,8 @@ export interface AppState {
   pendingSave: string | null;
   /** The message of the last save. */
   savedMessage: string | null;
+  /** The models opened lately, the most recent first. */
+  recentModels: string[];
   /** Ask the engine for the models the app offers. */
   loadModels: () => Promise<void>;
   /** Ask the engine for the block classes the editor offers. */
@@ -115,6 +124,8 @@ export interface AppState {
   redo: () => Promise<void>;
   /** Save the model; an invalid model asks for a confirmation first. */
   save: (path?: string) => Promise<void>;
+  /** Save the model under a name the user chooses with the system dialog. */
+  saveAs: () => Promise<void>;
   /** Run the open model and read its report. */
   simulate: () => Promise<void>;
   /** Run the open model and prepare its replay. */
@@ -145,6 +156,10 @@ export interface AppState {
   confirmSave: () => Promise<void>;
   /** Answer the confirmation of a save with no. */
   dismissSave: () => void;
+  /** Take the notice of the last save away. */
+  clearSavedMessage: () => void;
+  /** Ask the host for the models opened lately. */
+  loadRecentModels: () => Promise<void>;
 }
 
 /** The message of a failure the engine reported. */
@@ -244,8 +259,12 @@ export const useApp = create<AppState>((set, get) => ({
   catalogue: null,
   pendingSave: null,
   savedMessage: null,
+  recentModels: [],
 
   loadModels: async () => {
+    // The list of the models of the repository: the development server's
+    // tool. The app has no dropdown —a model is opened with the dialog of
+    // the system— so the list is not drawn.
     try {
       const models = await engine().listModels();
       set({ models, error: null });
@@ -296,6 +315,16 @@ export const useApp = create<AppState>((set, get) => ({
         report: null,
         error: `No se pudo abrir el modelo: ${messageOf(error)}`,
       });
+      return;
+    }
+    // The model joins the recents: the list is short and it holds the ones
+    // the reader comes back to. A recents that cannot be written is not a
+    // reason to say the model did not open.
+    try {
+      const recent = await files().rememberModel(path);
+      set({ recentModels: recent.slice(0, RECENT_LIMIT) });
+    } catch {
+      // The recents are a convenience.
     }
   },
 
@@ -458,6 +487,29 @@ export const useApp = create<AppState>((set, get) => ({
 
   dismissSave: () => set({ pendingSave: null }),
 
+  clearSavedMessage: () => set({ savedMessage: null }),
+
+  loadRecentModels: async () => {
+    try {
+      const recent = await files().recentModels();
+      set({ recentModels: recent.slice(0, RECENT_LIMIT) });
+    } catch (error) {
+      set({ error: `No se pudieron leer los modelos recientes: ${messageOf(error)}` });
+    }
+  },
+
+  saveAs: async () => {
+    // The path is the one the user chooses with the dialog of the system:
+    // the app does not guess where the model goes.
+    const suggested = get().currentPath ?? DEFAULT_MODEL_NAME;
+    const path = await files().pickSavePath(suggested);
+    if (path === null) {
+      // The user gave up: nothing is written and nothing is said.
+      return;
+    }
+    await get().save(path);
+  },
+
   simulate: async () => {
     set({ status: "running", error: null });
     // A run that draws its own seed is a new experiment every time; a run
@@ -499,10 +551,10 @@ export const useApp = create<AppState>((set, get) => ({
         until: get().until ?? undefined,
         limit: TRACE_LIMIT,
       };
-      // The report and the trace are two runs of the same model with the same
-      // seed: the engine is deterministic, so the trace belongs to the report.
-      const report = await engine().simulateCurrent(options);
-      const trace = await engine().traceCurrent(options);
+      // One run of the engine, with the trace on: the report and the trace
+      // come from the same run. The engine is deterministic, so the trace
+      // belongs to the report.
+      const { report, trace } = await engine().runCurrent(options);
       const monitor = buildIndex(trace, report, model);
       // The moves of the run, read from the trace. The program blocks are
       // mapped to the blocks of the model, because a ball travels between the

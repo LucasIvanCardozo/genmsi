@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Eraser, LayoutGrid, Redo2, Save, Scan, Undo2 } from "lucide-react";
 
 /**
@@ -39,7 +38,7 @@ export default function Toolbar({
   /** Save the model. */
   onSave: () => void;
   /** Save the model under another name. */
-  onSaveAs: (path: string) => void;
+  onSaveAs: () => void;
   /** Undo the last operation. */
   onUndo: () => void;
   /** Redo the last undone operation. */
@@ -55,9 +54,6 @@ export default function Toolbar({
   /** Answer the confirmation of a save with no. */
   onDismissSave: () => void;
 }) {
-  const [naming, setNaming] = useState(false);
-  const [name, setName] = useState("");
-
   const button =
     "flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300";
 
@@ -79,11 +75,9 @@ export default function Toolbar({
       <button
         type="button"
         className={button}
-        onClick={() => {
-          setNaming(true);
-          setName("");
-        }}
+        onClick={onSaveAs}
         disabled={!hasModel}
+        title="Guardar el modelo con el diálogo del sistema"
       >
         Guardar como…
       </button>
@@ -140,30 +134,6 @@ export default function Toolbar({
         <LayoutGrid className="size-3.5" aria-hidden />
         Reacomodar
       </button>
-
-      {naming && (
-        <span className="flex items-center gap-1.5">
-          <input
-            aria-label="Ruta del modelo"
-            className="w-72 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-mono text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="fixtures/models/mi-modelo.gmdl"
-          />
-          <button
-            type="button"
-            className={button}
-            onClick={() => {
-              setNaming(false);
-              if (name.trim() !== "") {
-                onSaveAs(name.trim());
-              }
-            }}
-          >
-            Guardar
-          </button>
-        </span>
-      )}
 
       {pendingSave !== null && (
         <span className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">

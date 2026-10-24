@@ -1,14 +1,11 @@
 import { devBridge } from "./devBridge";
 import { tauri } from "./tauri";
+import { isTauri } from "./host";
 import type { EngineAdapter } from "./adapter";
 
 export type { EngineAdapter, ModelRef, SimulationOptions } from "./adapter";
 export { EngineError } from "./adapter";
-
-/** Whether the app runs inside the Tauri shell. */
-export function isTauri(): boolean {
-  return typeof globalThis !== "undefined" && "__TAURI_INTERNALS__" in globalThis;
-}
+export { isTauri } from "./host";
 
 /**
  * The adapter of the running host.

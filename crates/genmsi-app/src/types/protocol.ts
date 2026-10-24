@@ -40,6 +40,18 @@ export interface SessionState {
 }
 
 /**
+ * The two documents of one run: the report and the trace.
+ *
+ * They come from one run of the engine, with the trace on.
+ */
+export interface RunDocuments {
+  /** The report of the run (`genmsi.report/1`). */
+  report: string;
+  /** The trace of the run (`genmsi.trace/1`). */
+  trace: string;
+}
+
+/**
  * The answer of the facade to one request of the session protocol.
  *
  * The envelope is the app's own (four optional fields), so it is written by
@@ -54,6 +66,8 @@ export interface SessionAnswer {
   state?: SessionState;
   /** A document of the engine, byte for byte as the CLI prints it. */
   document?: string;
+  /** The two documents of one run: the report and the trace. */
+  documents?: RunDocuments;
   /** Where a model was written. */
   path?: string;
   /** How many bytes the written model has. */

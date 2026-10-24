@@ -3,6 +3,10 @@
 //! The shell is a window around the same frontend the Vite server serves: it
 //! moves the engine's documents through the same facade the dev bridge's
 //! binary runs, so both backends return the same bytes.
+//!
+//! The shell also carries the plugin of the dialogs: the app opens and
+//! saves the models with the dialogs of the system, and the recents live in
+//! the app's data directory.
 
 mod commands;
 
@@ -28,6 +32,9 @@ pub fn run() {
         );
     }
     tauri::Builder::default()
+        // The dialogs of the system: the app opens and saves the models
+        // with them, and the frontend asks the plugin's commands.
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::list_models,
             commands::load_model,
@@ -35,6 +42,8 @@ pub fn run() {
             commands::simulate_model,
             commands::trace_model,
             commands::session,
+            commands::recent_models,
+            commands::remember_model,
         ])
         .run(tauri::generate_context!())
         .expect("the GenMSI application could not start");

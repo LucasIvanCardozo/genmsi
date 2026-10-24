@@ -36,6 +36,14 @@ export interface SaveResult {
   bytes: number;
 }
 
+/** The two documents of one run. */
+export interface RunOutcome {
+  /** The report of the run (`genmsi.report/1`). */
+  report: ReportDocument;
+  /** The trace of the run (`genmsi.trace/1`). */
+  trace: TraceDocument;
+}
+
 /** A failure the engine reported. */
 export class EngineError extends Error {
   constructor(message: string) {
@@ -83,6 +91,13 @@ export interface EngineAdapter {
   simulateCurrent(options?: SimulationOptions): Promise<ReportDocument>;
   /** The trace of a run of the model in memory. */
   traceCurrent(options?: SimulationOptions): Promise<TraceDocument>;
+  /**
+   * The report and the trace of one run of the model in memory.
+   *
+   * The engine runs **once**, with the trace on: the two documents come from
+   * the same run, and they are the ones the two separate runs gave.
+   */
+  runCurrent(options?: SimulationOptions): Promise<RunOutcome>;
   /** The block classes the editor offers to create. */
   catalogue(): Promise<CatalogueDocument>;
 }

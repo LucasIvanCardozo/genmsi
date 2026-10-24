@@ -9,21 +9,14 @@ import type {
   TraceDocument,
 } from "../types";
 import { EngineError } from "./adapter";
-import type { EngineAdapter, ModelRef, SaveResult, SimulationOptions } from "./adapter";
-
-/** The bridge the Tauri shell exposes to the webview. */
-interface TauriInternals {
-  invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
-}
-
-/** The Tauri bridge of the running shell. */
-function bridge(): TauriInternals {
-  const value = (globalThis as Record<string, unknown>).__TAURI_INTERNALS__;
-  if (!value) {
-    throw new EngineError("la aplicación de escritorio no está disponible");
-  }
-  return value as TauriInternals;
-}
+import type {
+  EngineAdapter,
+  ModelRef,
+  RunOutcome,
+  SaveResult,
+  SimulationOptions,
+} from "./adapter";
+import { invoke } from "./host";
 
 /**
  * Send one request of the session protocol.
@@ -32,7 +25,7 @@ function bridge(): TauriInternals {
  * answers with the same JSON.
  */
 async function session(request: unknown): Promise<SessionAnswer> {
-  const answer = await bridge().invoke<string>("session", {
+  const answer = await invoke<string>("session", {
     request: JSON.stringify(request),
   });
   const parsed = JSON.parse(answer) as SessionAnswer;
@@ -76,14 +69,14 @@ function documentOf<T>(answer: SessionAnswer): T {
  * both backends return the same documents.
  */
 export const tauri: EngineAdapter = {
-  listModels: () => bridge().invoke<ModelRef[]>("list_models"),
+  listModels: () => invoke<ModelRef[]>("list_models"),
   loadModel: async (path: string) =>
-    parsed<ModelDocument>(await bridge().invoke<string>("load_model", { path })),
+    parsed<ModelDocument>(await invoke<string>("load_model", { path })),
   lint: async (path: string) =>
-    parsed<LintDocument>(await bridge().invoke<string>("lint_model", { path })),
+    parsed<LintDocument>(await invoke<string>("lint_model", { path })),
   simulate: async (path: string, options?: SimulationOptions) =>
     parsed<ReportDocument>(
-      await bridge().invoke<string>("simulate_model", {
+      await invoke<string>("simulate_model", {
         path,
         seed: options?.seed ?? 1,
         until: options?.until ?? null,
@@ -91,7 +84,7 @@ export const tauri: EngineAdapter = {
     ),
   trace: async (path: string, options?: SimulationOptions) =>
     parsed<TraceDocument>(
-      await bridge().invoke<string>("trace_model", {
+      await invoke<string>("trace_model", {
         path,
         seed: options?.seed ?? 1,
         until: options?.until ?? null,
@@ -128,5 +121,20 @@ export const tauri: EngineAdapter = {
         limit: options?.limit ?? null,
       }),
     ),
+  runCurrent: async (options?: SimulationOptions): Promise<RunOutcome> => {
+    const answer = await session({
+      op: "runCurrent",
+      seed: options?.seed ?? null,
+      until: options?.until ?? null,
+      limit: options?.limit ?? null,
+    });
+    if (answer.documents === undefined) {
+      throw new EngineError("el motor no devolvió el informe ni la traza");
+    }
+    return {
+      report: JSON.parse(answer.documents.report) as ReportDocument,
+      trace: JSON.parse(answer.documents.trace) as TraceDocument,
+    };
+  },
   catalogue: async () => documentOf<CatalogueDocument>(await session({ op: "catalogue" })),
 };

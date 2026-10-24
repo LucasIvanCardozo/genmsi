@@ -9,7 +9,13 @@ import type {
   TraceDocument,
 } from "../types";
 import { EngineError } from "./adapter";
-import type { EngineAdapter, ModelRef, SaveResult, SimulationOptions } from "./adapter";
+import type {
+  EngineAdapter,
+  ModelRef,
+  RunOutcome,
+  SaveResult,
+  SimulationOptions,
+} from "./adapter";
 
 /** The list document of the app (`genmsi.models/1`). */
 interface ModelsDocument {
@@ -136,5 +142,20 @@ export const devBridge: EngineAdapter = {
         limit: options?.limit ?? null,
       }),
     ),
+  runCurrent: async (options?: SimulationOptions): Promise<RunOutcome> => {
+    const answer = await session({
+      op: "runCurrent",
+      seed: options?.seed ?? null,
+      until: options?.until ?? null,
+      limit: options?.limit ?? null,
+    });
+    if (answer.documents === undefined) {
+      throw new EngineError("el motor no devolvió el informe ni la traza");
+    }
+    return {
+      report: JSON.parse(answer.documents.report) as ReportDocument,
+      trace: JSON.parse(answer.documents.trace) as TraceDocument,
+    };
+  },
   catalogue: async () => documentOf<CatalogueDocument>(await session({ op: "catalogue" })),
 };

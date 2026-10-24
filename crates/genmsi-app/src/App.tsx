@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import ErrorNotice from "./components/ErrorNotice";
-import ModelPicker from "./components/ModelPicker";
+import ModelBar from "./components/ModelBar";
 import MonitorView from "./components/MonitorView";
 import RunConsole from "./components/RunConsole";
 import Toolbar from "./components/Toolbar";
 import { useApp } from "./state/store";
+
+/** How long the notice of a save stays on the screen. */
+const SAVED_NOTICE_MS = 4000;
 
 /**
  * The app's shell.
@@ -28,11 +31,13 @@ export default function App() {
     savedMessage,
     loadModels,
     loadCatalogue,
+    loadRecentModels,
     newModel,
     apply,
     undo,
     redo,
     save,
+    saveAs,
     select,
     copy,
     paste,
@@ -43,12 +48,24 @@ export default function App() {
     setUntil,
     confirmSave,
     dismissSave,
+    clearSavedMessage,
   } = useApp();
 
   useEffect(() => {
     void loadModels();
     void loadCatalogue();
-  }, [loadModels, loadCatalogue]);
+    void loadRecentModels();
+  }, [loadModels, loadCatalogue, loadRecentModels]);
+
+  // The notice of a save goes away on its own: a notice that stays is a
+  // message that takes the place of the work.
+  useEffect(() => {
+    if (savedMessage === null) {
+      return;
+    }
+    const handle = window.setTimeout(() => clearSavedMessage(), SAVED_NOTICE_MS);
+    return () => window.clearTimeout(handle);
+  }, [savedMessage, clearSavedMessage]);
 
   // The keyboard of the editor: undo, redo, copy and paste.
   useEffect(() => {
@@ -125,7 +142,7 @@ export default function App() {
           <span className="text-[11px] text-slate-500">Simulación GPSS</span>
         </div>
 
-        <ModelPicker />
+        <ModelBar />
 
         <div className="flex items-center gap-1.5">
           <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
@@ -182,7 +199,7 @@ export default function App() {
             pendingSave={pendingSave}
             onNew={() => void newModel()}
             onSave={() => void save()}
-            onSaveAs={(path) => void save(path)}
+            onSaveAs={() => void saveAs()}
             onUndo={() => void undo()}
             onRedo={() => void redo()}
             onRelayout={() => void relayout()}

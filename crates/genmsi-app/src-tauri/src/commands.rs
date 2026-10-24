@@ -9,7 +9,7 @@
 //! with its undo stack, exactly like the dev bridge keeps one in its session
 //! process.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use genmsi_app_engine::{
@@ -17,9 +17,17 @@ use genmsi_app_engine::{
     list_models as list_model_files, model_document_bytes, simulate_document_bytes,
     trace_document_bytes,
 };
+use tauri::Manager;
 
 /// The directory the shell offers as models.
 const MODELS_DIR: &str = "fixtures/models";
+
+/// How many models the list of recents keeps.
+const RECENT_MODELS: usize = 8;
+
+/// The name of the file the recents live in, inside the app's data
+/// directory.
+const RECENTS_FILE: &str = "recent-models.json";
 
 /// Say what the shell did.
 ///
@@ -100,4 +108,65 @@ pub fn session(request: String) -> Result<String, String> {
     log("session: una petición del frontend");
     let response = answer(&mut guard, parsed);
     serde_json::to_string(&response).map_err(|error| error.to_string())
+}
+
+/// The file the recents live in, inside the app's data directory.
+///
+/// The path comes from the resolver of Tauri: the app's data directory is
+/// where the shell may write without asking.
+fn recents_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| format!("no se pudo encontrar el directorio de datos: {error}"))?;
+    Ok(dir.join(RECENTS_FILE))
+}
+
+/// The models opened lately, the most recent first.
+///
+/// A file that is not there, or that cannot be read, is a list without
+/// recents: the app opens models anyway.
+fn read_recents(file: &Path) -> Vec<String> {
+    let Ok(text) = std::fs::read_to_string(file) else {
+        return Vec::new();
+    };
+    let Ok(models) = serde_json::from_str::<Vec<String>>(&text) else {
+        return Vec::new();
+    };
+    models
+}
+
+/// Write the recents, creating the app's data directory if it is not there.
+fn write_recents(file: &Path, models: &[String]) -> Result<(), String> {
+    if let Some(dir) = file.parent() {
+        std::fs::create_dir_all(dir)
+            .map_err(|error| format!("no se pudo crear {}: {error}", dir.display()))?;
+    }
+    let text = serde_json::to_string_pretty(models).map_err(|error| error.to_string())?;
+    std::fs::write(file, text)
+        .map_err(|error| format!("no se pudo escribir {}: {error}", file.display()))
+}
+
+/// The models opened lately, the most recent first.
+#[tauri::command]
+pub fn recent_models(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let file = recents_file(&app)?;
+    log("recent_models: los modelos recientes");
+    Ok(read_recents(&file))
+}
+
+/// Remember a model as one of the last opened ones.
+///
+/// The list is short and the last one is the first: the model the reader
+/// comes back to is the one he opened last.
+#[tauri::command]
+pub fn remember_model(app: tauri::AppHandle, path: String) -> Result<Vec<String>, String> {
+    let file = recents_file(&app)?;
+    log(&format!("remember_model: {path}"));
+    let mut models = read_recents(&file);
+    models.retain(|model| model != &path);
+    models.insert(0, path);
+    models.truncate(RECENT_MODELS);
+    write_recents(&file, &models)?;
+    Ok(models)
 }

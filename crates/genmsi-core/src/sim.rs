@@ -28,6 +28,39 @@ use crate::stat::Entities;
 use crate::stat::Table;
 use crate::xact::{Transaction, XactId, XactState};
 
+/// The order of the chain of delay of a facility.
+///
+/// The original serves the chain by priority, descending, and among the ones
+/// of the same priority by the order in which they arrived
+/// (`odd/tasks/notas-orden-simultaneos.md`): the identifier of a transaction
+/// grows with its birth, so it is the order of arrival.
+fn facility_waiter_order(
+    xacts: &HashMap<XactId, Transaction>,
+    xact: XactId,
+) -> (std::cmp::Reverse<i64>, XactId) {
+    (
+        std::cmp::Reverse(xacts.get(&xact).map(|xact| xact.priority).unwrap_or(0)),
+        xact,
+    )
+}
+
+/// The order of the chain of delay of a storage.
+///
+/// The priority decides, as in a facility, but among the ones of the same
+/// priority the last one that was programmed is the first one served: the
+/// original takes the events of an instant in the reverse order of their
+/// programming, and the chain of a storage is served by the events the
+/// engine programs for it.
+fn storage_waiter_order(
+    xacts: &HashMap<XactId, Transaction>,
+    xact: XactId,
+) -> (std::cmp::Reverse<i64>, std::cmp::Reverse<XactId>) {
+    (
+        std::cmp::Reverse(xacts.get(&xact).map(|xact| xact.priority).unwrap_or(0)),
+        std::cmp::Reverse(xact),
+    )
+}
+
 /// What the interruption of a facility's owner left behind.
 struct OwnerInterruption {
     /// The block the owner was in.
@@ -1067,7 +1100,6 @@ impl<'p> Simulation<'p> {
                         facility.entries += 1;
                         true
                     } else {
-                        facility.waiters.push(xact);
                         false
                     }
                 };
@@ -1090,12 +1122,12 @@ impl<'p> Simulation<'p> {
                     self.counted_at.remove(&xact);
                     self.leave_counted_at(xact, block_index, block.next_default(), counted);
                 } else {
-                    let mut waiters = {
-                        let facility = self.entities.facility(&name, self.now);
-                        std::mem::take(&mut facility.waiters)
-                    };
-                    waiters.sort_by_key(|waiter| (std::cmp::Reverse(self.priority_of(*waiter)), *waiter));
-                    self.entities.facility(&name, self.now).waiters = waiters;
+                    // The transaction waits: it joins the chain of delay in
+                    // its place. The chain is kept sorted, so the newcomer
+                    // goes between the waiters that have a higher priority
+                    // and the ones that arrived before it: the chain is
+                    // neither copied nor sorted again.
+                    self.push_facility_waiter(&name, xact);
                     if let Some(transaction) = self.xacts.get_mut(&xact) {
                         transaction.transition(XactState::Waiting);
                     }
@@ -1230,13 +1262,13 @@ impl<'p> Simulation<'p> {
                     self.counted_at.remove(&xact);
                     self.leave_counted_at(xact, block_index, block.next_default(), counted);
                 } else {
-                    let mut waiters = {
-                        let storage = self.entities.storage(&name, capacity, self.now);
-                        storage.waiters.push(xact);
-                        std::mem::take(&mut storage.waiters)
-                    };
-                    waiters.sort_by_key(|waiter| (std::cmp::Reverse(self.priority_of(*waiter)), *waiter));
-                    self.entities.storage(&name, capacity, self.now).waiters = waiters;
+                    // The transaction waits: it joins the chain of delay in
+                    // its place. The chain of a storage is kept in the order
+                    // in which it is served, so the newcomer goes before the
+                    // waiters of the same priority that were programmed
+                    // before it: the chain is neither copied nor sorted
+                    // again.
+                    self.push_storage_waiter(&name, capacity, xact);
                     if let Some(transaction) = self.xacts.get_mut(&xact) {
                         transaction.transition(XactState::Waiting);
                     }
@@ -2254,60 +2286,148 @@ impl<'p> Simulation<'p> {
         self.retry_gates();
     }
 
-    fn release_waiters(&mut self, name: &str) {
-        let waiters = {
-            let facility = self.entities.facility(name, self.now);
-            std::mem::take(&mut facility.waiters)
-        };
-        if waiters.is_empty() {
-            return;
+    /// Put a waiter in its place in the chain of delay of a facility.
+    ///
+    /// The chain is kept sorted: the newcomer goes between the waiters that
+    /// have a higher priority and the ones that arrived before it. The
+    /// chain is neither copied nor sorted again: the chain of a facility
+    /// with a long queue of waiters is the reason a release used to cost
+    /// more and more as the queue grew.
+    fn push_facility_waiter(&mut self, name: &str, xact: XactId) {
+        let xacts = &self.xacts;
+        let target = facility_waiter_order(xacts, xact);
+        let position = self
+            .entities
+            .facilities
+            .get(name)
+            .map(|facility| {
+                facility
+                    .waiters
+                    .partition_point(|waiter| facility_waiter_order(xacts, *waiter) < target)
+            })
+            .unwrap_or(0);
+        self.entities
+            .facility(name, self.now)
+            .waiters
+            .insert(position, xact);
+    }
+
+    /// Put a waiter in its place in the chain of delay of a storage.
+    ///
+    /// The chain is kept sorted, as the chain of a facility, but in the
+    /// order in which it is served: the priority first and, among the ones
+    /// of the same priority, the last one that was programmed.
+    fn push_storage_waiter(&mut self, name: &str, capacity: i64, xact: XactId) {
+        let xacts = &self.xacts;
+        let target = storage_waiter_order(xacts, xact);
+        let position = self
+            .entities
+            .storages
+            .get(name)
+            .map(|storage| {
+                storage
+                    .waiters
+                    .partition_point(|waiter| storage_waiter_order(xacts, *waiter) < target)
+            })
+            .unwrap_or(0);
+        self.entities
+            .storage(name, capacity, self.now)
+            .waiters
+            .insert(position, xact);
+    }
+
+    /// Take the head of the chain of delay of a facility.
+    ///
+    /// The chain is kept sorted, so the head is the first one: the waiter
+    /// with the highest priority and, among them, the one that arrived
+    /// first. The ones that are no longer there are dropped: they cannot be
+    /// resumed and they are not waiting anymore.
+    fn take_facility_waiter(&mut self, name: &str) -> Option<XactId> {
+        loop {
+            let head = {
+                let facility = self.entities.facility(name, self.now);
+                if facility.waiters.is_empty() {
+                    return None;
+                }
+                facility.waiters.remove(0)
+            };
+            if self.xacts.contains_key(&head) {
+                return Some(head);
+            }
         }
-        let mut sorted: Vec<XactId> = waiters
-            .into_iter()
-            .filter(|candidate| self.xacts.contains_key(candidate))
-            .collect();
-        sorted.sort_by_key(|xact| (std::cmp::Reverse(self.priority_of(*xact)), *xact));
+    }
+
+    /// Take the head of the chain of delay of a storage.
+    ///
+    /// The chain is kept sorted in the order in which it is served, so the
+    /// head is the first one. The ones that are no longer there are
+    /// dropped: they cannot be resumed and they are not waiting anymore.
+    fn take_storage_waiter(&mut self, name: &str, capacity: i64) -> Option<XactId> {
+        loop {
+            let head = {
+                let storage = self.entities.storage(name, capacity, self.now);
+                if storage.waiters.is_empty() {
+                    return None;
+                }
+                storage.waiters.remove(0)
+            };
+            if self.xacts.contains_key(&head) {
+                return Some(head);
+            }
+        }
+    }
+
+    fn release_waiters(&mut self, name: &str) {
         // Retry only the head of the pending chain; the rest stay queued for the
         // next release. Resuming one waiter and dropping the others would strand
         // every transaction behind it in the SEIZE block forever.
-        let resumed = if sorted.is_empty() {
-            None
-        } else {
-            Some(sorted.remove(0))
+        //
+        // The chain is kept sorted, so the head is the first one: the chain
+        // is not copied, not filtered and not sorted again.
+        let Some(xact) = self.take_facility_waiter(name) else {
+            return;
         };
-        if !sorted.is_empty() {
-            let facility = self.entities.facility(name, self.now);
-            sorted.append(&mut facility.waiters);
-            facility.waiters = sorted;
-        }
-        if let Some(xact) = resumed
-            && let Some(block) = self
-                .xacts
-                .get(&xact)
-                .and_then(|transaction| transaction.current_block)
+        if let Some(block) = self
+            .xacts
+            .get(&xact)
+            .and_then(|transaction| transaction.current_block)
         {
             self.resume_block(xact, block);
         }
     }
 
+    /// Let the waiters of a storage in, one at a time.
+    ///
+    /// The chain of delay of a storage is served by the order in which it is
+    /// kept: the priority first and, among the ones of the same priority,
+    /// the last one that was programmed. The waiter that gets in is the
+    /// first one of the chain, and the one it leaves behind takes its place
+    /// when the storage has room again: the chain is not copied, not
+    /// filtered and not sorted again.
+    ///
+    /// While the storage is full nobody can get in, so the chain waits for
+    /// the next unit: the waiters are not resumed one by one to find out
+    /// that they do not fit, and the storage does not spend its time
+    /// waking transactions that cannot get in. The waiters of a storage all
+    /// take the same number of units, unless the model says otherwise, so
+    /// the one that is first in the chain is the one that gets in.
     fn release_storage_waiters(&mut self, name: &str) {
-        let waiters = {
-            // A storage the model does not declare has no waiters: the run
-            // stops at the first use of it.
-            let Some(capacity) = self.storage_capacity(name) else {
-                return;
-            };
-            let storage = self.entities.storage(name, capacity, self.now);
-            std::mem::take(&mut storage.waiters)
+        // A storage the model does not declare has no waiters: the run
+        // stops at the first use of it.
+        let Some(capacity) = self.storage_capacity(name) else {
+            return;
         };
-        for xact in waiters {
-            let Some(block) = self
-                .xacts
-                .get(&xact)
-                .and_then(|transaction| transaction.current_block)
-            else {
-                continue;
-            };
+        if self.entities.storage(name, capacity, self.now).remaining() == 0 {
+            return;
+        }
+        let Some(xact) = self.take_storage_waiter(name, capacity) else {
+            return;
+        };
+        if let Some(block) = self
+            .xacts
+            .get(&xact)
+            .and_then(|transaction| transaction.current_block)
+        {
             self.resume_block(xact, block);
         }
     }
@@ -2392,13 +2512,9 @@ impl<'p> Simulation<'p> {
     /// The transaction queues with the facility's waiters, as a `SEIZE` that
     /// finds the facility busy does.
     fn wait_for_facility(&mut self, xact: XactId, block_index: usize, name: &str) {
-        let mut waiters = {
-            let facility = self.entities.facility(name, self.now);
-            facility.waiters.push(xact);
-            std::mem::take(&mut facility.waiters)
-        };
-        waiters.sort_by_key(|waiter| (std::cmp::Reverse(self.priority_of(*waiter)), *waiter));
-        self.entities.facility(name, self.now).waiters = waiters;
+        // The transaction joins the chain of delay in its place: the chain
+        // is kept sorted, so it is neither copied nor sorted again.
+        self.push_facility_waiter(name, xact);
         if let Some(transaction) = self.xacts.get_mut(&xact) {
             transaction.transition(XactState::Waiting);
         }

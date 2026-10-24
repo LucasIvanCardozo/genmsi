@@ -1,0 +1,26 @@
+01 tool=catalogue args={}
+02 tool=initialize args={"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}
+03 tool=catalogue args={"classes":["Generate","Clock","Queue","FacilityUse","Seize","Release","Advance","Assign","Terminate","Counter","Tabulate","Table","StorageDef","Enter","Leave","StorageUse","GateL","Logic","InitialLS"
+04 tool=catalogue args={"classes":["StorageUse","GateL","Logic","InitialLS","Note","Match","GateM","Assemble","Gather","Split","Transfer","Multifurcacion","Buffer","Depart","Priority","Mark","Test","Function","FunctionExpon
+05 tool=catalogue args={"classes":["SaveValue","InitiaSV","GateS","GateF","ExamineNumber","JoinMe","RemoveTrans","Scan","Unlink","QTable","Alter","Preempt","Return","SelectF","FacilityInt","MFunction","MFunctionDist","Multi
+06 tool=lint args={"model": "<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules>\n<module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\"><links><link frommodulei
+07 tool=simulate args={"model": "<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules>\n<module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\"><links>\n<link frommodul
+08 tool=get_trace args={"model": "<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules>\n<module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\"><links>\n<link frommodul
+09 tool=explain_model args={"model": "<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules>\n<module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\"><links>\n<link frommodul
+10 tool=lint args={"model": "<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules>\n<module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\"><links>\n<link frommodul
+11 tool=simulate args={"model": "<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules>\n<module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\"><links>\n<link frommodul
+12 tool=lint args={"model": "<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules>\n<module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Comedor de la facultad\" name=\"Comedor\" kind=\"C\"><links>\
+13 tool=simulate args={"model": "<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules>\n<module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Comedor de la facultad\" name=\"Comedor\" kind=\"C\"><links>\
+14 tool=save_model args={"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida/modelo.gmdl", "model": "<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules>\n<module moduleid=\"0\" moduleclass=\"main\" own
+15 tool=lint args={"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida/modelo.gmdl"}
+16 tool=simulate args={"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida/modelo.gmdl", "seed": 42}
+17 tool=save_model args={"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida/modelo.gmdl", "model": "<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner
+18 tool=lint args={"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida/modelo.gmdl"}
+19 tool=simulate args={"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida/modelo.gmdl", "seed": 42}
+20 tool=save_model args={"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida/modelo.gmdl", "model": "<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner
+21 tool=get_trace args={"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida/modelo.gmdl", "seed": 42, "limit": 20000}
+22 tool=lint args={"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida/modelo.gmdl"}
+23 tool=simulate args={"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida/modelo.gmdl", "seed": 42}
+24 tool=save_model args={"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida/modelo.gmdl", "model": "<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner
+25 tool=explain_model args={"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida/modelo.gmdl"}
+26 tool=get_trace args={"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida/modelo.gmdl", "seed": 42, "limit": 30}

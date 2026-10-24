@@ -100,8 +100,9 @@ echo
 echo "Se abre con: ${app_dir}/genmsi-app-desktop"
 
 # El MCP: la misma CLI, con el subcomando `mcp`, habla el protocolo y
-# publica cuatro herramientas (lint, simulate, get_trace, explain_model).
-# Sin esto, un agente no puede trabajar con los modelos.
+# publica seis herramientas (lint, simulate, get_trace, explain_model,
+# catalogue y save_model). Sin esto, un agente no puede trabajar con los
+# modelos.
 if [[ $with_mcp -eq 1 ]]; then
   echo
   echo "== el MCP =="

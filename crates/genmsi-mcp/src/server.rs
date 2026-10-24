@@ -253,7 +253,7 @@ impl GenmsiServer {
     /// the XML of a block of it.
     #[tool(
         name = "catalogue",
-        description = "Describe the block classes a GenMSI model is built from. Call it BEFORE writing a model: it tells you which classes exist, which ports (ioid) and properties (name, type, value) each class declares, and the exact XML of a block of that class, so you never have to guess an element name. Without arguments it returns the genmsi.classlist/1 document (every class plus the skeleton of a model); with `class` (for example \"Generate\") it returns the genmsi.class/1 document of that class."
+        description = "Describe the block classes a GenMSI model is built from. Call it BEFORE writing a model: it tells you which classes exist, which ports (ioid) and properties (name, hint, type, subtype) each class declares, and the exact XML of a block of that class —with the default value of each property— so you never have to guess an element name. Without arguments it returns the genmsi.classlist/1 document (every class plus the skeleton of a model); with `class` (for example \"Generate\") it returns the genmsi.class/1 document of that class."
     )]
     pub fn catalogue(&self, Parameters(input): Parameters<CatalogueInput>) -> CallToolResult {
         finish(catalogue_document(input.class.as_deref()))

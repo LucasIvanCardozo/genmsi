@@ -266,6 +266,7 @@ pub struct TraceEvent {
 /// The original writes them in its `LOGICSWITCH` section: the value of the
 /// switch and the number of the attempts that failed its test.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct LogicSwitchStat {
     /// Name of the switch.
     pub name: String,
@@ -281,6 +282,7 @@ pub struct LogicSwitchStat {
 /// The original writes the groups of transactions in its `XACT_GROUP` section
 /// and the groups of numbers in its `NUMERIC_GROUP` one.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct GroupStat {
     /// Name of the group.
     pub name: String,
@@ -299,6 +301,7 @@ pub struct GroupStat {
 /// The original writes them in its `FEC_XACT_NUMBER` section: the events of
 /// the transactions that have not happened yet.
 #[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct PendingEvent {
     /// The number of the transaction the event belongs to.
     #[cfg_attr(feature = "ts", ts(as = "f64"))]

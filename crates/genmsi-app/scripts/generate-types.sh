@@ -17,10 +17,18 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 out="$root/crates/genmsi-app/src/types/generated"
 
 cd "$root"
+# The types are generated into a scratch directory first: a generation that
+# fails must not leave the app without the types it already had.
+scratch="$root/target/ts-types"
+rm -rf "$scratch"
+mkdir -p "$scratch"
+TS_RS_EXPORT_DIR="$scratch" cargo test -p genmsi-core -p genmsi-format \
+  --features genmsi-core/ts,genmsi-format/ts --lib export_bindings
+
 rm -rf "$out"
 mkdir -p "$out"
-TS_RS_EXPORT_DIR="$out" cargo test -p genmsi-core -p genmsi-format \
-  --features genmsi-core/ts,genmsi-format/ts --lib export_bindings
+cp "$scratch"/*.ts "$out"/
+rm -rf "$scratch"
 
 echo "generated:"
 ls -1 "$out"

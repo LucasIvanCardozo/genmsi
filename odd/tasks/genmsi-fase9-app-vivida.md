@@ -255,6 +255,28 @@ es el que lo muestra).
   al CLI (`--start`), al motor de la app, al comando de Tauri, al MCP, y a un
   campo en la app al lado del horizonte (que es donde lo tenía el original).
 
+- **S14** — **El modelo en vivo**: la app vigila el archivo que tiene abierto y
+  lo vuelve a correr cuando cambia en disco, para que un agente que está
+  construyendo el modelo y la persona que lo mira vean lo mismo.
+  - La app **no** se entera de los cambios ella sola hoy ✓: abrir el modelo es
+    una operación del usuario ✓ (el diálogo del sistema ✓) → si un agente
+    escribe el `.gmdl`, la app no se entera hasta que alguien vuelve a
+    abrirlo ✓.
+  - **Lo que tiene que quedar**: un comando que devuelve la *huella* del archivo
+    (su fecha de modificación en nanosegundos y su tamaño ✓), y la app la
+    consulta cada medio segundo ✓. Cuando la huella cambia ✓:
+    - si el modelo **carga y compila** ✓ → la app lo recarga ✓ y **vuelve a
+      correrlo** ✓ (en el hilo de trabajo ✓, con su cancelación ✓) → la
+      persona ve el modelo nuevo con su reproducción ✓✓;
+    - si el modelo **no compila** ✓ → la app **muestra el error** ✓, sin
+      romper nada ✓ (que es lo más útil del ciclo agente ↔ persona ✓: se ve
+      al instante que algo está roto ✓);
+    - si la persona tiene **cambios sin guardar** en la app ✓ → no se recarga
+      sola ✓ y se le avisa ✓ (su trabajo no se pisa ✓).
+  - **Lo que no puede cambiar**: el motor ✓, el formato ✓, los contratos ✓,
+  y el resto de la app ✓ (abrir, guardar, la reproducción, el informe ✓).
+  - La recarga **no** borra el historial de deshacer ✓ ni la selección ✓.
+
 ## Tasks
 
 | ID | Specs | Qué | Ruta | Commit |
@@ -270,6 +292,7 @@ es el que lo muestra).
 | T3 | S3 | Horizonte por defecto y aviso cuando el modelo no tiene forma de terminar | app + core | uno |
 | T4a | S4 | Medir el `START` del original (nota `notas-start.md`) | docs | `2e8be61` |
 | T4b | S13 | El `START` pasa a ser un parámetro de la corrida: el motor, el CLI, la app y el MCP | core + cli + app | — |
+| T11 | S14 | El modelo en vivo: la app vigila el archivo abierto y lo vuelve a correr cuando cambia | app | — |
 
 El orden importa: **T1 va primero** (es la causa del costo). T5, T6 y T7 no
 tocan el motor y pueden ir en paralelo. T2 y T3 pueden venir después. T4 es

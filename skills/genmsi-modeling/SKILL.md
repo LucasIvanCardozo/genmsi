@@ -163,12 +163,12 @@ Do not mix the two percentage forms: in an expression `70%` is 700, but in `Tran
 - **A model needs a way to end**: a `Clock` or a `Terminate` with a positive operand. Without one the engine refuses the model.
 - **The `Clock` is the horizon.** It takes one unit of the start counter every `Frecuencia` units, so a `Clock` with `Frecuencia=60` ends a run with `start=1` at time 60, and with `start=2` at time 120. The `Clock` compiles into a generator and a terminate: the report shows two rows for it.
 - **`Terminate.Unidades`** takes that many units from the counter for every transaction that arrives. `Unidades=0` never fires, and the class declares no default for it: a terminate without an operand never ends the run.
-- **A generator does not arrive at time 0**: the first transaction arrives one interval later. A numeric `Modificador` is a symmetric spread, `uniform(Media-Modificador, Media+Modificador)`; `Modificador=0` means exactly `Media`; a **function** as the modifier multiplies the mean (`Media * f(u)`), the idiom for an exponential service.
+- **A generator does not arrive at time 0**: the first transaction arrives one interval later — unless `OffSet` shifts it, and then the first arrival is *at* the offset (`OffSet=120` arrives at time 120, not at 130). A numeric `Modificador` is a symmetric spread, `uniform(Media-Modificador, Media+Modificador)`; `Modificador=0` means exactly `Media`; a **function** as the modifier multiplies the mean (`Media * f(u)`), the idiom for an exponential service.
 - **`FacilityUse` is five statements**: queue, seize, depart, advance, release. The transaction waits in the `Queue` while the facility is busy.
-- **`Queue` joins and leaves**: the transaction enters the queue and leaves it as soon as the block lets it continue; the report counts the entries of the queue and the time spent in it.
-- **`Match` is a rendezvous**: the transaction waits at the block (the trace shows a `backup` event) for the transaction that carries the conjugate label; the pair then continues together.
+- **`Queue` joins, it does not dequeue**: the transaction enters the queue and goes on its way; it stays in the queue until a `Depart` takes it out. A queue whose model has no `Depart` never empties, and the report says so (`content` grows, `zero_entries` stays at zero).
+- **`Match` is a rendezvous**: the transaction waits at the block (the trace shows a `backup` event) for the transaction that carries the conjugate label; the pair then continues together — **both** of them, so **both** keep whatever they had taken. A rendezvous is not a handover of one item to the other.
 - **`Transfer` splits**: the first output takes the share `Prob`, the second takes the rest.
-- **A storage needs its capacity**: `StorageDef` declares it; `Enter`/`Leave` (and `StorageUse`) take and give back units, and a transaction that does not fit waits.
+- **A storage needs its capacity**: `StorageDef` declares it. `Enter` takes units and keeps them until a `Leave` gives them back; a transaction that does not fit **waits at the `Enter`**, and a `Leave` never waits. `StorageUse` is the pair in one block: it joins the queue, takes the units, leaves the queue, waits the `Media` and gives the units back. The unit is **held, not consumed**, so a storage of capacity N admits N transactions at a time and the next one waits.
 - **The gate blocks** (`GateF`, `GateL`, `GateS`, `GateM`): the pass goes to `Salida1`; when `Salida2` is not connected, the transaction waits in the block and every change of the state retries the waiters.
 - **`Split` creates copies**: the original continues to its own output and the copies go to `Salida2`.
 - One deviation is documented and **not settled**: with a dispersion, the original draws the first interarrival while the engine schedules the first arrival exactly at `Media`. Do not use the first arrival of a generator to tell the two apart; use the counts over many replications.
@@ -195,7 +195,10 @@ Probe the classes whose behaviour you are not sure of, not the ones the catalogu
 - **`%` means two different things.** In an expression `70%` is 700; in `Transfer.Prob` `85%` is 0.85 and a bare `100` is 10%.
 - **`#` is multiplication**, not division: `160+(P:Tipo-1)#30` is a price.
 - **An entity name may not contain whitespace or `:`**, and the declaration check only fires for a plain name.
-- **The report has one row per statement, not per block.** The `FacilityUse` block is five rows and the `Clock` is two: do not read the row count as the block count.
+- **A queue that never empties.** The `Queue` block joins the queue and continues; only a `Depart` takes the transaction out of it. A model that wants a queue to drain needs the `Depart`.
+- **The report has one row per statement, not per block.** The `FacilityUse` block is five rows and the `Clock` is two: do not read the row count as the block count. `lint`'s `blocks` counts the same statements, not the modules of the document.
+- **The trace numbers the statements, not the modules.** The block of an event is the line of the compiled program, and the `-> N` of a detail is the statement the transaction goes to; neither is the `moduleid` of the document.
+- **`save_model` writes the engine's form of the document.** The writer normalises the whitespace and fills the empty attributes (`hint=""`, `genprefer`): the file it writes is not the text you sent, and the next agent that reads it sees the engine's bytes.
 - **A block without an output port is not a source.** The `Clock`, the definitions and the notes have no outputs and never appear in a link.
 
 ## If the MCP does not tell you something

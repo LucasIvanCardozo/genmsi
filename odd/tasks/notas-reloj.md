@@ -535,3 +535,56 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 ```
+
+## Epílogo: la anomalía del generador que "sorteaba bajo" (refutada)
+
+La sección 1.4 dejó anotado que el generador del original sortea bajo (los
+huecos de dos corridas promediaban 4,562 contra 5,0, con chi2 26,48 y 4
+grados de libertad). **Eso no se sostiene**, y la prueba es de conteo, no de
+densidad:
+
+- La medición de 1.4 mira **los últimos 1000 unidades de una sola corrida**.
+  Medida la corrida **entera**, el generador de la sonda tiene 733 entradas
+  (732 llegadas más la pendiente de la FEC) contra las **719,63 ± 7,59** que
+  predice la regla de la manual (uniforme entera sobre `[A-B, A+B]`): **z =
+  +1,63**. La media de los huecos de la corrida entera es 4,912.
+- La segunda sonda (`AdvanceDelay`, 60,30): 61 llegadas contra 59,55 ± 2,30
+  esperadas → **z = +0,63**.
+- **La prueba decisiva**: 51 corridas del original con un generador `60,30`
+  sobre 3600 dan **59,29 ± 0,32** llegadas contra las **59,55 ± 2,30**
+  esperadas → **z = −0,80**, y el histograma de los conteos da **chi2 4,75 con
+  4 grados de libertad (p ≈ 0,32)** contra la distribución simulada de la
+  regla. Una media baja (57) pediría 63,1 llegadas: **11,6 sigma** lejos. El
+  conteo es una estadística de la corrida entera, insensible a dónde se mire.
+
+O sea: **el generador del original no sortea bajo**.
+
+Lo que sí queda sin explicar es otra cosa: la ventana final de esas dos
+corridas es **más densa** que el modelo de renovación (218 llegadas contra
+200,03 ± 3,99, **z = +4,5**; y 20 contra 16,67 ± 1,28, **z = +2,6**), y las
+dos ventanas de la *misma* corrida difieren **4,8 sigma** (los primeros 514
+huecos promedian 5,06 y los últimos 217, 4,56). El ACF de la serie de huecos
+no muestra periodicidad (|ACF| ≤ 0,14 en los retardos 1 a 5). Es una
+pregunta sobre el **flujo aleatorio** del original (o sobre la ventana
+elegida), no sobre la distribución del generador. Queda anotada, con los
+guiones reproducibles en `/tmp/reloj-analisis/` (fuera del repositorio) sobre
+los reportes del original que ya estaban en `/tmp/reloj-probes/oracle/` y
+`/tmp/all-oracle/`.
+
+## Epílogo: la primera llegada, ya sorteada
+
+La unidad del core aplicó lo que esta nota midió (sección 2): la primera
+llegada de un generador **con dispersión** es un intervalo sorteado con la
+misma regla que los de adelante (`apply_modifier`, del flujo propio del
+bloque), y sin dispersión sigue siendo la media exacta, **sin consumir
+números** del flujo. Con `offset` (operando C) manda el offset, como dice el
+manual.
+
+**Una desviación que queda anotada**: cuando el modificador es una **función**
+(`GENERATE 60,FN$Expon`), la primera llegada sigue siendo la media. El
+manual dice que el primer incremento "es calculado desde los operandos A y
+B", o sea que la función debería entrar; pero aplicarla consume un número
+del flujo de esa función y mueve todas sus evaluaciones siguientes, y la
+medición no da evidencia a favor: el TP4 queda en 56 de 65 (contra 62 de 65
+de la base) y el Parcial sube a 138 de 150 (contra 134 de 150). Queda como
+decisión de quien coordina; es una línea en `Simulation::first_arrival`.

@@ -392,3 +392,33 @@ pendiente).
   estado de git (sólo se leyó).
 - Sólo se añadieron este documento y los dos scripts (que después se movieron
   a `scripts/wine-oracle/`).
+
+## Epílogo: el punto 2 está aplicado
+
+El punto 2 de esta nota ("con dispersión, el primer intervalo del original se
+sortea y el nuestro no") **quedó arreglado** por la unidad del core:
+
+- `crates/genmsi-core/src/sim.rs`: la nueva `Simulation::first_arrival`
+  programa la primera llegada con el mismo sorteo que los intervalos que
+  siguen (`apply_modifier`, del flujo propio del bloque), así que la primera
+  llegada toma el **primer** número del generador y las siguientes los que
+  siguen, igual que en el original.
+- Sin dispersión (o con dispersión 0) la primera llegada sigue siendo la
+  media exacta y **no consume ningún número**: los dieciocho modelos
+  deterministas de la tabla de esta nota quedan idénticos byte a byte.
+- Con `offset` (operando C) manda el offset, como dice el manual.
+- El test nuevo `crates/genmsi-core/tests/primera_llegada.rs` fija los cuatro
+  casos (con dispersión, sin dispersión, con dispersión 0 y con offset).
+
+**Lo que queda anotado**: cuando el modificador es una **función**
+(`GENERATE 60,FN$Expon`), la primera llegada sigue siendo la media. El
+manual pediría aplicar la función, pero hacerlo consume un número de su
+propio flujo y mueve todas las evaluaciones siguientes de esa función, y la
+medición no acompaña: el TP4 queda en 56 de 65 (contra 62 de 65) y el
+Parcial sube a 138 de 150 (contra 134 de 150). Queda como decisión de quien
+coordina.
+
+**Con la regla del orden de los eventos de un mismo instante** (commit
+`444d5b2`), la paridad con el original de los veinticinco modelos de
+referencia mejora en tres (TP4 61→62, TP6_3 14→15, TP8 109→114) y pierde
+una métrica en el TP2 (57→56, que es el ruido de una sola corrida).

@@ -231,6 +231,10 @@ fn wait_trace_still_carries_the_entity_name() {
         let expected = match &block.kind {
             BlockKind::Seize(spec) => spec.facility.to_string(),
             BlockKind::Enter(spec) => spec.storage.to_string(),
+            // A `PREEMPT` that finds the facility busy waits for it, the
+            // same way a `SEIZE` does, and the entity it waits for is the
+            // facility.
+            BlockKind::Preempt(spec) => spec.facility.to_string(),
             other => panic!("unexpected waiting block {other:?}"),
         };
         assert_eq!(event.detail, expected, "the wait event names the entity");

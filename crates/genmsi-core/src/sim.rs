@@ -475,29 +475,19 @@ impl<'p> Simulation<'p> {
             );
         }
         // Schedule every generator's first arrival: the offset when given,
-        // otherwise the mean interarrival (GPSS places the first transaction at
-        // time A, not at time zero).
-        let generators: Vec<(usize, GenerateSpec)> = program
+        // otherwise the first interarrival, drawn like the ones that follow
+        // (GPSS places the first transaction at time A, not at time zero).
+        let generators: Vec<(usize, u32, GenerateSpec)> = program
             .blocks
             .iter()
             .enumerate()
             .filter_map(|(index, block)| match &block.kind {
-                BlockKind::Generate(spec) => Some((index, spec.clone())),
+                BlockKind::Generate(spec) => Some((index, block.stream, spec.clone())),
                 _ => None,
             })
             .collect();
-        for (index, spec) in generators {
-            let first = {
-                let mut ctx = CtxView {
-                    sim: self,
-                    xact: 0,
-                    depth: 0,
-                };
-                match &spec.offset {
-                    Some(offset) => offset.eval(&mut ctx),
-                    None => spec.mean.eval(&mut ctx),
-                }
-            };
+        for (index, stream, spec) in generators {
+            let first = self.first_arrival(&spec, stream);
             self.generators[index] = Some(GeneratorState {
                 created: 0,
                 pending: true,
@@ -513,6 +503,51 @@ impl<'p> Simulation<'p> {
             // ahead of the events of the transactions of a higher priority.
             let priority = self.generator_priority(&spec);
             self.push_event(first.max(0.0), priority, index, None, EventKind::Tick);
+        }
+    }
+
+    /// The instant of the first arrival of a generator.
+    ///
+    /// The manual of the original: "El operando C puede ser usado para
+    /// especificar un incremento de tiempo positivo para la primera
+    /// transacción. En otro caso, el primer tiempo de incremento es calculado
+    /// desde los operandos A y B." So the offset, when the model brings one,
+    /// is the increment of the first transaction and nothing is drawn; without
+    /// an offset the first increment is the one the generator draws for the
+    /// arrivals that follow, with the same rule (`apply_modifier`).
+    ///
+    /// A generator without a spread has nothing to draw: it starts at its
+    /// mean, exactly as before.
+    fn first_arrival(&mut self, spec: &GenerateSpec, stream: u32) -> f64 {
+        let (mean, spread) = {
+            let mut ctx = CtxView {
+                sim: self,
+                xact: 0,
+                depth: 0,
+            };
+            match &spec.offset {
+                Some(offset) => return offset.eval(&mut ctx),
+                None => {
+                    let mean = spec.mean.eval(&mut ctx);
+                    // A function modifier is left alone: evaluating it here
+                    // would consume a number of its own stream and move every
+                    // later evaluation of it, and the original's rule for that
+                    // case is not measured.
+                    let spread = match &spec.modifier {
+                        Some(expr) if !is_function_modifier(expr) => expr.eval(&mut ctx).abs(),
+                        _ => 0.0,
+                    };
+                    (mean, spread)
+                }
+            }
+        };
+        if spread > 0.0 {
+            // The same draw the intervals that follow make: the first
+            // arrival takes the first number of the generator's own stream,
+            // and the ones that follow take the numbers that come after it.
+            apply_modifier(mean, Some((spread, false)), &mut self.streams, stream)
+        } else {
+            mean.max(0.0)
         }
     }
 
@@ -2912,16 +2947,24 @@ fn evaluate_delay(
 ) -> (f64, Option<(f64, bool)>) {
     let mean = mean.eval(ctx);
     let modifier = modifier.map(|expr| {
-        let is_function = matches!(
-            expr.ast(),
-            crate::expr::Expr::Ref {
-                kind: RefKind::Function,
-                ..
-            }
-        );
+        let is_function = is_function_modifier(expr);
         (expr.eval(ctx), is_function)
     });
     (mean, modifier)
+}
+
+/// Whether a delay modifier is a function (the GPSS idiom `GENERATE FN$Mean,FN$Expon`).
+///
+/// A function modifier multiplies the mean by the value of the function; a
+/// numeric one is a symmetric spread around it.
+fn is_function_modifier(expr: &ProgramExpr) -> bool {
+    matches!(
+        expr.ast(),
+        crate::expr::Expr::Ref {
+            kind: RefKind::Function,
+            ..
+        }
+    )
 }
 
 /// Turn a delay mean and modifier into a sampled delay.

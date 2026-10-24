@@ -165,6 +165,74 @@ lista de ejemplos: es una herramienta de desarrollo, no la app final.
 cambio. Quitar el desplegable sin el diálogo deja la app sin forma de abrir
 nada.
 
+### S9 — Los controles del modelo van en la barra de herramientas
+
+Hoy los controles del modelo (el nombre del modelo abierto, «Abrir…» y el menú
+de «Recientes») están en una barra propia, con el «MODELO» de antes. La barra
+de herramientas de la app —la de «Nuevo», «Guardar», «Guardar como…»,
+«Deshacer», «Rehacer», «Encuadrar», «Borrar» y «Recomendar»— tiene más
+espacio y es donde corresponde: son comandos del modelo, como los otros.
+
+**Lo que tiene que quedar**: los controles del modelo en la barra de
+herramientas, y el **input de la semilla más ancho** (que hoy no muestra el
+número completo).
+
+### S10 — El texto de «pulsa Ejecutar» no aparece nunca
+
+El panel de Reproducción, cuando no hay corrida, muestra un texto («Pulsa
+«Ejecutar» en la cabecera para reproducir la corrida»). Ese texto:
+
+- no se va nunca hasta que se corre algo, y ocupa el lugar del panel;
+- además quedó **desactualizado**: los botones ya no están en la cabecera.
+
+**Lo que tiene que quedar**: el panel vacío no muestra ese texto (ni otro que
+explique la interfaz). La app final no explica sus controles: los tiene.
+
+### S11 — La velocidad de las bolas: el vuelo del generador
+
+> "la instancia que sale de un generate lo noto mucho mas rapido que los que
+> salen por ejemplo de un advance es normal? o a que se debe? como se calcula
+> esa velocidad? el que sale del advance me gusta, el que sale del generate es
+> muy rapido, no deberia ser ambos igual? hay logica duplicada?"
+
+**La respuesta**: no hay lógica duplicada. Hay **una** regla: el vuelo de una
+bola es el tiempo que la transacción estuvo en el bloque del que salió
+(`crates/genmsi-app/src/monitor/replay.ts`, fn `buildTransitions`: la
+diferencia entre el instante en que entró y el instante en que salió), con dos
+topes: `MIN_FLIGHT = 0,3` (una bola siempre se ve) y `FLIGHT_SECONDS = 2` (una
+bola nunca se arrastra).
+
+La degeneración del generador viene de los datos: una transacción **nace** en
+el generador, así que nunca "entró" en un bloque y **no hay tiempo de vuelo**:
+le toca el piso de 0,3. La del `Advance` es el tiempo que la transacción
+estuvo ahí (10 unidades en el modelo del usuario), recortado al techo de 2.
+O sea: la bola del generador vuela 6,7 veces más rápido que la del advance.
+
+**Lo que hay que decidir** es qué significa el vuelo, porque es una convención
+nuestra (el original no tiene animación). Las opciones están en el encargo de
+la unidad.
+
+### S12 — Una corrida tiene que ser función del programa y la semilla
+
+Encontrado de paso por la unidad del costo (S1): `Simulation::retry_gates`
+(`crates/genmsi-core/src/sim.rs`) recorre un `HashMap<usize, Vec<XactId>>`
+(`gate_waiters`), y **el orden de un `HashMap` es aleatorio por proceso**. O
+sea: la misma corrida con la misma semilla puede dar resultados distintos.
+
+Se ve en `fixtures/models/TP6__Clase 6_2_UltimoCliente.gmdl`: el mismo
+binario con `--seed 1` da dos reportes distintos (207 o 230 lugares en la
+cola PUERTA), y en 30 corridas salen 17/13 y 14/16 de cada variante.
+
+Eso **contradice la decisión D5 del motor** (una corrida queda determinada
+por el programa y la semilla) y es una diferencia con el original, que sí es
+determinista.
+
+**Lo que hay que hacer**: que el recorrido de los espereros de las puertas no
+dependa del orden del hash (por ejemplo, guardar las puertas en el orden de
+sus bloques, o tener un vector de índices ordenado), y que el test que fija el
+determinismo cubra un modelo con `Gate` (hoy `TP6__Clase 6_2_UltimoCliente`
+es el que lo muestra).
+
 ## Tasks
 
 | ID | Specs | Qué | Ruta | Commit |
@@ -173,6 +241,9 @@ nada.
 | T5 | S7 | Una sola corrida: el informe y la traza salen del mismo paso del motor | app | uno |
 | T6 | S5, S6 | La cabecera del monitor desaparece y el aviso de guardado se va solo | app | uno |
 | T7 | S8 | El diálogo del sistema para abrir y guardar, los recientes, y el selector de modelos fuera | app | uno |
+| T8 | S9, S10 | Los controles del modelo en la barra de herramientas, la semilla más ancha, y el texto de «pulsa Ejecutar» fuera | app | uno |
+| T9 | S11 | El vuelo de la bola del generador, con la regla que se decida | app | uno |
+| T10 | S12 | El recorrido de los espereros de las puertas, que hoy depende del orden del hash | core | uno |
 | T2 | S2 | La simulación corre en un hilo de trabajo: la ventana sigue viva, con progreso y cancelación | app | uno |
 | T3 | S3 | Horizonte por defecto y aviso cuando el modelo no tiene forma de terminar | app + core | uno |
 | T4 | S4 | Medir el `START` del original y corregir el motor | core + docs | uno |
@@ -221,3 +292,35 @@ una medición contra el original y no depende de los otros.
   el botón "Abrir…" del diálogo del sistema (S8). El orden que se había
   fijado (el diálogo antes de quitar el desplegable) se cumple en el mismo
   cambio.
+- **L9** — "los botones de abrir, recientes y nombre del modelo tanto el que
+  esta al lado del boton abrir que dice 'sin modelo' como el que esta a la
+  izquierda quiero que se ubique aqui: [la barra de herramientas] siento que
+  tiene mas espacio y aparte es mas adecuado. ademas dandole mas espacio a el
+  input de la semilla, que aprovechando podria ser un poco mas ancho para que
+  mpeuda mostrar el numero completo" — los controles del modelo van en la barra
+  de herramientas (S9).
+- **L10** — "esto sigue apareciendo, eso debe desaparecer literal, cuando le
+  doy a ejecutar se va, pero literal nunca se debe mostrar" — el texto de
+  «pulsa «Ejecutar» en la cabecera» no se muestra nunca (S10).
+- **L11** — "la instancia que sale de un generate lo noto mucho mas rapido que
+  los que salen por ejemplo de un advance es normal? o a que se debe? como se
+  calcula esa velocidad? el que sale del advance me gusta, el que sale del
+  generate es muy rapido, no deberia ser ambos igual? hay logica duplicada?" —
+  no hay lógica duplicada: hay una regla (el vuelo es el tiempo que la
+  transacción estuvo en el bloque del que salió, con piso 0,3 y techo 2), y
+  la del generador degenera porque la transacción nace ahí y no tiene tiempo
+  de vuelo (S11).
+- **L12** — "yo quiero que la velocidad de la bola sea: que tarde 2 segundos
+  en llegar del bloque de donde sale hasta el destino. Por ende la bola debe
+  salir 2 segundos antes de que la instancia pase al bloque siguiente,
+  permitiendo la ilusion de que cuando la bola llegue al bloque objetivo se
+  pase. si la instancia va a salir del bloque en un tiempo menor a dos
+  segundos, el tiempo en llegar se convierte en el tiempo que la instancia va
+  a estar en el bloque... y asi es uniforme para todos" — la regla del vuelo,
+  tal cual: dos segundos, salvo que la instancia estuvo menos de dos
+  segundos en el bloque, en cuyo caso el vuelo es ese tiempo. Es la regla
+  que el motor ya usaba, con una sola diferencia: la transacción nacida en
+  un generador no tiene tiempo de vuelo y le tocaba el piso; ahora vuela los
+  dos segundos enteros (S11, commit `6f446f1`).
+- **L13** — El orden de un `HashMap` es aleatorio por proceso: la misma
+  corrida con la misma semilla puede dar reportes distintos (S12).

@@ -239,3 +239,40 @@ tocan `sim.rs`, así que van seguidos).
   `crates/genmsi-app/LEEME.txt` como texto de la carpeta instalada
   (`989f421`). La instalación anterior era a mano y quedó una copia vieja del
   motor: los números que mostraba la app no eran los de la última versión.
+- **L15** — El reloj entero (worker `mvmhb5vi-1-i0mx`, commits `27f42fb` y
+  `934a5fb`): el reloj de la corrida es **entero**, como el del original ✓. El
+  reporte, la traza, las transacciones, las estadísticas y los eventos
+  pendientes salen enteros **por construcción** (todos leen el mismo reloj ✓),
+  y los contratos publicados conservan sus campos y sus tipos ✓. Los retardos
+  siguen el manual del original: el sorteo de la dispersión es un entero sobre
+  `[A-B, A+B]` inclusive ✓ y el producto media × función se trunca ✓.
+  - **El bucle infinito del retardo 0**, medido contra el original:
+    - el original **rechaza** un modelo con media fraccionaria ("el modelo no
+      puede abrirse porque el archivo presenta errores estructurales") ✓: no
+      hay original contra el que copiar ✓;
+    - con media **entera 0** el original **abre el modelo, lo corre y nunca
+      termina**: el reloj se queda en `00:00:00` y el simulador dice
+      "Simulando..." para siempre ✓ (su memoria crece ✓). O sea que un retardo
+      de cero **no** avanza el reloj del original tampoco ✓ → truncar a 0 es
+      fiel ✓;
+    - nuestro motor hacía lo mismo pero con un GROWTH de la cola de eventos
+      (3,5 GB de RSS en 41 s ✗). La diferencia con el original: el original
+      rechaza el modelo de media fraccionaria ✓ y el nuestro lo corre ✓.
+  - **La desviación que el workerxrime y dejé aceptada**: la media que no es
+    entera **conserva su fracción por dentro** (el reloj visible sigue entero
+    ✓). Está **acotada a los modelos que el original rechaza** ✓: para todo
+    modelo que el original puede abrir los dos relojes son el mismo ✓✓. La
+    razón de no truncar la media: truncar a 0 congelaría el reloj (el bucle
+    infinito ✓) y la app se comería la memoria de la máquina ✗ — el mismo
+    problema que nos costó tres interrupciones ✓.
+  - **Verificado por el padre**: suite verde ✓ (21 binarios, 0 fallos ✓),
+    clippy verde ✓, oráculo **66 de 66** ✓ con las mismas líneas por banco ✓,
+    GPSS **66 de 66** ✓, las diez sondas del orden **10 de 10** ✓, y la paridad
+    con los 25 modelos en **902 de 958** ✓ (la base mide 910 ✓, pero la medida
+    se mueve ±20 métricas entre corridas ✓: con 10 corridas es 821 contra 804 ✓
+    y con 20 es 799 contra 800 ✓).
+  - **La conclusión honesta**: el reloj entero **no mejora de forma medible** la
+    paridad con el original ✓ (el ruido de la medida es mayor que el efecto ✓).
+    Lo que sí cambia es la **forma**: los tiempos del reporte y de la traza
+    son enteros ✓, como los del original ✓ → las cifras de los dos son
+    comparables ✓✓.

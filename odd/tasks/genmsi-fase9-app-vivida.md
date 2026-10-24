@@ -292,7 +292,7 @@ es el que lo muestra).
 | T3 | S3 | Horizonte por defecto y aviso cuando el modelo no tiene forma de terminar | app + core | uno |
 | T4a | S4 | Medir el `START` del original (nota `notas-start.md`) | docs | `2e8be61` |
 | T4b | S13 | El `START` pasa a ser un parámetro de la corrida: el motor, el CLI, la app y el MCP | core + cli + app | — |
-| T11 | S14 | El modelo en vivo: la app vigila el archivo abierto y lo vuelve a correr cuando cambia | app | — |
+| T11 | S14 | El modelo en vivo: la app vigila el archivo abierto y lo vuelve a correr cuando cambia | app | 75c9af9 |
 
 El orden importa: **T1 va primero** (es la causa del costo). T5, T6 y T7 no
 tocan el motor y pueden ir en paralelo. T2 y T3 pueden venir después. T4 es
@@ -447,3 +447,18 @@ una medición contra el original y no depende de los otros.
   el **sistema avise** (`inotify` ✓), con reacción al instante y la CPU quieta ✓— y
   se decidió **la pregunta**: es más simple ✓, no agrega dependencias ✓ y es más
   fácil de probar ✓; el retraso de medio segundo no se nota ✓.
+
+- **L18** — La prueba manual del modelo en vivo, en un **display privado**
+  (`:97` ✓), con una **copia** del modelo ✓: el modelo abrió ✓, el archivo se
+  cambió desde afuera ✓ y la app **lo recargó y lo volvió a correr sola** ✓
+  (los rótulos nuevos en pantalla ✓, el reloj corriendo ✓); después el modelo
+  se rompió ✓ y la app **mostró el mensaje del compilador** ✓ y **siguió con el
+  modelo anterior** ✓. El worker había hecho su prueba sobre el escritorio
+  real ✗ y además había modificado el modelo del usuario ✗ (le puso un rótulo
+  y dejó un enlace a un módulo inexistente ✓): el modelo se restauró desde el
+  respaldo de las 14:04 ✓ y quedó **idéntico** ✓.
+  - De paso: un `cargo build --release` de la app **no** sirve ✗ — apunta al
+    servidor de desarrollo ✗; el binario bueno sale de `cargo tauri build` ✓.
+    Y bajo Xvfb hacen falta `GSK_RENDERER=cairo` ✓ y `GDK_BACKEND=x11` ✓
+    (sin ellos el WebKit no dibuja ✗), y el teclado no llega a los diálogos
+    sin gestor de ventanas ✗ (hay que darle el foco a mano ✓).

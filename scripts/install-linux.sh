@@ -40,7 +40,9 @@ done
 
 if [[ $build -eq 1 ]]; then
   echo "== compilando la aplicación =="
-  (cd "${repo}/crates/genmsi-app" && cargo tauri build -j 2)
+  # `cargo tauri build` no acepta `-j`: el paralelismo lo acota el
+  # `.cargo/config.toml` del repositorio (4 trabajos).
+  (cd "${repo}/crates/genmsi-app" && cargo tauri build)
 fi
 
 binary="${repo}/crates/genmsi-app/src-tauri/target/release/genmsi-app-desktop"

@@ -82,6 +82,33 @@ line, one JSON answer per line. The dev bridge holds a `genmsi-app-engine
 session` process open; the desktop shell holds the same session in memory.
 Both call the same functions, so the two backends stay identical.
 
+### The app watches the model it has open
+
+The app asks for the **fingerprint** of the file it has open every half a
+second: the date of the modification, in nanoseconds, and the size. When the
+fingerprint changes, the file changed, and the app:
+
+- **reloads the model** and **runs it again**, by the same path as the button
+  *Ejecutar*: in the thread of the work, with its cancellation. The reader
+  sees the new model and its reproduction without touching anything.
+- **shows the compiler's message** when the model of the disk does not
+  compile, and keeps the model it had. A broken model never empties the app.
+- **does not reload** when the reader has changes that were not saved: the app
+  says that the model of the disk changed and waits. The reader's work is
+  never thrown away by a change somebody else made.
+
+The fingerprint travels as a string because a JavaScript number cannot hold
+nanoseconds since the epoch exactly, and two writes in the same millisecond
+have to look different.
+
+The reload is an operation of the session, like an edit: undoing it brings
+back the session it left behind, with the undo stack it had.
+
+This is what makes the cycle with an agent work: the agent writes the model
+through the MCP's `save_model` (which writes it atomically, so a reader that
+watches the file never sees half of one), and the app, which is watching,
+picks it up by itself.
+
 ### The commands
 
 The commands are the editing API of `genmsi-format`, and their types are

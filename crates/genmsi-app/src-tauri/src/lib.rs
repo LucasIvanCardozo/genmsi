@@ -10,13 +10,20 @@
 
 mod commands;
 
-/// The root of the repository the shell reads its models from.
+/// The root of the repository, when the app is run from one.
 ///
 /// While the app is developed it is the repository itself, so the model paths
 /// the frontend uses are the same ones the dev bridge uses. The shell lives
 /// in `crates/genmsi-app/src-tauri`, so the root is three levels up.
-pub fn app_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
+///
+/// **An installed app has no repository**: the path is baked in at compile
+/// time and it does not exist on the machine of the reader. That is not a
+/// problem — the models are opened with the dialogs of the system and the
+/// recents live in the data directory of the app — so the root is only used
+/// when it is really there.
+pub fn app_root() -> Option<std::path::PathBuf> {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    root.is_dir().then_some(root)
 }
 
 /// Start the shell.
@@ -24,12 +31,10 @@ pub fn run() {
     // The shell has no console of its own: the line goes to the log the
     // smoke check reads, so the path of the desktop app is observable.
     eprintln!("[genmsi-app] el shell arranca");
-    let root = app_root();
-    if std::env::set_current_dir(&root).is_err() {
-        eprintln!(
-            "warning: the application could not move to {}",
-            root.display()
-        );
+    // The app works on a machine where the repository is not: it only moves
+    // to it when it is there, and it never fails for it.
+    if let Some(root) = app_root() {
+        let _ = std::env::set_current_dir(&root);
     }
     tauri::Builder::default()
         // The dialogs of the system: the app opens and saves the models

@@ -44,7 +44,15 @@ static SESSION: Mutex<Option<Session>> = Mutex::new(None);
 /// The models the app offers.
 #[tauri::command]
 pub fn list_models() -> Result<Vec<ModelFile>, String> {
-    let models = list_model_files(Path::new(MODELS_DIR)).map_err(|error| error.to_string())?;
+    // The models of the repository, when the app runs from one: that list is
+    // the one the development bridge uses. An installed app has no
+    // repository, and the models the reader works with are the ones it opens
+    // with the dialog of the system, so the list is empty.
+    let directory = match crate::app_root() {
+        Some(root) => root.join(MODELS_DIR),
+        None => std::path::PathBuf::from(MODELS_DIR),
+    };
+    let models = list_model_files(&directory).unwrap_or_default();
     log(&format!("list_models: {} modelos", models.len()));
     Ok(models)
 }

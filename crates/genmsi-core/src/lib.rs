@@ -40,13 +40,13 @@ pub mod stat;
 pub mod xact;
 
 pub use documents::{
-    CATALOGUE_SCHEMA, CLASSLIST_SCHEMA, CLASS_SCHEMA, CatalogueClass, CatalogueDocument,
-    CataloguePort, CatalogueProperty, ClassDocument, ClassListDocument, ClassListEntry,
-    DefinitionCounts, EXPLAIN_SCHEMA, Envelope, LINT_SCHEMA, LintDocument, MODEL_SCHEMA,
-    ModelBlock, ModelDocument, ModelEdge, ModelPort, ModelProperty, ModelRect, OPEN_MODEL_SCHEMA,
-    REPORT_SCHEMA, TRACE_SCHEMA, TraceDocument, catalogue_document, class_document,
-    class_list_document, lint_diagnostics, lint_document, model_document, to_pretty_json,
-    trace_document,
+    CATALOGUE_SCHEMA, CLASSES_SCHEMA, CLASSLIST_SCHEMA, CLASS_SCHEMA, CatalogueClass,
+    CatalogueDocument, CatalogueEntity, CataloguePort, CatalogueProperty, ClassDocument,
+    ClassesDocument, ClassListDocument, ClassListEntry, DefinitionCounts, EXPLAIN_SCHEMA, Envelope,
+    LINT_SCHEMA, LintDocument, MODEL_SCHEMA, ModelBlock, ModelDocument, ModelEdge, ModelPort,
+    ModelProperty, ModelRect, OPEN_MODEL_SCHEMA, REPORT_SCHEMA, TRACE_SCHEMA, TraceDocument,
+    catalogue_document, class_document, class_list_document, lint_diagnostics, lint_document,
+    model_document, to_pretty_json, trace_document,
 };
 pub use error::EngineError;
 pub use open_model::{

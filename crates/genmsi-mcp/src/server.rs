@@ -150,6 +150,12 @@ pub struct CatalogueInput {
     /// of a model.
     #[serde(default)]
     pub class: Option<String>,
+    /// Names of several classes to describe, in one call.
+    ///
+    /// An agent that needs eight classes asks for the eight: one call
+    /// instead of eight. Give `class` or `classes`, not both.
+    #[serde(default)]
+    pub classes: Option<Vec<String>>,
 }
 
 /// The model the agent asked for: a file on disk or the document itself.
@@ -253,10 +259,10 @@ impl GenmsiServer {
     /// properties and the XML of a block of it.
     #[tool(
         name = "catalogue",
-        description = "Describe the block classes a GenMSI model is built from. Call it BEFORE writing a model: it tells you which classes exist, what each one does (its description), which ports (ioid) and properties (name, hint, type, subtype) each class declares, and the exact XML of a block of that class —with the default value of each property— so you never have to guess an element name. Without arguments it returns the genmsi.classlist/1 document (every class plus the skeleton of a model); with `class` (for example \"Generate\") it returns the genmsi.class/1 document of that class."
+        description = "Describe the block classes a GenMSI model is built from. Call it BEFORE writing a model: it tells you which classes exist, what each one does (its description), which ports (ioid) and properties (name, hint, type, subtype) each class declares, which entities the class declares and which it uses, and the exact XML of a block of that class —with the default value of each property— so you never have to guess an element name. Without arguments it returns the genmsi.classlist/1 document (every class plus the skeleton of a model). With `class` (for example \"Generate\") it returns the genmsi.class/1 document of that class; with `classes` (a list of names) it returns the genmsi.classes/1 document with every class asked for, so an agent that needs several classes asks for them all in ONE call."
     )]
     pub fn catalogue(&self, Parameters(input): Parameters<CatalogueInput>) -> CallToolResult {
-        finish(catalogue_document(input.class.as_deref()))
+        finish(catalogue_document(input.class.as_deref(), input.classes.as_deref()))
     }
 
     /// Say which model the app has open.
@@ -306,19 +312,39 @@ fn explain_document(input: &ModelInput) -> Result<String, ToolError> {
     ))
 }
 
-/// The catalogue document: the list of the classes, or the class asked about.
-fn catalogue_document(class: Option<&str>) -> Result<String, ToolError> {
-    match class {
-        None => Ok(genmsi_core::to_pretty_json(
+/// The catalogue document: the list of the classes, the detail of one class,
+/// or the detail of several classes in one call.
+fn catalogue_document(
+    class: Option<&str>,
+    classes: Option<&[String]>,
+) -> Result<String, ToolError> {
+    match (class, classes) {
+        (Some(_), Some(_)) => Err(ToolError::arguments(
+            "give `class` or `classes`, not both: `class` names one class and `classes` names several",
+        )),
+        (None, None) => Ok(genmsi_core::to_pretty_json(
             genmsi_core::CLASSLIST_SCHEMA,
             &genmsi_core::class_list_document(),
         )),
-        Some(name) => {
+        (Some(name), None) => {
             let document = genmsi_core::class_document(name)
                 .ok_or_else(|| ToolError::class_not_found(name))?;
             Ok(genmsi_core::to_pretty_json(
                 genmsi_core::CLASS_SCHEMA,
                 &document,
+            ))
+        }
+        (None, Some(names)) => {
+            let mut classes = Vec::with_capacity(names.len());
+            for name in names {
+                classes.push(
+                    genmsi_core::class_document(name)
+                        .ok_or_else(|| ToolError::class_not_found(name))?,
+                );
+            }
+            Ok(genmsi_core::to_pretty_json(
+                genmsi_core::CLASSES_SCHEMA,
+                &genmsi_core::ClassesDocument { classes },
             ))
         }
     }

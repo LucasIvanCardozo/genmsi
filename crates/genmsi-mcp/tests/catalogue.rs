@@ -148,6 +148,56 @@ async fn a_class_says_which_entities_it_declares_and_which_it_uses() {
     );
 }
 
+/// The catalogue answers for several classes in one call.
+///
+/// An agent that needs eight classes asks for the eight: one call instead of
+/// eight, and one document to read.
+#[tokio::test]
+async fn the_catalogue_answers_for_several_classes_at_once() {
+    let (client, _server) = pair().await;
+    let document = call(
+        &client,
+        "catalogue",
+        json!({ "classes": ["Generate", "Queue", "Terminate"] }),
+    )
+    .await;
+    assert_eq!(document["schema"], "genmsi.classes/1", "{document}");
+    let classes = document["classes"].as_array().expect("the classes");
+    assert_eq!(classes.len(), 3, "{document}");
+    assert_eq!(classes[0]["class"], "Generate");
+    assert_eq!(classes[1]["class"], "Queue");
+    assert_eq!(classes[2]["class"], "Terminate");
+
+    let single = call(&client, "catalogue", json!({ "class": "Queue" })).await;
+    assert_eq!(single["template"], classes[1]["template"]);
+    assert_eq!(single["declares"], classes[1]["declares"]);
+}
+
+#[tokio::test]
+async fn a_class_that_does_not_exist_fails_the_batch() {
+    let (client, _server) = pair().await;
+    let error = call(
+        &client,
+        "catalogue",
+        json!({ "classes": ["Generate", "NotAClass"] }),
+    )
+    .await;
+    assert_eq!(error["error"], "class_not_found", "{error}");
+    assert_eq!(error["class"], "NotAClass", "{error}");
+}
+
+#[tokio::test]
+async fn the_catalogue_takes_one_class_or_several_but_not_both() {
+    let (client, _server) = pair().await;
+    let error = call(
+        &client,
+        "catalogue",
+        json!({ "class": "Generate", "classes": ["Queue"] }),
+    )
+    .await;
+    assert_eq!(error["error"], "invalid_arguments", "{error}");
+}
+
 #[tokio::test]
 async fn the_catalogue_says_what_every_class_does() {
     let (client, _server) = pair().await;

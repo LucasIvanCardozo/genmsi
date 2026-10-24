@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { engine } from "../engine";
 import { files } from "../engine/files";
+import { adviceFor } from "../engine/reasons";
 import type { ModelRef } from "../engine/adapter";
 import { relayout } from "../edit/layout";
 import {
@@ -30,6 +31,19 @@ export type Status = "idle" | "loading" | "ready" | "running";
  */
 export const STOPPED_NOTICE =
   "La corrida se canceló: el motor la cortó y su resultado se descartó.";
+
+/**
+ * The horizon of the run when the reader does not choose one.
+ *
+ * 3600 is the horizon of the original: the `Clock` block has 3600 as its
+ * default frequency, and the 66 runs of the comparison against the oracle
+ * last 3600 units of simulated time.
+ *
+ * A run without a horizon is a run that lasts until the engine runs out of
+ * patience, so the app puts one there. The reader can change it —or leave
+ * it empty— from the toolbar.
+ */
+export const DEFAULT_UNTIL = 3600;
 
 /**
  * How many trace records the monitor asks the engine for.
@@ -189,6 +203,25 @@ function messageOf(error: unknown): string {
 }
 
 /**
+ * What the app says about a failure of the engine.
+ *
+ * A reason the app knows is an advice: it says what to do about it, and it
+ * is not an error —the model is not broken, the run is what could not
+ * start. A reason the app does not know is a plain failure with the
+ * engine's own message, which is never hidden.
+ */
+function failureOf(
+  error: unknown,
+  what: string,
+): { error: string | null; notice: string | null } {
+  const advice = adviceFor(messageOf(error));
+  if (advice !== null) {
+    return { error: null, notice: advice };
+  }
+  return { error: `${what}: ${messageOf(error)}`, notice: null };
+}
+
+/**
  * A free spot for a new block: under the model, at its left.
  *
  * The spot stays inside the picture the author left, so the graph does not
@@ -266,7 +299,7 @@ export const useApp = create<AppState>((set, get) => ({
   clipboard: [],
   seed: randomSeed(),
   seedIsAuto: true,
-  until: null,
+  until: DEFAULT_UNTIL,
   status: "idle",
   cancelling: false,
   notice: null,
@@ -560,7 +593,8 @@ export const useApp = create<AppState>((set, get) => ({
         set({ status: "ready", cancelling: false, notice: STOPPED_NOTICE });
         return;
       }
-      set({ status: "ready", error: `No se pudo simular el modelo: ${messageOf(error)}` });
+      const failure = failureOf(error, "No se pudo simular el modelo");
+      set({ status: "ready", error: failure.error, notice: failure.notice });
     }
   },
 
@@ -610,10 +644,8 @@ export const useApp = create<AppState>((set, get) => ({
         set({ status: "ready", cancelling: false, notice: STOPPED_NOTICE });
         return;
       }
-      set({
-        status: "ready",
-        error: `No se pudo reproducir la simulación: ${messageOf(error)}`,
-      });
+      const failure = failureOf(error, "No se pudo reproducir la simulación");
+      set({ status: "ready", error: failure.error, notice: failure.notice });
     }
   },
 

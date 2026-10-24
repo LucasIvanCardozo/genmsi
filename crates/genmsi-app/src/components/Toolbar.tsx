@@ -14,7 +14,9 @@ import { useApp } from "../state/store";
  *
  * The seed and the horizon of the run live here too: they are the two
  * numbers the next run takes, and the seed is a 64-bit one, so its field is
- * wide enough to read it whole.
+ * wide enough to read it whole. The horizon comes with the 3600 of the
+ * original: a run without a horizon lasts until the engine runs out of
+ * patience.
  */
 export default function Toolbar({
   dirty,
@@ -99,6 +101,7 @@ export default function Toolbar({
           type="number"
           min={0}
           placeholder="—"
+          title="El horizonte de la corrida, en tiempo simulado. Por defecto 3600, como el reloj del original; vacío es una corrida sin tope."
           value={until ?? ""}
           onChange={(event) => setUntil(event.target.value === "" ? null : Number(event.target.value))}
           className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-mono text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"

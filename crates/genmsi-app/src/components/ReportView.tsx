@@ -2,6 +2,7 @@ import { useState } from "react";
 import { number } from "../format";
 import { closeFigures, type Figures } from "../monitor/stats";
 import { useLive } from "../monitor/live";
+import { endReasonText } from "../engine/reasons";
 import type { ReplayState } from "../monitor/replay";
 import type { ReportDocument } from "../types";
 
@@ -160,7 +161,7 @@ export default function ReportView({
           </span>
         </span>
         <span className="text-slate-500">
-          Fin <span className="font-mono text-slate-800">{report.end_reason}</span>
+          Fin <span className="font-mono text-slate-800">{endReasonText(report.end_reason)}</span>
         </span>
         <span className="text-slate-500">
           Transacciones{" "}

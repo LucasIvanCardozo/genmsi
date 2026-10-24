@@ -1,4 +1,5 @@
 import type { Diagnostics } from "../types";
+import { adviceFor } from "../engine/reasons";
 
 /**
  * What the model compiles to, right now.
@@ -18,10 +19,19 @@ export default function DiagnosticsPanel({
   }
 
   if (diagnostics.status === "error") {
+    // The reason the engine knows is said in the words of the app, with
+    // the remedy; a reason the app does not know is the engine's own
+    // message, which is never hidden.
+    const advice =
+      diagnostics.message === null ? null : adviceFor(diagnostics.message);
     return (
       <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900">
         <p className="font-semibold">El modelo no compila</p>
-        <p className="mt-0.5 font-mono">{diagnostics.message}</p>
+        {advice !== null ? (
+          <p className="mt-0.5">{advice}</p>
+        ) : (
+          <p className="mt-0.5 font-mono">{diagnostics.message}</p>
+        )}
       </div>
     );
   }

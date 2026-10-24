@@ -13,3 +13,8 @@
 # o con `-j` en el comando, si la máquina está libre.
 [build]
 jobs = 4
+
+# El andamiaje de las corridas no va a /tmp: /tmp es un tmpfs (memoria RAM)
+# con un tope de 7,8 GB, y una copia del repositorio o del target son
+# cientos de megas que salen de la RAM. Las comparaciones "antes/después"
+# van a ~/genmsi-scratch, que está en el disco.

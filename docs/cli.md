@@ -13,9 +13,9 @@ fails. The document is deterministic, which is what makes it snapshot-testable
 genmsi <command> [options]
 
 genmsi lint     <model.gmdl> [--json]
-genmsi simulate <model.gmdl> [--seed <n>] [--until <time>] [--json]
-genmsi trace    <model.gmdl> [--seed <n>] [--until <time>] [--limit <n>] [--json]
-genmsi run-all  <directory>  [--seed <n>] [--until <time>] [--json]
+genmsi simulate <model.gmdl> [--seed <n>] [--until <time>] [--start <n>] [--json]
+genmsi trace    <model.gmdl> [--seed <n>] [--until <time>] [--start <n>] [--limit <n>] [--json]
+genmsi run-all  <directory>  [--seed <n>] [--until <time>] [--start <n>] [--json]
 genmsi mcp
 ```
 
@@ -26,11 +26,16 @@ genmsi mcp
 | `--seed <n>` | `simulate`, `trace`, `run-all` | Base seed of every random stream. Without it, a run draws one at random and says which it used, so the run can be repeated by passing that number back. The same seed reproduces the same run, bit for bit. |
 | `--until <time>` | `simulate`, `trace`, `run-all` | Stop once the simulated clock passes `<time>`, instead of running to the model's own termination. The engine stops at the first event after the horizon, so `end_time` can be larger than `<time>`. |
 | `--limit <n>` | `trace` | Maximum number of trace records the engine keeps. Default `100`. |
+| `--start <n>` | `simulate`, `trace`, `run-all` | How many terminations the run waits for. Default `1`, which is what the original's simulator panel shows. The run ends when the counter reaches zero **or below**: the `Terminate` block with an operand A lowers it by that operand per transaction that arrives, and the `Clock` lowers it by one per tick. The model does not declare it (the original has nowhere to declare it either): whoever launches the run sets it. A value below one is refused, like the original ("El Start debe ser mayor a cero."). |
 | `--json` | all | Emit the versioned JSON document instead of the human-readable form (see [`--json` documents](#json-documents)). |
 
 Without `--until`, a model runs until its termination counter reaches zero. All
 25 reference models that the original accepts do that on their own; the five the
 original refuses never start (see [Reference models](#reference-models)).
+
+The counter starts at `--start` (one by default). With one, the run ends with
+the first transaction that reaches the `Terminate`, which is what the original
+does with its default. With five, it ends with the fifth.
 
 ## Exit codes
 
@@ -227,7 +232,7 @@ appear exactly as the user wrote them on the command line.
 | `title` | string | Program title |
 | `seed` | number | Seed used |
 | `start_time`, `end_time` | number | Simulated time span |
-| `end_reason` | string | `terminated`, `no_events` or `time_limit` |
+| `end_reason` | string | `terminated`, `no_events`, `time_limit` or `event_limit` (the run was cut by the engine's guard: the model kept making events without finishing) |
 | `transactions` | number | Transactions created |
 | `events` | number | Events processed |
 | `blocks` | array | One row per executable statement, in report order |
@@ -269,7 +274,7 @@ from it, so a consumer that wants `AVE.CONT.` divides `area` by
 | `title` | string | Program title |
 | `seed` | number | Seed used |
 | `start_time`, `end_time` | number | Simulated time span |
-| `end_reason` | string | `terminated`, `no_events` or `time_limit` |
+| `end_reason` | string | `terminated`, `no_events`, `time_limit` or `event_limit` (the run was cut by the engine's guard: the model kept making events without finishing) |
 | `limit` | number | Record limit the run used |
 | `records` | number | Records kept |
 | `truncated` | boolean | True when `records` reached `limit` |

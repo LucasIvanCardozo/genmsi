@@ -56,6 +56,7 @@ described in [`docs/cli.md`](cli.md#genmsilint1).
 | `model` | string or null | — | The `.gmdl` document as text. |
 | `seed` | number | drawn at random | Seed of every random stream; the run says which it used, and the same seed reproduces the same run. |
 | `until` | number or null | — | Stop once the simulated clock passes this time. |
+| `start` | number | `1` | How many terminations the run waits for, like the original's `Start` field. The run ends when the counter reaches zero or below. The model does not declare it. A value below one is refused. |
 
 Returns the `genmsi.report/1` document, the same document
 `genmsi simulate --json` prints.
@@ -68,6 +69,7 @@ Returns the `genmsi.report/1` document, the same document
 | `model` | string or null | — | The `.gmdl` document as text. |
 | `seed` | number | drawn at random | Seed of every random stream; the run says which it used. |
 | `until` | number or null | — | Stop once the simulated clock passes this time. |
+| `start` | number | `1` | How many terminations the run waits for, like the original's `Start` field. The run ends when the counter reaches zero or below. The model does not declare it. A value below one is refused. |
 | `limit` | number | `100` | Maximum number of trace records to keep. |
 
 Returns the `genmsi.trace/1` document, the same document `genmsi trace --json`

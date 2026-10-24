@@ -13,7 +13,7 @@ OK    TP4__supermercado                              3600.0  terminated
 OK    TP5__burgerShop                                3600.0  terminated
 FAIL  TP6__Clase 6_0_TestGate                    (node 0): no TERMINATE block with operand A and no CLOCK block: the simulation would never finish
 OK    TP6__Clase 6_1_PuertaBanco                     3600.0  terminated
-OK    TP6__Clase 6_2_UltimoCliente                   6097.1  terminated
+OK    TP6__Clase 6_2_UltimoCliente                   6097.0  terminated
 OK    TP6__Clase 6_3_JefeEducado                     3600.0  terminated
 OK    TP7__Clase 7_1_Link_Unlink                     3600.0  terminated
 OK    TP7__Clase 7_2_ProductorConsumidor             3600.0  terminated

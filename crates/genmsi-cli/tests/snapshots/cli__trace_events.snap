@@ -9,5 +9,5 @@ expression: stdout(&output)
  2700.000  T1    #5    GateL          enter
  2700.000  T1    #5    GateL          wait       gate
  2700.000  T1    #5    GateL          backup     -> 13
- 2808.288  T2    #1    Generate       generate
+ 2809.000  T2    #1    Generate       generate
 # trace stopped at the 8 record limit (raise --limit)

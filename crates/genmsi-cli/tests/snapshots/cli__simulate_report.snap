@@ -29,12 +29,12 @@ expression: stdout(&output)
    18        1       0     0             18  TERMINATE       1                          
 
 QUEUE            MAX  CONT. ENTRIES ENTRIES(0) AVE.CONT. AVE.TIME AVE.(-0) RETRY
-  QAFUERA          9     9       9         0     1,250    500,124  500,124    0
+  QAFUERA          9     9       9         0     1,248    499,000  499,000    0
 
 LOGICSWITCH               VALUE      RETRY
   PUERTA                     0          9
 
 FEC_XACT_NUMBER    PRI      BDT    CURRENT   NEXT   PARAMETER   VALUE
             11      0       3600       12      12
-            12      0       3607        1       1
+            12      0       3608        1       1
             13      0       7200       17      17

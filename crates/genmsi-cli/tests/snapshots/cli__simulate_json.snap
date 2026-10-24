@@ -204,7 +204,7 @@ expression: stdout(&output)
         "entries": 9,
         "zero_entries": 0,
         "total_time": 0.0,
-        "area": 4501.111948286849,
+        "area": 4491.0,
         "retry": 0
       }
     },

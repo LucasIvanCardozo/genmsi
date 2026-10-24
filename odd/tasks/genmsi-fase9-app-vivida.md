@@ -430,3 +430,20 @@ una medición contra el original y no depende de los otros.
   - Verificado por el padre: suite verde (67 binarios ✓), clippy verde ✓,
     oráculo **66 de 66** ✓, GPSS **66 de 66** ✓, sondas **10 de 10** ✓, paridad
     **902 de 958** ✓ (821 a 10 corridas ✓, 799 a 20 ✓), el front **117** ✓.
+- **L16** — "veo que el worker esta usando mucho el mouse literal de mi pc para tocar la
+  aplicacion... nunca deberia usar el mouse de la pc del cliente para tocar cualquier
+  cosa" — **corrección del padre al worker** ✓: la prueba manual del modelo en vivo
+  se había hecho sobre el **escritorio real** (`DISPLAY=:0` ✓) manejando la ventana
+  con `xdotool` ✓ → le movió el mouse físico a la persona ✓. **Regla** ✓: toda
+  automatización —la app, el original, el arnés— va en un **display privado**
+  (`Xvfb` ✓) y las capturas se sacan de ese display ✓ (`import -window root` sobre
+  el virtual ✓), nunca con `spectacle` ✗ ni sobre `:0` ✗. Y la automatización **no es
+  parte del diseño** ✗: la app no necesita que nadie la maneje ✓ → la prueba manual
+  es una comodidad ✓ y los tests son la prueba ✓.
+- **L17** — "que es eso de la vigilancia cada medio segundo?" — la app no puede
+  enterarse de que un archivo cambió si nadie se lo dice ✓ → **pregunta cada 500 ms**
+  ✓ si la fecha de modificación (en nanosegundos ✓) y el tamaño cambiaron ✓, y si
+  cambiaron recarga y vuelve a correr el modelo ✓. Se preguntó la alternativa —que
+  el **sistema avise** (`inotify` ✓), con reacción al instante y la CPU quieta ✓— y
+  se decidió **la pregunta**: es más simple ✓, no agrega dependencias ✓ y es más
+  fácil de probar ✓; el retraso de medio segundo no se nota ✓.

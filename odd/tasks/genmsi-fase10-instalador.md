@@ -118,6 +118,7 @@ mismo (un Linux cualquiera, sin instalar) y sí anda.
 | T1 | S1, S4 | La configuración del bundle: iconos, formatos, descripción y los datos del paquete | app | uno |
 | T2 | S2 | La app sin el repositorio: la ruta del repo deja de ser necesaria en tiempo de ejecución | app | uno |
 | T3 | S3 | El bundle se genera, se instala y la app instalada corre | — | — |
+| T4 | S3 | La instalación es un comando, no una sesión de terminal | scripts | `6a746c7` |
 
 El orden: T1 y T2 juntos (son el mismo cambio, la configuración y el
 arranque), y T3 es la prueba.
@@ -132,3 +133,12 @@ arranque), y T3 es la prueba.
 - **L3** — "no te preocupes era un archivo de test" — el `modelo de test` de la
   raíz del repositorio es material de trabajo, no del repo: no se commitea.
   (`L1` y `L3` son la misma cosa, en el orden en que se dijeron.)
+- **L4** — La instalación se había hecho a mano, dos veces, y lo que quedó
+  instalado era una copia vieja del motor: los números que mostraba la app no
+  eran los de la última versión. `scripts/install-linux.sh` (`6a746c7`) hace el
+  paso completo —compilar con `-j 2`, instalar el binario, el lanzador y el
+  icono en las carpetas del usuario, refrescar la caché de iconos del
+  escritorio— y acepta `--no-build` para reinstalar lo ya compilado. El texto
+  que explica el uso de la app instalada (`crates/genmsi-app/LEEME.txt`,
+  `989f421`) pasa a ser parte del proyecto, porque antes sólo existía en la
+  carpeta del usuario.

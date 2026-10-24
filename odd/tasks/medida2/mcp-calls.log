@@ -1,0 +1,24 @@
+01 tool=catalogue args={}
+02 tool=catalogue args={"classes":["Advance","Assign","Assemble","Buffer","Clock","Counter","Depart","Enter","FacilityUse","Function","GateL","Generate","Gather","InitialLS","InitiaSV","Leave","Logic","Mark","Match","Multif
+03 tool=lint args={"model":""}
+04 tool=lint args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+05 tool=simulate args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+06 tool=simulate args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+07 tool=lint args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+08 tool=simulate args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+09 tool=get_trace args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+10 tool=lint args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+11 tool=simulate args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+12 tool=lint args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+13 tool=simulate args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+14 tool=get_trace args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+15 tool=get_trace args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+16 tool=lint args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+17 tool=simulate args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+18 tool=get_trace args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+19 tool=lint args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+20 tool=simulate args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+21 tool=get_trace args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+22 tool=explain_model args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0
+23 tool=save_model args={"path":"/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida2/modelo.gmdl","model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\
+24 tool=simulate args={"model":"<gmodel versioncode=\"1.00.2008.03.23\"><gclasses/><modules><module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\" genprefer=\"1,1,1,1,1,0,0,0

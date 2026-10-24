@@ -162,3 +162,33 @@ Phase 3b session of genmsi-rs. Coordinator: "GenMSI-rs: sesión principal coordi
   move the number is semantic: a class that carries a worked example — a minimal model
   and its trace — so the agent sees the behaviour instead of probing it. That is a
   decision for a later phase, and it is recorded here as the finding, not as work.
+- L11 (measurement, the second run): the same agent, the same prompt and the guide
+  corrected: **24 MCP calls** (2 `catalogue`, 7 `lint`, 9 `simulate`, 5 `get_trace`, 1
+  `explain_model`, 1 `save_model`) and **one** file read. The model is better than the
+  first run's (35 modules, a full cafeteria with the oven in batches of twelve, 953
+  transactions, a line of 47 students before noon) and the agent saved it **once**, when
+  it ran, as the guide says. The evidence is in `odd/tasks/medida2/`.
+  The two runs say the same thing: the calls are the semantics. The first run spent
+  them on a wrong guide and the second on a right one, and the number barely moved —
+  because the semantics of the classes are in the engine and in the docs, not in the
+  tools.
+- L12 (defects the measurements found, and the fixes):
+  1. **The catalogue lied about the generator.** The description of `Generate` said that
+     a `Cantidad` of zero means forever; the engine reads zero as a total of zero and
+     creates nothing, and the empty value is the one that creates transactions forever.
+     The text now says what the engine does (`e71ddc3`), and a test pins the three
+     cases so the text cannot drift again.
+  2. **A typo in a property was silent.** A `StorageDef` with `Tamano` instead of
+     `Tamaño` linted clean and left the storage with no capacity: the model ran and
+     nothing happened. The format now names the property the block probably meant and
+     the lint carries the finding (`442e3e4`). The twenty-five reference models carry
+     none of these findings.
+  3. **The guide was thin** in six places the second agent had to probe: a property the
+     block does not set is read as zero and not as the default of the template, the
+     limit of a generator, the order of the chain of delay, the two blocks a rendezvous
+     needs, the clock that cannot send a transaction and the table that tabulates an
+     expression (`7e5fc0e`).
+- L13 (what is left, for a later phase): the class that carries a **worked example** — a
+  minimal model of that class and its trace — is the lever that would move the number of
+  calls of a cold agent, because it replaces the probe with a reading. The mutation
+  tools are not: the agent writes the XML of a whole model in one call.

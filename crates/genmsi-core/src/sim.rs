@@ -411,7 +411,15 @@ pub struct Simulation<'p> {
     transaction_labels: HashMap<XactId, String>,
     assemble_waiters: HashMap<usize, Vec<(u64, XactId)>>,
     match_waiters: HashMap<usize, VecDeque<XactId>>,
-    gate_waiters: HashMap<usize, Vec<XactId>>,
+    /// The transactions that wait at each gate, by the index of its block.
+    ///
+    /// The map is ordered by the index of the block, and not by a hash: the
+    /// order of a `HashMap` is random by process, and the order in which the
+    /// engine walks the gates decides the order of the resumptions, and with
+    /// it the numbers of the run. A run has to be a function of the program
+    /// and the seed (decision D5), so the gates are walked in the order of
+    /// the program.
+    gate_waiters: BTreeMap<usize, Vec<XactId>>,
     cancelled_resumes: HashSet<(XactId, usize)>,
     /// The connections of the listing, and the block each one leaves.
     ///
@@ -457,7 +465,7 @@ impl<'p> Simulation<'p> {
             transaction_labels: HashMap::new(),
             assemble_waiters: HashMap::new(),
             match_waiters: HashMap::new(),
-            gate_waiters: HashMap::new(),
+            gate_waiters: BTreeMap::new(),
             cancelled_resumes: HashSet::new(),
             connections: crate::gpss::connections(program),
             connection_of: HashMap::new(),
@@ -2342,6 +2350,12 @@ impl<'p> Simulation<'p> {
     }
 
     /// Retry every transaction blocked in a GATE block, in priority order.
+    ///
+    /// The gates are visited in the order of the program: the index of the
+    /// block, which is the order of the map of the waiters (a `BTreeMap`).
+    /// The order of a hash is random by process, and the order of the
+    /// resumptions decides the numbers of the run, so it cannot be the one of
+    /// a hash.
     fn retry_gates(&mut self) {
         let waiters: Vec<(usize, XactId)> = self
             .gate_waiters

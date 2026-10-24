@@ -324,3 +324,16 @@ una medición contra el original y no depende de los otros.
   dos segundos enteros (S11, commit `6f446f1`).
 - **L13** — El orden de un `HashMap` es aleatorio por proceso: la misma
   corrida con la misma semilla puede dar reportes distintos (S12).
+- **L13** — El recorrido de los espereros de las puertas dependía del orden
+  del hash, y con él del proceso: la misma corrida con la misma semilla podía
+  dar dos reportes distintos (207 o 230 lugares en la cola PUERTA del
+  `TP6__Clase_6_2_UltimoCliente`, 17/13 y 14/16 en 30 corridas). **Arreglado**
+  (commit `0302ea5` y el siguiente): las puertas se guardan en un `BTreeMap`
+  y se recorren en el orden del programa. Verificado con veinte corridas del
+  binario en procesos distintos: las veinte dan el mismo reporte, byte a byte
+  (antes: dos variantes). De los 25 modelos de `fixtures/models`, 24 dan el
+  reporte idéntico al de antes y el que cambia es justamente el que era no
+  determinista, que ahora da una sola variante. El conteo de intentos
+  fallidos de la puerta (230 nuestro contra 26 del original) es la diferencia
+  ya anotada en `odd/tasks/notas-w5-motor.md` y este arreglo no la toca:
+  sólo la hace determinista.

@@ -382,3 +382,28 @@ una medición contra el original y no depende de los otros.
     (`--start`), al motor de la app, al comando de Tauri, al MCP, y a un campo
     en la app al lado del horizonte.
   - Se hace **después** del reloj entero: las dos unidades tocan `sim.rs`.
+- **L15** — El `START` como parámetro de la corrida y el guard acotado (worker
+  `mvmjqaeg-3-igko`, commits `ded28c4` y `a1ce822`):
+  - El contador de terminaciones **sale del programa compilado** y pasa a
+    `SimConfig.start` (con **1** por defecto ✓, que es lo que muestra el panel
+    del original ✓). De ahí llega al CLI (`--start` ✓, y un valor menor que
+    uno se rechaza ✓), al motor de la app ✓, al protocolo de sesión ✓, al
+    comando de Tauri ✓, al MCP ✓ y a un campo **«Inicio»** en la barra de
+    herramientas, al lado de «Hasta» ✓.
+  - La regla del descuento, el `Clock` como `GENERATE`+`TERMINATE 1` y
+    `validate_runnable` **no se tocaron** ✓: ya eran los del original ✓.
+  - `genmsi.explain/1` sigue publicando `start_counter` (el default de la
+    corrida) y queda **byte a byte igual** ✓.
+  - **El guard**: el motor tenía un tope de 50 millones de eventos ✓, que con
+    la traza son nueve gigabytes ✗✗. Con un modelo de retardo cero (el reloj no
+    avanza, el horizonte nunca se dispara ✓) el motor se comía **6,1 GB** de la
+    máquina ✗✗. Ahora el tope es **2 millones** de eventos ✓, la corrida
+    **termina** con el motivo `event_limit` ✓ (en vez de fallar con un error ✓)
+    y el informe lo dice ✓. La corrida legítima más grande del repo hace
+    **46.492** eventos ✓ → el tope nuevo está 43 veces por encima ✓.
+  - El detector «el reloj no avanza» **no** se implementó ✓: la medición
+    mostró que en ese modelo el reloj entero **sí** avanza (llega a 1,5e9 ✓),
+    así que ese detector no lo habría cortado ✓ → la red es el guard ✓.
+  - Verificado por el padre: suite verde (67 binarios ✓), clippy verde ✓,
+    oráculo **66 de 66** ✓, GPSS **66 de 66** ✓, sondas **10 de 10** ✓, paridad
+    **902 de 958** ✓ (821 a 10 corridas ✓, 799 a 20 ✓), el front **117** ✓.

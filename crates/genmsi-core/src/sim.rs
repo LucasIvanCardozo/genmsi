@@ -3,6 +3,12 @@
 //! One run is a deterministic function of `(program, seed)` (decision D5).
 //! Events live in a single ordered queue keyed by `(time, priority, sequence)`;
 //! a transaction is only ever in one place, tracked by [`XactState`].
+//!
+//! The order inside an instant is the one of the original (`odd/tasks/
+//! notas-orden-simultaneos.md`): the events of an instant are processed by
+//! priority, from the highest to the lowest, and the ones of the same
+//! priority the other way round: the last one scheduled is the first one
+//! processed.
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
@@ -265,11 +271,12 @@ enum EventKind {
 struct Event {
     time: f64,
     priority: i64,
-    /// The order of the event among the ones of its hour.
+    /// The order of the event among the ones of its instant.
     ///
-    /// It is negative for the events of the hour in which the run ends: the
-    /// original processes those the other way round.
-    seq: i64,
+    /// The original processes the events of the same instant and the same
+    /// priority the other way round: the last one scheduled is the first one
+    /// processed.  The comparison of [`Ord`] is the one that says so.
+    seq: u64,
     block: usize,
     xact: Option<XactId>,
     kind: EventKind,
@@ -294,7 +301,10 @@ impl Ord for Event {
         self.time
             .total_cmp(&other.time)
             .then_with(|| other.priority.cmp(&self.priority))
-            .then_with(|| self.seq.cmp(&other.seq))
+            // Between the events of the same instant and the same priority,
+            // the last one scheduled is the first one processed: the
+            // original's tie-break is the other way round than ours was.
+            .then_with(|| other.seq.cmp(&self.seq))
     }
 }
 
@@ -326,11 +336,6 @@ pub struct Simulation<'p> {
     terminations_left: f64,
     ended: bool,
     end_reason: Option<EndReason>,
-    /// The hour in which the run ends, when the model has a clock.
-    ///
-    /// The original processes the events of that hour the other way round:
-    /// the last one scheduled is the first one processed.
-    end_time: Option<f64>,
     events: u64,
     streams: Streams,
     trace: Vec<TraceEvent>,
@@ -384,7 +389,6 @@ impl<'p> Simulation<'p> {
             terminations_left: program.start_counter,
             ended: false,
             end_reason: None,
-            end_time: None,
             events: 0,
             streams: Streams::new(config.seed),
             trace: Vec::new(),
@@ -416,22 +420,6 @@ impl<'p> Simulation<'p> {
 
     fn install_definitions(&mut self) {
         let program = self.program;
-        // The hour in which the run ends: the clock of the model stops it.
-        // The original processes the events of that hour the other way round
-        // (the last one scheduled is the first one processed), and that
-        // order is what decides whether the arrival of that hour is counted.
-        let end_time = program
-            .blocks
-            .iter()
-            .find_map(|block| match &block.kind {
-                BlockKind::Generate(spec) if spec.termination_tick => Some(spec.mean.eval(&mut CtxView {
-                    sim: self,
-                    xact: 0,
-                    depth: 0,
-                })),
-                _ => None,
-            });
-        self.end_time = end_time;
         for (name, capacity) in &program.definitions.storages {
             self.entities.storage(name, *capacity, 0.0);
         }
@@ -486,8 +474,30 @@ impl<'p> Simulation<'p> {
             // the `ENTRY COUNT` of the generator, not only the ones it has
             // already made.
             self.block_stats[index].entries = 1;
-            self.push_event(first.max(0.0), 0, index, None, EventKind::Tick);
+            // The pending arrival carries the priority of the transaction it
+            // will create: the original puts it in the queue of events with
+            // that priority, and a pending arrival of priority 0 would get
+            // ahead of the events of the transactions of a higher priority.
+            let priority = self.generator_priority(&spec);
+            self.push_event(first.max(0.0), priority, index, None, EventKind::Tick);
         }
+    }
+
+    /// The priority of the transactions a generator creates.
+    ///
+    /// The pending arrival of the generator carries this priority: the
+    /// original puts the arrival in the queue of events with the priority of
+    /// the transaction it will create, and not with the priority 0.
+    fn generator_priority(&mut self, spec: &GenerateSpec) -> i64 {
+        let mut ctx = CtxView {
+            sim: self,
+            xact: 0,
+            depth: 0,
+        };
+        spec.priority
+            .as_ref()
+            .map(|expr| expr.eval(&mut ctx) as i64)
+            .unwrap_or(0)
     }
 
     /// The capacity a `StorageDef` declares for `name`, when the model declares it.
@@ -512,14 +522,7 @@ impl<'p> Simulation<'p> {
         kind: EventKind,
     ) {
         self.seq += 1;
-        let seq = self.seq as i64;
-        // The events of the hour in which the run ends are processed the other
-        // way round: the last one scheduled is the first one processed. Their
-        // number is negated to say so.
-        let seq = match self.end_time {
-            Some(end_time) if time == end_time => -seq,
-            _ => seq,
-        };
+        let seq = self.seq;
         self.heap.push(std::cmp::Reverse(Event {
             time,
             priority,
@@ -708,8 +711,8 @@ impl<'p> Simulation<'p> {
         }
         // The transactions that have not been born yet take the numbers that
         // come after the ones that were born, in the order they will be
-        // born: the original processes the events of the same hour the other
-        // way round, so the last one scheduled is the first one born.
+        // born: the original processes the events of the same instant the
+        // other way round, so the last one scheduled is the first one born.
         let mut by_birth: Vec<usize> = (0..pending.len())
             .filter(|index| pending[*index].xact == 0)
             .collect();
@@ -717,7 +720,11 @@ impl<'p> Simulation<'p> {
             pending[*left]
                 .time
                 .total_cmp(&pending[*right].time)
-                .then_with(|| right.cmp(left))
+                // The pending events are already in the order in which they
+                // will be processed, and the arrivals of the same instant
+                // are born in that order: the last one scheduled is the
+                // first one born.
+                .then_with(|| left.cmp(right))
         });
         for (number, index) in ((self.next_xact + 1)..).zip(by_birth) {
             pending[index].xact = number;
@@ -760,17 +767,7 @@ impl<'p> Simulation<'p> {
         }
 
         self.block_stats[block_index].entries += 1;
-        let priority = {
-            let mut ctx = CtxView {
-                sim: self,
-                xact: 0,
-                depth: 0,
-            };
-            spec.priority
-                .as_ref()
-                .map(|expr| expr.eval(&mut ctx) as i64)
-                .unwrap_or(0)
-        };
+        let priority = self.generator_priority(&spec);
         let xact = self.new_transaction(priority, self.now);
         if self.config.trace {
             self.record_trace(xact, block_index, "generate", String::new());
@@ -825,9 +822,12 @@ impl<'p> Simulation<'p> {
             created,
             pending: true,
         });
+        // The next arrival is pending too, and it carries the priority of
+        // the transaction it will create: the original keeps it in the queue
+        // of events with that priority.
         self.push_event(
             self.now + delay.max(0.0),
-            0,
+            priority,
             block_index,
             None,
             EventKind::Tick,

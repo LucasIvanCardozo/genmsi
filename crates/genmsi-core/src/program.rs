@@ -143,8 +143,6 @@ pub struct GenerateSpec {
     pub offset: Option<ProgramExpr>,
     /// `Prioridad`: priority of generated transactions.
     pub priority: Option<ProgramExpr>,
-    /// Whether this generator is the one a `Clock` block synthesizes.
-    pub termination_tick: bool,
 }
 
 /// `TERMINATE` specification.
@@ -1188,7 +1186,6 @@ impl Compiler<'_> {
                         modifier: None,
                         offset: None,
                         priority: None,
-                        termination_tick: true,
                     }),
                     None,
                     "Generate",
@@ -1217,7 +1214,6 @@ impl Compiler<'_> {
                     modifier: self.sna(module, "Modificador")?,
                     offset: self.sna(module, "OffSet")?,
                     priority: self.sna(module, "Prioridad")?,
-                    termination_tick: false,
                 };
                 Ok(Some(push!(BlockKind::Generate(spec), label, class)))
             }

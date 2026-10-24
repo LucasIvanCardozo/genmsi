@@ -898,6 +898,17 @@ fn interrupted_owner_model(remove_owner: bool) -> Program {
 fn the_preempt_class_sends_the_owner_it_interrupts_to_its_own_output() {
     // The macro code of the original routes the owner of the interrupted
     // facility to the `SalidaAlt` output (`Propietaria`).
+    //
+    // The order inside an instant is the one of the original
+    // (`odd/tasks/notas-orden-simultaneos.md`): the events of an instant are
+    // processed by priority, from the highest to the lowest, and the ones of
+    // the same priority the other way round, the last one scheduled first.
+    // The two generators of this model are born in the same instant, so the
+    // one that comes last in the program (the preemptor) is born first: it
+    // finds the facility free, it takes it and it gives it back at once, and
+    // the owner that is born after it takes the facility without being
+    // interrupted.  The owners that arrive in the instants after that one
+    // are the ones the preemptor interrupts.
     let program = interrupted_owner_model(false);
     let result = run(&program, 100.0, 1);
     let facility = &result.entities.facilities["Maquina"];
@@ -907,9 +918,12 @@ fn the_preempt_class_sends_the_owner_it_interrupts_to_its_own_output() {
         facility.inter,
         "every interrupted owner goes on to the interrupt output"
     );
+    // The owner that was interrupted does not carry on with its own work:
+    // the owners that reach the release are the ones that were not
+    // interrupted.
     assert_eq!(
         entries(&program, &result, "C"),
-        0,
+        entries(&program, &result, "A") - facility.inter,
         "the interrupted owner does not carry on with its own work"
     );
 }
@@ -918,6 +932,11 @@ fn the_preempt_class_sends_the_owner_it_interrupts_to_its_own_output() {
 fn the_preempt_class_removes_the_owner_it_interrupts_when_the_class_says_so() {
     // The `ModoArrebato` of the original: `Remover` takes the owner out of
     // the model instead of routing it.
+    //
+    // The order inside an instant is the one of the original: the preemptor
+    // is born before the owner of the same instant, so the owners that are
+    // interrupted are the ones of the instants after that one (see the test
+    // above).
     let program = interrupted_owner_model(true);
     let result = run(&program, 100.0, 1);
     let facility = &result.entities.facilities["Maquina"];
@@ -927,9 +946,11 @@ fn the_preempt_class_removes_the_owner_it_interrupts_when_the_class_says_so() {
         0,
         "the removed owner goes nowhere"
     );
+    // The owner that was removed does not carry on with its own work: the
+    // owners that reach the release are the ones that were not interrupted.
     assert_eq!(
         entries(&program, &result, "C"),
-        0,
+        entries(&program, &result, "A") - facility.inter,
         "the removed owner does not carry on with its own work"
     );
 }

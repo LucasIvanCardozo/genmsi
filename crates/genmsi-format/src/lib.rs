@@ -26,6 +26,7 @@
 
 pub mod catalogue;
 pub mod declaration;
+pub mod properties;
 pub mod edit;
 pub mod error;
 pub mod model;
@@ -39,6 +40,7 @@ pub use declaration::{
 };
 pub use edit::{EditCommand, EditSession, Position, UndoStep};
 pub use error::{FormatError, Location};
+pub use properties::{UndeclaredProperty, property_warnings, undeclared_properties};
 pub use model::{
     Block, ContainerHeader, CustomClass, GmdlModel, Layout, Link, Port, PortLayout, Property,
     SectionKind, SourcePos, percent_decode, percent_encode,

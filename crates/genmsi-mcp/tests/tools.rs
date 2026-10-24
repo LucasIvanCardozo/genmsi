@@ -299,6 +299,37 @@ async fn el_start_de_la_corrida_llega_al_motor() {
     );
 }
 
+/// The lint says the property a block carries and its class does not.
+///
+/// A typo in the name of a property is silent in the engine: the storage
+/// keeps no capacity and the model runs without saying why. The lint says it,
+/// and it says which property the block probably meant.
+#[tokio::test]
+async fn the_lint_says_the_property_the_class_does_not_declare() {
+    let (client, _server) = pair().await;
+    let document = "<gmodel versioncode=\"1\"><gclasses/><modules>\
+        <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"m\" name=\"m\" kind=\"C\"><links/><inputs/><outputs/></module>\
+        <module moduleid=\"1\" moduleclass=\"StorageDef\" owner=\"0\" caption=\"c\" name=\"n\" kind=\"A\">\
+        <props>\
+        <property name=\"Storage\" hint=\"\" value=\"Almacen\" type=\"EntityDef\" subType=\"Storage\" visible=\"1\" unique=\"1\"/>\
+        <property name=\"Tamano\" hint=\"\" value=\"30\" type=\"PosInteger\" subType=\"\" visible=\"1\" unique=\"0\"/>\
+        </props></module>\
+        <module moduleid=\"2\" moduleclass=\"Clock\" owner=\"0\" caption=\"c\" name=\"c\" kind=\"A\">\
+        <props><property name=\"Frecuencia\" hint=\"\" value=\"3600\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/></props></module>\
+        </modules></gmodel>";
+
+    let linted = call(&client, "lint", json!({ "model": document })).await;
+    assert_eq!(linted["schema"], "genmsi.lint/1");
+    assert_eq!(linted["status"], "diagnostics", "{linted}");
+    let diagnostics = linted["diagnostics"]
+        .as_array()
+        .expect("an array of diagnostics");
+    assert_eq!(diagnostics.len(), 1, "{linted}");
+    let finding = diagnostics[0].as_str().expect("a message");
+    assert!(finding.contains("Tamano"), "{linted}");
+    assert!(finding.contains("Tamaño"), "{linted}");
+}
+
 #[tokio::test]
 async fn the_lint_says_the_warning_of_the_format() {
     let (client, _server) = pair().await;

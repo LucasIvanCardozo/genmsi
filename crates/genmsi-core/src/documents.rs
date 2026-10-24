@@ -141,7 +141,12 @@ pub fn lint_document<'a>(program: &'a Program, model: &GmdlModel, path: &str) ->
 /// the run does about the finding.
 pub fn lint_diagnostics(program: &Program, model: &GmdlModel) -> Vec<String> {
     let mut diagnostics = program.diagnostics.clone();
-    for warning in genmsi_format::declaration_warnings(model) {
+    // The findings of the format: the entities a block uses that nothing
+    // declares, and the properties a block carries that its class does not.
+    for warning in genmsi_format::declaration_warnings(model)
+        .into_iter()
+        .chain(genmsi_format::property_warnings(model))
+    {
         if diagnostics.iter().any(|said| said.contains(&warning)) {
             continue;
         }

@@ -77,7 +77,7 @@ const GLOSSARY: &[(&str, &str)] = &[
     ),
     (
         "Generate",
-        "Creates transactions: Media is the mean time between them, Cantidad how many to create (0 means forever), with the optional Modificador, OffSet and Prioridad.",
+        "Creates transactions: Media is the mean time between them, Cantidad how many to create (leave it empty to create them forever; a number limits the total, and zero creates none), with the optional Modificador, OffSet and Prioridad.",
     ),
     (
         "GateF",

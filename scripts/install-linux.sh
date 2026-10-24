@@ -11,6 +11,11 @@
 #
 #   ./scripts/install-linux.sh              # compila e instala
 #   ./scripts/install-linux.sh --no-build   # sólo reinstala lo ya compilado
+#   ./scripts/install-linux.sh --with-mcp   # además instala la CLI y
+#                                             # configura el MCP de Pi
+#
+# El MCP es lo que permite que un agente (Pi, u otro cliente MCP) lea,
+# valide y simule los modelos: lo publica la misma CLI, con `genmsi mcp`.
 #
 set -euo pipefail
 
@@ -24,7 +29,14 @@ icon="${icon_dir}/genmsi-app-desktop.png"
 # trabajos de .cargo/config.toml no alcanza cuando el enlazado pide toda la
 # memoria de la máquina, así que aquí se pide -j 2 a mano.
 build=1
-[[ "${1:-}" == "--no-build" ]] && build=0
+with_mcp=0
+for arg in "$@"; do
+  case "$arg" in
+    --no-build) build=0 ;;
+    --with-mcp) with_mcp=1 ;;
+    *) echo "opción desconocida: $arg" >&2; exit 2 ;;
+  esac
+done
 
 if [[ $build -eq 1 ]]; then
   echo "== compilando la aplicación =="
@@ -84,3 +96,28 @@ echo "== instalado =="
 ls -l "${app_dir}/genmsi-app-desktop" "${launcher}" "${icon}"
 echo
 echo "Se abre con: ${app_dir}/genmsi-app-desktop"
+
+# El MCP: la misma CLI, con el subcomando `mcp`, habla el protocolo y
+# publica cuatro herramientas (lint, simulate, get_trace, explain_model).
+# Sin esto, un agente no puede trabajar con los modelos.
+if [[ $with_mcp -eq 1 ]]; then
+  echo
+  echo "== el MCP =="
+  if [[ $build -eq 1 ]]; then
+    (cd "${repo}" && cargo build --release -j 2 -p genmsi-cli)
+  fi
+  cli="${repo}/target/release/genmsi"
+  if [[ ! -x "${cli}" ]]; then
+    echo "no está la CLI en ${cli}" >&2
+  else
+    install -Dm 755 "${cli}" "${HOME}/.local/bin/genmsi"
+    echo "CLI instalada en ${HOME}/.local/bin/genmsi"
+    if command -v pi >/dev/null 2>&1; then
+      pi mcp add genmsi -- "${HOME}/.local/bin/genmsi" mcp || true
+      echo "MCP configurado. En una sesión de Pi, /reload para que aparezcan sus herramientas."
+    else
+      echo "Para conectarlo a Pi:"
+      echo "  pi mcp add genmsi -- ${HOME}/.local/bin/genmsi mcp"
+    fi
+  fi
+fi

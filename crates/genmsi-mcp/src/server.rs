@@ -129,6 +129,18 @@ impl TraceInput {
     }
 }
 
+/// Where a model goes and what goes there.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct SaveInput {
+    /// Path of the `.gmdl` file to write.
+    pub path: String,
+    /// The whole `.gmdl` document as text.
+    ///
+    /// The tool writes the whole document, not a patch: the agent reads the
+    /// model, changes it and hands the complete text back.
+    pub model: String,
+}
+
 /// The model the agent asked for: a file on disk or the document itself.
 fn source_of(path: &Option<String>, model: &Option<String>) -> Result<ModelSource, ToolError> {
     match (path, model) {
@@ -221,6 +233,19 @@ impl GenmsiServer {
     pub fn explain_model(&self, Parameters(input): Parameters<ModelInput>) -> CallToolResult {
         finish(explain_document(&input))
     }
+
+    /// Write a model to a file.
+    ///
+    /// The model is checked first: a model that does not load, does not
+    /// validate or does not compile is **not** written, and the error names
+    /// the block that caused it.
+    #[tool(
+        name = "save_model",
+        description = "Write a GPSS model to a .gmdl file. The model is checked before it is written: one that does not load, does not validate or does not compile is NOT written, and the error names the block that caused it. Takes `path` (the file to write) and `model` (the whole .gmdl document as text, not a patch) and returns the genmsi.lint/1 document of what was written. Use it to create or to change a model: read it first with explain_model, change the text and hand the complete document back."
+    )]
+    pub fn save_model(&self, Parameters(input): Parameters<SaveInput>) -> CallToolResult {
+        finish(save_document(&input))
+    }
 }
 
 /// Body of the `genmsi.explain/1` document.
@@ -249,6 +274,21 @@ fn explain_document(input: &ModelInput) -> Result<String, ToolError> {
 fn lint_document(input: &ModelInput) -> Result<String, ToolError> {
     let loaded = engine::load(&input.source()?)?;
     let document = genmsi_core::lint_document(&loaded.program, &loaded.model, &loaded.name);
+    Ok(genmsi_core::to_pretty_json(
+        genmsi_core::LINT_SCHEMA,
+        &document,
+    ))
+}
+
+/// The lint document of a model that was written.
+fn save_document(input: &SaveInput) -> Result<String, ToolError> {
+    let path = PathBuf::from(&input.path);
+    let saved = engine::save_model(&path, &input.model)?;
+    let document = genmsi_core::lint_document(
+        &saved.program,
+        &saved.model,
+        &saved.path.display().to_string(),
+    );
     Ok(genmsi_core::to_pretty_json(
         genmsi_core::LINT_SCHEMA,
         &document,

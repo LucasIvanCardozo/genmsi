@@ -89,7 +89,7 @@ async fn call(
 }
 
 #[tokio::test]
-async fn the_server_offers_the_four_tools() {
+async fn the_server_offers_the_five_tools() {
     let (client, _server) = pair().await;
     let listed = client.list_tools(None).await.expect("tools are listed");
     let mut names: Vec<String> = listed
@@ -100,8 +100,14 @@ async fn the_server_offers_the_four_tools() {
     names.sort();
     assert_eq!(
         names,
-        ["explain_model", "get_trace", "lint", "simulate"],
-        "the four tools of the roadmap, and nothing else"
+        [
+            "explain_model",
+            "get_trace",
+            "lint",
+            "save_model",
+            "simulate"
+        ],
+        "the four tools of the roadmap plus the one that writes, and nothing else"
     );
     // Every tool tells the agent what it takes and what it returns.
     for tool in &listed.tools {
@@ -300,4 +306,88 @@ async fn a_call_without_a_model_is_an_argument_error() {
     let (client, _server) = pair().await;
     let result = call(&client, "lint", json!({})).await;
     assert_eq!(result["error"], "invalid_arguments");
+}
+
+/// A temporary directory that cleans itself up.
+struct TempDir(PathBuf);
+
+impl TempDir {
+    fn new(tag: &str) -> Self {
+        let path = std::env::temp_dir().join(format!(
+            "genmsi-mcp-{tag}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&path);
+        std::fs::create_dir_all(&path).expect("the temporary directory is created");
+        Self(path)
+    }
+
+    fn file(&self, name: &str) -> PathBuf {
+        self.0.join(name)
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+#[tokio::test]
+async fn a_model_written_by_the_agent_can_be_simulated_afterwards() {
+    let (client, _server) = pair().await;
+    let dir = TempDir::new("save");
+    let path = dir.file("modelo.gmdl");
+    let model = std::fs::read_to_string(model_path("TP7__Clase 7_1_Link_Unlink"))
+        .expect("the reference model is readable");
+
+    let lint = call(
+        &client,
+        "save_model",
+        json!({ "path": path.to_string_lossy(), "model": model }),
+    )
+    .await;
+    assert_eq!(lint["schema"], "genmsi.lint/1", "the lint of what was written");
+    assert!(
+        path.exists(),
+        "the file is there: {}",
+        path.display()
+    );
+    assert!(
+        !dir.file(".modelo.gmdl.tmp").exists(),
+        "the temporary file of the atomic write is gone"
+    );
+
+    // The model that was written is a model the engine runs.
+    let report = call(
+        &client,
+        "simulate",
+        json!({ "path": path.to_string_lossy() }),
+    )
+    .await;
+    assert_eq!(report["schema"], "genmsi.report/1", "the model runs: {report}");
+}
+
+#[tokio::test]
+async fn a_model_that_does_not_compile_is_not_written() {
+    let (client, _server) = pair().await;
+    let dir = TempDir::new("save-broken");
+    let path = dir.file("roto.gmdl");
+    // The UNLINK without a label: the model the reference refuses.
+    let model = std::fs::read_to_string(model_path("TP9__tp9")).expect("the model is readable");
+
+    let error = call(
+        &client,
+        "save_model",
+        json!({ "path": path.to_string_lossy(), "model": model }),
+    )
+    .await;
+    assert_eq!(error["error"], "invalid_model", "the failure names the class");
+    assert_eq!(error["class"], "Unlink");
+    assert!(
+        !path.exists(),
+        "a model that does not compile is not written: {}",
+        path.display()
+    );
 }

@@ -47,6 +47,7 @@ impl ToolError {
         "invalid_xml",
         "model_not_found",
         "model_unreadable",
+        "model_unwritable",
         "runtime_error",
         "unsupported_block",
     ];
@@ -90,6 +91,20 @@ impl ToolError {
         Self {
             error: "model_unreadable",
             message: format!("cannot read model: {reason}"),
+            path: Some(path),
+            line: None,
+            column: None,
+            node: None,
+            class: None,
+        }
+    }
+
+    /// The model file could not be written.
+    pub fn cannot_write(path: impl Into<String>, reason: impl fmt::Display) -> Self {
+        let path = path.into();
+        Self {
+            error: "model_unwritable",
+            message: format!("cannot write model: {reason}"),
             path: Some(path),
             line: None,
             column: None,

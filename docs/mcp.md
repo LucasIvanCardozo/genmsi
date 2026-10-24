@@ -1,8 +1,9 @@
 # genmsi MCP server
 
 `genmsi-mcp` is the MCP server of the GenMSI engine (ROADMAP Phase 3): it serves
-the engine to an AI agent over stdio with the four tools of decision D7 —
-`simulate`, `lint`, `get_trace` and `explain_model`. The binary is a thin layer
+the engine to an AI agent over stdio with the five tools of decision D7 —
+`simulate`, `lint`, `get_trace` and `explain_model`, plus `save_model`, which
+writes a model the agent built. The binary is a thin layer
 over `genmsi-core` and `genmsi-format`; it carries no simulation logic
 (decision D2), and the documents it returns are the ones the CLI publishes
 (decision D13).
@@ -15,7 +16,7 @@ Standard output belongs to the protocol: the server writes nothing else there.
 A failure that stops the server goes to standard error and the process exits
 with `1`.
 
-## The four tools
+## The five tools
 
 | Tool | What it does | Returns |
 |---|---|---|
@@ -23,6 +24,7 @@ with `1`.
 | `simulate` | Runs the model once and returns its GPSS report. | `genmsi.report/1` |
 | `get_trace` | Runs the model with the event trace enabled and returns the records. | `genmsi.trace/1` |
 | `explain_model` | Describes the model: its blocks, its operands and what each statement does. | `genmsi.explain/1` |
+| `save_model` | Writes a model the agent built to a file, after checking that it compiles. | `genmsi.lint/1` |
 
 Every tool takes the model in one of two ways:
 
@@ -96,6 +98,26 @@ each statement does and which operands it takes (`Media`, `Cantidad`,
 `Parametro`, ...). It covers the classes the engine implements; the wording
 follows the semantics of `genmsi-core`.
 
+### `save_model`
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `path` | string | — | Path of the `.gmdl` file to write. |
+| `model` | string | — | The whole `.gmdl` document as text. |
+
+Writes the model to the file and returns the `genmsi.lint/1` document of what
+was written.
+
+**The model is checked before it is written**: a model that does not load,
+does not validate or does not compile is **not** written, and the failure is
+the same one the other tools give, with the block and its position. The write
+is **atomic**: the text goes to a temporary file next to the target and that
+file is renamed over it, so a reader that watches the model (the desktop
+application does) never sees half of one.
+
+The tool writes the **whole document**, not a patch: read the model with
+`explain_model`, change the text and hand the complete document back.
+
 ## Errors
 
 A model that does not work is a **tool error**: the call succeeds as a call
@@ -150,6 +172,7 @@ The classes:
 | `invalid_arguments` | The call itself is wrong: no model, or both `path` and `model`. |
 | `model_not_found` | The file named by `path` does not exist. |
 | `model_unreadable` | Reserved for a file the tool cannot read outside the model load path; a model the server loads goes through the same `parse_file` call the CLI uses, so its read failures are `invalid_model` (a missing file is still `model_not_found`). |
+| `model_unwritable` | The file could not be written: the permissions, the disk, or the path. A model that does not compile is never written at all, so this class means the write itself failed. |
 | `invalid_xml` | The document is not well-formed XML. The line and the column are known, the block is not. |
 | `invalid_model` | The document breaks a structural or runnable rule (a name with whitespace, no `TERMINATE` and no `CLOCK`, an `UNLINK` without a label), or cannot be decoded at all (see above). Parse failures carry the position of the offending element; rule failures carry the position of the block that breaks the rule. |
 | `invalid_block` | A block does not compile (a missing operand, an empty entity name). |

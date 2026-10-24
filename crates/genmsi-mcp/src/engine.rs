@@ -82,6 +82,67 @@ pub fn load(source: &ModelSource) -> Result<Loaded, ToolError> {
     })
 }
 
+/// A model that was written to a file.
+#[derive(Debug)]
+pub struct Saved {
+    /// The compiled program: the model compiles, that is why it was written.
+    pub program: Program,
+    /// The model as it was written.
+    pub model: GmdlModel,
+    /// Where it was written.
+    pub path: PathBuf,
+    /// How many bytes the file has.
+    pub bytes: u64,
+}
+
+/// Save a model to a file.
+///
+/// The model is checked **before** it is written: a model that does not
+/// load, does not validate or does not compile is **not** written, and the
+/// failure names the block that caused it, exactly like the other tools.
+///
+/// The write is atomic: the text goes to a temporary file next to the target
+/// and that file is renamed over it. A reader that watches the model (the
+/// desktop application does) never sees half a model.
+pub fn save_model(path: &std::path::Path, text: &str) -> Result<Saved, ToolError> {
+    let name = path.display().to_string();
+    let model = genmsi_format::parse_str(text)
+        .map_err(|error| ToolError::from_format(&error, Some(&name), None))?;
+    genmsi_format::validate(&model)
+        .map_err(|error| ToolError::from_format(&error, Some(&name), Some(&model)))?;
+    let program = genmsi_core::compile_model(&model)
+        .map_err(|error| ToolError::from_engine(&error, &model, &name))?;
+    let bytes = write_atomically(&model, path)?;
+    Ok(Saved {
+        program,
+        model,
+        path: path.to_path_buf(),
+        bytes,
+    })
+}
+
+/// Write the model to a temporary file next to the target, then rename it.
+///
+/// The temporary file is in the same directory, so the rename is atomic: the
+/// target is either the old model or the new one, never a half-written one.
+fn write_atomically(model: &GmdlModel, path: &std::path::Path) -> Result<u64, ToolError> {
+    let name = path.display().to_string();
+    let file_name = path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| "model.gmdl".to_string());
+    let temporary = path.with_file_name(format!(".{file_name}.tmp"));
+    genmsi_format::save(model, &temporary).map_err(|error| {
+        ToolError::cannot_write(&name, format!("{error}"))
+    })?;
+    let bytes = std::fs::metadata(&temporary).map(|meta| meta.len()).unwrap_or(0);
+    if let Err(error) = std::fs::rename(&temporary, path) {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(ToolError::cannot_write(&name, error));
+    }
+    Ok(bytes)
+}
+
 /// The configuration of a run.
 ///
 /// `trace` and `limit` decide whether the run keeps its event trace and how

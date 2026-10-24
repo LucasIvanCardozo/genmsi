@@ -337,3 +337,25 @@ una medición contra el original y no depende de los otros.
   fallidos de la puerta (230 nuestro contra 26 del original) es la diferencia
   ya anotada en `odd/tasks/notas-w5-motor.md` y este arreglo no la toca:
   sólo la hace determinista.
+
+## Log (continuación)
+
+- **L14** — La medición del `START` del original (worker `mvmhd6qk-2-a8d1`, nota
+  `odd/tasks/notas-start.md`, commit `2e8be61`): el `START` del original es el
+  **contador de terminaciones de la corrida** y lo fija **quien la lanza** (el
+  campo "Start" de su panel Simulador, 1 por defecto). El modelo no lo declara
+  en ninguna parte. Lo baja el `Terminate` **con operando A** (su operando A
+  unidades por transacción que llega) y el `Clock` (una unidad por tic); un
+  `Terminate` **sin** operando A no baja nada. La corrida termina con el
+  contador en **cero o por debajo** (el original termina en −1).
+  - Nuestro motor tiene **la regla correcta** y el valor inicial **clavado en
+    1.0** (`program.rs`, `start_counter`). Con el Start del original en 1, que
+    es su defecto, nuestros cinco reportes comparados salen **byte a byte
+    idénticos** a los del original; con Start=5 el nuestro termina en la
+    primera transacción (el original, en la quinta).
+  - La corrección (pendiente): `Program.start_counter` deja de compilarse y
+    pasa a `SimConfig.start`; `terminations_left` se inicializa con él; la
+    regla, el `Clock` y `validate_runnable` no se tocan. Y de ahí al CLI
+    (`--start`), al motor de la app, al comando de Tauri, al MCP, y a un campo
+    en la app al lado del horizonte.
+  - Se hace **después** del reloj entero: las dos unidades tocan `sim.rs`.

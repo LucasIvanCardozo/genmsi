@@ -386,6 +386,7 @@ fn main() {
     let _ = writeln!(out, "     vacía en un mismo instante.");
 
     let mut missing = Vec::new();
+    let mut agreeing = 0usize;
     for probe in PROBES {
         section(&mut out, &format!("{} — {}", probe.name.to_uppercase(), probe.question));
         let model = options.probes.join(format!("{}.gmdl", probe.name));
@@ -408,15 +409,22 @@ fn main() {
         let original = original.unwrap_or_default();
         let ours = ours.unwrap_or_default();
         let _ = writeln!(out, "   tabla             el original      este motor");
+        let mut probe_agrees = true;
         for table in probe.tables {
             let original_values = readings(&original, table).unwrap_or_default();
             let our_values = readings(&ours, table).unwrap_or_default();
+            if original_values != our_values {
+                probe_agrees = false;
+            }
             let _ = writeln!(
                 out,
                 "   {table:<16}  {:<15}  {}",
                 reading(&original_values),
                 reading(&our_values)
             );
+        }
+        if probe_agrees {
+            agreeing += 1;
         }
         if let Some(row) = facility(&original) {
             let _ = writeln!(
@@ -478,10 +486,15 @@ fn main() {
     );
     let _ = writeln!(
         out,
-        "   los de la misma prioridad, en el orden en que se programaron (FIFO): al revés que el"
+        "   los de la misma prioridad, al revés: el último programado se procesa primero."
     );
-    let _ = writeln!(out, "   original.");
-    section(&mut out, "DÓNDE SE APLICARÍA LA REGLA");
+    let _ = writeln!(
+        out,
+        "   Igual que el original: las {} sondas con todas sus lecturas iguales son {}.",
+        PROBES.len(),
+        agreeing
+    );
+    section(&mut out, "DÓNDE ESTÁ LA REGLA");
     let _ = writeln!(
         out,
         "   El desempate de los eventos de un mismo instante está en"
@@ -492,16 +505,25 @@ fn main() {
     );
     let _ = writeln!(
         out,
-        "   `impl Ord for Event` (la comparación es `(time, priority, seq)`), y el"
+        "   `impl Ord for Event` (la comparación es `(time, priority, seq)` y la secuencia se"
     );
     let _ = writeln!(
         out,
-        "   número de secuencia en `Simulation::push_event` (que hoy invierte el orden"
+        "   compara al revés, para que gane el último programado)."
     );
     let _ = writeln!(
         out,
-        "   sólo para los eventos de la hora en que termina la corrida)."
+        "   El caso especial de la hora en que termina la corrida ya no está: ese parche"
     );
+    let _ = writeln!(
+        out,
+        "   negaba el número de secuencia para que el tic del reloj terminara la corrida"
+    );
+    let _ = writeln!(
+        out,
+        "   antes de que se contara la llegada de esa hora, y la regla general pone esa"
+    );
+    let _ = writeln!(out, "   llegada antes del tic por sí sola.");
     let _ = writeln!(
         out,
         "   La cadena de demora de una facilidad está en el mismo archivo:"
@@ -512,26 +534,22 @@ fn main() {
     );
     let _ = writeln!(
         out,
-        "   los que esperan por prioridad y, a igualdad, por orden de llegada: eso ya"
+        "   los que esperan por prioridad y, a igualdad, por orden de llegada: eso no se"
     );
-    let _ = writeln!(out, "   coincide con el original.");
+    let _ = writeln!(out, "   tocó, ya coincidía con el original.");
     let _ = writeln!(
         out,
-        "   Y un segundo cambio, que no es evidente: en `Simulation::install_definitions`"
-    );
-    let _ = writeln!(
-        out,
-        "   la llegada pendiente de un generador se programa con prioridad 0; en el"
+        "   Y la llegada pendiente de un generador lleva la prioridad de su transacción,"
     );
     let _ = writeln!(
         out,
-        "   original lleva la prioridad de la transacción, y sin eso una llegada"
+        "   en `Simulation::install_definitions` y en el reprogramado de `tick()`: el"
     );
     let _ = writeln!(
         out,
-        "   pendiente de prioridad 0 se cuela por delante de los eventos de las"
+        "   reporte del original lo dice (la llegada pendiente de `ejercicio_3` lee"
     );
-    let _ = writeln!(out, "   transacciones de mayor prioridad.");
+    let _ = writeln!(out, "   `39  1  1839  9  9`, prioridad 1, la de su generador).");
     if !missing.is_empty() {
         let _ = writeln!(
             out,

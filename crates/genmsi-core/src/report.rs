@@ -72,12 +72,14 @@ pub fn not_computed() -> String {
 ///
 /// The original's events happen at whole times (its generator draws whole
 /// intervals) and its `BDT` column writes them without decimals
-/// (`3615,334` is ours, `3646` is the original's).
+/// (`3615,334` is ours with a fractional clock, `3646` is the original's).
+/// The clock of the run is whole, so the value is already a whole number
+/// and it is written as it is.
 pub fn event_time(value: f64) -> String {
     if !value.is_finite() {
         return "0".to_string();
     }
-    format!("{}", value.round() as i64)
+    format!("{}", value.trunc() as i64)
 }
 
 /// Render the human-readable report.

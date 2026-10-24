@@ -4,6 +4,14 @@
 //! Events live in a single ordered queue keyed by `(time, priority, sequence)`;
 //! a transaction is only ever in one place, tracked by [`XactState`].
 //!
+//! The clock of the run is whole units, as it is in the original
+//! (`odd/tasks/notas-reloj.md`): its operands are integers, its delays are
+//! whole numbers and its clock only ticks in whole units. So every instant
+//! a reader sees — in the report, in the trace, in the transactions and in
+//! the statistics — is a whole number, and many events share an instant:
+//! the order inside the instant decides who takes a facility, who is
+//! preempted and the order of the queue.
+//!
 //! The order inside an instant is the one of the original (`odd/tasks/
 //! notas-orden-simultaneos.md`): the events of an instant are processed by
 //! priority, from the highest to the lowest, and the ones of the same
@@ -179,6 +187,10 @@ pub struct BlockStats {
 #[cfg_attr(feature = "ts", ts(export))]
 pub struct TraceEvent {
     /// Simulation time.
+    ///
+    /// A whole number of simulated time, like the clock of the original: the
+    /// published contract of the document does not change, the value it
+    /// carries is whole.
     pub time: f64,
     /// Transaction id.
     #[cfg_attr(feature = "ts", ts(as = "f64"))]
@@ -325,6 +337,14 @@ enum EventKind {
 
 #[derive(Debug, Clone, Copy)]
 struct Event {
+    /// The exact instant of the event.
+    ///
+    /// The clock of the run is whole (see [`Simulation::now`]), but the
+    /// engine keeps the fractions of the delays here, to place the events:
+    /// a model the original refuses — its operands are whole numbers — can
+    /// ask for a delay of a fraction of a unit, and then this field is the
+    /// only place where the fraction lives. Every model the original can
+    /// open has whole delays, and then this instant *is* the clock.
     time: f64,
     priority: i64,
     /// The order of the event among the ones of its instant.
@@ -332,6 +352,9 @@ struct Event {
     /// The original processes the events of the same instant and the same
     /// priority the other way round: the last one scheduled is the first one
     /// processed.  The comparison of [`Ord`] is the one that says so.
+    ///
+    /// The instants are whole numbers, so the events of an instant are many
+    /// and this tie-break is the one that decides their order.
     seq: u64,
     block: usize,
     xact: Option<XactId>,
@@ -374,7 +397,20 @@ struct GeneratorState {
 pub struct Simulation<'p> {
     program: &'p Program,
     config: SimConfig,
+    /// The clock of the run, in whole units of simulated time.
+    ///
+    /// This is the time everybody sees: the report, the trace, the
+    /// transactions and the statistics. The clock of the original counts
+    /// whole units too, and its times are whole (`odd/tasks/notas-reloj.md`).
     now: f64,
+    /// The exact time of the run, with the fractions of the delays.
+    ///
+    /// The engine needs it to place the events: the delays of a model the
+    /// original refuses (its operands are whole numbers) can carry a
+    /// fraction, and that fraction decides how many events share an instant.
+    /// Every model the original can open has whole delays, and then the two
+    /// clocks are one and the same.
+    exact: f64,
     heap: BinaryHeap<std::cmp::Reverse<Event>>,
     seq: u64,
     xacts: HashMap<XactId, Transaction>,
@@ -443,6 +479,7 @@ impl<'p> Simulation<'p> {
             program,
             config,
             now: 0.0,
+            exact: 0.0,
             heap: BinaryHeap::new(),
             seq: 0,
             xacts: HashMap::new(),
@@ -569,7 +606,8 @@ impl<'p> Simulation<'p> {
                 depth: 0,
             };
             match &spec.offset {
-                Some(offset) => return offset.eval(&mut ctx),
+                // The offset is the increment of the first transaction.
+                Some(offset) => return offset.eval(&mut ctx).max(0.0),
                 None => {
                     let mean = spec.mean.eval(&mut ctx);
                     // A function modifier is left alone: evaluating it here
@@ -590,6 +628,8 @@ impl<'p> Simulation<'p> {
             // and the ones that follow take the numbers that come after it.
             apply_modifier(mean, Some((spread, false)), &mut self.streams, stream)
         } else {
+            // Without a spread there is nothing to draw, and the first
+            // arrival is the mean.
             mean.max(0.0)
         }
     }
@@ -635,6 +675,10 @@ impl<'p> Simulation<'p> {
         self.seq += 1;
         let seq = self.seq;
         self.heap.push(std::cmp::Reverse(Event {
+            // The time that enters the queue of events is the exact one:
+            // the clock of the run is whole, and the fractions of the
+            // delays of the models the original refuses live here, in the
+            // only place where they are needed.
             time,
             priority,
             seq,
@@ -690,9 +734,13 @@ impl<'p> Simulation<'p> {
                     detail.join(", ")
                 )));
             }
-            if event.time > self.now {
-                self.now = event.time;
+            // The clock of the run is whole: the exact time of the event
+            // carries the fractions of the delays, and the clock that
+            // everybody sees only moves in whole units.
+            if event.time > self.exact {
+                self.exact = event.time;
             }
+            self.now = self.exact.trunc();
             if let Some(limit) = self.config.stop_time
                 && self.now > limit
             {
@@ -824,7 +872,9 @@ impl<'p> Simulation<'p> {
             pending.push(PendingEvent {
                 xact: event.xact.unwrap_or(0),
                 priority: event.priority,
-                time: event.time,
+                // The time of a pending event is a whole number of
+                // simulated time, like every instant a reader sees.
+                time: event.time.trunc(),
                 block: event.block,
                 next,
             });
@@ -946,7 +996,7 @@ impl<'p> Simulation<'p> {
         // the transaction it will create: the original keeps it in the queue
         // of events with that priority.
         self.push_event(
-            self.now + delay.max(0.0),
+            self.exact + delay.max(0.0),
             priority,
             block_index,
             None,
@@ -1084,10 +1134,13 @@ impl<'p> Simulation<'p> {
                     } else {
                         if let Some(transaction) = self.xacts.get_mut(&xact) {
                             transaction.transition(XactState::Scheduled);
-                            transaction.scheduled_at = Some(self.now + delay);
+                            // The time the transaction comes back is a whole
+                            // number of simulated time, like every instant
+                            // a reader sees.
+                            transaction.scheduled_at = Some((self.exact + delay).trunc());
                         }
                         self.push_event(
-                            self.now + delay,
+                            self.exact + delay,
                             self.priority_of(xact),
                             block_index,
                             Some(xact),
@@ -2629,10 +2682,10 @@ impl<'p> Simulation<'p> {
             self.block_stats[block].current += 1;
             if let Some(transaction) = self.xacts.get_mut(&owner) {
                 transaction.transition(XactState::Scheduled);
-                transaction.scheduled_at = Some(self.now + remaining);
+                transaction.scheduled_at = Some((self.exact + remaining).trunc());
             }
             self.push_event(
-                self.now + remaining,
+                self.exact + remaining,
                 self.priority_of(owner),
                 block,
                 Some(owner),
@@ -2998,6 +3051,9 @@ fn name_and_value(name: &str, value: &str) -> String {
 /// Evaluate the mean and optional modifier of a delay expression.
 ///
 /// Returns `(mean, modifier)` where `modifier` is `Some((value, is_function))`.
+///
+/// The operands are evaluated as they are; the rule of the whole numbers is
+/// applied when the delay is drawn, in [`apply_modifier`].
 fn evaluate_delay(
     mean: &ProgramExpr,
     modifier: Option<&ProgramExpr>,
@@ -3025,7 +3081,74 @@ fn is_function_modifier(expr: &ProgramExpr) -> bool {
     )
 }
 
+/// Draw a whole number over `[low, high]`, both ends included.
+///
+/// The original draws a whole number over the inclusive range of its spread:
+/// the manual of the `ADVANCE` says that "un número aleatorio entre A-B y A
+/// + B, inclusivamente" is used as the time increment.
+///
+/// The draw always takes one number of the stream, even when the range holds
+/// a single value, so that the numbers a stream gives do not depend on the
+/// width of the range.
+///
+/// It is not [`Streams::uniform_integer`], which does not take a number when
+/// the range holds a single value: the numbers a stream gives have to be the
+/// same ones the run had before the clock became whole.
+fn draw_whole(streams: &mut Streams, stream: u32, low: i64, high: i64) -> f64 {
+    let draw = streams.uniform(stream);
+    if high <= low {
+        return low.max(0) as f64;
+    }
+    let span = (high - low + 1) as f64;
+    (low + (draw * span).floor() as i64).min(high).max(0) as f64
+}
+
+/// The mean of a delay, as the operand of the original.
+///
+/// The operands of the original are whole numbers: its manual says that the
+/// operand of an `ADVANCE` "debe ser un nombre, entero, SNA, o SNA*parámetro",
+/// and that the product of the mean with the value of a modifier function "es
+/// truncado a un entero".
+///
+/// A mean that is not whole is a model the original **refuses**: it answers
+/// "El modelo no puede abrirse porque el archivo presenta errores
+/// estructurales" (measured with a generator whose mean is 0.01). So there is
+/// no original to copy, and the engine keeps the fraction of the mean inside
+/// itself: the clock of the run is whole all the same (see
+/// [`Simulation::now`]), and the fraction only decides how many events share
+/// an instant.
+///
+/// Truncating it instead would freeze the clock: a delay of zero leaves the
+/// run at the same instant forever, and the queue of events grows without
+/// bound. The original's own zero-mean generator does exactly that — it
+/// opens, it runs, and it never ends (its clock stays at 00:00:00 and its
+/// simulator says "Simulando..." forever) — but a model the original refuses
+/// is not a model to copy that from.
+fn delay_mean(mean: f64) -> f64 {
+    if !mean.is_finite() {
+        return 0.0;
+    }
+    mean.max(0.0)
+}
+
 /// Turn a delay mean and modifier into a sampled delay.
+///
+/// The simulated time of the original is whole units, and so are its delays.
+/// Its manual says that the operand of an `ADVANCE` "debe ser un nombre,
+/// entero, SNA, o SNA*parámetro", that with two operands "un número
+/// aleatorio entre A-B y A + B, inclusivamente" is used as the time
+/// increment, and that the product of the mean with a modifier function "es
+/// truncado a un entero".
+///
+/// So the delay of a model the original can open is always a whole number:
+///
+/// - with a numeric modifier the draw is a whole number over the inclusive
+///   range `[A-B, A+B]` (the whole numbers inside it, when the operands of
+///   the model are not whole, which the original cannot express);
+/// - with a function modifier the product of the mean and the value of the
+///   function is truncated to an integer;
+/// - without a modifier the mean itself, which is a whole number in every
+///   model the original can open (see [`delay_mean`]).
 ///
 /// A numeric modifier is a symmetric spread (`uniform(mean - B, mean + B)`);
 /// a function modifier is a distribution evaluated to a multiplier (the GPSS
@@ -3036,14 +3159,33 @@ fn apply_modifier(
     streams: &mut Streams,
     stream: u32,
 ) -> f64 {
+    // The mean is the operand of the original: a whole number of simulated
+    // time.
+    let mean = delay_mean(mean);
     match modifier {
-        Some((value, true)) => (mean * value).max(0.0),
+        // The product of the mean with the value of the function is
+        // truncated to an integer, as the manual says. It can be zero: the
+        // original's own truncations can be zero too, and a zero delay
+        // leaves the clock standing, as it does in the original.
+        Some((value, true)) => (mean * value).trunc().max(0.0),
         Some((value, false)) => {
             let spread = value.abs();
-            let draw = streams.uniform(stream);
-            (mean - spread + 2.0 * spread * draw).max(0.0)
+            let low = (mean - spread).ceil();
+            let high = (mean + spread).floor();
+            let (low, high) = if low > high {
+                // A range with no whole number inside it, which only a model
+                // the original cannot open asks for: the mean, truncated.
+                let only = mean.trunc();
+                (only, only)
+            } else {
+                // The low end of the range is clamped at zero: an instant
+                // below zero does not exist, and the draw can be zero, as
+                // the original's can.
+                (low.max(0.0), high.max(0.0))
+            };
+            draw_whole(streams, stream, low as i64, high as i64)
         }
-        None => mean.max(0.0),
+        None => mean,
     }
 }
 

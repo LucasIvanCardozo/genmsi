@@ -13,6 +13,10 @@
 //! gave the exact mean in the six hundred samples of ten seeds, and the same
 //! test rejected them (D=0.5).
 //!
+//! The clock of the run is whole (`odd/tasks/notas-reloj.md` §1), so the draw
+//! is a whole number over the inclusive range `[A-B, A+B]`, and the range of
+//! the model holds seven of them.
+//!
 //! The three cases the rule has:
 //!
 //! - with a spread, the first arrival is drawn, and not the mean;
@@ -91,14 +95,25 @@ fn con_dispersion_la_primera_llegada_se_sortea() {
         firsts.iter().any(|time| *time != 5.0),
         "every first arrival was the mean: nothing was drawn"
     );
+    // The clock of the run is whole, so the draw is a whole number too: the
+    // range of the model holds seven of them, and the draw reaches both of
+    // its ends (the manual of the original: "inclusivamente").
     let distinct: std::collections::BTreeSet<u64> = firsts
         .iter()
         .map(|time| time.to_bits())
         .collect();
     assert!(
-        distinct.len() > 100,
-        "only {} distinct first arrivals in 200 seeds: the draw is not free",
+        distinct.len() > 1 && distinct.len() <= 7,
+        "the draw gave {} distinct first arrivals in 200 seeds: the draw is not whole",
         distinct.len()
+    );
+    assert!(
+        firsts.contains(&2.0),
+        "the low end of the range was never drawn: {firsts:?}"
+    );
+    assert!(
+        firsts.contains(&8.0),
+        "the high end of the range was never drawn: {firsts:?}"
     );
 
     // And it is centered on the mean: the draw is the symmetric spread.

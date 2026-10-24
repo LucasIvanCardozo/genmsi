@@ -295,6 +295,9 @@ impl GenmsiServer {
 struct ExplainBody {
     /// The engine's description of the compiled program.
     program: serde_json::Value,
+    /// The model as the document writes it: every block with its properties
+    /// by name, and the links that wire the blocks.
+    model: genmsi_core::ModelDocument,
     /// What each statement of the model does.
     glossary: BTreeMap<String, String>,
 }
@@ -304,6 +307,7 @@ fn explain_document(input: &ModelInput) -> Result<String, ToolError> {
     let loaded = engine::load(&input.source()?)?;
     let body = ExplainBody {
         program: genmsi_core::program_json(&loaded.program),
+        model: genmsi_core::model_document(&loaded.model, &loaded.name),
         glossary: glossary::for_model(&loaded.model),
     };
     Ok(genmsi_core::to_pretty_json(
@@ -415,12 +419,20 @@ impl ServerHandler for GenmsiServer {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
             "GenMSI: a discrete-event simulation engine for GPSS-style models. \
              Call `catalogue` before you write a model: it says which block classes \
-             exist and what the XML of a block of each class looks like. \
+             exist and what the XML of a block of each class looks like; ask for \
+             every class you need in ONE call, with `classes`. \
              Use `lint` to validate a model, `simulate` to run it, `get_trace` to read \
-             its events and `explain_model` to describe it. Give the model either as \
-             `path` (a .gmdl file) or as `model` (the .gmdl document as text). \
+             its events and `explain_model` to describe it: its `program` is the \
+             compiled GPSS and its `model` is the document itself, with every block, \
+             its properties by name and the links that wire the blocks. Give the model \
+             either as `path` (a .gmdl file) or as `model` (the .gmdl document as text). \
+             Two blocks are connected by a link inside the `<links>` of their container: \
+             `<link frommoduleid=\"1\" fromioid=\"1\" tomoduleid=\"2\" toioid=\"1\"/>`, \
+             where the ioids are the ports the catalogue publishes for the class. \
              Call `open_model` to learn which file the desktop app has open: write \
-             the model there and the app reloads it and runs it again.",
+             the model there and the app reloads it and runs it again. \
+             The `genmsi-modeling` skill carries the rules of the format and the \
+             procedure to follow.",
         )
     }
 }

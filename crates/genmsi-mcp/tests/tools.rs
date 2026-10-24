@@ -214,6 +214,53 @@ async fn an_inline_model_needs_no_file() {
     );
 }
 
+/// The explain document says how the model is wired.
+///
+/// The `program` is the compiled GPSS and the `model` is the document
+/// itself: every block with its properties **by name** and the links that
+/// connect them. An agent reads the model as it is written, instead of
+/// guessing what a position of an operand string means.
+#[tokio::test]
+async fn the_explain_document_says_how_the_model_is_wired() {
+    let (client, _server) = pair().await;
+    let document = "<gmodel versioncode=\"1\"><gclasses/><modules>\
+        <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"m\" name=\"m\" kind=\"C\"><links>\
+        <link frommoduleid=\"1\" fromioid=\"1\" tomoduleid=\"2\" toioid=\"1\"/>\
+        </links><inputs/><outputs/></module>\
+        <module moduleid=\"1\" moduleclass=\"Generate\" owner=\"0\" caption=\"g\" name=\"g\" kind=\"A\"><outputs><output ioid=\"1\" name=\"Salida1\" caption=\"\" mylabel=\"L1\"/></outputs>\
+        <props><property name=\"Media\" hint=\"\" value=\"10\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/></props></module>\
+        <module moduleid=\"2\" moduleclass=\"Terminate\" owner=\"0\" caption=\"t\" name=\"t\" kind=\"A\"><inputs><input ioid=\"1\" name=\"i\" caption=\"\" mylabel=\"L1\"/></inputs>\
+        <props><property name=\"Unidades\" hint=\"\" value=\"1\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/></props></module>\
+        </modules></gmodel>";
+
+    let explained = call(&client, "explain_model", json!({ "model": document })).await;
+    assert_eq!(explained["schema"], "genmsi.explain/1");
+
+    let blocks = explained["model"]["blocks"]
+        .as_array()
+        .expect("the blocks of the model");
+    let generate = blocks
+        .iter()
+        .find(|block| block["class"] == "Generate")
+        .expect("the generator");
+    let media = generate["properties"]
+        .as_array()
+        .expect("the properties")
+        .iter()
+        .find(|property| property["name"] == "Media")
+        .expect("the Media property");
+    assert_eq!(media["value"], "10", "{explained}");
+
+    let edges = explained["model"]["edges"]
+        .as_array()
+        .expect("the links of the model");
+    assert_eq!(edges.len(), 1, "{explained}");
+    assert_eq!(edges[0]["from_module"], 1, "{explained}");
+    assert_eq!(edges[0]["from_port"], "Salida1", "{explained}");
+    assert_eq!(edges[0]["to_module"], 2, "{explained}");
+    assert_eq!(edges[0]["to_port"], "i", "{explained}");
+}
+
 #[tokio::test]
 async fn el_start_de_la_corrida_llega_al_motor() {
     let (client, _server) = pair().await;

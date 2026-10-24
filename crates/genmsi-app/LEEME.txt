@@ -1,0 +1,43 @@
+GenMSI 0.1.0 — simulador GPSS
+================================
+
+Esta carpeta lleva la aplicación para Linux (x86_64), sin instalar.
+
+CÓMO SE USA
+-----------
+1. Dale permiso de ejecución al programa:
+
+       chmod +x genmsi-app-desktop
+
+2. Ábrelo con un doble clic, o desde una terminal:
+
+       ./genmsi-app-desktop
+
+La ventana se titula "GenMSI". Desde la barra de herramientas se abre un
+modelo («Abrir…»), se guarda («Guardar» y «Guardar como…») y se corre la
+simulación («Simular» para el informe, «Ejecutar» para verla reproducida).
+
+La simulación corre una sola vez: la reproducción y el informe salen de esa
+misma corrida, así que los números que ves son los de esa corrida ✓. Se
+puede interrumpir con «Cancelar», y el informe dice que la corrida se
+cortó.
+
+QUÉ NECESITA
+------------
+Un escritorio Linux con GTK 3 y WebKitGTK 4.1 (los tiene cualquier
+distribución de escritorio: Debian, Ubuntu, Fedora, openSUSE, Arch, CachyOS...).
+
+Para instalarlo como un programa del sistema, mejor el paquete:
+  - Debian, Ubuntu y derivados:  GenMSI_0.1.0_amd64.deb   (sudo dpkg -i)
+  - Fedora, openSUSE y derivados:  GenMSI-0.1.0-1.x86_64.rpm
+
+QUÉ HAY DENTRO
+--------------
+  genmsi-app-desktop   la aplicación (el motor va dentro: no hace falta nada más)
+  GenMSI.desktop       el lanzador, por si quieres ponerlo en el menú
+  GenMSI.png           el icono
+  LEEME.txt            este archivo
+
+Los modelos que abras son tuyos: la aplicación no borra ni toca nada fuera de
+la carpeta de datos del usuario, donde guarda la lista de los últimos modelos
+abiertos.

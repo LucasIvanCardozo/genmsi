@@ -41,6 +41,7 @@ echo "== instalando en ${app_dir} =="
 mkdir -p "${app_dir}" "${icon_dir}" "$(dirname "${launcher}")"
 install -m 755 "${binary}" "${app_dir}/genmsi-app-desktop"
 install -m 644 "${repo}/crates/genmsi-app/src-tauri/icons/128x128.png" "${app_dir}/GenMSI.png"
+install -m 644 "${repo}/crates/genmsi-app/LEEME.txt" "${app_dir}/LEEME.txt"
 install -m 644 "${repo}/crates/genmsi-app/src-tauri/icons/128x128.png" "${icon}"
 
 cat > "${app_dir}/GenMSI.desktop" <<DESKTOP

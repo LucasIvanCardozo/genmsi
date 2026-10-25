@@ -43,15 +43,29 @@ fn a_model_without_geometry_is_composed() {
     assert!(is_composed(&model));
 }
 
+/// Whether a place comes before another one in the reading order: a column
+/// first, and inside it, from top to bottom.
+fn before(first: (i32, i32), second: (i32, i32)) -> bool {
+    first.0 < second.0 || (first.0 == second.0 && first.1 < second.1)
+}
+
 #[test]
-fn the_blocks_of_a_layer_are_stacked_and_the_layers_advance() {
+fn the_blocks_of_the_flow_are_placed_one_after_the_other() {
     let mut model = model("");
     compose_incomplete(&mut model).expect("the model is composed");
     let (x1, y1, _, _) = layout_of(&model, 1).expect("placed");
     let (x2, y2, _, _) = layout_of(&model, 2).expect("placed");
-    // The link goes from the clock to the terminate: they are in two layers.
-    assert_ne!(x1, x2);
-    assert_eq!(y1, y2);
+    // The link goes from the clock to the terminate: the terminate comes
+    // after the clock, down a column or in the next one.
+    assert!(
+        before((x1, y1), (x2, y2)),
+        "the flow does not go forward: the clock at ({x1}, {y1}), the terminate at ({x2}, {y2})"
+    );
+    // And the two do not sit on each other.
+    assert!(
+        !(x1 < x2 && x2 < x1 || y1 < y2 && y2 < y1),
+        "the blocks of the flow are on each other"
+    );
 }
 
 #[test]
@@ -142,12 +156,12 @@ fn the_blocks_follow_the_flow_across_the_border_of_a_container() {
          </modules></gmodel>";
     let mut model = genmsi_format::parse_str(text).expect("the model parses");
     compose_incomplete(&mut model).expect("composed");
-    let (ax, _, _, _) = layout_of(&model, 1).expect("the container A is placed");
-    let (bx, _, _, _) = layout_of(&model, 3).expect("the container B is placed");
     // The flow goes from the block of B to the block of A: B comes first.
+    let (bx, by, _, _) = layout_of(&model, 3).expect("the container B is placed");
+    let (ax, ay, _, _) = layout_of(&model, 1).expect("the container A is placed");
     assert!(
-        bx < ax,
-        "the container of the flow's start comes first: B at {bx}, A at {ax}"
+        before((bx, by), (ax, ay)),
+        "the container of the flow's start comes first: B at ({bx}, {by}), A at ({ax}, {ay})"
     );
 }
 

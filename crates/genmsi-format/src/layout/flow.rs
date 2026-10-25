@@ -26,6 +26,10 @@ pub struct Flow {
     children: BTreeMap<u32, Vec<u32>>,
     /// The links every container owns.
     links: BTreeMap<u32, Vec<(u32, u32)>>,
+    /// The blocks every block is joined to.
+    neighbours: BTreeMap<u32, Vec<u32>>,
+    /// The blocks that simulate under every container.
+    leaves: BTreeMap<u32, Vec<u32>>,
 }
 
 impl Flow {
@@ -53,21 +57,72 @@ impl Flow {
         rank_containers(&blocks, &children, &mut ranks);
         // The links every container owns.
         let mut links: BTreeMap<u32, Vec<(u32, u32)>> = BTreeMap::new();
+        // The blocks every block is joined to.
+        let mut neighbours: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
         for block in &model.blocks {
             let owned = links.entry(block.id).or_default();
             for link in &block.links {
                 if link.from_module != link.to_module {
                     owned.push((link.from_module, link.to_module));
+                    neighbours
+                        .entry(link.from_module)
+                        .or_default()
+                        .push(link.to_module);
+                    neighbours
+                        .entry(link.to_module)
+                        .or_default()
+                        .push(link.from_module);
                 }
             }
             owned.sort_unstable();
             owned.dedup();
         }
+        for list in neighbours.values_mut() {
+            list.sort_unstable();
+            list.dedup();
+        }
+        // The blocks that simulate under every container.
+        let mut leaves: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
+        for block in &model.blocks {
+            if block.is_container() {
+                leaves.insert(block.id, leaves_under(block.id, &children, &blocks));
+            }
+        }
         Flow {
             ranks,
             children,
             links,
+            neighbours,
+            leaves,
         }
+    }
+
+    /// Whether no link reaches a block.
+    ///
+    /// A block that no link reaches is not part of the flow: it does not say
+    /// where anything comes from or where it goes. A container that holds
+    /// blocks with links is part of the flow even when the links do not
+    /// touch the container itself.
+    pub fn is_isolated(&self, id: u32) -> bool {
+        if !self
+            .neighbours
+            .get(&id)
+            .map(|list| list.is_empty())
+            .unwrap_or(true)
+        {
+            return false;
+        }
+        self.leaves
+            .get(&id)
+            .map(|leaves| {
+                leaves.iter().all(|leaf| {
+                    self.neighbours
+                        .get(leaf)
+                        .map(|list| list.is_empty())
+                        .unwrap_or(true)
+                })
+            })
+            .unwrap_or(true)
     }
 
     /// How deep in the flow a block is.

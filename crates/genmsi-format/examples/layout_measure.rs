@@ -89,6 +89,7 @@ fn total(rows: &[(String, Both)], from_scratch: bool) -> Composition {
         total.outside += one.outside;
         total.crossings += one.crossings;
         total.isolated += one.isolated;
+        total.over_blocks += one.over_blocks;
     }
     total
 }
@@ -124,8 +125,9 @@ fn print_table(rows: &[(String, Both)]) {
 /// One line with the numbers of a measure.
 fn summary(one: &Composition) -> String {
     format!(
-        "bloques {} aristas {} solapes {} fuera {} cruces {} aislados {}",
-        one.blocks, one.edges, one.overlaps, one.outside, one.crossings, one.isolated
+        "bloques {} aristas {} solapes {} fuera {} cruces {} aislados {} por-encima {}",
+        one.blocks, one.edges, one.overlaps, one.outside, one.crossings, one.isolated,
+        one.over_blocks
     )
 }
 
@@ -164,6 +166,7 @@ fn value(one: &Composition) -> serde_json::Value {
         "outside": one.outside,
         "crossings": one.crossings,
         "isolated": one.isolated,
+        "over_blocks": one.over_blocks,
         "width": one.width,
         "height": one.height,
     })

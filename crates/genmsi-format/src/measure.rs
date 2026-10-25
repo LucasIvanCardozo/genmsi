@@ -30,6 +30,8 @@ pub struct Composition {
     pub crossings: usize,
     /// The blocks that no link reaches: they belong to no flow.
     pub isolated: usize,
+    /// The links that pass over a block: the reader has to look past them.
+    pub over_blocks: usize,
     /// The width of the canvas.
     pub width: i32,
     /// The height of the canvas.
@@ -173,6 +175,25 @@ pub fn measure(model: &GmdlModel, positions: &[Position]) -> Composition {
         }
     }
     measure.edges = edges.len();
+    // The links that pass over a block. A link that goes through the frame
+    // of a container is not one of them: the frame is around the flow, not
+    // in the way of it.
+    for (from, to) in &edges {
+        let a = rects[from].center();
+        let b = rects[to].center();
+        for (id, rect) in &rects {
+            if id == from || id == to {
+                continue;
+            }
+            if ancestors(&owners, *from).contains(id) || ancestors(&owners, *to).contains(id) {
+                continue;
+            }
+            if crosses_block(a, b, rect) {
+                measure.over_blocks += 1;
+                break;
+            }
+        }
+    }
     // The blocks that no link reaches.
     let mut reached: BTreeSet<u32> = BTreeSet::new();
     for (from, to) in &edges {
@@ -212,6 +233,22 @@ fn ancestors(owners: &BTreeMap<u32, u32>, id: u32) -> BTreeSet<u32> {
         current = owners.get(&owner).copied();
     }
     above
+}
+
+/// Whether the segment `a`-`b` passes over the rectangle.
+fn crosses_block(a: (f64, f64), b: (f64, f64), rect: &Rect) -> bool {
+    let corners = [
+        (f64::from(rect.x), f64::from(rect.y)),
+        (f64::from(rect.right()), f64::from(rect.y)),
+        (f64::from(rect.right()), f64::from(rect.bottom())),
+        (f64::from(rect.x), f64::from(rect.bottom())),
+    ];
+    for index in 0..4 {
+        if crosses(a, b, corners[index], corners[(index + 1) % 4]) {
+            return true;
+        }
+    }
+    false
 }
 
 /// Whether the segment `a`-`b` crosses the segment `c`-`d`.

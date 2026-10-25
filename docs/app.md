@@ -288,6 +288,20 @@ The trace has a **record limit** (the CLI keeps 100 by default; the app asks
 for 200000), and the document says when the bound cut the trace: the monitor
 says so instead of implying that it replayed everything.
 
+**The figures of the blocks are the engine's** (D19). A block of the model is
+one or several statements of the listing, and the report marks the row that
+counts its block: the first one, the transactions that entered it. The app
+shows that figure and adds nothing up — adding the rows of a block up would
+count one transaction once per statement, five times for a facility use. A
+generator shows no figure: no transaction stays inside one.
+
+**A crossing is always seen.** A transaction that crosses blocks with no
+waiting time crosses them in no time either, so the ball that shows the
+crossing would blink: the flight has a floor in the clock of the reader (the
+speed of the replay times the shortest a ball may fly), and the clock stops
+at the next crossing instead of skipping it. The clock of the run is still
+the run's clock: the floor is in the time of the reader, not in the model's.
+
 ### The charts read the documents
 
 The charts of the run are drawn with **Recharts** (the only charting library,

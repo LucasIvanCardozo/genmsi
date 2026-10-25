@@ -224,3 +224,40 @@ Rationale: the session the user ran asked for a simpler model and wrote it
 with two Python scripts, because the MCP had no way to build a model and the
 file it wrote had no geometry to draw. The engine composing the canvas is
 what makes an agent's model a model the reader can see.
+
+## D19 — One zone of truth: the engine publishes, the app invents nothing
+
+The zone of truth is the engine, and it already was: D2 says the GUI, CLI
+and MCP layers are thin, the report is the engine's `genmsi.report/1` (byte
+for byte, with a parity test), and the replay is a **projection** of the
+engine's documents, checked against that report at the end of the run
+(`checkFidelity`).
+
+The breach was one single place: the app **invented** a figure the engine
+never published. To show how many transactions had gone through a block it
+added up the report's rows that belonged to it; a `FacilityUse` is five
+statements of the listing (a queue, a seize, a depart, an advance and a
+release), so the figure was five times the truth. And no check could catch
+it: a figure the engine never published has nothing to be compared with.
+
+The rule that stays:
+
+- **the engine publishes** which row counts each block (the first one: the
+  transactions that entered it), as an additive field of the report's JSON,
+  like the ones the class document gained in the fase 3b;
+- **the app shows** that figure and adds nothing up;
+- **a generator shows no figure**: no transaction stays inside a generator,
+  and the generator itself is not an instance that went through it;
+- what the engine does not publish, the app does not show: a row that does
+  not say it counts its block leaves the block without a figure, because no
+  figure is better than a wrong one.
+
+The figure is published in the report and not in the model document because it
+belongs to the run and not to the model: the model document is built from the
+file, without compiling, so that a model that does not compile still has its
+graph.
+
+Rationale: the figure of a block does not exist in the original's report (the
+original writes one row per statement, not one per block), so the engine has
+to publish it if anybody wants it. The user saw the consequence of the app
+making it up: a facility use that served 59 transactions showed 295.

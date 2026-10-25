@@ -192,3 +192,28 @@ Phase 3b session of genmsi-rs. Coordinator: "GenMSI-rs: sesión principal coordi
   minimal model of that class and its trace — is the lever that would move the number of
   calls of a cold agent, because it replaces the probe with a reading. The mutation
   tools are not: the agent writes the XML of a whole model in one call.
+- L14 (correction of L10, after the session the user ran with this phase): the mutation
+  tools **are** the next step, and the measurement understated their value. The session
+  that tested the phase asked for a simpler model and did this: **58 `codemode` calls**,
+  **17 `lint`** (9 clean, 1 with findings, **7 refused**), and — the telling part — it
+  **left the MCP to write the model**: `/tmp/build_gmdl.py` and `/tmp/patch_hints.py`,
+  two Python scripts that generate and patch the `.gmdl` by hand. The seven refusals are
+  all authoring errors: malformed XML, a `link` with a bad attribute, a class the
+  catalogue does not have, a definition with a bad name. The MCP offers no way to
+  *build* a model, only to send one as text, so the agent invents the XML and the
+  format refuses it one error at a time (the format's validation chains with `?` and
+  the compiler aborts at the first bad block).
+  The measurement did not show this because the measured agent wrote the XML inline in
+  the tool's argument, where the guide's grammar was enough. The agent that had to
+  work for itself wrote a generator instead.
+- L15 (the other defect the session found: the canvas comes out empty): the layout
+  algorithm lives only in the frontend (`crates/genmsi-app/src/edit/layout.ts`), the
+  catalogue's template carries no geometry, and the app draws only the blocks that
+  have one (`crates/genmsi-app/src/graph/graph.ts:95`). A model built from the
+  templates therefore has **no nodes at all**: the engine validates it perfectly and
+  the editor shows an empty canvas. The app's own "re-layout" button cannot fix it
+  either — it skips the blocks that have no geometry. The agent worked around it by
+  writing `x`, `y`, `width` and `height` for the 44 blocks of its model by hand.
+  The session also saved the model to `simulacion/modelocomedor.gmdl` while the app
+  had `simulacion/modelo.gmdl` open: the app watches the file it has open, so it
+  never saw the agent's work.

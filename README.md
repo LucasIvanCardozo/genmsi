@@ -13,9 +13,9 @@ crates/
   genmsi-cli/      `genmsi` binary: lint, simulate (+ --json), trace
   genmsi-mcp/      `genmsi-mcp` binary: rmcp stdio server (simulate, lint, get_trace, explain_model)
   genmsi-app/      Tauri 2 + React GUI (joins in Phase 4; placeholder for now)
-docs/              DECISIONS.md (decision log), ROADMAP.md (phases)
+docs/              DECISIONS.md (decision log), ROADMAP.md (phases), scratch.md (the work area outside the repository)
 fixtures/          example .gmdl models + expected outputs from the original
-scripts/           Wine oracle harness, block inventory tooling
+scripts/           Wine oracle harness, MCP probe, block inventory tooling
 ```
 
 ## Rules

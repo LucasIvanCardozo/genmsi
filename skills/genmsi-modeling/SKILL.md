@@ -206,6 +206,7 @@ Probe the classes whose behaviour you are not sure of, not the ones the catalogu
 - **The report has one row per statement, not per block.** The `FacilityUse` block is five rows and the `Clock` is two: do not read the row count as the block count. `lint`'s `blocks` counts the same statements, not the modules of the document.
 - **The trace numbers the statements, not the modules.** The block of an event is the line of the compiled program, and the `-> N` of a detail is the statement the transaction goes to; neither is the `moduleid` of the document.
 - **`save_model` writes the engine's form of the document.** The writer normalises the whitespace and fills the empty attributes (`hint=""`, `genprefer`): the file it writes is not the text you sent, and the next agent that reads it sees the engine's bytes.
+- **The canvas geometry is the engine's, not yours.** A model you build carries no `x`, `y`, `width` or `height`, and it does not need them: `save_model` composes the model before writing it, so the desktop app draws it. Do not place the blocks by hand — the engine's composition is the one the app expects, and a model you place yourself is a model the reader sees in pieces.
 - **A block without an output port is not a source.** The `Clock`, the definitions and the notes have no outputs and never appear in a link.
 
 ## If the MCP does not tell you something

@@ -14,10 +14,14 @@
 //! to hold the blocks they own, and the model root (which the editor does not
 //! draw) is left alone.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+
+mod flow;
 
 use crate::edit::Position;
 use crate::model::{Block, GmdlModel, Layout};
+
+use flow::Flow;
 
 /// Horizontal gap between two layers.
 pub const GAP_X: i32 = 60;
@@ -56,18 +60,23 @@ pub fn relayout(model: &GmdlModel) -> Vec<Position> {
         .iter()
         .map(|block| (block.id, block))
         .collect();
+    // The flow of the model: how deep in it every block is. The depth is
+    // the depth of the whole model, so a link that crosses the border of a
+    // container says where the flow goes.
+    let flow = Flow::of(model);
     // The size of every block, from the leaves up: a container is as big as
     // the blocks it holds, plus the margin that separates them.
     let mut sizes: HashMap<u32, Size> = HashMap::new();
     for block in &model.blocks {
         if block.id != root.id {
-            block_size(&blocks, block.id, &mut sizes);
+            block_size(&blocks, &flow, block.id, &mut sizes);
         }
     }
     let (origin_x, origin_y) = origin(model);
     let mut positions = Vec::new();
     place(
         &blocks,
+        &flow,
         root.id,
         origin_x,
         origin_y,
@@ -142,34 +151,11 @@ fn origin(model: &GmdlModel) -> (i32, i32) {
     }
 }
 
-/// The blocks a container owns, in the order they are composed.
-fn children_of(blocks: &HashMap<u32, &Block>, container: u32) -> Vec<u32> {
-    let mut children: Vec<u32> = blocks
-        .values()
-        .filter(|block| block.owner == container && block.id != container)
-        .map(|block| block.id)
-        .collect();
-    children.sort_unstable();
-    children
-}
-
-/// The links a container owns, as the pairs of blocks they join.
-fn edges_of(blocks: &HashMap<u32, &Block>, container: u32) -> Vec<(u32, u32)> {
-    blocks
-        .get(&container)
-        .map(|block| {
-            block
-                .links
-                .iter()
-                .map(|link| (link.from_module, link.to_module))
-                .collect()
-        })
-        .unwrap_or_default()
-}
 
 /// The size of a block: its own, or the size that holds what it owns.
 fn block_size(
     blocks: &HashMap<u32, &Block>,
+    flow: &Flow,
     id: u32,
     memo: &mut HashMap<u32, Size>,
 ) -> Size {
@@ -178,7 +164,7 @@ fn block_size(
     }
     let size = match blocks.get(&id) {
         Some(block) if block.is_container() => {
-            let (width, height) = content_size(blocks, id, memo);
+            let (width, height) = content_size(blocks, flow, id, memo);
             Size {
                 width: width + 2 * PAD,
                 height: height + 2 * PAD,
@@ -200,11 +186,11 @@ fn block_size(
 /// The space the blocks of a container take, arranged in layers.
 fn content_size(
     blocks: &HashMap<u32, &Block>,
+    flow: &Flow,
     container: u32,
     memo: &mut HashMap<u32, Size>,
 ) -> (i32, i32) {
-    let children = children_of(blocks, container);
-    let layers = layers_of(&children, &edges_of(blocks, container));
+    let layers = flow.layers_of(container);
     let mut width = 0;
     let mut height = 0;
     for (index, layer) in layers.iter().enumerate() {
@@ -214,7 +200,7 @@ fn content_size(
         let mut layer_width = 0;
         let mut layer_height = 0;
         for (position, child) in layer.iter().enumerate() {
-            let size = block_size(blocks, *child, memo);
+            let size = block_size(blocks, flow, *child, memo);
             layer_width = layer_width.max(size.width);
             layer_height += size.height;
             if position > 0 {
@@ -230,14 +216,14 @@ fn content_size(
 /// Place the blocks of a container, and the blocks of the containers it owns.
 fn place(
     blocks: &HashMap<u32, &Block>,
+    flow: &Flow,
     container: u32,
     origin_x: i32,
     origin_y: i32,
     sizes: &HashMap<u32, Size>,
     out: &mut Vec<Position>,
 ) {
-    let children = children_of(blocks, container);
-    let layers = layers_of(&children, &edges_of(blocks, container));
+    let layers = flow.layers_of(container);
     let mut x = origin_x;
     let mut placed: HashMap<u32, (i32, i32)> = HashMap::new();
     for layer in &layers {
@@ -259,7 +245,7 @@ fn place(
         x += layer_width + GAP_X;
     }
     // The blocks of a container that is itself a container.
-    for child in children {
+    for child in flow.children_of(container) {
         let is_container = blocks
             .get(&child)
             .map(|block| block.is_container())
@@ -270,74 +256,7 @@ fn place(
         let Some((x, y)) = placed.get(&child).copied() else {
             continue;
         };
-        place(blocks, child, x + PAD, y + PAD, sizes, out);
+        place(blocks, flow, child, x + PAD, y + PAD, sizes, out);
     }
 }
 
-/// The layers of the blocks of one container.
-///
-/// A block with no incoming link between the blocks of the container is in the
-/// first layer; a block that follows another one is one layer deeper. A cycle
-/// (the editor allows one) is broken at the block the walk meets again, so the
-/// result is still deterministic.
-fn layers_of(children: &[u32], edges: &[(u32, u32)]) -> Vec<Vec<u32>> {
-    let ids: HashSet<u32> = children.iter().copied().collect();
-    let mut incoming: HashMap<u32, Vec<u32>> = HashMap::new();
-    for (from, to) in edges {
-        if !ids.contains(from) || !ids.contains(to) || from == to {
-            continue;
-        }
-        incoming.entry(*to).or_default().push(*from);
-    }
-    let mut layer_of: HashMap<u32, usize> = HashMap::new();
-    let mut visiting: HashSet<u32> = HashSet::new();
-    for child in children {
-        depth(
-            *child,
-            &incoming,
-            &mut layer_of,
-            &mut visiting,
-        );
-    }
-    let deepest = children
-        .iter()
-        .filter_map(|child| layer_of.get(child).copied())
-        .max()
-        .unwrap_or(0);
-    let mut layers: Vec<Vec<u32>> = vec![Vec::new(); deepest + 1];
-    for child in children {
-        let layer = layer_of.get(child).copied().unwrap_or(0);
-        layers[layer].push(*child);
-    }
-    layers
-}
-
-/// How deep a block is: the layer it belongs to.
-fn depth(
-    id: u32,
-    incoming: &HashMap<u32, Vec<u32>>,
-    layer_of: &mut HashMap<u32, usize>,
-    visiting: &mut HashSet<u32>,
-) -> usize {
-    if let Some(known) = layer_of.get(&id) {
-        return *known;
-    }
-    // The walk meets the block again: the links have a cycle, and the block
-    // stays in the first layer so the result is still deterministic.
-    if !visiting.insert(id) {
-        return 0;
-    }
-    let sources = incoming.get(&id).cloned().unwrap_or_default();
-    let value = if sources.is_empty() {
-        0
-    } else {
-        1 + sources
-            .iter()
-            .map(|source| depth(*source, incoming, layer_of, visiting))
-            .max()
-            .unwrap_or(0)
-    };
-    visiting.remove(&id);
-    layer_of.insert(id, value);
-    value
-}

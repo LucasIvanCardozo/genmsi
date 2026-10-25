@@ -123,6 +123,35 @@ fn a_container_grows_to_hold_the_blocks_it_owns() {
 }
 
 #[test]
+fn the_blocks_follow_the_flow_across_the_border_of_a_container() {
+    // Two containers, and a link that goes from the block of one to the
+    // block of the other: the flow crosses the border, and the containers
+    // have to be in the order the flow says.
+    let text = "<gmodel versioncode=\"1\"><gclasses/><modules>\
+         <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\">\
+         <links/><inputs/><outputs/></module>\
+         <module moduleid=\"1\" moduleclass=\"\" owner=\"0\" caption=\"A\" name=\"A\" kind=\"C\">\
+         <links><link frommoduleid=\"4\" fromioid=\"1\" tomoduleid=\"2\" toioid=\"1\"/></links>\
+         <inputs/><outputs/></module>\
+         <module moduleid=\"2\" moduleclass=\"Clock\" owner=\"1\" caption=\"Clock\" name=\"Clock\" kind=\"A\">\
+         <inputs/><outputs/><props/></module>\
+         <module moduleid=\"3\" moduleclass=\"\" owner=\"0\" caption=\"B\" name=\"B\" kind=\"C\">\
+         <links/><inputs/><outputs/></module>\
+         <module moduleid=\"4\" moduleclass=\"Terminate\" owner=\"3\" caption=\"Terminate\" name=\"Terminate\" kind=\"A\">\
+         <inputs/><outputs/><props/></module>\
+         </modules></gmodel>";
+    let mut model = genmsi_format::parse_str(text).expect("the model parses");
+    compose_incomplete(&mut model).expect("composed");
+    let (ax, _, _, _) = layout_of(&model, 1).expect("the container A is placed");
+    let (bx, _, _, _) = layout_of(&model, 3).expect("the container B is placed");
+    // The flow goes from the block of B to the block of A: B comes first.
+    assert!(
+        bx < ax,
+        "the container of the flow's start comes first: B at {bx}, A at {ax}"
+    );
+}
+
+#[test]
 fn a_container_inside_a_container_holds_its_own_blocks() {
     let text = "<gmodel versioncode=\"1\"><gclasses/><modules>\
          <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\">\

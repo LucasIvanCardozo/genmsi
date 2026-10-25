@@ -112,6 +112,13 @@ export interface EngineAdapter {
   newModel(): Promise<SessionState>;
   /** Apply one editing command. */
   apply(command: EditCommand): Promise<SessionState>;
+  /**
+   * Compose the model on the canvas.
+   *
+   * The positions come from the engine, the same composition the MCP applies
+   * before it writes a model: there is one algorithm.
+   */
+  relayout(): Promise<SessionState>;
   /** Undo the last operation. */
   undo(): Promise<SessionState>;
   /** Redo the last undone operation. */

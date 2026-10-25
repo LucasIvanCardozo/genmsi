@@ -207,6 +207,20 @@ impl Session {
         Ok(self.state())
     }
 
+    /// Compose the model on the canvas.
+    ///
+    /// The positions come from the engine's composition, the same one the MCP
+    /// applies before it writes a model: there is one algorithm, so the app
+    /// and the agent put the model on the canvas the same way. The
+    /// composition is one undo entry, like every other edit.
+    pub fn relayout(&mut self) -> Result<SessionState, AppError> {
+        let positions = genmsi_format::relayout(self.editor.model());
+        if positions.is_empty() {
+            return Ok(self.state());
+        }
+        self.apply(EditCommand::SetLayouts { positions })
+    }
+
     /// Undo the last operation.
     ///
     /// When the model in memory has nothing to undo, the last reload is

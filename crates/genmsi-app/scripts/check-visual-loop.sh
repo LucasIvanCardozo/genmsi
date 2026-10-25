@@ -117,6 +117,26 @@ set_range_middle() {
   agent-browser eval "(() => { const input = document.querySelector('$selector'); if (!input) return 'not found'; const max = Number(input.max); const value = String(Math.floor(max / 2)); const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set; setter.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); return value; })()" >/dev/null
 }
 
+# Open a model in the browser.
+#
+# The app has no dropdown of models: it opens them with the dialog of the
+# system, and the browser has no dialog. The recents are the way in — the
+# browser keeps them in its own storage — so the loop leaves the path there,
+# reloads the page and clicks the model in the menu.
+open_model() {
+  local path="$1"
+  local file stem
+  file="$(basename "$path")"
+  stem="$(basename "$path" .gmdl)"
+  agent-browser eval "localStorage.setItem('genmsi.recent-models', JSON.stringify(['$path']))" >/dev/null
+  agent-browser reload >/dev/null
+  agent-browser wait --text "GenMSI"
+  agent-browser find role button click --name "Recientes"
+  agent-browser eval "(() => { const button = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes('$file')); if (!button) return 'the model is not in the recents'; button.click(); return 'opened'; })()" >/dev/null
+  # The header carries the name of the model that is open.
+  agent-browser wait --text "$stem"
+}
+
 # 1. The copy the loop edits. The reference model stays untouched.
 mkdir -p "$REPO_ROOT/$WORK"
 cp "$REPO_ROOT/$MODEL" "$REPO_ROOT/$EDITED"
@@ -153,13 +173,8 @@ agent-browser open "http://127.0.0.1:$PORT/"
 agent-browser set viewport 1440 1000
 agent-browser wait --text "GenMSI"
 
-# 4. The model picker. The options arrive after the model list, so the loop
-#    waits for one model's name before selecting: selecting earlier is a
-#    silent no-op.
-agent-browser wait --text "TP2__problema1"
-
-# The reviewed model: the graph, framed with the model's own geometry.
-agent-browser select '[aria-label="Modelo"]' "$MODEL"
+# 4. The reviewed model: the graph, framed with the model's own geometry.
+open_model "$MODEL"
 agent-browser wait --text "Puerta Banco"
 agent-browser screenshot "$SHOTS/01-grafo.png"
 
@@ -178,7 +193,7 @@ agent-browser click '[data-monitor-panel="reproduccion"]'
 agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > 0"
 
 # 5. The editing steps, on the copy of the model.
-agent-browser select '[aria-label="Modelo"]' "$EDITED"
+open_model "$EDITED"
 agent-browser wait --text "Puerta Banco"
 
 # A new node, created from the catalogue. The classes live in the lateral
@@ -222,42 +237,49 @@ agent-browser press "Control+Shift+z"
 agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"$GENERATE_ID\"]').style.transform !== '$POSITION_BEFORE'"
 agent-browser screenshot "$SHOTS/08-rehacer.png"
 
+# The re-layout: the button asks the engine to compose the model, and the
+# blocks move to the layers of the flow. The composition is the engine's, the
+# same one the MCP applies before it writes a model.
+POSITION_BEFORE=$(node_position "$GENERATE_ID")
+agent-browser find role button click --name "Reacomodar"
+agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"$GENERATE_ID\"]').style.transform !== '$POSITION_BEFORE'"
+agent-browser screenshot "$SHOTS/09-reacomodado.png"
+
 # The model is saved, and the app says so.
 agent-browser find role button click --name "Guardar"
 agent-browser wait --text "Se guardó"
-agent-browser screenshot "$SHOTS/09-guardado.png"
+agent-browser screenshot "$SHOTS/10-guardado.png"
 
 # The file is reopened: the change is in the file, not only in the session.
 agent-browser open "http://127.0.0.1:$PORT/"
 agent-browser wait --text "GenMSI"
-agent-browser wait --text "TP2__problema1"
-agent-browser select '[aria-label="Modelo"]' "$EDITED"
+open_model "$EDITED"
 agent-browser wait --text "Puerta Banco"
 agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > $((NODE_COUNT + 1))"
-agent-browser screenshot "$SHOTS/10-reabierto.png"
+agent-browser screenshot "$SHOTS/11-reabierto.png"
 
 # A model the engine refuses: the engine's message, not an empty graph.
-agent-browser select '[aria-label="Modelo"]' "$REFUSED"
+open_model "$REFUSED"
 agent-browser wait --text "$REFUSAL_TEXT"
 # The screenshot must show the settled state, not the transition: the previous
 # model stays on screen while the next one loads.
 agent-browser wait --fn '!document.body.innerText.includes("Cargando")'
-agent-browser screenshot "$SHOTS/11-error.png"
+agent-browser screenshot "$SHOTS/12-error.png"
 
 # 6. The monitor: the run, the replay and the charts.
 #
 # The model of the monitor is the one with tables, queues and facilities:
 # the charts need a model that has all of them.
-agent-browser select '[aria-label="Modelo"]' "$MONITOR_MODEL"
+open_model "$MONITOR_MODEL"
 agent-browser wait --text "supermercado"
 # The model has to be in memory before the run: the button waits for it, and
 # the run of a model that is still loading would have nothing to run.
 agent-browser wait --fn '!document.body.innerText.includes("Cargando")'
 agent-browser wait --text "Ejecutar"
 agent-browser find role button click --name "Ejecutar"
-# The header of the monitor says how many records the trace kept.
-agent-browser wait --text "Registros"
-agent-browser screenshot "$SHOTS/12-monitor.png"
+# The clock of the run advances: the monitor is playing the trace.
+agent-browser wait --fn "!document.body.innerText.includes('0:00:00')"
+agent-browser screenshot "$SHOTS/13-monitor.png"
 
 # The replay is paused and put at the middle of the run, so the picture is
 # the same on every run: the blocks that hold transactions are marked and the
@@ -265,18 +287,18 @@ agent-browser screenshot "$SHOTS/12-monitor.png"
 agent-browser find role button click --name "Pausar la reproducción"
 set_range_middle '[aria-label="Posición de la reproducción"]'
 agent-browser wait --fn 'document.querySelector("input[aria-label=\"Posición de la reproducción\"]").value === String(Math.floor(Number(document.querySelector("input[aria-label=\"Posición de la reproducción\"]").max) / 2))'
-agent-browser screenshot "$SHOTS/13-monitor-reproduccion.png"
+agent-browser screenshot "$SHOTS/14-monitor-reproduccion.png"
 
 # The charts of the run: the time series of the entities and the histogram of
 # the tables of the model.
 agent-browser click '[data-monitor-panel="graficos"]'
 agent-browser wait --text "Histograma"
-agent-browser screenshot "$SHOTS/14-monitor-graficos.png"
+agent-browser screenshot "$SHOTS/15-monitor-graficos.png"
 
 # The report of the run, with the numbers of the instant the replay is at.
 agent-browser click '[data-monitor-panel="reporte"]'
 agent-browser wait --text "Colas"
-agent-browser screenshot "$SHOTS/15-monitor-reporte.png"
+agent-browser screenshot "$SHOTS/16-monitor-reporte.png"
 
 agent-browser close
 echo "==> the visual loop ran; the screenshots are in $SHOTS"

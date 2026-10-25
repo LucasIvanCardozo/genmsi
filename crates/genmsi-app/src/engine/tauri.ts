@@ -100,6 +100,7 @@ export const tauri: EngineAdapter = {
   reload: async (path: string) => stateOf(await session({ op: "reload", path })),
   newModel: async () => stateOf(await session({ op: "new" })),
   apply: async (command: EditCommand) => stateOf(await session({ op: "apply", command })),
+  relayout: async () => stateOf(await session({ op: "relayout" })),
   undo: async () => stateOf(await session({ op: "undo" })),
   redo: async () => stateOf(await session({ op: "redo" })),
   save: async (path?: string): Promise<SaveResult> => {

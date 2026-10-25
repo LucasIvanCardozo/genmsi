@@ -42,6 +42,11 @@ pub enum SessionRequest {
         /// The command to apply.
         command: EditCommand,
     },
+    /// Compose the model on the canvas.
+    ///
+    /// The positions come from the engine's composition, so the app and the
+    /// MCP put the model on the canvas the same way.
+    Relayout,
     /// Undo the last operation.
     Undo,
     /// Redo the last undone operation.
@@ -252,6 +257,7 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
             with_session(session, |session| session.reload(Path::new(&path)))
         }
         SessionRequest::Apply { command } => with_session(session, |session| session.apply(command)),
+        SessionRequest::Relayout => with_session(session, |session| session.relayout()),
         SessionRequest::Undo => with_session(session, |session| session.undo()),
         SessionRequest::Redo => with_session(session, |session| session.redo()),
         SessionRequest::State => with_session(session, |session| Ok(session.state())),

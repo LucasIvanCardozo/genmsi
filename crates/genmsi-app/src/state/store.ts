@@ -3,7 +3,6 @@ import { engine } from "../engine";
 import { files } from "../engine/files";
 import { adviceFor } from "../engine/reasons";
 import type { FileFingerprint, ModelRef } from "../engine/adapter";
-import { relayout } from "../edit/layout";
 import {
   buildIndex,
   buildTransitions,
@@ -944,28 +943,24 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   relayout: async () => {
-    const model = get().model;
-    if (model === null) {
-      return;
+    try {
+      // The positions come from the engine: the app and the MCP put the
+      // model on the canvas the same way.
+      const state = await engine().relayout();
+      // The model moved, but the program did not change: the run the reader
+      // was watching stays.
+      set({
+        model: state.model,
+        diagnostics: state.diagnostics,
+        dirty: state.dirty,
+        canUndo: state.canUndo,
+        canRedo: state.canRedo,
+        error: null,
+        status: "ready",
+      });
+    } catch (error) {
+      set({ error: `No se pudo reacomodar el modelo: ${messageOf(error)}` });
     }
-    const root = model.blocks.find((block) => block.class === "main");
-    if (root === undefined) {
-      return;
-    }
-    const positions = relayout(model.blocks, model.edges, root.id);
-    if (positions.length === 0) {
-      return;
-    }
-    await get().apply({
-      op: "setLayouts",
-      positions: positions.map((position) => ({
-        id: position.id,
-        x: position.x,
-        y: position.y,
-        width: position.width,
-        height: position.height,
-      })),
-    });
   },
 
   setSeed: (seed: number) => set({ seed, seedIsAuto: false }),

@@ -308,6 +308,7 @@ fn describe(request: &SessionRequest) -> String {
         SessionRequest::New => "new".to_string(),
         SessionRequest::Reload { path } => format!("reload {path}"),
         SessionRequest::Apply { .. } => "apply".to_string(),
+        SessionRequest::Relayout => "relayout".to_string(),
         SessionRequest::Undo => "undo".to_string(),
         SessionRequest::Redo => "redo".to_string(),
         SessionRequest::State => "state".to_string(),

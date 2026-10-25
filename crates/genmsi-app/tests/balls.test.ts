@@ -229,3 +229,27 @@ test("a move of a big run is found without walking them all", () => {
   );
   assert.ok(elapsed < 50, `the frame took ${elapsed} ms`);
 });
+
+test("a ball that crosses with no waiting time still flies long enough to be seen", () => {
+  // The transaction crossed the block with no waiting time: the flight is
+  // the floor the caller asked for (the speed of the replay times the
+  // shortest a ball may fly on the wall clock).
+  const move = {
+    from: 1,
+    to: 2,
+    xact: 7,
+    time: 10,
+    flight: 0,
+  };
+  const floor = 3;
+  const travellers = travellersAt([move], [10], 10 - floor, FLIGHT_SECONDS, floor);
+  assert.equal(travellers.length, 1, "the ball is on the screen");
+  assert.equal(travellers[0].flight, floor, "the flight is the floor");
+});
+
+test("the flight of a ball is the time the transaction spent in the block", () => {
+  const move = { from: 1, to: 2, xact: 7, time: 10, flight: 1.5 };
+  const travellers = travellersAt([move], [10], 8.5, FLIGHT_SECONDS, 0.3);
+  assert.equal(travellers.length, 1);
+  assert.equal(travellers[0].flight, 1.5);
+});

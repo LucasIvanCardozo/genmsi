@@ -32,7 +32,7 @@
  * them.
  */
 import { applyChange, closeFigures, emptyFigures, type FigureChange, type Figures } from "./stats.ts";
-import { FLIGHT_SECONDS } from "./balls.ts";
+import { FLIGHT_SECONDS, firstMoveAfter } from "./balls.ts";
 
 /** One event of the trace, as the replay reads it. */
 export interface TraceEventLike {
@@ -1128,6 +1128,30 @@ function targetOf(detail: string): number | null {
  */
 export function advanceClock(clock: number, elapsed: number, rate: number): number {
   return clock + elapsed * rate;
+}
+
+/**
+ * The clock of the replay, with the crossings in the way.
+ *
+ * The replay does not skip a crossing: the clock stops at the instant of the
+ * next one, so the picture shows the transaction arriving instead of jumping
+ * over it. A run without crossings advances at the speed the reader asked
+ * for.
+ *
+ * The crossings are the instants of the moves: a transaction that crossed
+ * three blocks with no waiting time crosses them at the same instant, and
+ * the picture holds there instead of passing over it.
+ */
+export function clockWithCrossings(
+  clock: number,
+  elapsed: number,
+  rate: number,
+  crossings: number[],
+): number {
+  const advanced = advanceClock(clock, elapsed, rate);
+  const index = firstMoveAfter(crossings, clock);
+  const next = index < crossings.length ? crossings[index] : Infinity;
+  return next === Infinity ? advanced : Math.min(advanced, next);
 }
 
 /**

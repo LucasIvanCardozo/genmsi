@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { number } from "../format";
-import { advance, advanceClock, frameAt, stateAt, type ReplayState } from "../monitor/replay";
+import { advance, clockWithCrossings, frameAt, stateAt, type ReplayState } from "../monitor/replay";
 import { useApp } from "../state/store";
-import { FLIGHT_SECONDS, travellersAt, type Move } from "../monitor/balls";
+import { FLIGHT_SECONDS, MIN_WALL_FLIGHT, travellersAt, type Move } from "../monitor/balls";
 import { graphOf, routeOf, visibleLinks } from "../graph/graph";
 import { countsOf } from "../monitor/counts";
 import { useLive, type LiveBall, type LiveCounts } from "../monitor/live";
@@ -154,6 +154,10 @@ export default function MonitorView({
       current.times,
       clock,
       FLIGHT_SECONDS,
+      // The floor of the flight is in the clock of the reader: at a hundred
+      // times the speed, a ball that crossed a block with no waiting time
+      // still flies long enough to be seen.
+      speed * MIN_WALL_FLIGHT,
     )) {
       const id = routeOf(current.edges, traveller.from, traveller.to);
       const list = balls.get(id);
@@ -189,7 +193,15 @@ export default function MonitorView({
         setRef.current = current;
         publish(clockRef.current);
       }
-      const clock = advanceClock(clockRef.current, elapsed, rate);
+      // The replay does not skip a crossing: the clock stops at the instant
+      // of the next one, so the picture shows the transaction arriving
+      // instead of jumping over it.
+      const clock = clockWithCrossings(
+        clockRef.current,
+        elapsed,
+        rate,
+        live.current.times,
+      );
       // The clock stops at the end of the run: a run that is over does not
       // keep counting, and the picture is the picture of its last instant.
       const reached = clock >= monitor.endTime;

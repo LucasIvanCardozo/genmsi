@@ -36,6 +36,18 @@
 /** The shortest a ball flies, in seconds of the run: a ball is always seen. */
 export const MIN_FLIGHT = 0.3;
 
+/**
+ * The shortest a ball flies, in seconds of the wall clock.
+ *
+ * The flight is the time the transaction spent in the block it came from, so
+ * a transaction that crossed three blocks with no waiting time crosses them
+ * in no time either: the ball would blink. The flight has a floor in the
+ * clock of the reader, so the crossing is always seen. The floor is in
+ * seconds of the run, so the caller multiplies it by the speed of the
+ * replay.
+ */
+export const MIN_WALL_FLIGHT = 0.12;
+
 /** The longest a ball flies, in seconds of the run: a ball never crawls. */
 export const FLIGHT_SECONDS = 2;
 
@@ -135,14 +147,20 @@ export function travellersAt(
   times: number[],
   time: number,
   maxFlight: number = FLIGHT_SECONDS,
+  minFlight: number = MIN_FLIGHT,
 ): Traveller[] {
   const travellers: Traveller[] = [];
   if (moves.length === 0) {
     return travellers;
   }
+  // The floor of every flight: a ball that would take no time at all still
+  // flies, and it flies long enough to be seen at the speed of the replay.
+  const floor = Math.max(minFlight, MIN_FLIGHT);
   // The longest a ball may fly: the ceiling of every flight, and the window
-  // the search looks ahead.
-  const ceiling = Math.min(Math.max(maxFlight, MIN_FLIGHT), FLIGHT_SECONDS);
+  // the search looks ahead. The floor is inside it: a flight that is shorter
+  // than the floor cannot be seen, and a ceiling below the floor would make
+  // the balls pile up on the links.
+  const ceiling = Math.min(Math.max(maxFlight, floor), Math.max(FLIGHT_SECONDS, floor));
   // The ball of a move that happens at `t` flies while the clock is between
   // `t - flight` and `t`: the move that matters happens in the next
   // `ceiling` seconds of the run, and not before the clock is at it.
@@ -150,7 +168,7 @@ export function travellersAt(
   const end = firstMoveAfter(times, time + ceiling);
   for (let index = start; index < end; index += 1) {
     const move = moves[index];
-    const flight = flightOf(move, ceiling);
+    const flight = flightOf(move, floor, ceiling);
     const progress = (time - (move.time - flight)) / flight;
     if (progress < 0) {
       // The ball has not left yet: the transaction is still in the block it
@@ -179,10 +197,10 @@ export function travellersAt(
  * transaction that passed through a block in no time still shows a ball
  * (`MIN_FLIGHT`).
  */
-function flightOf(move: Move, ceiling: number): number {
+function flightOf(move: Move, floor: number, ceiling: number): number {
   const raw = Number.isFinite(move.flight) ? move.flight : 0;
-  if (raw < MIN_FLIGHT) {
-    return MIN_FLIGHT;
+  if (raw < floor) {
+    return floor;
   }
   if (raw > ceiling) {
     return ceiling;

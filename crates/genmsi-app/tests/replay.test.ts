@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   advanceClock,
+  clockWithCrossings,
   buildIndex,
   buildTransitions,
   checkFidelity,
@@ -549,4 +550,18 @@ test("the slider is a clock: a time selects the last record at or before it", ()
   assert.equal(at(2), 2, "the exact instant of a record");
   assert.equal(at(9.9), 4, "the last record of the run");
   assert.equal(frameAt(index, -5), 0, "before the run, the first record");
+});
+
+test("the replay does not skip a crossing", () => {
+  // The clock would jump over the instant of the crossing (a transaction
+  // that crossed a block with no waiting time), and the picture would not
+  // show it arriving.
+  const clock = clockWithCrossings(9.5, 1, 10, [10]);
+  assert.equal(clock, 10, "the clock stops at the crossing");
+  // And it goes on after it.
+  assert.equal(clockWithCrossings(10, 1, 10, [10]), 20);
+});
+
+test("a run without crossings advances at the speed the reader asked for", () => {
+  assert.equal(clockWithCrossings(0, 1, 10, []), 10);
 });

@@ -343,6 +343,9 @@ function fitFlow(instance: ReactFlowInstance<Node<BlockData>, Edge> | null, node
     // A model that is composed can be wide: the picture is framed whole,
     // even if the reader has to zoom out to see it.
     minZoom: 0.15,
+    // And a fit never zooms past a readable level: the picture of a small
+    // model does not become a block the size of the window.
+    maxZoom: 1.25,
   });
 }
 

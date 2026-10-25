@@ -32,6 +32,7 @@ every recipe that produced it is in the repository.
 | `shots/` | The screenshots of the visual loop | Yes: the loop writes them again on every run (`GENMSI_SHOTS`) |
 | `node-compile-cache/` | The cache of the frontend's bundler | Yes |
 | `*.log`, `*_out.txt`, `*.json` | The answers and the transcripts of the measurements (the catalogue's before and after, the MCP's transcript) | Yes: the durable ones are in `odd/tasks/medida/` and `odd/tasks/medida2/` |
+| `regenerar-oracle*.sh`, `test-one.sh` | One-off variants of `scripts/wine-oracle/run_oracle.sh` (a copy of the executable whose name the other sessions' `pkill` does not match, and a check of the title of the window) | Yes: the bulk regeneration is `scripts/wine-oracle/run-benches.sh` |
 
 ## The recipes that live in the repository
 

@@ -56,6 +56,12 @@ así que la app lo dibuja sin que nadie tenga que tocar el archivo a mano. La
 composición sólo se aplica cuando la geometría está incompleta: un modelo ya
 colocado conserva la disposición que su autor dejó.
 
+La composición **no es un hallazgo**: el documento de lint de un modelo que
+compila es `ok` y no tiene hallazgos, componga el motor el modelo o no. Un
+cliente que lea `diagnostics` como "el modelo tiene problemas" no puede ser
+engañado por la geometría; la descripción de la herramienta dice que la
+composición pasa, y `genmsi layout` dice qué compuso.
+
 ### S7 — La CLI compone un modelo
 
 `genmsi layout` compone un modelo y dice qué compuso. Sin escribir nada por
@@ -166,7 +172,7 @@ gráficas.
 
 ### L8 — T3: `save_model` compone y la CLI compone (`b5a1b58`)
 
-El MCP compone el modelo antes de escribirlo (después de validarlo y compilarlo, como antes): un modelo sin geometría llega al archivo con la geometría puesta y el documento de lint lo dice; un modelo que ya la tiene se escribe byte a byte como llegó. La CLI gana `genmsi layout`, que dice dónde quedó cada bloque y no escribe nada, salvo que se lo pidan con `--write` (la escritura es atómica).
+El MCP compone el modelo antes de escribirlo (después de validarlo y compilarlo, como antes): un modelo sin geometría llega al archivo con la geometría puesta; un modelo que ya la tiene se escribe byte a byte como llegó. La composición no es un hallazgo: el documento de lint de un modelo que compila es `ok`, sin hallazgos (lo corrigió la verificación independiente, que señaló que un cliente podía leer `diagnostics` como "el modelo tiene problemas"). La CLI gana `genmsi layout`, que dice dónde quedó cada bloque y no escribe nada, salvo que se lo pidan con `--write` (la escritura es atómica).
 
 Las pruebas: el archivo escrito lleva la geometría de cada bloque y la raíz no, y el modelo compuesto simula igual que el que el agente mandó; un modelo que ya tiene geometría se escribe sin cambios; un modelo que no compila no llega al disco; la CLI compone sin escribir, escribe con `--write` y falla como las demás órdenes.
 
@@ -203,7 +209,24 @@ geometría es del motor y que no hay que colocar los bloques a mano.
   (byte a byte, atómica, idempotente) y por la prueba de que la geometría no
   cambia la semántica.
 
-### L12 — Lo que la fase no hace
+### L12 — La verificación independiente de la unidad de escritura
+
+El plan de `assess` con la escalación del ítem 1 pidió un verificador independiente sobre la unidad de escritura (`b5a1b58`). Verificó las seis cosas: nada se pierde (el archivo escrito sólo difiere del original en la geometría: 19 módulos, 27 propiedades, 12 links, 23 puertos y 23 etiquetas sobreviven), un modelo que no compila no llega al disco, la escritura es atómica (240.043 lecturas concurrentes, ninguna parcial), `--write` es idempotente, la geometría no cambia la semántica (el GPSS y los reportes salen byte a byte iguales) y ningún bloque se superpone con otro del mismo contenedor.
+
+Sus tres avisos se corrigieron:
+
+- **A1**: una escritura que falla a mitad de camino dejaba el archivo temporal
+  (`.modelo.gmdl.tmp`) en el directorio. Ahora las dos escrituras (la del MCP
+  y la de la CLI) lo borran cuando la escritura falla.
+- **A2**: `--write` reescribía el archivo entero (con la forma canónica del
+  motor) aunque no hubiera compuesto nada. Ahora un modelo que no necesita
+  composición **no se escribe**: la orden no toca un archivo que no necesita
+  toque.
+- **A3**: la nota de la composición convertía el documento de lint en
+  `diagnostics`, y un cliente podía leerlo como "el modelo tiene
+  problemas". La nota se fue: la composición no es un hallazgo.
+
+### L13 — Lo que la fase no hace
 
 - No publica una geometría en el catálogo: la composición es del motor y no
   de la clase.

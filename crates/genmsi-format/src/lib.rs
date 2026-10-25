@@ -28,6 +28,7 @@ pub mod catalogue;
 pub mod declaration;
 pub mod properties;
 pub mod edit;
+pub mod layout;
 pub mod error;
 pub mod model;
 pub mod parser;
@@ -39,6 +40,7 @@ pub use declaration::{
     UndeclaredEntity, declaration_warnings, undeclared_entities, validate_declarations,
 };
 pub use edit::{EditCommand, EditSession, Position, UndoStep};
+pub use layout::{compose_incomplete, is_composed, relayout};
 pub use error::{FormatError, Location};
 pub use properties::{UndeclaredProperty, property_warnings, undeclared_properties};
 pub use model::{

@@ -180,7 +180,31 @@ una corrida sin cruces avanza a la velocidad pedida).
 La decisión D19 ("una zona de verdad: el motor publica, la app no inventa"),
 la sección del monitor en `docs/app.md` y esta fase.
 
-### L8 — La decisión
+### L8 — La puerta que cuenta el intento: medido contra el original
+
+El usuario vio que una puerta ya sumaba una instancia en su total mientras la
+instancia seguía en la `Queue` de antes. Se armó la sonda (el banco del
+`GateL` más el puerto de fallo conectado) y se le preguntó al original:
+
+| | La fila de la puerta | El `RETRY` de la llave |
+|---|---|---|
+| El original | **59** | 0 |
+| El nuestro | **59** | 0 |
+
+**Nuestro motor coincide con el original** ✓: la puerta cuenta las
+transacciones que **entran** a ella (las que pasan y las que salen por el
+fallo ✓) y no las que esperan (esas quedan contadas en el bloque de donde
+vinieron ✓). Lo que el banco del `GateL` no cubría era el camino del fallo ✓.
+
+Lo que falta, entonces, no es el número ✗ sino **el nombre**: la app muestra
+la cifra de la fila que cuenta el bloque sin decir qué cuenta ✓, y el lector
+la lee como "las instancias que pasaron por él" ✗. En el caso del usuario, la
+instancia entró a la puerta ✓ (falló la prueba y salió por el fallo ✓) → la
+puerta la cuenta ✓ → por eso la `Queue` también ✓ (la instancia volvió ✓).
+
+La sonda quedó en `~/genmsi-scratch/probes-puerta/` ✓.
+
+### L9 — La decisión
 
 El motor publica qué sentencia cuenta cada bloque (el dato sale de la
 compilación: un `FacilityUse` son cinco sentencias, y la primera es la que

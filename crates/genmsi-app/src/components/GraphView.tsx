@@ -340,7 +340,9 @@ function fitFlow(instance: ReactFlowInstance<Node<BlockData>, Edge> | null, node
   instance?.fitView({
     nodes: flow.length > 0 ? flow : nodes,
     padding: 0.2,
-    minZoom: 0.4,
+    // A model that is composed can be wide: the picture is framed whole,
+    // even if the reader has to zoom out to see it.
+    minZoom: 0.15,
   });
 }
 

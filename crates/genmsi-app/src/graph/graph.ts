@@ -109,6 +109,9 @@ export function graphOf(model: ModelBody): { nodes: Node<BlockData>[]; edges: Ed
         height: Math.max(block.layout?.height ?? 40, 32),
       },
       zIndex: block.kind === "C" ? 0 : 2,
+      // A container is the frame around what it holds: the frame does not
+      // move, the blocks inside it do.
+      draggable: block.kind !== "C",
     }));
 
   const edges: Edge[] = model.edges

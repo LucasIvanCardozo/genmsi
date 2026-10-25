@@ -85,6 +85,21 @@ test("a container is a node of its own", () => {
   assert.equal(nodes[0].zIndex, 0);
 });
 
+test("a container is the frame around what it holds, and it does not move", () => {
+  const model = modelOf([
+    block(1, "", { kind: "C", class: "" }),
+    block(2, "Queue"),
+  ]);
+  const { nodes } = graphOf(model);
+  const container = nodes.find((node) => node.id === "1");
+  const activity = nodes.find((node) => node.id === "2");
+  // The frame is behind what it holds, and it is not a thing the reader
+  // drags: the blocks inside it are.
+  assert.equal(container?.zIndex, 0);
+  assert.equal(container?.draggable, false);
+  assert.equal(activity?.draggable, true);
+});
+
 test("a block the model does not place is not a node", () => {
   const model = modelOf([block(1, "Queue", { layout: null })]);
   assert.equal(graphOf(model).nodes.length, 0);

@@ -121,3 +121,36 @@ fn a_container_grows_to_hold_the_blocks_it_owns() {
     // The blocks of the container do not sit on each other.
     assert!(!(x1 < x2 + w2 && x2 < x1 + w1 && y1 < y2 + h2 && y2 < y1 + h1));
 }
+
+#[test]
+fn a_container_inside_a_container_holds_its_own_blocks() {
+    let text = "<gmodel versioncode=\"1\"><gclasses/><modules>\
+         <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\">\
+         <links/><inputs/><outputs/></module>\
+         <module moduleid=\"1\" moduleclass=\"main\" owner=\"0\" caption=\"Grupo\" name=\"Grupo1\" kind=\"C\">\
+         <links/><inputs/><outputs/></module>\
+         <module moduleid=\"2\" moduleclass=\"main\" owner=\"1\" caption=\"Subgrupo\" name=\"Subgrupo1\" kind=\"C\">\
+         <links><link frommoduleid=\"3\" fromioid=\"1\" tomoduleid=\"4\" toioid=\"1\"/></links>\
+         <inputs/><outputs/></module>\
+         <module moduleid=\"3\" moduleclass=\"Clock\" owner=\"2\" caption=\"Clock\" name=\"Clock\" kind=\"A\">\
+         <inputs/><outputs/><props/></module>\
+         <module moduleid=\"4\" moduleclass=\"Terminate\" owner=\"2\" caption=\"Terminate\" name=\"Terminate\" kind=\"A\">\
+         <inputs/><outputs/><props/></module>\
+         </modules></gmodel>";
+    let mut model = genmsi_format::parse_str(text).expect("the model parses");
+    compose_incomplete(&mut model).expect("composed");
+    // The blocks of the inner container are inside it.
+    let (cx, cy, cw, ch) = layout_of(&model, 2).expect("the inner container is placed");
+    let (x1, y1, w1, h1) = layout_of(&model, 3).expect("placed");
+    let (x2, y2, w2, h2) = layout_of(&model, 4).expect("placed");
+    for (x, y, w, h) in [(x1, y1, w1, h1), (x2, y2, w2, h2)] {
+        assert!(x >= cx && y >= cy, "the block is inside the container");
+        assert!(x + w <= cx + cw, "the block is inside the container");
+        assert!(y + h <= cy + ch, "the block is inside the container");
+    }
+    // And the inner container is inside the outer one.
+    let (ox, oy, ow, oh) = layout_of(&model, 1).expect("the outer container is placed");
+    assert!(cx >= ox && cy >= oy, "the inner container is inside the outer one");
+    assert!(cx + cw <= ox + ow, "the inner container is inside the outer one");
+    assert!(cy + ch <= oy + oh, "the inner container is inside the outer one");
+}

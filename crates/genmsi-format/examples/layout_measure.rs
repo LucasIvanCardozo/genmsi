@@ -167,6 +167,7 @@ fn value(one: &Composition) -> serde_json::Value {
         "crossings": one.crossings,
         "isolated": one.isolated,
         "over_blocks": one.over_blocks,
+        "edge_length": one.edge_length,
         "width": one.width,
         "height": one.height,
     })

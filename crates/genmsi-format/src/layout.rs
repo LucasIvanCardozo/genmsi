@@ -7,70 +7,259 @@
 //! touches the semantics (the geometry does not enter the simulation) and it
 //! leaves a model that is already composed exactly as its author left it.
 //!
-//! The blocks of every container are placed in layers: the depth of a block
-//! in the flow is its layer, and the depth is the depth of the whole model,
-//! so a link that crosses the border of a container says where the flow goes
-//! (`layout::flow`). Inside a layer the blocks are put in the order that
-//! crosses the fewest links (`layout::order`). The layers are columns, one
-//! after the other, and inside a column every block goes to the place its
-//! neighbours ask for, so the links are short and straight. The blocks that
-//! no link reaches are not part of the flow: they are put aside, in a grid,
-//! so they do not stretch the picture of the flow. The containers grow to
-//! hold the blocks they own, and the model root (which the editor does not
-//! draw) is left alone.
+//! The composition is **dagre** (the Rust port of dagre.js), the Sugiyama
+//! pipeline: the flow of the model is cut into layers (*network simplex*),
+//! the layers are ordered to cross the fewest links (barycenter) and the
+//! blocks are placed (Brandes–Köpf). The direction is **top to bottom**
+//! (`TB`): the ports of a block are its input at the top and its output at
+//! the bottom, so the flow a reader follows goes down.
+//!
+//! The containers are the **compound** nodes of the graph: dagre computes
+//! their frame from the blocks they hold, and the flow that crosses a
+//! container's border is spliced before the layout (`layout::flow`), so a link
+//! that goes from a block of one container to a block of another says where
+//! the flow goes.
 
-mod flow;
-mod order;
+pub mod flow;
+
+use dagre::graph::{Graph, GraphOptions};
+use dagre::{EdgeLabel, LayoutOptions, NodeLabel, RankDir, Ranker};
 
 use std::collections::HashMap;
 
 use crate::edit::Position;
-use crate::model::{Block, GmdlModel, Layout};
+use crate::model::{GmdlModel, Layout};
 
-use flow::Flow;
-
-/// Horizontal gap between two layers.
-pub const GAP_X: i32 = 60;
-/// Vertical gap between two blocks of the same layer.
-pub const GAP_Y: i32 = 30;
-/// Margin between a container and the blocks it holds.
-pub const PAD: i32 = 24;
-/// Gap between the flow and the blocks that are in no flow.
-pub const GAP_ORPHANS: i32 = 120;
-/// Gap between two bands of the flow.
-pub const BAND_GAP: i32 = 80;
 /// Width of a block that has no geometry of its own.
 pub const DEFAULT_WIDTH: i32 = 120;
 /// Height of a block that has no geometry of its own.
 pub const DEFAULT_HEIGHT: i32 = 48;
-
-/// The size of a block.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct Size {
-    width: i32,
-    height: i32,
-}
-
-/// The size a block that carries no geometry of its own gets.
-const DEFAULT_SIZE: Size = Size {
-    width: DEFAULT_WIDTH,
-    height: DEFAULT_HEIGHT,
-};
+/// Margin between a container and the blocks it holds.
+pub const PAD: i32 = 24;
+/// Vertical gap between two blocks of the same layer.
+pub const GAP_Y: i32 = 30;
 
 /// The positions that compose the model, one per block except the root.
 ///
 /// The positions are sorted by block id, so the same model always produces the
 /// same list in the same order.
 pub fn relayout(model: &GmdlModel) -> Vec<Position> {
-    let Some(root) = model.root() else {
-        return Vec::new();
+    // The network simplex of the port panics on some compound graphs (the
+    // cycles of the container borders): the composition must never panic, so
+    // the answer comes from the tight tree when the simplex fails. Both
+    // answers are the same every time, so the composition stays
+    // deterministic.
+    match compose(model, Ranker::NetworkSimplex) {
+        Some(positions) => positions,
+        None => compose(model, Ranker::TightTree).unwrap_or_default(),
+    }
+}
+
+/// The composition of a model with a ranker, when the ranker can do it.
+///
+/// `None` means the ranker failed: the port's network simplex panics on some
+/// compound graphs, and the panic is caught so that the composition falls
+/// back to the tight tree.
+fn compose(model: &GmdlModel, ranker: Ranker) -> Option<Vec<Position>> {
+    let root = model.root()?.id;
+    let hook = std::panic::take_hook();
+    if std::env::var("DAGRE_VERBOSE").is_err() {
+        std::panic::set_hook(Box::new(|_| {}));
+    }
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        compose_with(model, root, ranker)
+    }));
+    std::panic::set_hook(hook);
+    result.ok()
+}
+
+/// The composition of a model: dagre's Sugiyama pipeline, top to bottom.
+///
+/// The graph dagre composes has the blocks that **simulate** and the flow
+/// between them, with the borders of the containers spliced: the flow that
+/// enters a container goes to the block its entry port names, and the flow
+/// that leaves it comes from the block its exit port names.
+///
+/// The containers are **not** part of that graph: dagre's compound graphs
+/// leave blocks without a place when the model has a cycle, and the frames of
+/// the containers are computed here, around the blocks they hold.
+fn compose_with(model: &GmdlModel, root: u32, ranker: Ranker) -> Vec<Position> {
+    let mut graph = Graph::with_options(GraphOptions {
+        directed: true,
+        multigraph: true,
+        compound: true,
+    });
+    for block in &model.blocks {
+        if block.id == root {
+            continue;
+        }
+        if block.is_container() {
+            // A container has no size of its own: its frame is computed
+            // around the blocks it holds.
+            graph.set_node(block.id.to_string(), None);
+            continue;
+        }
+        let (width, height) = match block.layout {
+            Some(layout) => (layout.width, layout.height),
+            None => (DEFAULT_WIDTH, DEFAULT_HEIGHT),
+        };
+        let label = NodeLabel {
+            width: f64::from(width),
+            height: f64::from(height),
+            ..NodeLabel::default()
+        };
+        graph.set_node(block.id.to_string(), Some(label));
+    }
+    // The containers are the parents of the blocks they hold.
+    for block in &model.blocks {
+        if block.id == root || block.owner == block.id {
+            continue;
+        }
+        graph.set_parent(&block.id.to_string(), Some(&block.owner.to_string()));
+    }
+    // The flow of the model: the links between the blocks that simulate, with
+    // the borders of the containers spliced, and the links that carry the
+    // flow into each container.
+    for (from, to) in flow::flow_edges_for(model) {
+        graph.set_edge(
+            from.to_string(),
+            to.to_string(),
+            Some(EdgeLabel::default()),
+            None,
+        );
+    }
+    let options = LayoutOptions {
+        // The flow goes down: the input of a block is at its top and its
+        // output at its bottom.
+        rankdir: RankDir::TB,
+        ranker,
+        nodesep: 30.0,
+        ranksep: 60.0,
+        edgesep: 20.0,
+        ..LayoutOptions::default()
     };
-    let mut composition = Composition::of(model);
-    let (origin_x, origin_y) = origin(model);
-    let mut positions = Vec::new();
-    composition.place(root.id, origin_x, origin_y, &mut positions);
+    dagre::layout(&mut graph, Some(options));
+
+    // dagre places a block by its middle; the file carries its corner.
+    let mut positions: Vec<Position> = Vec::new();
+    for block in &model.blocks {
+        if block.id == root || block.is_container() {
+            continue;
+        }
+        let Some(node) = graph.node(&block.id.to_string()) else {
+            continue;
+        };
+        let (Some(x), Some(y)) = (node.x, node.y) else {
+            continue;
+        };
+        let width = node.width.round() as i32;
+        let height = node.height.round() as i32;
+        positions.push(Position {
+            id: block.id,
+            x: (x - f64::from(width) / 2.0).round() as i32,
+            y: (y - f64::from(height) / 2.0).round() as i32,
+            width: Some(width),
+            height: Some(height),
+        });
+    }
+    // The containers: the frame of each one is the box of the blocks it
+    // holds, with the margin that separates them. The frames are computed
+    // from the innermost out.
+    let frames = frames_of(model, root, &positions);
+    for block in &model.blocks {
+        if !block.is_container() {
+            continue;
+        }
+        let Some((x, y, width, height)) = frames.get(&block.id).copied() else {
+            continue;
+        };
+        positions.push(Position {
+            id: block.id,
+            x,
+            y,
+            width: Some(width),
+            height: Some(height),
+        });
+    }
+    // The containers dagre did not place (its tight tree leaves the blocks of
+    // a cycle without a place): their frame is computed around the blocks
+    // they hold.
+    let missing: Vec<u32> = model
+        .blocks
+        .iter()
+        .filter(|block| block.is_container() && block.id != root)
+        .filter(|block| !positions.iter().any(|position| position.id == block.id))
+        .map(|block| block.id)
+        .collect();
+    if !missing.is_empty() {
+        let frames = frames_of(model, root, &positions);
+        for container in missing {
+            let Some((x, y, width, height)) = frames.get(&container).copied() else {
+                continue;
+            };
+            positions.push(Position {
+                id: container,
+                x,
+                y,
+                width: Some(width),
+                height: Some(height),
+            });
+        }
+    }
+    // The blocks nobody placed get a place: a block without one is a block
+    // the reader cannot see. The port's tight tree leaves the blocks of a
+    // cycle without a place, and they go where their container is.
+    let missing: Vec<u32> = model
+        .blocks
+        .iter()
+        .filter(|block| block.id != root)
+        .filter(|block| !positions.iter().any(|position| position.id == block.id))
+        .map(|block| block.id)
+        .collect();
+    if !missing.is_empty() {
+        let frames = frames_of(model, root, &positions);
+        let mut stacked: HashMap<u32, i32> = HashMap::new();
+        for block in missing {
+            let owner = model.block(block).map(|block| block.owner).unwrap_or(root);
+            let (x, y, _, _) = match frames.get(&owner) {
+                Some((x, y, width, height)) => (*x, *y, *width, *height),
+                None => (0, 0, DEFAULT_WIDTH, DEFAULT_HEIGHT),
+            };
+            let width = DEFAULT_WIDTH;
+            let height = DEFAULT_HEIGHT;
+            // The blocks that go in the same place are stacked, not piled.
+            let offset = stacked.entry(owner).or_default();
+            positions.push(Position {
+                id: block,
+                x: x + PAD + *offset,
+                y: y + PAD + *offset,
+                width: Some(width),
+                height: Some(height),
+            });
+            *offset += DEFAULT_HEIGHT + GAP_Y;
+        }
+        // The frames of the containers grow to hold the blocks that were
+        // placed in them.
+        let frames = frames_of(model, root, &positions);
+        for position in &mut positions {
+            let Some(block) = model.block(position.id) else {
+                continue;
+            };
+            if !block.is_container() {
+                continue;
+            }
+            let Some((x, y, width, height)) = frames.get(&block.id).copied() else {
+                continue;
+            };
+            position.x = x;
+            position.y = y;
+            position.width = Some(width);
+            position.height = Some(height);
+        }
+    }
     // The composition starts where the author put things, and never before
     // it: the picture has no negative coordinates.
+    let (origin_x, origin_y) = origin(model);
     let left = positions.iter().map(|position| position.x).min().unwrap_or(0);
     let top = positions.iter().map(|position| position.y).min().unwrap_or(0);
     let (shift_x, shift_y) = (origin_x - left.min(origin_x), origin_y - top.min(origin_y));
@@ -80,6 +269,84 @@ pub fn relayout(model: &GmdlModel) -> Vec<Position> {
     }
     positions.sort_by_key(|position| position.id);
     positions
+}
+
+/// The frame of every container: the box of the blocks it holds.
+///
+/// The frames are computed from the innermost out: the frame of a container
+/// is the box of its children, and a container that holds another container
+/// holds that container's frame.
+fn frames_of(
+    model: &GmdlModel,
+    root: u32,
+    positions: &[Position],
+) -> HashMap<u32, (i32, i32, i32, i32)> {
+    let mut boxes: HashMap<u32, (i32, i32, i32, i32)> = HashMap::new();
+    for position in positions {
+        boxes.insert(
+            position.id,
+            (
+                position.x,
+                position.y,
+                position.x + position.width.unwrap_or(0),
+                position.y + position.height.unwrap_or(0),
+            ),
+        );
+    }
+    let mut frames: HashMap<u32, (i32, i32, i32, i32)> = HashMap::new();
+    for block in &model.blocks {
+        if !block.is_container() || block.id == root {
+            continue;
+        }
+        frame_of(block.id, model, &boxes, &mut frames);
+    }
+    frames
+}
+
+/// The frame of a container: the box of the blocks it holds, with the margin
+/// that separates them.
+///
+/// A container that holds another container holds that container's frame, so
+/// the frames are taken from the innermost out.
+fn frame_of(
+    container: u32,
+    model: &GmdlModel,
+    boxes: &HashMap<u32, (i32, i32, i32, i32)>,
+    frames: &mut HashMap<u32, (i32, i32, i32, i32)>,
+) -> Option<(i32, i32, i32, i32)> {
+    let children: Vec<u32> = model
+        .blocks
+        .iter()
+        .filter(|block| block.owner == container && block.id != container)
+        .map(|block| block.id)
+        .collect();
+    let mut box_of: Option<(i32, i32, i32, i32)> = None;
+    for child in children {
+        let corners = match frames.get(&child) {
+            // The frame is stored as its corner and its size; the box of the
+            // children is their corners.
+            Some((x, y, width, height)) => Some((*x, *y, x + width, y + height)),
+            None => match model.block(child) {
+                Some(block) if block.is_container() => {
+                    // The walk returns the corners of the frame.
+                    frame_of(child, model, boxes, frames)
+                        .map(|(x, y, width, height)| (x, y, x + width, y + height))
+                }
+                _ => boxes.get(&child).copied(),
+            },
+        };
+        let Some((x1, y1, x2, y2)) = corners else {
+            continue;
+        };
+        box_of = Some(match box_of {
+            None => (x1, y1, x2, y2),
+            Some((bx1, by1, bx2, by2)) => (bx1.min(x1), by1.min(y1), bx2.max(x2), by2.max(y2)),
+        });
+    }
+    let (x1, y1, x2, y2) = box_of?;
+    let frame = (x1 - PAD, y1 - PAD, x2 - x1 + 2 * PAD, y2 - y1 + 2 * PAD);
+    frames.insert(container, frame);
+    Some(frame)
 }
 
 /// Whether every block of the model, the root aside, carries a geometry.
@@ -145,292 +412,3 @@ fn origin(model: &GmdlModel) -> (i32, i32) {
         (x, y)
     }
 }
-
-/// The content of a container: where its children go, relative to it.
-#[derive(Debug, Clone, Default)]
-struct Content {
-    /// The children: their id, their `x` and their `y`.
-    children: Vec<(u32, i32, i32)>,
-    /// The width the children take.
-    width: i32,
-    /// The height the children take.
-    height: i32,
-}
-
-/// The composition of a model: the layers of every container, the size of
-/// every block and the place of every child.
-struct Composition<'a> {
-    /// The blocks of the model, by id.
-    blocks: HashMap<u32, &'a Block>,
-    /// The flow of the model: how deep in it every block is.
-    flow: Flow,
-    /// The layers of every container, in order.
-    layers: HashMap<u32, Vec<Vec<u32>>>,
-    /// The blocks of every container that no link reaches.
-    orphans: HashMap<u32, Vec<u32>>,
-    /// The size of every block.
-    sizes: HashMap<u32, Size>,
-    /// The content of every container.
-    contents: HashMap<u32, Content>,
-}
-
-impl<'a> Composition<'a> {
-    /// The composition of a model, with the size of every block.
-    fn of(model: &'a GmdlModel) -> Composition<'a> {
-        let blocks: HashMap<u32, &Block> = model
-            .blocks
-            .iter()
-            .map(|block| (block.id, block))
-            .collect();
-        let mut composition = Composition {
-            blocks,
-            flow: Flow::of(model),
-            layers: HashMap::new(),
-            orphans: HashMap::new(),
-            sizes: HashMap::new(),
-            contents: HashMap::new(),
-        };
-        // The size of every block, from the leaves up: a container is as big
-        // as the blocks it holds, plus the margin that separates them.
-        let ids: Vec<u32> = model
-            .blocks
-            .iter()
-            .filter(|block| !block.is_root())
-            .map(|block| block.id)
-            .collect();
-        for id in ids {
-            composition.size_of(id);
-        }
-        composition
-    }
-
-    /// The layers of a container: the blocks it owns, in the layers the flow
-    /// puts them in, and in the order that crosses the fewest links.
-    ///
-    /// The blocks that no link reaches are not part of the flow: they are
-    /// apart, in their own place.
-    fn layers_of(&mut self, container: u32) -> Vec<Vec<u32>> {
-        if let Some(layers) = self.layers.get(&container) {
-            return layers.clone();
-        }
-        let orphans = self.orphans_of(container);
-        let mut layers = self.flow.layers_of(container);
-        for layer in &mut layers {
-            layer.retain(|block| !orphans.contains(block));
-        }
-        layers.retain(|layer| !layer.is_empty());
-        let edges = self.flow.inner_edges(container);
-        order::order(&mut layers, &edges);
-        self.layers.insert(container, layers.clone());
-        layers
-    }
-
-    /// The blocks of a container that no link reaches.
-    fn orphans_of(&mut self, container: u32) -> Vec<u32> {
-        if let Some(orphans) = self.orphans.get(&container) {
-            return orphans.clone();
-        }
-        let orphans: Vec<u32> = self
-            .flow
-            .children_of(container)
-            .into_iter()
-            .filter(|block| self.flow.is_isolated(*block))
-            .collect();
-        self.orphans.insert(container, orphans.clone());
-        orphans
-    }
-
-    /// The size of a block: its own, or the size that holds what it owns.
-    fn size_of(&mut self, id: u32) -> Size {
-        if let Some(size) = self.sizes.get(&id) {
-            return *size;
-        }
-        let size = match self.blocks.get(&id) {
-            Some(block) if block.is_container() => {
-                let content = self.content_of(id);
-                Size {
-                    width: content.width + 2 * PAD,
-                    height: content.height + 2 * PAD,
-                }
-            }
-            Some(block) => match block.layout {
-                Some(layout) => Size {
-                    width: layout.width,
-                    height: layout.height,
-                },
-                None => DEFAULT_SIZE,
-            },
-            None => DEFAULT_SIZE,
-        };
-        self.sizes.insert(id, size);
-        size
-    }
-
-    /// The place of the children of a container, relative to the container.
-    ///
-    /// The layers of the flow are packed into **columns**: a layer that
-    /// follows another one goes under it, and the columns go one after the
-    /// other, from left to right. The flow is read the way it is written:
-    /// down a column, and then the next column.
-    ///
-    /// The picture of a flow is read at a glance, so it has to be close to
-    /// what a reader expects: a shape that is neither a very long line nor a
-    /// very tall column. The number of columns is the one that makes the
-    /// picture the closest to a square.
-    fn content_of(&mut self, container: u32) -> Content {
-        if let Some(content) = self.contents.get(&container) {
-            return content.clone();
-        }
-        let layers = self.layers_of(container);
-        let orphans = self.orphans_of(container);
-        let mut children: Vec<(u32, i32, i32)> = Vec::new();
-        let mut top = i32::MAX;
-        let mut bottom = i32::MIN;
-        let mut right = 0;
-        // The flow, packed into columns.
-        let mut x = 0;
-        for column in self.columns_of(&layers) {
-            let mut y = 0;
-            let mut column_width = 0;
-            for layer in &column {
-                for block in layer {
-                    let size = self.size_of(*block);
-                    children.push((*block, x, y));
-                    top = top.min(y);
-                    bottom = bottom.max(y + size.height);
-                    right = right.max(x + size.width);
-                    column_width = column_width.max(size.width);
-                    y += size.height + GAP_Y;
-                }
-            }
-            x += column_width + GAP_X;
-        }
-        // The blocks that are in no flow go aside, in a grid, so that they do
-        // not stretch the picture of the flow.
-        if !orphans.is_empty() {
-            let (cell_width, cell_height) = self.grid_of(&orphans);
-            let grid_x = right + GAP_ORPHANS;
-            let columns = grid_columns(orphans.len());
-            for (index, block) in orphans.iter().enumerate() {
-                let column = (index % columns) as i32;
-                let row = (index / columns) as i32;
-                let y = row * (cell_height + GAP_Y);
-                children.push((
-                    *block,
-                    grid_x + column * (cell_width + GAP_X),
-                    y,
-                ));
-                let size = self.size_of(*block);
-                top = top.min(y);
-                bottom = bottom.max(y + size.height);
-                right = right.max(grid_x + column * (cell_width + GAP_X) + size.width);
-            }
-        }
-        if children.is_empty() {
-            top = 0;
-            bottom = 0;
-        }
-        // The content starts at the top of its box.
-        for (_, _, y) in &mut children {
-            *y -= top;
-        }
-        let content = Content {
-            children,
-            width: right.max(0),
-            height: (bottom - top).max(0),
-        };
-        self.contents.insert(container, content.clone());
-        content
-    }
-
-    /// The columns of the flow: the layers, packed into columns.
-    ///
-    /// The picture of a flow is read at a glance, so it has to be close to
-    /// what a reader expects: a shape that is neither a very long line nor a
-    /// very tall column. The number of columns is the one that makes the
-    /// picture the closest to a square.
-    fn columns_of(&mut self, layers: &[Vec<u32>]) -> Vec<Vec<Vec<u32>>> {
-        if layers.len() < 2 {
-            return layers.iter().map(|layer| vec![layer.clone()]).collect();
-        }
-        let blocks: usize = layers.iter().map(|layer| layer.len()).sum();
-        let mut width = 0;
-        let mut height = 0;
-        for layer in layers {
-            for block in layer {
-                let size = self.size_of(*block);
-                width += size.width;
-                height += size.height;
-            }
-        }
-        let width = width as f64 / blocks.max(1) as f64 + f64::from(GAP_X);
-        let height = height as f64 / blocks.max(1) as f64 + f64::from(GAP_Y);
-        let columns = ((blocks as f64 * height / width).sqrt().round() as i32).max(1) as usize;
-        let columns = columns.min(layers.len());
-        // The layers, in order, spread over the columns.
-        let per_column = blocks.div_ceil(columns);
-        let mut result: Vec<Vec<Vec<u32>>> = Vec::new();
-        let mut current: Vec<Vec<u32>> = Vec::new();
-        let mut count = 0;
-        for layer in layers {
-            current.push(layer.clone());
-            count += layer.len();
-            if count >= per_column && result.len() + 1 < columns {
-                result.push(std::mem::take(&mut current));
-                count = 0;
-            }
-        }
-        if !current.is_empty() {
-            result.push(current);
-        }
-        result
-    }
-
-    /// The size of the cell of the grid of the blocks that are in no flow.
-    fn grid_of(&mut self, orphans: &[u32]) -> (i32, i32) {
-        let mut width = 0;
-        let mut height = 0;
-        for block in orphans {
-            let size = self.size_of(*block);
-            width = width.max(size.width);
-            height = height.max(size.height);
-        }
-        (width, height)
-    }
-
-    /// Place the blocks of a container, and the blocks of the containers it
-    /// owns.
-    fn place(
-        &mut self,
-        container: u32,
-        origin_x: i32,
-        origin_y: i32,
-        out: &mut Vec<Position>,
-    ) {
-        let content = self.content_of(container);
-        for (block, x, y) in content.children {
-            let size = self.size_of(block);
-            out.push(Position {
-                id: block,
-                x: origin_x + x,
-                y: origin_y + y,
-                width: Some(size.width),
-                height: Some(size.height),
-            });
-            let is_container = self
-                .blocks
-                .get(&block)
-                .map(|block| block.is_container())
-                .unwrap_or(false);
-            if is_container {
-                self.place(block, origin_x + x + PAD, origin_y + y + PAD, out);
-            }
-        }
-    }
-}
-
-/// How many columns the grid of the blocks that are in no flow has.
-fn grid_columns(count: usize) -> usize {
-    ((count as f64).sqrt().ceil() as usize).max(1)
-}
-

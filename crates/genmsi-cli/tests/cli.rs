@@ -434,8 +434,31 @@ fn layout_composes_a_model_and_writes_nothing() {
     // The command says what it composed.
     assert!(text.contains("status: composed"), "{text}");
     assert!(text.contains("composed: 2"), "{text}");
-    assert!(text.contains("block 1 at (0, 0)"), "{text}");
-    assert!(text.contains("block 2 at ("), "{text}");
+    // The flow goes down: the block that follows the first one is below it,
+    // in the same column.
+    let place = |id: u32| -> (i32, i32) {
+        let line = text
+            .lines()
+            .find(|line| line.contains(&format!("block {id} at (")))
+            .unwrap_or_else(|| panic!("the block {id} has no place: {text}"));
+        let (x, y) = line
+            .split_once(" at (")
+            .and_then(|(_, rest)| rest.split_once(')'))
+            .map(|(pair, _)| pair.to_string())
+            .map(|pair| {
+                let (x, y) = pair.split_once(", ").expect("the place is x, y");
+                (
+                    x.trim().parse().expect("the x is a number"),
+                    y.trim().parse().expect("the y is a number"),
+                )
+            })
+            .expect("the place has two numbers");
+        (x, y)
+    };
+    let (x1, y1) = place(1);
+    let (x2, y2) = place(2);
+    assert_eq!(x1, x2, "the flow stays in the same column: {text}");
+    assert!(y2 > y1, "the flow goes down: {text}");
 
     // And the file is untouched: writing is explicit.
     assert_eq!(

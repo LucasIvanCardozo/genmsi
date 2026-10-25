@@ -227,12 +227,19 @@ debemos cambiar la forma en que se hace esto"). The first composition counted
 the flow container by container: a link that crossed the border of a container
 said nothing to the blocks on either side, every container counted its own
 depth, and the picture came out as a very long line (the corpus measured
-11316 × 690 pixels for 107 blocks, a ratio of 16 to 1). The composition now
-counts the flow over the whole model, with the borders of the containers
-spliced, packs the layers into columns and puts the blocks that no link
-reaches aside. The measure lives in the engine (`genmsi_format::measure`) and
-the corpus test compares the composition against a committed baseline: a
-change to the algorithm shows in the baseline as a change in the numbers.
+11316 × 690 pixels for 107 blocks, a ratio of 16 to 1).
+
+The composition is now **dagre** (the Rust port of dagre.js), the Sugiyama
+pipeline, with the direction **top to bottom**: the input of a block is at its
+top and its output at its bottom, so the flow a reader follows goes down. The
+flow is counted over the whole model, with the borders of the containers
+spliced, so a link that crosses a container says where the flow goes.
+
+The measure lives in the engine (`genmsi_format::measure`) and the corpus
+test compares the composition against a committed baseline: a change to the
+algorithm shows in the baseline as a change in the numbers. Against the first
+composition, the corpus went from 383 to 276 crossings and from 404 to 225
+links that pass over a block.
 
 Rationale: the session the user ran asked for a simpler model and wrote it
 with two Python scripts, because the MCP had no way to build a model and the

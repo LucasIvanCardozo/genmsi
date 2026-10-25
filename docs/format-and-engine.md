@@ -43,40 +43,40 @@ influencing the simulation.
 ### The composition of the canvas
 
 The geometry is the engine's business (D18). `genmsi_format::layout` composes
-a model that does not carry it:
+a model that does not carry it, with **dagre** (the Rust port of dagre.js),
+the Sugiyama pipeline:
 
-- The **flow** of the model is counted over the whole model, not container by
-  container: the depth of a block is the length of the longest path that
-  reaches it, and a link that crosses the border of a container says where
-  the flow goes (the flow that enters a container goes to the block its entry
-  port names, and the flow that leaves it comes from the block its exit port
-  names). The links that close a cycle are taken out of the path, so the
-  depth is always defined and always the same.
-- The blocks of every container are placed in **layers** — the layers of the
-  flow — and inside a layer they are put in the order that crosses the fewest
-  links (the barycentre of the neighbours and the transpose; no luck in it).
-- The layers are **packed into columns**: a layer that follows another one
-  goes under it, and the columns go one after the other, from left to right.
-  The flow is read the way it is written: down a column, and then the next
-  column.
-- The blocks that **no link reaches** are not part of the flow: they go
-  aside, in a grid, so that they do not stretch the picture of the flow.
+- The **flow** of the model is cut into layers: the depth of a block is the
+  length of the longest path that reaches it, and the links that close a
+  cycle are taken out first (the flow of a model with a cycle is still a flow,
+  and the block the cycle comes back to is its start). The links that cross
+  the border of a container are spliced: the flow that enters a container goes
+  to the block its entry port names, and the flow that leaves it comes from
+  the block its exit port names (`layout::flow`).
+- The layers are **ordered** to cross the fewest links (the barycentre of the
+  neighbours and the transpose; no luck in it).
+- The blocks are **placed** (Brandes–Köpf): the direction is **top to bottom**
+  (`TB`), because the input of a block is at its top and its output at its
+  bottom, so the flow a reader follows goes down.
+- The **containers** are the frames around the blocks they hold: each frame is
+  the box of its content, with the margin that separates them.
 - The blocks that carry no geometry of their own get the default size
-  (`120 × 48`), the containers grow to hold what they own, and the model root
-  — which the editor does not draw — is left alone.
+  (`120 × 48`), and the model root — which the editor does not draw — is left
+  alone.
 
-The composition is deterministic, it never touches the semantics, and it is
-only applied when something asks for it:
+The composition is deterministic (the same model always produces the same
+geometry), it never touches the semantics, and it is only applied when
+something asks for it:
 
 - the app's `Reacomodar` (the facade's `relayout` operation, one undo entry),
 - the MCP's `save_model`, before it writes a model whose geometry is
   incomplete,
 - the CLI's `genmsi layout`.
 
-A model whose blocks all carry their geometry is left exactly as its author
-placed it. A model that does not is composed **entirely**: the composition is
-one picture, not a patch. And the composition never happens on its own: only
-when something asks for it.
+A model that is already composed is left exactly as its author placed it: a
+model whose blocks all carry their geometry is left alone, and one that does
+not is composed entirely (the composition is one picture, not a patch). And
+never on its own.
 
 ## 2. Container topology
 

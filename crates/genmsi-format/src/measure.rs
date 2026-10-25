@@ -16,7 +16,7 @@ use crate::layout::{DEFAULT_HEIGHT, DEFAULT_WIDTH};
 use crate::model::GmdlModel;
 
 /// What a composed canvas measures.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Composition {
     /// The blocks the composition placed.
     pub blocks: usize,
@@ -32,6 +32,8 @@ pub struct Composition {
     pub isolated: usize,
     /// The links that pass over a block: the reader has to look past them.
     pub over_blocks: usize,
+    /// The average length of the links, in canvas units.
+    pub edge_length: f64,
     /// The width of the canvas.
     pub width: i32,
     /// The height of the canvas.
@@ -201,6 +203,17 @@ pub fn measure(model: &GmdlModel, positions: &[Position]) -> Composition {
         reached.insert(*to);
     }
     measure.isolated = rects.keys().filter(|id| !reached.contains(id)).count();
+    // The average length of the links: the shorter they are, the more the
+    // picture reads as a flow.
+    if !edges.is_empty() {
+        let mut total = 0.0;
+        for (from, to) in &edges {
+            let a = rects[from].center();
+            let b = rects[to].center();
+            total += (b.0 - a.0).hypot(b.1 - a.1);
+        }
+        measure.edge_length = total / edges.len() as f64;
+    }
     let pairs: Vec<(u32, u32)> = edges.iter().copied().collect();
     for (index, first) in pairs.iter().enumerate() {
         for second in pairs.iter().skip(index + 1) {

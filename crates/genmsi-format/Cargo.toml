@@ -7,6 +7,10 @@ license.workspace = true
 authors.workspace = true
 
 [dependencies]
+# The composition of the canvas: the Sugiyama pipeline (network simplex for
+# the ranks, barycenter for the crossings, Brandes-Köpf for the coordinates),
+# with the direction and the compound graphs (the containers).
+dagre = "0.1"
 serde.workspace = true
 thiserror.workspace = true
 roxmltree.workspace = true

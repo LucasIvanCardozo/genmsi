@@ -51,6 +51,9 @@ Goal: agents create, validate, simulate and inspect models.
   entities the class declares and which it uses, and the explain document
   publishes the structure of the model; the procedure lives in the agent's
   guide (`skills/genmsi-modeling/`), installed with the product.
+- The engine composes the canvas of a model that carries no geometry, and
+  `save_model` writes the model composed: a model an agent builds is a model
+  the editor can draw.
 
 Exit criteria: an agent can build and simulate a model end to end via MCP.
 
@@ -60,6 +63,8 @@ Goal: GUI parity with the original, better.
 
 - Node editor (React Flow) with real Ctrl+Z/Y, multi-select, copy/paste with
   stable ids (the original's structural-bug source).
+- The re-layout is the engine's composition: the button asks the engine and
+  the frontend has no copy of the algorithm.
 - Live monitor, property grid, reports and charts from engine JSON.
 - Generated TS types from the Rust schema.
 

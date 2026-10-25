@@ -3,7 +3,7 @@
     {
       "from_scratch": {
         "blocks": 107,
-        "crossings": 132,
+        "crossings": 117,
         "edges": 123,
         "height": 2244,
         "isolated": 18,
@@ -14,7 +14,7 @@
       "model": "Parcial 6-11-23__Veron - Parcial.gmdl",
       "recomposed": {
         "blocks": 107,
-        "crossings": 132,
+        "crossings": 119,
         "edges": 123,
         "height": 2391,
         "isolated": 18,
@@ -26,7 +26,7 @@
     {
       "from_scratch": {
         "blocks": 81,
-        "crossings": 22,
+        "crossings": 21,
         "edges": 74,
         "height": 1632,
         "isolated": 13,
@@ -37,7 +37,7 @@
       "model": "Parcial 8-11-21__ParcialMikelModelos.gmdl",
       "recomposed": {
         "blocks": 81,
-        "crossings": 43,
+        "crossings": 39,
         "edges": 74,
         "height": 1819,
         "isolated": 13,
@@ -49,7 +49,7 @@
     {
       "from_scratch": {
         "blocks": 95,
-        "crossings": 8,
+        "crossings": 0,
         "edges": 44,
         "height": 4764,
         "isolated": 58,
@@ -60,7 +60,7 @@
       "model": "Problema 1__semaforo-1.gmdl",
       "recomposed": {
         "blocks": 95,
-        "crossings": 24,
+        "crossings": 12,
         "edges": 44,
         "height": 3901,
         "isolated": 58,
@@ -95,7 +95,7 @@
     {
       "from_scratch": {
         "blocks": 86,
-        "crossings": 16,
+        "crossings": 11,
         "edges": 84,
         "height": 1740,
         "isolated": 15,
@@ -106,7 +106,7 @@
       "model": "TP10__tp10.gmdl",
       "recomposed": {
         "blocks": 86,
-        "crossings": 26,
+        "crossings": 20,
         "edges": 84,
         "height": 1943,
         "isolated": 15,
@@ -118,7 +118,7 @@
     {
       "from_scratch": {
         "blocks": 39,
-        "crossings": 21,
+        "crossings": 19,
         "edges": 41,
         "height": 960,
         "isolated": 7,
@@ -129,7 +129,7 @@
       "model": "TP2__problema1.gmdl",
       "recomposed": {
         "blocks": 39,
-        "crossings": 24,
+        "crossings": 25,
         "edges": 41,
         "height": 941,
         "isolated": 7,
@@ -141,7 +141,7 @@
     {
       "from_scratch": {
         "blocks": 88,
-        "crossings": 103,
+        "crossings": 21,
         "edges": 93,
         "height": 1464,
         "isolated": 9,
@@ -152,7 +152,7 @@
       "model": "TP3__aeropuerto.gmdl",
       "recomposed": {
         "blocks": 88,
-        "crossings": 113,
+        "crossings": 34,
         "edges": 93,
         "height": 1517,
         "isolated": 9,
@@ -187,7 +187,7 @@
     {
       "from_scratch": {
         "blocks": 51,
-        "crossings": 12,
+        "crossings": 9,
         "edges": 49,
         "height": 1224,
         "isolated": 12,
@@ -198,7 +198,7 @@
       "model": "TP5__burgerShop.gmdl",
       "recomposed": {
         "blocks": 51,
-        "crossings": 18,
+        "crossings": 12,
         "edges": 49,
         "height": 1210,
         "isolated": 12,
@@ -233,7 +233,7 @@
     {
       "from_scratch": {
         "blocks": 18,
-        "crossings": 3,
+        "crossings": 0,
         "edges": 12,
         "height": 516,
         "isolated": 5,
@@ -244,7 +244,7 @@
       "model": "TP6__Clase 6_1_PuertaBanco.gmdl",
       "recomposed": {
         "blocks": 18,
-        "crossings": 3,
+        "crossings": 0,
         "edges": 12,
         "height": 511,
         "isolated": 5,
@@ -256,7 +256,7 @@
     {
       "from_scratch": {
         "blocks": 21,
-        "crossings": 3,
+        "crossings": 0,
         "edges": 14,
         "height": 594,
         "isolated": 6,
@@ -267,7 +267,7 @@
       "model": "TP6__Clase 6_2_UltimoCliente.gmdl",
       "recomposed": {
         "blocks": 21,
-        "crossings": 3,
+        "crossings": 0,
         "edges": 14,
         "height": 567,
         "isolated": 6,
@@ -302,7 +302,7 @@
     {
       "from_scratch": {
         "blocks": 13,
-        "crossings": 1,
+        "crossings": 0,
         "edges": 10,
         "height": 282,
         "isolated": 2,
@@ -313,7 +313,7 @@
       "model": "TP7__Clase 7_1_Link_Unlink.gmdl",
       "recomposed": {
         "blocks": 13,
-        "crossings": 1,
+        "crossings": 0,
         "edges": 10,
         "height": 295,
         "isolated": 2,
@@ -325,7 +325,7 @@
     {
       "from_scratch": {
         "blocks": 17,
-        "crossings": 3,
+        "crossings": 0,
         "edges": 13,
         "height": 282,
         "isolated": 2,
@@ -336,7 +336,7 @@
       "model": "TP7__Clase 7_2_ProductorConsumidor.gmdl",
       "recomposed": {
         "blocks": 17,
-        "crossings": 3,
+        "crossings": 0,
         "edges": 13,
         "height": 295,
         "isolated": 2,
@@ -359,7 +359,7 @@
       "model": "TP7__Clase 7_3_Cadete.gmdl",
       "recomposed": {
         "blocks": 20,
-        "crossings": 1,
+        "crossings": 3,
         "edges": 16,
         "height": 481,
         "isolated": 5,
@@ -417,7 +417,7 @@
     {
       "from_scratch": {
         "blocks": 67,
-        "crossings": 9,
+        "crossings": 7,
         "edges": 60,
         "height": 1692,
         "isolated": 7,
@@ -428,7 +428,7 @@
       "model": "TP9__tp9.gmdl",
       "recomposed": {
         "blocks": 67,
-        "crossings": 9,
+        "crossings": 11,
         "edges": 60,
         "height": 1889,
         "isolated": 7,
@@ -486,7 +486,7 @@
     {
       "from_scratch": {
         "blocks": 16,
-        "crossings": 2,
+        "crossings": 0,
         "edges": 12,
         "height": 360,
         "isolated": 2,
@@ -497,7 +497,7 @@
       "model": "ejercicio_3__ejercicio_3.gmdl",
       "recomposed": {
         "blocks": 16,
-        "crossings": 2,
+        "crossings": 1,
         "edges": 12,
         "height": 389,
         "isolated": 2,
@@ -555,7 +555,7 @@
     {
       "from_scratch": {
         "blocks": 37,
-        "crossings": 7,
+        "crossings": 8,
         "edges": 30,
         "height": 798,
         "isolated": 9,
@@ -566,7 +566,7 @@
       "model": "monorriel__monorriel.gmdl",
       "recomposed": {
         "blocks": 37,
-        "crossings": 8,
+        "crossings": 6,
         "edges": 30,
         "height": 960,
         "isolated": 9,
@@ -580,7 +580,7 @@
   "totals": {
     "from_scratch": {
       "blocks": 1008,
-      "crossings": 458,
+      "crossings": 329,
       "edges": 876,
       "height": 0,
       "isolated": 246,
@@ -590,7 +590,7 @@
     },
     "recomposed": {
       "blocks": 1008,
-      "crossings": 550,
+      "crossings": 422,
       "edges": 876,
       "height": 0,
       "isolated": 246,

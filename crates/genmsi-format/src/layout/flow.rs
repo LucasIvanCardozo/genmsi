@@ -24,6 +24,8 @@ pub struct Flow {
     ranks: BTreeMap<u32, usize>,
     /// The children of every container.
     children: BTreeMap<u32, Vec<u32>>,
+    /// The links every container owns.
+    links: BTreeMap<u32, Vec<(u32, u32)>>,
 }
 
 impl Flow {
@@ -49,7 +51,23 @@ impl Flow {
         // A container sits where its content begins: the frame is around the
         // flow, not before it.
         rank_containers(&blocks, &children, &mut ranks);
-        Flow { ranks, children }
+        // The links every container owns.
+        let mut links: BTreeMap<u32, Vec<(u32, u32)>> = BTreeMap::new();
+        for block in &model.blocks {
+            let owned = links.entry(block.id).or_default();
+            for link in &block.links {
+                if link.from_module != link.to_module {
+                    owned.push((link.from_module, link.to_module));
+                }
+            }
+            owned.sort_unstable();
+            owned.dedup();
+        }
+        Flow {
+            ranks,
+            children,
+            links,
+        }
     }
 
     /// How deep in the flow a block is.
@@ -74,6 +92,21 @@ impl Flow {
             by_rank.entry(self.rank(child)).or_default().push(child);
         }
         by_rank.into_values().collect()
+    }
+
+    /// The links between the children of a container.
+    ///
+    /// The links that leave the container (to a block of another container)
+    /// are not here: they do not order the blocks of this one.
+    pub fn inner_edges(&self, container: u32) -> Vec<(u32, u32)> {
+        let children = self.children_of(container);
+        let owned = self.links.get(&container).cloned().unwrap_or_default();
+        owned
+            .into_iter()
+            .filter(|(from, to)| {
+                children.contains(from) && children.contains(to) && from != to
+            })
+            .collect()
     }
 }
 

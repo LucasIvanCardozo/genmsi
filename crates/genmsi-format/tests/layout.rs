@@ -151,6 +151,69 @@ fn the_blocks_follow_the_flow_across_the_border_of_a_container() {
     );
 }
 
+/// Whether the two segments cross.
+fn crosses(
+    first: (i32, i32),
+    second: (i32, i32),
+    third: (i32, i32),
+    fourth: (i32, i32),
+) -> bool {
+    fn side(a: (i32, i32), b: (i32, i32), c: (i32, i32)) -> i64 {
+        let value = i64::from(b.0 - a.0) * i64::from(c.1 - a.1)
+            - i64::from(b.1 - a.1) * i64::from(c.0 - a.0);
+        match value.cmp(&0) {
+            std::cmp::Ordering::Greater => 1,
+            std::cmp::Ordering::Less => -1,
+            std::cmp::Ordering::Equal => 0,
+        }
+    }
+    let opposite = |first: i64, second: i64| {
+        (first > 0 && second < 0) || (first < 0 && second > 0)
+    };
+    opposite(side(third, fourth, first), side(third, fourth, second))
+        && opposite(side(first, second, third), side(first, second, fourth))
+}
+
+#[test]
+fn the_blocks_of_a_layer_are_in_the_order_that_does_not_cross_the_links() {
+    // Two blocks in a layer and two in the next one, with the links
+    // crossed: the composition puts the blocks in the order that does not
+    // cross them.
+    let text = "<gmodel versioncode=\"1\"><gclasses/><modules>\
+         <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\">\
+         <links/><inputs/><outputs/></module>\
+         <module moduleid=\"1\" moduleclass=\"\" owner=\"0\" caption=\"Grupo\" name=\"Grupo1\" kind=\"C\">\
+         <links><link frommoduleid=\"2\" fromioid=\"1\" tomoduleid=\"5\" toioid=\"1\"/>\
+         <link frommoduleid=\"3\" fromioid=\"1\" tomoduleid=\"4\" toioid=\"1\"/></links>\
+         <inputs/><outputs/></module>\
+         <module moduleid=\"2\" moduleclass=\"Clock\" owner=\"1\" caption=\"Clock\" name=\"Clock\" kind=\"A\">\
+         <inputs/><outputs/><props/></module>\
+         <module moduleid=\"3\" moduleclass=\"Terminate\" owner=\"1\" caption=\"Terminate\" name=\"Terminate\" kind=\"A\">\
+         <inputs/><outputs/><props/></module>\
+         <module moduleid=\"4\" moduleclass=\"Terminate\" owner=\"1\" caption=\"Terminate2\" name=\"Terminate2\" kind=\"A\">\
+         <inputs/><outputs/><props/></module>\
+         <module moduleid=\"5\" moduleclass=\"Terminate\" owner=\"1\" caption=\"Terminate3\" name=\"Terminate3\" kind=\"A\">\
+         <inputs/><outputs/><props/></module>\
+         </modules></gmodel>";
+    let mut model = genmsi_format::parse_str(text).expect("the model parses");
+    compose_incomplete(&mut model).expect("composed");
+    let place = |id: u32| -> (i32, i32) {
+        let (x, y, _, _) = layout_of(&model, id).expect("placed");
+        (x, y)
+    };
+    // The link from the first block to the last, and the one from the second
+    // to the third: they would cross if the blocks kept the order of their
+    // ids.
+    assert!(
+        !crosses(place(2), place(5), place(3), place(4)),
+        "the links of the model cross: {:?} {:?} {:?} {:?}",
+        place(2),
+        place(5),
+        place(3),
+        place(4)
+    );
+}
+
 #[test]
 fn a_container_inside_a_container_holds_its_own_blocks() {
     let text = "<gmodel versioncode=\"1\"><gclasses/><modules>\

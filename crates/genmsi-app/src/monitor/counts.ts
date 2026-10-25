@@ -9,7 +9,9 @@
  * counts it**, and the engine says which row that is.
  *
  * A generator has no figure: no transaction stays inside one, and the
- * generator itself is not an instance that passed through it.
+ * generator itself is not an instance that passed through it. The generator
+ * is told apart by the **block** it belongs to, not by the statement: the
+ * clock is a generator of ticks, and its figure is the one of the block.
  */
 import type { LiveCounts } from "./live";
 import type { ReportBlockLike } from "./replay";
@@ -31,10 +33,11 @@ export interface CountState {
 export function countsOf(
   blocks: ReportBlockLike[],
   state: CountState,
+  generators: ReadonlySet<number> = new Set(),
 ): Map<number, LiveCounts> {
   const byNode = new Map<number, LiveCounts>();
   for (const block of blocks) {
-    if (!block.counts_block || block.class === "Generate") {
+    if (!block.counts_block || generators.has(block.node)) {
       continue;
     }
     byNode.set(block.node, {

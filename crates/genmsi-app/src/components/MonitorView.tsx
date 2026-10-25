@@ -101,8 +101,15 @@ export default function MonitorView({
     if (report === null || state === null) {
       return new Map<number, LiveCounts>();
     }
-    return countsOf(report.blocks, state);
-  }, [report, state]);
+    // The blocks that are generators have no figure: no transaction stays
+    // inside one.
+    const generators = new Set(
+      (model?.blocks ?? [])
+        .filter((block) => block.class === "Generate")
+        .map((block) => block.id),
+    );
+    return countsOf(report.blocks, state, generators);
+  }, [report, state, model]);
 
   // The links of the model: a ball travels over the one that joins the two
   // blocks it goes from and to.

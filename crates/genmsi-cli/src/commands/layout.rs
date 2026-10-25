@@ -92,11 +92,13 @@ fn placed_of(position: &genmsi_format::Position) -> Placed {
 
 /// Run `genmsi layout`.
 pub fn run(args: LayoutArgs) -> Result<ExitCode, CliError> {
-    let mut loaded = model::load(&args.model.path)?;
+    // The model is loaded without compiling it: the composition is a matter
+    // of geometry, and a model the engine refuses can still be laid out.
+    let mut loaded = model::load_geometry(&args.model.path)?;
     // The composition: the engine places the blocks of a model whose
     // geometry is incomplete, and leaves a model that already carries one
     // exactly as its author left it.
-    let composed = genmsi_format::compose_incomplete(&mut loaded.model);
+    let composed = genmsi_format::compose_incomplete(&mut loaded);
     let positions: Vec<Placed> = composed
         .as_ref()
         .map(|positions| positions.iter().map(placed_of).collect())
@@ -107,7 +109,7 @@ pub fn run(args: LayoutArgs) -> Result<ExitCode, CliError> {
         // lays the canvas out does not re-serialize a file that needs no
         // layout.
         if composed.is_some() {
-            model::save(&loaded.model, &args.model.path)?;
+            model::save(&loaded, &args.model.path)?;
         }
     }
     let document = LayoutDocument {
@@ -117,7 +119,7 @@ pub fn run(args: LayoutArgs) -> Result<ExitCode, CliError> {
         } else {
             "unchanged"
         },
-        blocks: loaded.model.blocks.len(),
+        blocks: loaded.blocks.len(),
         composed: positions.len(),
         written: args.write && composed.is_some(),
         positions,

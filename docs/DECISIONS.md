@@ -220,6 +220,19 @@ re-layout, and a copy is a second answer to the same question: the app
 reordered the graph one way and the engine another. The button now asks the
 engine, and the frontend's copy is gone.
 
+The composition itself was rebuilt later, when the reader said the reordering
+was not good enough ("el reordenamiento no es del todo bueno realmente
+debemos cambiar la forma en que se hace esto"). The first composition counted
+the flow container by container: a link that crossed the border of a container
+said nothing to the blocks on either side, every container counted its own
+depth, and the picture came out as a very long line (the corpus measured
+11316 × 690 pixels for 107 blocks, a ratio of 16 to 1). The composition now
+counts the flow over the whole model, with the borders of the containers
+spliced, packs the layers into columns and puts the blocks that no link
+reaches aside. The measure lives in the engine (`genmsi_format::measure`) and
+the corpus test compares the composition against a committed baseline: a
+change to the algorithm shows in the baseline as a change in the numbers.
+
 Rationale: the session the user ran asked for a simpler model and wrote it
 with two Python scripts, because the MCP had no way to build a model and the
 file it wrote had no geometry to draw. The engine composing the canvas is

@@ -43,13 +43,30 @@ influencing the simulation.
 ### The composition of the canvas
 
 The geometry is the engine's business (D18). `genmsi_format::layout` composes
-a model that does not carry it: the blocks of every container are placed in
-layers (a block with no incoming link is in the first layer, and a block that
-follows another one is in the layer after it), the blocks that carry no
-geometry of their own get the default size (`120 × 48`), the containers grow
-to hold what they own, and the model root — which the editor does not draw —
-is left alone. The composition is deterministic, it never touches the
-semantics, and it is only applied when something asks for it:
+a model that does not carry it:
+
+- The **flow** of the model is counted over the whole model, not container by
+  container: the depth of a block is the length of the longest path that
+  reaches it, and a link that crosses the border of a container says where
+  the flow goes (the flow that enters a container goes to the block its entry
+  port names, and the flow that leaves it comes from the block its exit port
+  names). The links that close a cycle are taken out of the path, so the
+  depth is always defined and always the same.
+- The blocks of every container are placed in **layers** — the layers of the
+  flow — and inside a layer they are put in the order that crosses the fewest
+  links (the barycentre of the neighbours and the transpose; no luck in it).
+- The layers are **packed into columns**: a layer that follows another one
+  goes under it, and the columns go one after the other, from left to right.
+  The flow is read the way it is written: down a column, and then the next
+  column.
+- The blocks that **no link reaches** are not part of the flow: they go
+  aside, in a grid, so that they do not stretch the picture of the flow.
+- The blocks that carry no geometry of their own get the default size
+  (`120 × 48`), the containers grow to hold what they own, and the model root
+  — which the editor does not draw — is left alone.
+
+The composition is deterministic, it never touches the semantics, and it is
+only applied when something asks for it:
 
 - the app's `Reacomodar` (the facade's `relayout` operation, one undo entry),
 - the MCP's `save_model`, before it writes a model whose geometry is

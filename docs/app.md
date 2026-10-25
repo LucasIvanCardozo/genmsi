@@ -320,18 +320,26 @@ as D8 says):
 
 ### The re-layout is explicit
 
-`Reacomodar` reorders the graph in layers: a block with no incoming link
-is in the first layer, and a block that follows another one is in the layer
-after it. The layout is computed by the **engine**
-(`genmsi_format::layout`, D18), it is deterministic (the same model always
-produces the same positions) and it travels as **one** command, so the whole
-re-layout is one undo entry. It is never run on open: the picture the author
-of the file left stays until the user asks for a new one.
+`Reacomodar` recomposes the whole canvas: the flow of the model is counted
+over the whole model (a link that crosses the border of a container says where
+the flow goes), the blocks are placed in layers and the layers are packed
+into columns, so the flow reads the way it is written: down a column, and
+then the next one. The blocks that no link reaches go aside, in a grid, so
+that they do not stretch the picture of the flow. The layout is computed by
+the **engine** (`genmsi_format::layout`, D18), it is deterministic (the same
+model always produces the same positions) and it travels as **one** command,
+so the whole re-layout is one undo entry. It is never run on open: the
+picture the author of the file left stays until the user asks for a new one.
 
 The engine's composition also places the blocks that carry no geometry of
 their own (with the default size), and the containers grow to hold what they
 own. The frontend has no copy of the algorithm: the button asks the engine,
 so the app and the MCP place a model the same way.
+
+A container is the **frame** around what it holds: it is drawn behind its
+content and it is not a thing the reader drags (the blocks inside it are).
+The picture is framed whole, even when the model is wide enough to need a
+zoom out to be seen.
 
 ## The files
 

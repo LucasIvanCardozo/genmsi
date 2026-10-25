@@ -20,6 +20,18 @@ pub struct Loaded {
     pub model: GmdlModel,
 }
 
+/// Load one model file, without compiling it.
+///
+/// The composition of the canvas is a matter of geometry: a model the engine
+/// refuses (a missing `TERMINATE`, an `UNLINK` without a label) can still be
+/// laid out. The geometry does not enter the simulation, so the composition
+/// does not wait for the compilation.
+pub fn load_geometry(path: &Path) -> Result<GmdlModel, CliError> {
+    let model: GmdlModel =
+        genmsi_format::load(path).map_err(|error| CliError::model(path, error))?;
+    Ok(model)
+}
+
 /// Load, validate and compile one model file.
 ///
 /// The three failures the engine distinguishes (invalid XML, structural

@@ -191,8 +191,10 @@ A model that needs no layout is **not written at all** (`written: no`): a
 command that lays the canvas out does not rewrite a file that is already
 laid out.
 
-Like every other subcommand, the command works on a model that compiles: a
-model that loads but does not compile is refused with exit 1.
+The command does not compile the model: the composition is a matter of
+geometry, and the geometry does not enter the simulation. A model that loads
+but does not compile (a missing `TERMINATE`, an `UNLINK` without a label) is
+**composed anyway**: a reader can rearrange a model that does not run.
 
 ### `run-all`
 

@@ -73,8 +73,10 @@ only applied when something asks for it:
   incomplete,
 - the CLI's `genmsi layout`.
 
-A model that is already composed is left exactly as its author placed it:
-only an incomplete geometry is composed, and never on its own.
+A model whose blocks all carry their geometry is left exactly as its author
+placed it. A model that does not is composed **entirely**: the composition is
+one picture, not a patch. And the composition never happens on its own: only
+when something asks for it.
 
 ## 2. Container topology
 

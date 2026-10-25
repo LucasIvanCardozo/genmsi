@@ -74,8 +74,10 @@ Y, en todos los modelos:
 ### S6 — Lo que no se rompe
 
 - La geometría es del motor (D18): la app no tiene copia del algoritmo.
-- Un modelo ya compuesto conserva la disposición de su autor al guardarlo:
-  sólo se compone lo que está incompleto.
+- Un modelo cuyos bloques llevan todos geometría conserva la disposición de
+  su autor al guardarlo. Uno que no la lleva se compone **entero**: la
+  composición es una imagen, no un parche (verificarlo dejó esto escrito:
+  finding A de L14).
 - La geometría no entra en la simulación.
 - `genmsi layout` sigue sin escribir nada salvo que se lo pidan con
   `--write`, y la escritura es atómica.
@@ -91,13 +93,13 @@ geometría: tiene que poder hacerse sobre un modelo roto.
 
 | T | Specs | Qué | Ruta | Estado | Commit |
 |---|---|---|---|---|---|
-| T1 | S1, S2, S5 | La medida: benchmark determinista sobre el corpus, línea base commiteada e invariantes como pruebas | inline | pendiente | — |
-| T2 | S1, S5, S6 | El modelo jerárquico: árbol de contenedores, contenedor como macro-nodo, rango global con los links que cruzan el borde, quiebre de ciclos | inline | pendiente | — |
-| T3 | S1, S5 | El orden dentro de la capa: reducción de cruces determinista (sin azar) | inline | pendiente | — |
-| T4 | S1, S5 | Las coordenadas: sin solapes, la huella del contenedor reservada, los huérfanos aparte y la proporción del lienzo | inline | pendiente | — |
-| T5 | S3, S4, S5 | La app: el botón recompone todo y los contenedores se dibujan como marcos reales | delegada | pendiente | — |
-| T6 | S1, S6, S7 | La superficie: `genmsi layout` compone un modelo que no compila; los documentos (D18, `app.md`, `cli.md`) | inline | pendiente | — |
-| T7 | S1, S5 | La prueba visual: el lazo visual del antes y del después, con capturas revisadas | inline | pendiente | — |
+| T1 | S1, S2, S5 | La medida: benchmark determinista sobre el corpus, línea base commiteada e invariantes como pruebas | inline | hecho | `088b79d`, `c61b942` |
+| T2 | S1, S5, S6 | El modelo jerárquico: árbol de contenedores, contenedor como macro-nodo, rango global con los links que cruzan el borde, quiebre de ciclos | inline | hecho | `1f7d2a2` |
+| T3 | S1, S5 | El orden dentro de la capa: reducción de cruces determinista (sin azar) | inline | hecho | `0319e72` |
+| T4 | S1, S5 | Las coordenadas: sin solapes, la huella del contenedor reservada, los huérfanos aparte y la proporción del lienzo | inline | hecho | `61f4845` |
+| T5 | S3, S4, S5 | La app: el botón recompone todo y los contenedores se dibujan como marcos reales | inline | hecho | `3f182b9`, `b3f50ea` |
+| T6 | S1, S6, S7 | La superficie: `genmsi layout` compone un modelo que no compila; los documentos (D18, `app.md`, `cli.md`) | inline | hecho | `66d2e82` |
+| T7 | S1, S5 | La prueba visual: el lazo visual del antes y del después, con capturas revisadas | inline | hecho | — |
 
 ## Log
 
@@ -200,3 +202,211 @@ Los riesgos, por unidad:
   Cubierto por el verificador independiente y por las pruebas de escritura
   atómica e idempotente.
 - **T7**: ninguno. Es una revisión con capturas.
+
+### L6 — T1: la medida (`088b79d`, `c61b942`)
+
+El medidor vive en el motor (`crates/genmsi-format/src/measure.rs`): cuenta
+los bloques, las aristas, los solapes, los bloques fuera de su contenedor, los
+cruces, los bloques que ningún enlace alcanza y la caja del lienzo. Un ejemplo
+(`cargo run -p genmsi-format --example layout_measure`) lo imprime sobre el
+corpus y `--write` refresca la línea base; la prueba del corpus
+(`tests/layout_corpus.rs`) compara la composición contra esa línea base y
+falla con la diferencia si el algoritmo cambia sin que la línea base se
+refresque a propósito.
+
+Lo que encontró (y corrigió a la primera cuenta, que tomaba por solapes los
+contenedores conteniendo a sus descendientes):
+
+- **0 solapes** y **0 bloques fuera de su contenedor** en los 25 modelos: el
+  algoritmo actual no pisa nada, y eso se mantiene;
+- **383 cruces** (de cero) y **496** (recompuesto);
+- **246 bloques de 1008** (uno de cada cuatro) en ningún flujo;
+- **once modelos** con un lienzo de más de 4:1, el peor de 16.4:1.
+
+Las tres pruebas del corpus: la medida es la de la línea base, ningún bloque
+cae fuera de su contenedor, y la composición es determinista (las dos
+pictures, dos veces).
+
+### L7 — El corte de la entrega
+
+La fase va de ~1.700 líneas, así que el usuario eligió la **cadena sobre la
+rama de la feature** (`chain_strategy=feature-branch-chain`): cada unidad de
+trabajo es un PR encadenado sobre `feature/genmsi-reordenamiento`, con el
+corte de ~400 líneas. Primer corte: `088b79d` + `c61b942` (la medida).
+
+### L8 — T2: el flujo cruza las fronteras (`1f7d2a2`)
+
+El flujo ya no se cuenta por contenedor: se cuenta sobre el modelo entero, con
+las fronteras de los contenedores **cosidas** (`crates/genmsi-format/src/
+layout/flow.rs`).
+
+- Un enlace entre dos bloques es una arista del flujo.
+- Un enlace que toca la frontera de un contenedor no lo es: el contenedor es un
+  marco. El flujo que entra en un contenedor va al bloque que su puerto de
+  entrada nombra, y el que sale viene del bloque que su puerto de salida
+  nombra.
+- La profundidad de un bloque (su **rango**) es el camino más largo que llega
+  a él. Los enlaces que cierran un ciclo se sacan del camino (los encuentra
+  un recorrido en profundidad), así que el rango siempre está definido y
+  siempre es el mismo.
+- Un contenedor se coloca donde empieza su contenido: el marco rodea al flujo,
+  no va antes de él.
+
+El RED de la prueba: contra el algoritmo anterior, los dos contenedores de un
+modelo con un enlace que cruza la frontera salían en la misma capa ("B at 0,
+A at 0"); con el nuevo, el del principio del flujo sale primero.
+
+Lo que cambió en la medida:
+
+| | antes | después |
+|---|---|---|
+| Parcial 6-11-23 | 11316×690 (**16.4**) | 7608×2244 (**3.4**) |
+| Parcial 8-11-21 | 8604×1050 (8.2) | 4812×1632 (2.9) |
+| TP4 supermercado | 8436×1206 (7.0) | 4992×2496 (2.0) |
+| modelos por encima de 4:1 | 11 | **5** |
+| cruces | 383 | 458 |
+
+Los cruces **suben**, y es lo esperado: las capas ahora agrupan por la
+profundidad del flujo (antes cada contenedor contaba por su cuenta) y el orden
+dentro de la capa sigue siendo el del id. Ese orden es lo que cambia T3.
+
+### L9 — T3: el orden dentro de la capa (`0319e72`)
+
+Los bloques de una capa ya no se ordenan por su id: se ordenan por el flujo.
+El algoritmo es el clásico y no tiene azar: el **baricentro** de los vecinos
+(el promedio de las posiciones de los bloques a los que un bloque está unido)
+barre las capas de arriba abajo y de abajo arriba, y después el **transpuesto**
+intercambia dos vecinos cuando el intercambio cruza menos enlaces.
+
+`crates/genmsi-format/src/layout/order.rs`. El RED de la prueba: contra el
+orden por id, dos enlaces cruzados se cruzaban; con el orden nuevo, no.
+
+| | antes de T3 | después de T3 |
+|---|---|---|
+| cruces (de cero) | 458 | **329** |
+| cruces (recompuesto) | 550 | **422** |
+
+### L10 — T4: las coordenadas (`61f4845`)
+
+El flujo ya no es una cinta: las capas se **empaquetan en columnas**. Una capa
+que sigue a otra va debajo de ella, y las columnas van una tras otra, de
+izquierda a derecha. El flujo se lee como se escribe: down una columna, y
+después la columna siguiente. Y como la app dibuja las entradas de un bloque
+arriba y las salidas abajo, el flujo hacia abajo encaja con los puertos.
+
+- Los bloques que **ningún enlace alcanza** (246 de 1008) no son parte del
+  flujo: van aparte, en una rejilla, para no estirar la imagen del flujo.
+- Los contenedores crecen para lo que poseen, y **ningún bloque queda fuera**
+  de su contenedor (0 en los 25 modelos).
+- La imagen se acerca a lo que espera quien lee: la proporción del lienzo pasó
+  de 0.3–16.4 a **0.5–3.3**, y el lienzo del Parcial de 11316×690 a
+  3348×3414 (el autor lo tenía en 906×871, con bloques encimados).
+
+Lo que la medida dice ahora:
+
+| | antes (T1) | ahora |
+|---|---|---|
+| solapes | 0 | 0 |
+| bloques fuera de su contenedor | 0 | 0 |
+| bloques en ningún flujo | 246 | 246 (aparte, en rejilla) |
+| cruces | 383 | **345** |
+| enlaces que pasan por encima de un bloque | 280 | 404 |
+| proporción del lienzo | 0.3 – 16.4 | **0.5 – 3.3** |
+
+Los cruces bajan y la imagen se compacta, pero **más enlaces pasan por encima
+de un bloque**: las columnas están cerca y el enlace que salta de una columna
+a la otra cruza las de en medio. La métrica nueva (`por-encima`) es la que
+dice si algo se lee mal, y queda como deuda de la fase: el orden dentro de
+una columna es el del flujo, pero el enlace entre columnas se dibuja en
+diagonal.
+
+### L11 — T5: la app (`3f182b9`, `b3f50ea`)
+
+El botón **Reacomodar** ya pedía la composición al motor, así que no cambia:
+lo que cambia es lo que el motor compone. En la app, dos cosas:
+
+- **Un contenedor es el marco de lo que sostiene**: se dibuja detrás de su
+  contenido y **no se arrastra** (los que se arrastran son los bloques de
+  dentro). Antes el marco se podía mover y dejaba a su contenido atrás.
+- **La imagen se encuadra de nuevo** después de reacomodar: el lector tiene
+  que ver la imagen nueva entera, no el trozo de la vieja que estaba
+  mirando. Y el encuadre baja el piso del zoom (0.15), porque una imagen
+  compuesta puede ser ancha.
+
+La prueba de la app (`tests/graph.test.ts`) fija que el contenedor es el marco
+y que no se arrastra.
+
+### L12 — T6: la superficie (`66d2e82`)
+
+`genmsi layout` carga **y compilaba** el modelo, así que un modelo que el
+motor rechaza no se podía reacomodar: la geometría no entra en la simulación
+y no tiene por qué estar atada a la compilación. La CLI tiene ahora
+`model::load_geometry`, que carga sin compilar, y `layout` lo usa.
+
+Comprobado: `genmsi layout` sobre `TP9__tp9.gmdl` (un `UNLINK` sin etiqueta
+que el motor rechaza) ya no falla con exit 1: el modelo sale `unchanged`
+porque el fixture ya lleva geometría. Sin geometría compone sus 67 bloques
+(esto lo comprueba ahora `crates/genmsi-cli/tests/layout_write.rs`).
+
+Los documentos: D18 (la decisión, con la reconstrucción de la composición),
+`docs/format-and-engine.md` (cómo compone el motor), `docs/app.md` (el
+botón y el marco) y `docs/cli.md` (el comando compone un modelo que no
+compila).
+
+### L13 — T7: el lazo visual
+
+El lazo visual completo, con el navegador, sobre `TP4__supermercado.gmdl`
+(81 bloques):
+
+- **Antes** (la geometría del autor): los bloques **se pisan** entre ellos
+  (el `Generate` encima del contenedor, los contenedores encima de los
+  bloques que no son suyos). Es lo que el lector veía.
+- **Después** de `Reacomodar`: ningún bloque se pisa, los contenedores son
+  marcos alrededor de lo que sostienen, el flujo se lee de columna en
+  columna, y el deshacer devuelve la imagen del autor (un solo paso de undo,
+  como siempre).
+
+El undo de la composición y la corrida del modelo (el reloj del monitor)
+siguen funcionando después de reacomodar.
+
+### L14 — El verificador independiente de la unidad de escritura
+
+El plan de `assess` con la escalación del ítem 1 (la escritura) pidió un
+verificador independiente sobre la unidad de escritura. Verificó seis cosas:
+
+| # | Promesa | Veredicto |
+|---|---|---|
+| 1 | La escritura es atómica | **CUMPLE** (4785 lecturas concurrentes, 0 parciales; un fallo inyectado deja el destino intacto y sin temporal) |
+| 2 | La escritura es idempotente | **CUMPLE** (mismos bytes y mismo mtime la segunda vez) |
+| 3 | Un modelo que el motor rechaza se compone y se escribe | **CUMPLE CON RESERVA** (4 de 5; el quinto fallaba por la validación estructural) |
+| 4 | La geometría no cambia la semántica | **CUMPLE** (GPSS y reporte byte a byte iguales en los 20 modelos que compilan) |
+| 5 | Un modelo que no necesita composición no se escribe | **CUMPLE** (mismo mtime) |
+| 6 | Ningún bloque se pisa ni sale de su contenedor | **CUMPLE** (0 y 0, medido sobre la geometría escrita en disco) |
+
+Sus hallazgos:
+
+- **A** (preexistente): con geometría **parcial**, la composición reposiciona
+  **todos** los bloques. La lectura literal de S6 ("sólo se compone lo que
+  está incompleto") no era la del comportamiento. Se corrigió la **palabra**
+  de S6 y de los documentos (la composición es una imagen, no un parche), no
+  el comportamiento: componer la mitad y dejar la otra mitad es una imagen
+  que no se puede leer.
+- **B** (preexistente): el temporal de la escritura tiene nombre fijo, así
+  que dos escrituras simultáneas al mismo archivo lo comparten. No se
+  reprodujo fallo en 8 iteraciones; queda dicho.
+- **C** (preexistente): el temporal vive en el directorio de destino, así que
+  un lector que enumera el directorio lo ve a medio escribir. El comentario
+  del código decía lo contrario: se corrigió el comentario.
+- **D** (fuera de la unidad): la app guarda con `fs::write` sin temporal; el
+  MCP sí usa temporal y rename. Queda dicho para otra fase.
+
+La **reserva** de S7 sí se corrigió: `model::load_geometry` ya no valida el
+modelo (sólo lo lee), así que un modelo con un nombre de entidad inválido
+también se puede reacomodar (`Parcial 8-11-21`, que antes fallaba con exit 1,
+ahora compone sus 81 bloques).
+
+Y las cinco pruebas de regresión que el verificador dejó validadas (RED en la
+base, GREEN en la cabeza) quedan en el repositorio:
+`crates/genmsi-cli/tests/layout_write.rs` (idempotencia, atómica, la
+semántica que no se toca, el modelo que el motor rechaza y la escritura que
+falla sin dejar nada atrás).

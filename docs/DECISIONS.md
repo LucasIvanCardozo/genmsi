@@ -211,9 +211,10 @@ blocks that had no geometry exactly where they were.
 The composition is deterministic (the same model always produces the same
 positions), it never touches the semantics (the geometry does not enter the
 simulation), and it leaves a model that is already composed exactly as its
-author placed it: only an incomplete geometry is composed, and only when
-something asks for it (the app's `Reacomodar`, the MCP before it writes a
-model, the CLI's `genmsi layout`).
+author placed it: a model whose blocks all carry their geometry is left
+alone, and one that does not is composed entirely (the composition is one
+picture, not a patch). It only happens when something asks for it (the app's
+`Reacomodar`, the MCP before it writes a model, the CLI's `genmsi layout`).
 
 There is one algorithm, not two. The frontend had its own copy of the
 re-layout, and a copy is a second answer to the same question: the app

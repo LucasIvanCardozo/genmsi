@@ -20,15 +20,16 @@ pub struct Loaded {
     pub model: GmdlModel,
 }
 
-/// Load one model file, without compiling it.
+/// Load one model file, without compiling it and without validating it.
 ///
 /// The composition of the canvas is a matter of geometry: a model the engine
-/// refuses (a missing `TERMINATE`, an `UNLINK` without a label) can still be
-/// laid out. The geometry does not enter the simulation, so the composition
-/// does not wait for the compilation.
+/// refuses (a missing `TERMINATE`, an `UNLINK` without a label, an entity
+/// name with a space) can still be laid out. The geometry does not enter the
+/// simulation, so the composition does not wait for the compilation, nor for
+/// the structural validation.
 pub fn load_geometry(path: &Path) -> Result<GmdlModel, CliError> {
     let model: GmdlModel =
-        genmsi_format::load(path).map_err(|error| CliError::model(path, error))?;
+        genmsi_format::parse_file(path).map_err(|error| CliError::model(path, error))?;
     Ok(model)
 }
 
@@ -63,8 +64,10 @@ pub fn save(model: &GmdlModel, path: &Path) -> Result<(), CliError> {
     let temporary = path.with_file_name(format!(".{file_name}.tmp"));
     let text = genmsi_format::to_string(model);
     // A write that fails leaves nothing behind: the temporary file is the
-    // target's name with a dot in front, and a reader that lists the
-    // directory must not find a half-written model in it.
+    // target's name with a dot in front, and it is removed when the write
+    // fails. A reader that lists the directory can see the temporary file
+    // while the write is happening, but never half a model under the
+    // target's own name.
     if let Err(error) = std::fs::write(&temporary, text) {
         let _ = std::fs::remove_file(&temporary);
         return Err(CliError::Io {

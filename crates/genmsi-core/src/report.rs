@@ -6,6 +6,7 @@
 //! tables and savevalues. Numbers use a comma decimal separator like the
 //! Spanish original.
 
+use std::collections::HashSet;
 use std::fmt::Write as _;
 
 use serde::Serialize;
@@ -1391,6 +1392,16 @@ pub struct JsonBlock<'a> {
     /// Retry count.
     #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub retries: u64,
+    /// Whether this row counts the transactions that entered its block.
+    ///
+    /// A block of the model can be several statements of the listing (a
+    /// facility use is a queue, a seize, a depart, an advance and a release)
+    /// and the entries of the block are the entries of the **first** one: the
+    /// transactions that arrived at the block are the ones it counts. A
+    /// client that wants the figure of a block asks the row that says so
+    /// instead of adding the rows of the block up, which would count one
+    /// transaction once per statement.
+    pub counts_block: bool,
 }
 
 /// JSON document exported by the CLI and stored by the MCP tool.
@@ -1426,6 +1437,8 @@ pub struct JsonReport<'a> {
 /// Build the JSON document for a run.
 pub fn json_report<'a>(result: &'a RunResult, program: &'a Program) -> JsonReport<'a> {
     let mut numeric_label = 0usize;
+    // The first row of every block of the model is the one that counts it.
+    let mut counted: HashSet<u32> = HashSet::new();
     let blocks = program
         .blocks
         .iter()
@@ -1439,6 +1452,7 @@ pub fn json_report<'a>(result: &'a RunResult, program: &'a Program) -> JsonRepor
                     None
                 }
             };
+            let counts_block = counted.insert(block.module_id);
             JsonBlock {
                 line: index + 1,
                 node: block.module_id,
@@ -1448,6 +1462,7 @@ pub fn json_report<'a>(result: &'a RunResult, program: &'a Program) -> JsonRepor
                 entries: stats.entries,
                 current: stats.current,
                 retries: stats.retries,
+                counts_block,
             }
         })
         .collect();

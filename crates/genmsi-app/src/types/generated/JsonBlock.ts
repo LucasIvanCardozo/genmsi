@@ -35,4 +35,16 @@ current: number,
 /**
  * Retry count.
  */
-retries: number, };
+retries: number, 
+/**
+ * Whether this row counts the transactions that entered its block.
+ *
+ * A block of the model can be several statements of the listing (a
+ * facility use is a queue, a seize, a depart, an advance and a release)
+ * and the entries of the block are the entries of the **first** one: the
+ * transactions that arrived at the block are the ones it counts. A
+ * client that wants the figure of a block asks the row that says so
+ * instead of adding the rows of the block up, which would count one
+ * transaction once per statement.
+ */
+counts_block: boolean, };

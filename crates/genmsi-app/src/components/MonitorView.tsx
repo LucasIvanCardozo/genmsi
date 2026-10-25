@@ -4,6 +4,7 @@ import { advance, advanceClock, frameAt, stateAt, type ReplayState } from "../mo
 import { useApp } from "../state/store";
 import { FLIGHT_SECONDS, travellersAt, type Move } from "../monitor/balls";
 import { graphOf, routeOf, visibleLinks } from "../graph/graph";
+import { countsOf } from "../monitor/counts";
 import { useLive, type LiveBall, type LiveCounts } from "../monitor/live";
 import ClassList from "./ClassList";
 import DiagnosticsPanel from "./DiagnosticsPanel";
@@ -94,19 +95,13 @@ export default function MonitorView({
   // The counts of every block of the model: how many transactions are inside
   // it now, and how many have gone through it. The program blocks of a block
   // (a facility use expands into several) are added up.
+  // The figures of every block: the one of the row that counts it, never the
+  // sum of the rows of the block (see `src/monitor/counts.ts`).
   const counts = useMemo(() => {
-    const byNode = new Map<number, LiveCounts>();
     if (report === null || state === null) {
-      return byNode;
+      return new Map<number, LiveCounts>();
     }
-    for (const block of report.blocks) {
-      const before = byNode.get(block.node);
-      byNode.set(block.node, {
-        now: (before?.now ?? 0) + (state.blocks[block.line - 1] ?? 0),
-        ever: (before?.ever ?? 0) + (state.totals[block.line - 1] ?? 0),
-      });
-    }
-    return byNode;
+    return countsOf(report.blocks, state);
   }, [report, state]);
 
   // The links of the model: a ball travels over the one that joins the two

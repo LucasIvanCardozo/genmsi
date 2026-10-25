@@ -80,6 +80,13 @@ export interface ReportBlockLike {
   current: number;
   /** The entries the block counted during the whole run. */
   entries: number;
+  /**
+   * Whether this row counts the transactions that entered its block.
+   *
+   * A report that does not say it (an engine that does not publish it yet)
+   * leaves the block without a figure: no figure is better than a wrong one.
+   */
+  counts_block?: boolean;
 }
 
 /** The part of the report the replay reads. */

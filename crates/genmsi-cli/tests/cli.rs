@@ -127,6 +127,28 @@ const UNDECLARED_STORAGE: &str = "<gmodel versioncode=\"1\"><gclasses/><modules>
   </module>
 </modules></gmodel>";
 
+/// A model with no canvas geometry: the editor cannot draw it.
+///
+/// The catalogue templates carry no geometry, so this is what a model an
+/// agent builds looks like.
+const WITHOUT_GEOMETRY: &str = "<gmodel versioncode=\"1\"><gclasses/><modules>
+  <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\">
+    <links><link frommoduleid=\"1\" fromioid=\"1\" tomoduleid=\"2\" toioid=\"1\"/></links><inputs/><outputs/>
+  </module>
+  <module moduleid=\"1\" moduleclass=\"Generate\" owner=\"0\" caption=\"Generate\" name=\"Generate\" kind=\"A\">
+    <outputs><output ioid=\"1\" name=\"Salida1\" caption=\"\" mylabel=\"L1\"/></outputs>
+    <props>
+      <property name=\"Media\" hint=\"\" value=\"10\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/>
+    </props>
+  </module>
+  <module moduleid=\"2\" moduleclass=\"Terminate\" owner=\"0\" caption=\"Terminate\" name=\"Terminate\" kind=\"A\">
+    <inputs><input ioid=\"1\" name=\"Entrada1\" caption=\"\" mylabel=\"L1\"/></inputs>
+    <props>
+      <property name=\"Unidades\" hint=\"\" value=\"1\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/>
+    </props>
+  </module>
+</modules></gmodel>";
+
 /// Write a model to a file of its own, so the CLI can read it from the disk.
 fn write_model(name: &str, text: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("genmsi-cli-{name}-{}", std::process::id()));
@@ -378,6 +400,72 @@ fn run_all_on_a_file_is_a_usage_error() {
     let output = genmsi(&["run-all", SMALL]);
     assert_eq!(code(&output), 2);
     assert!(stderr(&output).contains("not a directory"), "{}", stderr(&output));
+}
+
+#[test]
+fn layout_composes_a_model_and_writes_nothing() {
+    let path = write_model("no-geometry", WITHOUT_GEOMETRY);
+    let before = std::fs::read(&path).expect("the model is readable");
+
+    let output = genmsi(&["layout", path.to_str().expect("a path")]);
+    assert_eq!(code(&output), 0, "{}", stderr(&output));
+    assert!(stderr(&output).is_empty());
+    let text = stdout(&output);
+    // The command says what it composed.
+    assert!(text.contains("status: composed"), "{text}");
+    assert!(text.contains("composed: 2"), "{text}");
+    assert!(text.contains("block 1 at (0, 0)"), "{text}");
+    assert!(text.contains("block 2 at ("), "{text}");
+
+    // And the file is untouched: writing is explicit.
+    assert_eq!(
+        std::fs::read(&path).expect("the model is readable"),
+        before,
+        "the model was rewritten"
+    );
+    let dir = path.parent().expect("the directory of the model");
+    std::fs::remove_dir_all(dir).expect("the scratch directory is removed");
+}
+
+#[test]
+fn layout_write_saves_the_composed_model() {
+    let path = write_model("no-geometry-write", WITHOUT_GEOMETRY);
+
+    let output = genmsi(&["layout", path.to_str().expect("a path"), "--write"]);
+    assert_eq!(code(&output), 0, "{}", stderr(&output));
+    let text = stdout(&output);
+    assert!(text.contains("written: yes"), "{text}");
+
+    // The file carries the geometry of every block the editor draws.
+    let written = std::fs::read_to_string(&path).expect("the model was written");
+    let model = genmsi_format::parse_str(&written).expect("the model that was written parses");
+    for block in model.blocks.iter().filter(|block| !block.is_root()) {
+        let layout = block.layout.expect("the block is placed on the canvas");
+        assert!(layout.width > 0, "block {} has no width", block.id);
+        assert!(layout.height > 0, "block {} has no height", block.id);
+    }
+    assert!(
+        model.root().expect("the root").layout.is_none(),
+        "the root is not drawn, so it keeps no geometry"
+    );
+
+    let dir = path.parent().expect("the directory of the model");
+    std::fs::remove_dir_all(dir).expect("the scratch directory is removed");
+}
+
+#[test]
+fn layout_of_a_model_that_does_not_load_exits_like_the_other_commands() {
+    let output = genmsi(&["layout", "fixtures/models/does-not-exist.gmdl"]);
+    assert_eq!(code(&output), 1);
+    assert!(stdout(&output).is_empty());
+    let message = stderr(&output);
+    assert!(
+        message.starts_with("error: fixtures/models/does-not-exist.gmdl: "),
+        "{message}"
+    );
+    // The other commands fail the same way.
+    let lint = genmsi(&["lint", "fixtures/models/does-not-exist.gmdl"]);
+    assert_eq!(code(&lint), code(&output));
 }
 
 #[test]

@@ -281,9 +281,13 @@ impl GenmsiServer {
     /// The model is checked first: a model that does not load, does not
     /// validate or does not compile is **not** written, and the error names
     /// the block that caused it.
+    ///
+    /// A model that carries no canvas geometry is composed before it is
+    /// written, so the editor can draw it; a model that already carries its
+    /// geometry keeps the disposition its author left.
     #[tool(
         name = "save_model",
-        description = "Write a GPSS model to a .gmdl file. The model is checked before it is written: one that does not load, does not validate or does not compile is NOT written, and the error names the block that caused it. Takes `path` (the file to write) and `model` (the whole .gmdl document as text, not a patch) and returns the genmsi.lint/1 document of what was written. Use it to create or to change a model: read it first with explain_model, change the text and hand the complete document back."
+        description = "Write a GPSS model to a .gmdl file. The model is checked before it is written: one that does not load, does not validate or does not compile is NOT written, and the error names the block that caused it. A model that carries no canvas geometry is composed before it is written, so the editor can draw it; a model that already carries its geometry keeps the disposition its author left. Takes `path` (the file to write) and `model` (the whole .gmdl document as text, not a patch) and returns the genmsi.lint/1 document of what was written. Use it to create or to change a model: read it first with explain_model, change the text and hand the complete document back."
     )]
     pub fn save_model(&self, Parameters(input): Parameters<SaveInput>) -> CallToolResult {
         finish(save_document(&input))
@@ -368,15 +372,32 @@ fn lint_document(input: &ModelInput) -> Result<String, ToolError> {
 fn save_document(input: &SaveInput) -> Result<String, ToolError> {
     let path = PathBuf::from(&input.path);
     let saved = engine::save_model(&path, &input.model)?;
-    let document = genmsi_core::lint_document(
+    let mut document = genmsi_core::lint_document(
         &saved.program,
         &saved.model,
         &saved.path.display().to_string(),
     );
+    // The composition is not a finding of the compiler: it is what the
+    // engine did to the model before writing it, and the agent has to know
+    // it, because the file it wrote is not the file it sent.
+    if let Some(blocks) = saved.composed {
+        document.diagnostics.push(composition_note(blocks));
+        document.status = "diagnostics";
+    }
     Ok(genmsi_core::to_pretty_json(
         genmsi_core::LINT_SCHEMA,
         &document,
     ))
+}
+
+/// What the lint document says when the engine composed the model.
+///
+/// The number is the blocks the composition placed: the model root is not
+/// drawn, so it is not one of them.
+fn composition_note(blocks: usize) -> String {
+    format!(
+        "the model carried no canvas geometry: the engine composed {blocks} blocks so the editor can draw it"
+    )
 }
 
 /// The report document of a run.

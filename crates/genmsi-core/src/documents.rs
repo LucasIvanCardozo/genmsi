@@ -725,7 +725,8 @@ mod tests {
             .find(|property| property.name == "Media")
             .expect("the Media property");
         assert_eq!(media.value, "90");
-        // The geometry comes from the file, not from a layout engine.
+        // The geometry is the model's own: the engine composes it when the
+        // model carries none (D18), and this document only publishes it.
         let placed = document
             .blocks
             .iter()

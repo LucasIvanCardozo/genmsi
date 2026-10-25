@@ -155,6 +155,40 @@ harness in `scripts/wine-oracle/` compares the two for the same model: it is
 the original's own statement of what each block does, and the closest thing to
 a specification the original publishes. See `docs/format-and-engine.md`.
 
+### `layout`
+
+Composes the canvas of a model and says what it composed: where every block
+went, how big it is and how many blocks the engine placed.
+
+```
+$ genmsi layout mi-modelo.gmdl
+model: mi-modelo.gmdl
+status: composed
+blocks: 12
+composed: 11
+written: no
+positions:
+  - block 1 at (0, 0) size 120x48
+  - block 2 at (180, 0) size 120x48
+  ...
+```
+
+The geometry is the engine's business (D18): a model that carries none is a
+model the desktop editor cannot draw, and the command composes it so that the
+reader can see it. A model that already carries its geometry is **left
+exactly as its author left it** (`status: unchanged`), and nothing is written
+either way: the write is explicit.
+
+```
+$ genmsi layout mi-modelo.gmdl --write
+```
+
+writes the composed model back to the file. The write is atomic, like the
+MCP's: a reader that watches the model never sees half of one.
+
+Like every other subcommand, the command works on a model that compiles: a
+model that loads but does not compile is refused with exit 1.
+
 ### `run-all`
 
 Runs every `.gmdl` file of one directory level (not recursive), sorted by file
@@ -306,6 +340,20 @@ number does not):
 |---|---|---|
 | `schema` | string | `genmsi.gpss/1` |
 | `gpss` | string | The GPSS program, as the text form prints it |
+
+### `genmsi.layout/1`
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema` | string | `genmsi.layout/1` |
+| `path` | string | The model, as it was named |
+| `status` | string | `composed` when the engine placed the blocks, `unchanged` when the model already carried its geometry |
+| `blocks` | number | Blocks of the model, the root included |
+| `composed` | number | Blocks the engine placed |
+| `written` | boolean | Whether the composed model was written back to the file |
+| `positions` | array | One entry per block, in block order |
+
+`positions[]`: `id`, `x`, `y`, `width` and `height`.
 
 ### `genmsi.run-all/1`
 

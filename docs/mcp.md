@@ -219,6 +219,13 @@ application does) never sees half of one.
 The tool writes the **whole document**, not a patch: read the model with
 `explain_model`, change the text and hand the complete document back.
 
+**A model without canvas geometry is composed before it is written.** The
+geometry is the engine's business (D18), and a model the editor cannot draw
+is of no use to the reader: the engine places the blocks in layers and the
+file carries the geometry. A model that already carries its geometry keeps
+the disposition its author left. When the engine composed the model, the lint
+document says so in its `diagnostics`.
+
 ### `open_model`
 
 The tool takes no arguments.

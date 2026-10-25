@@ -93,6 +93,11 @@ pub struct Saved {
     pub path: PathBuf,
     /// How many bytes the file has.
     pub bytes: u64,
+    /// How many blocks the engine composed, when it composed the model.
+    ///
+    /// `None` means the model already carried its geometry and was written
+    /// exactly as its author left it.
+    pub composed: Option<usize>,
 }
 
 /// Save a model to a file.
@@ -101,23 +106,34 @@ pub struct Saved {
 /// load, does not validate or does not compile is **not** written, and the
 /// failure names the block that caused it, exactly like the other tools.
 ///
+/// A model that carries no canvas geometry is **composed** before it is
+/// written: the geometry is the engine's business, and a model the editor
+/// cannot draw is of no use to the reader. A model that already carries its
+/// geometry keeps the disposition its author left.
+///
 /// The write is atomic: the text goes to a temporary file next to the target
 /// and that file is renamed over it. A reader that watches the model (the
 /// desktop application does) never sees half a model.
 pub fn save_model(path: &std::path::Path, text: &str) -> Result<Saved, ToolError> {
     let name = path.display().to_string();
-    let model = genmsi_format::parse_str(text)
+    let mut model = genmsi_format::parse_str(text)
         .map_err(|error| ToolError::from_format(&error, Some(&name), None))?;
     genmsi_format::validate(&model)
         .map_err(|error| ToolError::from_format(&error, Some(&name), Some(&model)))?;
     let program = genmsi_core::compile_model(&model)
         .map_err(|error| ToolError::from_engine(&error, &model, &name))?;
+    // The composition: the model that is about to be written is composed
+    // only when its geometry is incomplete, so a model its author placed
+    // keeps the disposition it was given.
+    let composed = genmsi_format::compose_incomplete(&mut model)
+        .map(|positions| positions.len());
     let bytes = write_atomically(&model, path)?;
     Ok(Saved {
         program,
         model,
         path: path.to_path_buf(),
         bytes,
+        composed,
     })
 }
 

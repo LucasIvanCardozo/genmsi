@@ -14,9 +14,9 @@ use clap::{Args, Parser, Subcommand};
 /// GUI clients.
 ///
 /// Every subcommand prints one deterministic document (report, trace, lint
-/// result or run summary), so the output is comparable as a snapshot and
-/// parseable by scripts. Add `--json` to get the versioned JSON document
-/// instead of the human-readable form; the schema is documented in
+/// result, layout result or run summary), so the output is comparable as a
+/// snapshot and parseable by scripts. Add `--json` to get the versioned JSON
+/// document instead of the human-readable form; the schema is documented in
 /// `docs/cli.md`.
 #[derive(Debug, Parser)]
 #[command(name = "genmsi", version, about, long_about = None)]
@@ -37,6 +37,8 @@ pub enum Command {
     Trace(TraceArgs),
     /// Print the GPSS program a model compiles to.
     Gpss(GpssArgs),
+    /// Compose the canvas of a model and say what it composed.
+    Layout(LayoutArgs),
     /// Simulate every model of a directory and summarise the outcome.
     RunAll(RunAllArgs),
     /// Serve the MCP protocol over stdio (the same server as `genmsi-mcp`).
@@ -144,6 +146,23 @@ pub struct GpssArgs {
     /// Options of the model to compile.
     #[command(flatten)]
     pub model: ModelArgs,
+    /// Output form.
+    #[command(flatten)]
+    pub output: OutputArgs,
+}
+
+/// `genmsi layout <model>`.
+#[derive(Debug, Args)]
+pub struct LayoutArgs {
+    /// Options of the model to compose.
+    #[command(flatten)]
+    pub model: ModelArgs,
+    /// Write the composed model back to the file.
+    ///
+    /// Without it the command only says what it composed: writing is
+    /// explicit, so the reader sees the composition before the file changes.
+    #[arg(long)]
+    pub write: bool,
     /// Output form.
     #[command(flatten)]
     pub output: OutputArgs,

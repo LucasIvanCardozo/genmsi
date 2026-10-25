@@ -204,7 +204,11 @@ export default function App() {
             onSaveAs={() => void saveAs()}
             onUndo={() => void undo()}
             onRedo={() => void redo()}
-            onRelayout={() => void relayout()}
+            onRelayout={() => {
+              // The picture is composed again: the reader has to see the new
+              // one whole, not the piece of the old one he was looking at.
+              void relayout().then(() => setFitSignal((current) => current + 1));
+            }}
             onFit={() => setFitSignal((current) => current + 1)}
             onDelete={() => void deleteSelection()}
             onConfirmSave={() => void confirmSave()}

@@ -192,3 +192,35 @@ Rationale: the cold agent that built a nine-block model spent 61 tool batches
 and read the engine's source, and what it lacked was information, not tools.
 D11's guard applies: every addition here answers a question the agent could
 not answer with what the tools already said.
+
+## D18 — The engine composes the canvas
+
+Where a block sits on the canvas and how big it is is the engine's business.
+A model that does not carry that geometry is still a model: the engine
+composes it (`genmsi_format::layout`), so the editor can draw it, and the
+composition is what the file carries once the model is written.
+
+The alternative was to keep the geometry in the file alone, as it was: the
+editor read the geometry the file carried and drew nothing without it. A
+model an agent builds comes from the catalogue's templates, and the templates
+carry no geometry, so every model an agent wrote reached the app as an empty
+canvas — the engine validated it perfectly (`lint: ok`) and the picture was
+blank. The app's own button could not fix it either: its algorithm left the
+blocks that had no geometry exactly where they were.
+
+The composition is deterministic (the same model always produces the same
+positions), it never touches the semantics (the geometry does not enter the
+simulation), and it leaves a model that is already composed exactly as its
+author placed it: only an incomplete geometry is composed, and only when
+something asks for it (the app's `Reacomodar`, the MCP before it writes a
+model, the CLI's `genmsi layout`).
+
+There is one algorithm, not two. The frontend had its own copy of the
+re-layout, and a copy is a second answer to the same question: the app
+reordered the graph one way and the engine another. The button now asks the
+engine, and the frontend's copy is gone.
+
+Rationale: the session the user ran asked for a simpler model and wrote it
+with two Python scripts, because the MCP had no way to build a model and the
+file it wrote had no geometry to draw. The engine composing the canvas is
+what makes an agent's model a model the reader can see.

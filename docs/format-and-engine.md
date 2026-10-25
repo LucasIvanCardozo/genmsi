@@ -40,6 +40,25 @@ geometry (block and port position/size, link breakpoints) lives in `Layout`
 values attached to the semantic model, so positions survive a rewrite without
 influencing the simulation.
 
+### The composition of the canvas
+
+The geometry is the engine's business (D18). `genmsi_format::layout` composes
+a model that does not carry it: the blocks of every container are placed in
+layers (a block with no incoming link is in the first layer, and a block that
+follows another one is in the layer after it), the blocks that carry no
+geometry of their own get the default size (`120 × 48`), the containers grow
+to hold what they own, and the model root — which the editor does not draw —
+is left alone. The composition is deterministic, it never touches the
+semantics, and it is only applied when something asks for it:
+
+- the app's `Reacomodar` (the facade's `relayout` operation, one undo entry),
+- the MCP's `save_model`, before it writes a model whose geometry is
+  incomplete,
+- the CLI's `genmsi layout`.
+
+A model that is already composed is left exactly as its author placed it:
+only an incomplete geometry is composed, and never on its own.
+
 ## 2. Container topology
 
 Containers group blocks and own their links. Two port directions exist:

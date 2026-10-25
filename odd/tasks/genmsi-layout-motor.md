@@ -132,3 +132,44 @@ cerrar la paridad es escribir un contrato sobre un motor que todavía tiene
 diferencias medidas. La medición final del producto (fase 8) es el lugar
 natural para medir de nuevo al agente: con el motor verificado, un número se
 atribuye al MCP y no a la semántica.
+
+### L6 — T1: la composición en el motor (`ebe554c`)
+
+`crates/genmsi-format/src/layout.rs`: los bloques de cada contenedor se
+colocan en capas, los bloques sin geometría reciben la que les corresponde
+(con el tamaño por omisión de 120 × 48), los contenedores crecen para
+contener lo que poseen y la raíz del modelo se deja como está (el editor no
+la dibuja).
+
+Las seis pruebas de `crates/genmsi-format/tests/layout.rs`: un modelo sin
+geometría queda compuesto; los bloques de una capa se apilan y las capas
+avanzan; la composición es determinista; un modelo ya compuesto no se mueve;
+un bloque sin geometría recibe la suya; un contenedor crece hasta contener
+los bloques que posee.
+
+### L7 — T2: el botón "Reacomodar" pide la composición al motor (`f4432d4`)
+
+La fachada de la app gana la operación `relayout` (el protocolo, la concha de
+Tauri, el adaptador y sus dos backedends), el store la llama y la copia del
+algoritmo que el frontend tenía (`src/edit/layout.ts` y su prueba) desaparece.
+
+**El lazo visual llevaba 101 commits roto**: la app quitó el desplegable de
+modelos (`14e9f1c`, "one run, the system dialog, and no spoilers") y el lazo
+seguía seleccionando desde él, así que moría en su primera espera y ninguna
+interfaz se había revisado con un navegador desde entonces. Ahora abre los
+modelos por los recientes (la única vía que el navegador tiene), espera el
+reloj en vez del texto que el monitor ya no lleva, y revisa también la
+composición.
+
+El lazo corre entero: 16 capturas, la última de ellas la del monitor con sus
+gráficas.
+
+### L8 — T3: `save_model` compone y la CLI compone
+
+_(pendiente del escritor)_
+
+### L9 — T4: los documentos
+
+La decisión D18 ("el motor compone el lienzo"), la sección de la composición
+en `docs/format-and-engine.md`, el botón de la app en `docs/app.md` y los
+pasos del lazo en `docs/app-visual-loop.md`.

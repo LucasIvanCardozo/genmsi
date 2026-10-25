@@ -61,14 +61,48 @@ agent-browser snapshot -i              # the interactive elements, with their re
 
 ## 3. Drive the slice
 
-```bash
-# The model picker: the options arrive after the model list, so wait for
-# one model's name before selecting. Selecting earlier is a silent no-op.
-agent-browser wait --text "TP2__problema1"
+The script (`scripts/check-visual-loop.sh`) does these steps; they are
+spelled out here. Three helpers come first, because they are what the app's
+own interface allows in a browser.
 
-# Open a reference model. `agent-browser select` takes a CSS selector and the
-# option's value (the model's path, as the model list lists it).
-agent-browser select '[aria-label="Modelo"]' "fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl"
+```bash
+# Open a model in the browser.
+#
+# The app has no dropdown of models: it opens them with the dialog of the
+# system, and the browser has no dialog. The recents are the way in — the
+# browser keeps them in its own storage — so the loop leaves the path there,
+# reloads the page and clicks the model in the menu.
+open_model() {
+  local path="$1"
+  local file stem
+  file="$(basename "$path")"
+  stem="$(basename "$path" .gmdl)"
+  agent-browser eval "localStorage.setItem('genmsi.recent-models', JSON.stringify(['$path']))" >/dev/null
+  agent-browser reload >/dev/null
+  agent-browser wait --text "GenMSI"
+  agent-browser find role button click --name "Recientes"
+  agent-browser eval "(() => { const button = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes('$file')); if (!button) return 'the model is not in the recents'; button.click(); return 'opened'; })()" >/dev/null
+  # The header carries the name of the model that is open.
+  agent-browser wait --text "$stem"
+}
+
+# The centre of an element, in the coordinates the mouse takes.
+centre_of() {
+  local selector="$1"
+  agent-browser eval "(() => { const el = document.querySelector('$selector'); if (!el) return ''; const r = el.getBoundingClientRect(); return [Math.round(r.x + r.width / 2), Math.round(r.y + r.height / 2)].join(','); })()" |
+    tr -d '"'
+}
+
+# Where a block is on the canvas, as the graph draws it.
+node_position() {
+  agent-browser eval "(() => { const el = document.querySelector('.react-flow__node[data-id=\"$1\"]'); return el ? el.style.transform : ''; })()" |
+    tr -d '"'
+}
+```
+
+```bash
+# The reviewed model: the graph, framed with the model's own geometry.
+open_model "fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl"
 agent-browser wait --text "Puerta Banco"
 agent-browser screenshot /tmp/genmsi-app/01-grafo.png
 
@@ -79,8 +113,12 @@ agent-browser screenshot /tmp/genmsi-app/02-propiedades.png
 
 # Run the model and read the report.
 agent-browser find role button click --name "Simular"
+agent-browser click '[data-monitor-panel="reporte"]'
 agent-browser wait --text "Bloques"
 agent-browser screenshot /tmp/genmsi-app/03-reporte.png
+# The editing below happens on the graph, so the window goes back to it.
+agent-browser click '[data-monitor-panel="reproduccion"]'
+agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > 0"
 ```
 
 ### The editing steps
@@ -88,13 +126,15 @@ agent-browser screenshot /tmp/genmsi-app/03-reporte.png
 ```bash
 # The copy the loop edits.
 cp fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl crates/genmsi-app/.devmodels/visual.gmdl
-agent-browser select '[aria-label="Modelo"]' "crates/genmsi-app/.devmodels/visual.gmdl"
+open_model "crates/genmsi-app/.devmodels/visual.gmdl"
 agent-browser wait --text "Puerta Banco"
 
-# A new node, created from the catalogue. The list of classes scrolls: the
-# class has to be on the picture before it can be clicked.
-agent-browser click '[aria-label="Añadir bloque"]'
+# A new node, created from the catalogue. The classes live in the lateral
+# panel, in the tab "Bloques".
+agent-browser click '[data-monitor-aside="bloques"]'
 agent-browser wait --text "Generar"
+# The list of classes scrolls: the class has to be on the picture before it
+# can be clicked.
 agent-browser scrollintoview '[data-block-class="Generate"]'
 agent-browser click '[data-block-class="Generate"]'
 agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > 18"
@@ -103,50 +143,70 @@ agent-browser screenshot /tmp/genmsi-app/04-nodo-nuevo.png
 # A second node, and the connection between the two: the new Generate feeds
 # the new Terminate, so the link does not replace any other one. React Flow
 # listens to the pointer events, so the connection is a real mouse drag.
-agent-browser click '[aria-label="Añadir bloque"]'
-agent-browser wait --text "Terminar"
 agent-browser scrollintoview '[data-block-class="Terminate"]'
 agent-browser click '[data-block-class="Terminate"]'
-agent-browser click 'button[title="Encuadrar el grafo"]'
-agent-browser mouse move 372 807
+agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > 19"
+agent-browser find role button click --name "Encuadrar"
+agent-browser wait 300
+
+# The drag needs the coordinates of the two handles, read from the picture:
+# the blocks move with the model, so fixed coordinates would not land.
+from_centre=$(centre_of ".react-flow__node[data-id=\"39\"] .react-flow__handle-bottom")
+to_centre=$(centre_of ".react-flow__node[data-id=\"40\"] .react-flow__handle-top")
+agent-browser mouse move "${from_centre%,*}" "${from_centre#*,}"
 agent-browser mouse down left
-agent-browser mouse move 484 891 --duration 400 --steps 12
+agent-browser mouse move "${to_centre%,*}" "${to_centre#*,}" --duration 400 --steps 12
 agent-browser mouse up left
 agent-browser wait --fn "document.querySelectorAll('.react-flow__edge').length > 9"
 agent-browser screenshot /tmp/genmsi-app/05-conectado.png
 
 # The node is dragged: one drag is one undo entry.
-agent-browser mouse move 368 780
+POSITION_BEFORE=$(node_position 39)
+x=$(centre_of '.react-flow__node[data-id="39"]')
+agent-browser mouse move "${x%,*}" "${x#*,}"
 agent-browser mouse down left
-agent-browser mouse move 248 720 --duration 400 --steps 12
+agent-browser mouse move $(( ${x%,*} - 120 )) $(( ${x#*,} - 60 )) --duration 400 --steps 12
 agent-browser mouse up left
+agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"39\"]').style.transform !== '$POSITION_BEFORE'"
 agent-browser screenshot /tmp/genmsi-app/06-arrastrado.png
 
-# Undo takes the drag back, and redo puts it back.
+# Undo takes the drag back.
 agent-browser press "Control+z"
+agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"39\"]').style.transform === '$POSITION_BEFORE'"
 agent-browser screenshot /tmp/genmsi-app/07-deshacer.png
+
+# And redo puts it back.
 agent-browser press "Control+Shift+z"
+agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"39\"]').style.transform !== '$POSITION_BEFORE'"
 agent-browser screenshot /tmp/genmsi-app/08-rehacer.png
+
+# The re-layout: the button asks the engine to compose the model, and the
+# blocks move to the layers of the flow. The composition is the engine's,
+# the same one the MCP applies before it writes a model.
+POSITION_BEFORE=$(node_position 39)
+agent-browser find role button click --name "Reacomodar"
+agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"39\"]').style.transform !== '$POSITION_BEFORE'"
+agent-browser screenshot /tmp/genmsi-app/09-reacomodado.png
 
 # The model is saved, and the app says so.
 agent-browser find role button click --name "Guardar"
 agent-browser wait --text "Se guardó"
-agent-browser screenshot /tmp/genmsi-app/09-guardado.png
+agent-browser screenshot /tmp/genmsi-app/10-guardado.png
 
 # The file is reopened: the change is in the file, not only in the session.
 agent-browser open http://127.0.0.1:5173/
 agent-browser wait --text "GenMSI"
-agent-browser select '[aria-label="Modelo"]' "crates/genmsi-app/.devmodels/visual.gmdl"
+open_model "crates/genmsi-app/.devmodels/visual.gmdl"
 agent-browser wait --text "Puerta Banco"
-agent-browser screenshot /tmp/genmsi-app/10-reabierto.png
+agent-browser screenshot /tmp/genmsi-app/11-reabierto.png
 ```
 
 ### A model the engine refuses
 
 ```bash
-agent-browser select '[aria-label="Modelo"]' "fixtures/models/TP9__tp9.gmdl"
+open_model "fixtures/models/TP9__tp9.gmdl"
 agent-browser wait --text "El modelo no compila"
-agent-browser screenshot /tmp/genmsi-app/11-error.png
+agent-browser screenshot /tmp/genmsi-app/12-error.png
 ```
 
 `agent-browser wait --text ...` is the wait to use after an action: the app
@@ -163,33 +223,34 @@ model with the run on it.
 ```bash
 # The model of the monitor: it has queues, facilities and tables, so the
 # charts have something to draw.
-agent-browser select '[aria-label="Modelo"]' "fixtures/models/TP4__supermercado.gmdl"
+open_model "fixtures/models/TP4__supermercado.gmdl"
 agent-browser wait --text "supermercado"
 
 # The run it needs.
-agent-browser wait --text "Ejecutar y reproducir"
-agent-browser find role button click --name "Ejecutar y reproducir"
-agent-browser wait --text "Registros"
-agent-browser screenshot /tmp/genmsi-app/12-monitor.png
+agent-browser wait --text "Ejecutar"
+agent-browser find role button click --name "Ejecutar"
+# The clock of the run advances: the monitor is playing the trace.
+agent-browser wait --fn "!document.body.innerText.includes('0:00:00')"
+agent-browser screenshot /tmp/genmsi-app/13-monitor.png
 
 # The replay is paused and put at the middle of the run, so the picture is
 # the same on every run. React reads the value of the input from its own
 # tracker, so the value is set through the native setter and the input event
 # is dispatched: the component sees the change.
-agent-browser find role button click --name "Pausar"
+agent-browser find role button click --name "Pausar la reproducción"
 agent-browser eval "(() => { const input = document.querySelector('[aria-label=\"Posición de la reproducción\"]'); const max = Number(input.max); const value = String(Math.floor(max / 2)); const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set; setter.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); return value; })()"
-agent-browser screenshot /tmp/genmsi-app/13-monitor-reproduccion.png
+agent-browser screenshot /tmp/genmsi-app/14-monitor-reproduccion.png
 
 # The charts of the run: the time series of the entities and the histogram
 # of the tables.
 agent-browser click '[data-monitor-panel="graficos"]'
 agent-browser wait --text "Histograma"
-agent-browser screenshot /tmp/genmsi-app/14-monitor-graficos.png
+agent-browser screenshot /tmp/genmsi-app/15-monitor-graficos.png
 
 # The report of the run, with the numbers of the instant the replay is at.
 agent-browser click '[data-monitor-panel="reporte"]'
 agent-browser wait --text "Colas"
-agent-browser screenshot /tmp/genmsi-app/15-monitor-reporte.png
+agent-browser screenshot /tmp/genmsi-app/16-monitor-reporte.png
 ```
 
 ## 4. Look, fix, repeat
@@ -204,6 +265,8 @@ with the image reader of the session). The things to look at:
 - the new node is on the picture, connected to the other one, and the
   labels of the link are the original editor's (`A_<Class>`);
 - the undo takes the drag back and the redo puts it back;
+- the re-layout puts the blocks in layers: that picture is the engine's
+  composition, the same one the MCP applies before it writes a model;
 - the diagnostics say what the model compiles to, after every change;
 - the report's tables carry the engine's numbers, with the original's comma
   decimals;

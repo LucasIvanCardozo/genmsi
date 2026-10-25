@@ -45,6 +45,7 @@ The frontend knows one interface (`src/engine/adapter.ts`):
 | `trace(path, options)` | `genmsi.trace/1` | The run's trace: every event of the run. |
 | `openModel(path)` / `newModel()` | the session state | The model in memory, ready to edit. |
 | `apply(command)` | the session state | One editing command, applied. |
+| `relayout()` | the session state | The model composed on the canvas, by the engine. |
 | `undo()` / `redo()` | the session state | One step of the command stack. |
 | `save(path?)` | the outcome of a save | The model written back to a `.gmdl`. |
 | `simulateCurrent(options)` | `genmsi.report/1` | The run of the model **in memory**. |
@@ -307,11 +308,16 @@ as D8 says):
 
 `Reacomodar` reorders the graph in layers: a block with no incoming link
 is in the first layer, and a block that follows another one is in the layer
-after it. The layout is computed in the frontend (`src/edit/layout.ts`), it
-is deterministic (the same model always produces the same positions) and it
-travels as **one** command, so the whole re-layout is one undo entry. It
-is never run on open: the picture the author of the file left stays until
-the user asks for a new one.
+after it. The layout is computed by the **engine**
+(`genmsi_format::layout`, D18), it is deterministic (the same model always
+produces the same positions) and it travels as **one** command, so the whole
+re-layout is one undo entry. It is never run on open: the picture the author
+of the file left stays until the user asks for a new one.
+
+The engine's composition also places the blocks that carry no geometry of
+their own (with the default size), and the containers grow to hold what they
+own. The frontend has no copy of the algorithm: the button asks the engine,
+so the app and the MCP place a model the same way.
 
 ## The files
 
@@ -319,7 +325,7 @@ the user asks for a new one.
 |---|---|
 | `crates/genmsi-app/src/engine/` | The adapter and its two backends. |
 | `crates/genmsi-app/src/components/` | The graph, the property panel, the report, the monitor, the charts, the picker, the toolbar. |
-| `crates/genmsi-app/src/edit/` | The pure parts of the editor: the layout and the property editors. |
+| `crates/genmsi-app/src/edit/` | The pure parts of the editor: the property editors. |
 | `crates/genmsi-app/src/monitor/` | The replay: the projection of the trace and the state it rebuilds. |
 | `crates/genmsi-app/src/state/store.ts` | The app's state (Zustand). |
 | `crates/genmsi-app/src/types/generated/` | The types generated from the Rust schema. |
@@ -350,8 +356,8 @@ crates/genmsi-app/scripts/check-tauri-shell.sh
 
 ```bash
 cd crates/genmsi-app
-bun test        # the dev bridge's bytes against the engine's, the deterministic
-                # layout, the property editors and the replay of the trace
+bun test        # the dev bridge's bytes against the engine's, the property
+                # editors and the replay of the trace
 bunx tsc --noEmit
 ```
 

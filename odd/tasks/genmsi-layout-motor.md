@@ -76,10 +76,10 @@ disposición al guardarlo. Sólo se compone lo que está incompleto.
 
 | T | Specs | Qué | Ruta | Commit |
 |---|---|---|---|---|
-| T1 | S2, S3, S4, S8, S9 | La composición en el motor: `crates/genmsi-format/src/layout.rs`, con sus pruebas | format | pendiente |
-| T2 | S5 | El botón "Reacomodar" pide la composición al motor; la copia del frontend se borra | format + app | pendiente |
-| T3 | S6, S7 | `save_model` compone antes de escribir y la CLI compone un modelo | mcp + cli | pendiente |
-| T4 | S1, S3 | Los documentos (la decisión, el formato, el MCP, la CLI, la app) y el lazo visual | docs | pendiente |
+| T1 | S2, S3, S4, S8, S9 | La composición en el motor: `crates/genmsi-format/src/layout.rs`, con sus pruebas | format | `ebe554c` |
+| T2 | S5 | El botón "Reacomodar" pide la composición al motor; la copia del frontend se borra | format + app | `f4432d4` |
+| T3 | S6, S7 | `save_model` compone antes de escribir y la CLI compone un modelo | mcp + cli | `b5a1b58` |
+| T4 | S1, S3 | Los documentos (la decisión, el formato, el MCP, la CLI, la app) y el lazo visual | docs | `dbb3c3b`, `f49ac03` |
 
 ## Log
 
@@ -164,12 +164,50 @@ composición.
 El lazo corre entero: 16 capturas, la última de ellas la del monitor con sus
 gráficas.
 
-### L8 — T3: `save_model` compone y la CLI compone
+### L8 — T3: `save_model` compone y la CLI compone (`b5a1b58`)
 
-_(pendiente del escritor)_
+El MCP compone el modelo antes de escribirlo (después de validarlo y compilarlo, como antes): un modelo sin geometría llega al archivo con la geometría puesta y el documento de lint lo dice; un modelo que ya la tiene se escribe byte a byte como llegó. La CLI gana `genmsi layout`, que dice dónde quedó cada bloque y no escribe nada, salvo que se lo pidan con `--write` (la escritura es atómica).
+
+Las pruebas: el archivo escrito lleva la geometría de cada bloque y la raíz no, y el modelo compuesto simula igual que el que el agente mandó; un modelo que ya tiene geometría se escribe sin cambios; un modelo que no compila no llega al disco; la CLI compone sin escribir, escribe con `--write` y falla como las demás órdenes.
 
 ### L9 — T4: los documentos
 
 La decisión D18 ("el motor compone el lienzo"), la sección de la composición
-en `docs/format-and-engine.md`, el botón de la app en `docs/app.md` y los
-pasos del lazo en `docs/app-visual-loop.md`.
+en `docs/format-and-engine.md`, el botón de la app en `docs/app.md`, los
+pasos del lazo en `docs/app-visual-loop.md`, la orden nueva en `docs/cli.md` y
+la composición en `docs/mcp.md`. La guía del agente (`skills/`) dice que la
+geometría es del motor y que no hay que colocar los bloques a mano.
+
+### L10 — La verificación
+
+- `cargo test --workspace`: 78 suites, 532 pruebas, 0 fallos.
+- `cargo clippy --workspace --all-targets -- -D warnings`: limpio.
+- El lazo visual: 16 capturas, entero.
+- La prueba de extremo a extremo: un modelo de referencia al que se le quitó
+  la geometría, compuesto por el motor, se abre en la app con sus 18 bloques
+  en el lienzo (antes: un lienzo vacío).
+- `genmsi layout --write` dos veces sobre el mismo archivo: el segundo write
+  no cambia un byte (el modelo ya está compuesto).
+- El plan de `assess` con la escalación del ítem 1 (el `--write` reescribe un
+  archivo guardado): el verificador independiente corre sobre la unidad de
+  escritura.
+
+### L11 — El riesgo
+
+- T1 (la composición): ninguno. Es cálculo puro y un módulo nuevo.
+- T2 (el botón y el lazo): ninguno. La fachada crece con una operación y el
+  frontend pierde su copia del algoritmo.
+- T3 (la escritura): **ítem 1** (efectos sobre datos: el `--write` reescribe
+  un modelo guardado y el `save_model` ahora escribe un modelo compuesto).
+  Cubierto por el verificador independiente, por las pruebas de la escritura
+  (byte a byte, atómica, idempotente) y por la prueba de que la geometría no
+  cambia la semántica.
+
+### L12 — Lo que la fase no hace
+
+- No publica una geometría en el catálogo: la composición es del motor y no
+  de la clase.
+- No toca la semántica: el motor compone, el simulador no se entera.
+- El lazo visual abre los modelos por los recientes, que es la única vía que
+  el navegador tiene; la app de escritorio sigue usando el diálogo del
+  sistema.

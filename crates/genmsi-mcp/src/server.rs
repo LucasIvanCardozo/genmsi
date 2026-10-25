@@ -372,18 +372,16 @@ fn lint_document(input: &ModelInput) -> Result<String, ToolError> {
 fn save_document(input: &SaveInput) -> Result<String, ToolError> {
     let path = PathBuf::from(&input.path);
     let saved = engine::save_model(&path, &input.model)?;
-    let mut document = genmsi_core::lint_document(
+    // The composition is not a finding of the compiler: it is what the engine
+    // did to the model before writing it, and it does not belong in the list
+    // of findings (a model with no finding is `ok`, and a model the engine
+    // composed has none). The tool's own description says the composition
+    // happens, and `genmsi layout` says what it composed.
+    let document = genmsi_core::lint_document(
         &saved.program,
         &saved.model,
         &saved.path.display().to_string(),
     );
-    // The composition is not a finding of the compiler: it is what the
-    // engine did to the model before writing it, and the agent has to know
-    // it, because the file it wrote is not the file it sent.
-    if let Some(blocks) = saved.composed {
-        document.diagnostics.push(composition_note(blocks));
-        document.status = "diagnostics";
-    }
     Ok(genmsi_core::to_pretty_json(
         genmsi_core::LINT_SCHEMA,
         &document,
@@ -394,12 +392,6 @@ fn save_document(input: &SaveInput) -> Result<String, ToolError> {
 ///
 /// The number is the blocks the composition placed: the model root is not
 /// drawn, so it is not one of them.
-fn composition_note(blocks: usize) -> String {
-    format!(
-        "the model carried no canvas geometry: the engine composed {blocks} blocks so the editor can draw it"
-    )
-}
-
 /// The report document of a run.
 fn report_document(input: &RunInput) -> Result<String, ToolError> {
     let loaded = engine::load(&input.source()?)?;

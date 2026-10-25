@@ -102,7 +102,13 @@ pub fn run(args: LayoutArgs) -> Result<ExitCode, CliError> {
         .map(|positions| positions.iter().map(placed_of).collect())
         .unwrap_or_default();
     if args.write {
-        model::save(&loaded.model, &args.model.path)?;
+        // Only a model the engine composed is written: a model that already
+        // carries its geometry is left alone, byte for byte. A command that
+        // lays the canvas out does not re-serialize a file that needs no
+        // layout.
+        if composed.is_some() {
+            model::save(&loaded.model, &args.model.path)?;
+        }
     }
     let document = LayoutDocument {
         path: args.model.path.display().to_string(),
@@ -113,7 +119,7 @@ pub fn run(args: LayoutArgs) -> Result<ExitCode, CliError> {
         },
         blocks: loaded.model.blocks.len(),
         composed: positions.len(),
-        written: args.write,
+        written: args.write && composed.is_some(),
         positions,
     };
     if args.output.json {

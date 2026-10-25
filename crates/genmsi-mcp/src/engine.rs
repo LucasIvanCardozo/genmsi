@@ -93,11 +93,6 @@ pub struct Saved {
     pub path: PathBuf,
     /// How many bytes the file has.
     pub bytes: u64,
-    /// How many blocks the engine composed, when it composed the model.
-    ///
-    /// `None` means the model already carried its geometry and was written
-    /// exactly as its author left it.
-    pub composed: Option<usize>,
 }
 
 /// Save a model to a file.
@@ -125,15 +120,13 @@ pub fn save_model(path: &std::path::Path, text: &str) -> Result<Saved, ToolError
     // The composition: the model that is about to be written is composed
     // only when its geometry is incomplete, so a model its author placed
     // keeps the disposition it was given.
-    let composed = genmsi_format::compose_incomplete(&mut model)
-        .map(|positions| positions.len());
+    genmsi_format::compose_incomplete(&mut model);
     let bytes = write_atomically(&model, path)?;
     Ok(Saved {
         program,
         model,
         path: path.to_path_buf(),
         bytes,
-        composed,
     })
 }
 
@@ -148,9 +141,13 @@ fn write_atomically(model: &GmdlModel, path: &std::path::Path) -> Result<u64, To
         .map(|name| name.to_string_lossy().to_string())
         .unwrap_or_else(|| "model.gmdl".to_string());
     let temporary = path.with_file_name(format!(".{file_name}.tmp"));
-    genmsi_format::save(model, &temporary).map_err(|error| {
-        ToolError::cannot_write(&name, format!("{error}"))
-    })?;
+    // A write that fails leaves nothing behind: the temporary file is the
+    // target's name with a dot in front, and a reader that lists the
+    // directory must not find a half-written model in it.
+    if let Err(error) = genmsi_format::save(model, &temporary) {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(ToolError::cannot_write(&name, format!("{error}")));
+    }
     let bytes = std::fs::metadata(&temporary).map(|meta| meta.len()).unwrap_or(0);
     if let Err(error) = std::fs::rename(&temporary, path) {
         let _ = std::fs::remove_file(&temporary);

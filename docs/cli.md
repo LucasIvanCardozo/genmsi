@@ -184,7 +184,12 @@ $ genmsi layout mi-modelo.gmdl --write
 ```
 
 writes the composed model back to the file. The write is atomic, like the
-MCP's: a reader that watches the model never sees half of one.
+MCP's: a reader that watches the model never sees half of one, and a write
+that fails leaves nothing behind.
+
+A model that needs no layout is **not written at all** (`written: no`): a
+command that lays the canvas out does not rewrite a file that is already
+laid out.
 
 Like every other subcommand, the command works on a model that compiles: a
 model that loads but does not compile is refused with exit 1.

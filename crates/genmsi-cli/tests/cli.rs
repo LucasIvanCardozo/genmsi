@@ -402,6 +402,26 @@ fn run_all_on_a_file_is_a_usage_error() {
     assert!(stderr(&output).contains("not a directory"), "{}", stderr(&output));
 }
 
+/// The same model with the geometry the editor gives it: a model whose
+/// author placed the blocks.
+const WITH_GEOMETRY: &str = "<gmodel versioncode=\"1\"><gclasses/><modules>
+  <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\">
+    <links><link frommoduleid=\"1\" fromioid=\"1\" tomoduleid=\"2\" toioid=\"1\"/></links><inputs/><outputs/>
+  </module>
+  <module moduleid=\"1\" moduleclass=\"Generate\" owner=\"0\" caption=\"Generate\" name=\"Generate\" kind=\"A\" width=\"120\" height=\"48\" x=\"0\" y=\"0\">
+    <outputs><output ioid=\"1\" name=\"Salida1\" caption=\"\" mylabel=\"L1\"/></outputs>
+    <props>
+      <property name=\"Media\" hint=\"\" value=\"10\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/>
+    </props>
+  </module>
+  <module moduleid=\"2\" moduleclass=\"Terminate\" owner=\"0\" caption=\"Terminate\" name=\"Terminate\" kind=\"A\" width=\"120\" height=\"48\" x=\"200\" y=\"0\">
+    <inputs><input ioid=\"1\" name=\"Entrada1\" caption=\"\" mylabel=\"L1\"/></inputs>
+    <props>
+      <property name=\"Unidades\" hint=\"\" value=\"1\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/>
+    </props>
+  </module>
+</modules></gmodel>";
+
 #[test]
 fn layout_composes_a_model_and_writes_nothing() {
     let path = write_model("no-geometry", WITHOUT_GEOMETRY);
@@ -448,6 +468,26 @@ fn layout_write_saves_the_composed_model() {
         model.root().expect("the root").layout.is_none(),
         "the root is not drawn, so it keeps no geometry"
     );
+
+    let dir = path.parent().expect("the directory of the model");
+    std::fs::remove_dir_all(dir).expect("the scratch directory is removed");
+}
+
+#[test]
+fn layout_write_leaves_a_model_that_needs_no_layout_alone() {
+    let path = write_model("already-composed", WITH_GEOMETRY);
+    let before = std::fs::read_to_string(&path).expect("the model is there");
+
+    let output = genmsi(&["layout", path.to_str().expect("a path"), "--write"]);
+    assert_eq!(code(&output), 0, "{}", stderr(&output));
+    let text = stdout(&output);
+    assert!(text.contains("status: unchanged"), "{text}");
+    assert!(text.contains("written: no"), "{text}");
+
+    // The file is byte for byte the one that was there: a command that lays
+    // the canvas out does not rewrite a file that needs no layout.
+    let after = std::fs::read_to_string(&path).expect("the model is there");
+    assert_eq!(after, before, "the model was rewritten");
 
     let dir = path.parent().expect("the directory of the model");
     std::fs::remove_dir_all(dir).expect("the scratch directory is removed");

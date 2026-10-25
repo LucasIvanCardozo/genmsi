@@ -223,8 +223,11 @@ The tool writes the **whole document**, not a patch: read the model with
 geometry is the engine's business (D18), and a model the editor cannot draw
 is of no use to the reader: the engine places the blocks in layers and the
 file carries the geometry. A model that already carries its geometry keeps
-the disposition its author left. When the engine composed the model, the lint
-document says so in its `diagnostics`.
+the disposition its author left.
+
+The composition is **not a finding**: the lint document of a model that
+compiles is `ok`, with no findings, whether the engine composed the model or
+not. `genmsi layout` is the command that says what the composition placed.
 
 ### `open_model`
 

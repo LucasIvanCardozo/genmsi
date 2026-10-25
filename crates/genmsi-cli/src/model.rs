@@ -50,10 +50,16 @@ pub fn save(model: &GmdlModel, path: &Path) -> Result<(), CliError> {
         .unwrap_or_else(|| "model.gmdl".to_string());
     let temporary = path.with_file_name(format!(".{file_name}.tmp"));
     let text = genmsi_format::to_string(model);
-    std::fs::write(&temporary, text).map_err(|error| CliError::Io {
-        path: name.clone(),
-        message: format!("cannot write the model: {error}"),
-    })?;
+    // A write that fails leaves nothing behind: the temporary file is the
+    // target's name with a dot in front, and a reader that lists the
+    // directory must not find a half-written model in it.
+    if let Err(error) = std::fs::write(&temporary, text) {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(CliError::Io {
+            path: name,
+            message: format!("cannot write the model: {error}"),
+        });
+    }
     if let Err(error) = std::fs::rename(&temporary, path) {
         let _ = std::fs::remove_file(&temporary);
         return Err(CliError::Io {

@@ -161,15 +161,12 @@ async fn a_model_without_geometry_is_composed_before_it_is_written() {
         "the root is not drawn, so it keeps no geometry"
     );
 
-    // The lint document says what the engine did.
+    // The composition is not a finding: the lint document of a model that
+    // compiles is `ok`, with no findings. A client that reads `diagnostics`
+    // as "the model has a problem" must not be misled by the geometry.
     let findings = diagnostics(&lint);
-    assert!(
-        findings
-            .iter()
-            .any(|message| message.contains("the engine composed 2 blocks")),
-        "{lint}"
-    );
-    assert_eq!(lint["status"], "diagnostics", "{lint}");
+    assert!(findings.is_empty(), "{lint}");
+    assert_eq!(lint["status"], "ok", "{lint}");
 
     // The geometry does not enter the simulation: the composed model runs
     // like the model the agent sent.

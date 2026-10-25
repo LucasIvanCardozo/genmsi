@@ -100,7 +100,6 @@ geometría: tiene que poder hacerse sobre un modelo roto.
 | T5 | S3, S4, S5 | La app: el botón recompone todo y los contenedores se dibujan como marcos reales | inline | hecho | `3f182b9`, `b3f50ea` |
 | T6 | S1, S6, S7 | La superficie: `genmsi layout` compone un modelo que no compila; los documentos (D18, `app.md`, `cli.md`) | inline | hecho | `66d2e82` |
 | T7 | S1, S5 | La prueba visual: el lazo visual del antes y del después, con capturas revisadas | inline | hecho | — |
-
 ## Log
 
 ### L1 — El pedido del usuario (verbatim)
@@ -410,3 +409,33 @@ base, GREEN en la cabeza) quedan en el repositorio:
 `crates/genmsi-cli/tests/layout_write.rs` (idempotencia, atómica, la
 semántica que no se toca, el modelo que el motor rechaza y la escritura que
 falla sin dejar nada atrás).
+
+### L15 — La revisión nativa: empezada, sin veredicto
+
+El plan de `assess` (con la escalación del ítem 1) dejó la revisión nativa
+**pendiente** y con el verificador independiente como paso obligatorio (el
+plan pide los dos: el verificador corre y la revisión nativa es la vista
+adicional). La revisión se empezó con las tres lentes que el cambio pedía
+(risk, readability, reliability) y el consentimiento lo resolvió el host.
+
+La **captura no llegó a correr**: el provider rechaza el binding de captura
+("collectBinding is missing or stale for current STATUS") en todas las
+formas que el protocolo permite (objeto, cadena serializada, cadena con las
+comillas escapadas), y un segundo `inspect` reporta el estado del provider
+como inconsistente ("unrelated target status is inconsistent"). Se probó
+también con el workspace alineado al candidate congelado y con el workspace
+en su cabeza: el mismo rechazo.
+
+Lo que esto deja:
+
+- la **revisión nativa no dio veredicto** (no es un "aprobado" ni un
+  "rechazado"): queda como **no disponible**;
+- el **verificador independiente sí corrió** y verificó la unidad de escritura
+  (L14), que es lo que el plan pedía como paso obligatorio;
+- el resto de la fase está probado por sus propias pruebas y por el lazo
+  visual (L13).
+
+La deuda queda dicha: el engine de revisión no pudo correr sobre esta
+fase, y el commit que añadió las pruebas del verificador (L14) movió el
+workspace después de que el candidate se congelara. Queda para otra sesión
+reintentar la revisión nativa sobre la rama ya quieta.

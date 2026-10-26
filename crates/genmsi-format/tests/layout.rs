@@ -171,7 +171,7 @@ fn two_chains() -> GmdlModel {
          <module moduleid=\"9\" moduleclass=\"Table\" owner=\"0\" caption=\"Tabla\" name=\"Tabla\" kind=\"A\">\
          <inputs/><outputs/><props/></module>\
          </modules></gmodel>";
-    genmsi_format::parse_str(&text).expect("the model parses")
+    genmsi_format::parse_str(text).expect("the model parses")
 }
 
 #[test]

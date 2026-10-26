@@ -40,6 +40,8 @@ pub const PAD: i32 = 24;
 pub const GAP_Y: i32 = 30;
 /// Horizontal gap between two blocks side by side.
 pub const GAP_X: i32 = 30;
+/// Vertical gap between two layers of the flow.
+pub const RANK_SEP: i32 = 60;
 
 /// The positions that compose the model, one per block except the root.
 ///
@@ -55,7 +57,8 @@ pub fn relayout(model: &GmdlModel) -> Vec<Position> {
     // the answer comes from the tight tree when the simplex fails. Both
     // answers are the same every time, so the composition stays
     // deterministic.
-    match compose(model, Ranker::NetworkSimplex) {
+    let ranker = Ranker::NetworkSimplex;
+    match compose(model, ranker) {
         Some(positions) => positions,
         None => compose(model, Ranker::TightTree).unwrap_or_default(),
     }
@@ -93,10 +96,19 @@ fn compose_with(model: &GmdlModel, root: u32, ranker: Ranker) -> Vec<Position> {
     // The flow of the model: the links between the blocks that simulate,
     // with the borders of the containers spliced.
     let edges = flow::flow_edges_for(model);
-    // The blocks that are in no flow: they are not part of the flow dagre
-    // composes, they go in a grid beside it.
-    let free = free_blocks(model, root, &edges);
-    let in_flow: HashSet<u32> = free.iter().copied().collect();
+    // The containers that hold blocks: their frame is drawn around them, so
+    // dagre gives them no size of their own. A container that holds nothing
+    // is a block like any other: the composition places it.
+    let holders: HashSet<u32> = model
+        .blocks
+        .iter()
+        .filter(|block| block.id != root && block.owner != block.id)
+        .map(|block| block.owner)
+        .collect();
+    // The blocks that are drawn in a grid beside the flow: the ones no link
+    // reaches and that live in the root of the model.
+    let grid = grid_blocks(model, root, &edges, &holders);
+    let in_grid: HashSet<u32> = grid.iter().copied().collect();
     let mut graph = Graph::with_options(GraphOptions {
         directed: true,
         multigraph: true,
@@ -106,20 +118,20 @@ fn compose_with(model: &GmdlModel, root: u32, ranker: Ranker) -> Vec<Position> {
         if block.id == root {
             continue;
         }
-        if block.is_container() {
-            // A container has no size of its own: its frame is computed
-            // around the blocks it holds.
+        if holders.contains(&block.id) {
+            // A container that holds blocks has no size of its own: its
+            // frame is computed around the blocks it holds.
             graph.set_node(block.id.to_string(), None);
             continue;
         }
-        if in_flow.contains(&block.id) {
-            // A block that is in no flow has no place in the flow: the
-            // composition puts it in a grid beside the flow.
-            continue;
-        }
-        let (width, height) = match block.layout {
-            Some(layout) => (layout.width, layout.height),
-            None => (DEFAULT_WIDTH, DEFAULT_HEIGHT),
+        // The blocks that are drawn in the grid take no room in the flow:
+        // they are not drawn there. They stay in the graph all the same: the
+        // order the crate gives the flow depends on them, and the flow
+        // crosses fewer links when they are there.
+        let (width, height) = if in_grid.contains(&block.id) {
+            (0, 0)
+        } else {
+            size_of(model, block.id)
         };
         let label = NodeLabel {
             width: f64::from(width),
@@ -153,8 +165,12 @@ fn compose_with(model: &GmdlModel, root: u32, ranker: Ranker) -> Vec<Position> {
         // output at its bottom.
         rankdir: RankDir::TB,
         ranker,
-        nodesep: 30.0,
-        ranksep: 60.0,
+        // The gap between two blocks of the same layer, and the gap between
+        // two layers of the flow. They are what makes the picture big: the
+        // flow goes down, so the picture is tall and the gap between the
+        // layers is what makes it taller.
+        nodesep: f64::from(GAP_X),
+        ranksep: f64::from(RANK_SEP),
         edgesep: 20.0,
         ..LayoutOptions::default()
     };
@@ -163,7 +179,17 @@ fn compose_with(model: &GmdlModel, root: u32, ranker: Ranker) -> Vec<Position> {
     // dagre places a block by its middle; the file carries its corner.
     let mut positions: Vec<Position> = Vec::new();
     for block in &model.blocks {
-        if block.id == root || block.is_container() {
+        if block.id == root {
+            continue;
+        }
+        if holders.contains(&block.id) {
+            // The frame of a container is computed around the blocks it
+            // holds, not read from dagre.
+            continue;
+        }
+        if in_grid.contains(&block.id) {
+            // The blocks that are drawn in the grid are placed in the grid,
+            // not where dagre puts them.
             continue;
         }
         let Some(node) = graph.node(&block.id.to_string()) else {
@@ -182,12 +208,19 @@ fn compose_with(model: &GmdlModel, root: u32, ranker: Ranker) -> Vec<Position> {
             height: Some(height),
         });
     }
+    // The containers: the frame of each one is the box of the blocks it
+    // holds, with the margin that separates them. The frames are computed
+    // from the innermost out.
+    place_frames(model, root, &mut positions);
     // The components of the flow start together at the top: the sources of
     // the flow are the first row of the picture.
     align_components(model, root, &mut positions, &edges);
-    // The blocks that are in no flow get a place in the grid: the grid is
+    // The components that share the canvas move apart: the picture grows
+    // only where two chains of the flow meet nowhere and overlap.
+    separate_components(model, root, &mut positions, &edges);
+    // The blocks that are drawn in the grid get a place in it: the grid is
     // laid out once the picture of the flow is known.
-    for id in &free {
+    for id in &grid {
         let (width, height) = size_of(model, *id);
         positions.push(Position {
             id: *id,
@@ -197,50 +230,13 @@ fn compose_with(model: &GmdlModel, root: u32, ranker: Ranker) -> Vec<Position> {
             height: Some(height),
         });
     }
+    // The blocks that are drawn in the grid go in a grid beside the flow, in
+    // the shape that leaves the picture as square as possible.
+    place_free(&mut positions, model, &grid);
     // The containers: the frame of each one is the box of the blocks it
     // holds, with the margin that separates them. The frames are computed
-    // from the innermost out.
-    let frames = frames_of(model, root, &positions);
-    for block in &model.blocks {
-        if !block.is_container() {
-            continue;
-        }
-        let Some((x, y, width, height)) = frames.get(&block.id).copied() else {
-            continue;
-        };
-        positions.push(Position {
-            id: block.id,
-            x,
-            y,
-            width: Some(width),
-            height: Some(height),
-        });
-    }
-    // The containers dagre did not place (its tight tree leaves the blocks of
-    // a cycle without a place): their frame is computed around the blocks
-    // they hold.
-    let missing: Vec<u32> = model
-        .blocks
-        .iter()
-        .filter(|block| block.is_container() && block.id != root)
-        .filter(|block| !positions.iter().any(|position| position.id == block.id))
-        .map(|block| block.id)
-        .collect();
-    if !missing.is_empty() {
-        let frames = frames_of(model, root, &positions);
-        for container in missing {
-            let Some((x, y, width, height)) = frames.get(&container).copied() else {
-                continue;
-            };
-            positions.push(Position {
-                id: container,
-                x,
-                y,
-                width: Some(width),
-                height: Some(height),
-            });
-        }
-    }
+    // from the innermost out, and they follow the blocks they hold.
+    place_frames(model, root, &mut positions);
     // The blocks nobody placed get a place: a block without one is a block
     // the reader cannot see. The port's tight tree leaves the blocks of a
     // cycle without a place, and they go where their container is.
@@ -275,26 +271,8 @@ fn compose_with(model: &GmdlModel, root: u32, ranker: Ranker) -> Vec<Position> {
         }
         // The frames of the containers grow to hold the blocks that were
         // placed in them.
-        let frames = frames_of(model, root, &positions);
-        for position in &mut positions {
-            let Some(block) = model.block(position.id) else {
-                continue;
-            };
-            if !block.is_container() {
-                continue;
-            }
-            let Some((x, y, width, height)) = frames.get(&block.id).copied() else {
-                continue;
-            };
-            position.x = x;
-            position.y = y;
-            position.width = Some(width);
-            position.height = Some(height);
-        }
+        place_frames(model, root, &mut positions);
     }
-    // The blocks that are in no flow go in a grid beside the flow, in the
-    // shape that leaves the picture as square as possible.
-    place_free(&mut positions, model, &free);
     // The composition starts where the author put things, and never before
     // it: the picture has no negative coordinates.
     let (origin_x, origin_y) = origin(model);
@@ -309,21 +287,29 @@ fn compose_with(model: &GmdlModel, root: u32, ranker: Ranker) -> Vec<Position> {
     positions
 }
 
-/// The blocks that are in no flow: the ones no link reaches and that live
-/// in the root of the model.
+/// The blocks that are drawn in a grid beside the flow: the ones no link
+/// reaches and that live in the root of the model.
 ///
 /// The blocks inside a container are not here: they stay with the container
-/// that owns them, and the frame of the container grows to hold them.
-fn free_blocks(model: &GmdlModel, root: u32, edges: &[(u32, u32)]) -> Vec<u32> {
-    let mut free: Vec<u32> = model
+/// that owns them, and the frame of the container grows to hold them. A
+/// container that holds nothing is here all the same: it is a block with no
+/// flow in it.
+fn grid_blocks(
+    model: &GmdlModel,
+    root: u32,
+    edges: &[(u32, u32)],
+    holders: &HashSet<u32>,
+) -> Vec<u32> {
+    let mut grid: Vec<u32> = model
         .blocks
         .iter()
-        .filter(|block| block.id != root && !block.is_container() && block.owner == root)
+        .filter(|block| block.id != root && block.owner == root)
+        .filter(|block| !holders.contains(&block.id))
         .filter(|block| !edges.iter().any(|(from, to)| *from == block.id || *to == block.id))
         .map(|block| block.id)
         .collect();
-    free.sort_unstable();
-    free
+    grid.sort_unstable();
+    grid
 }
 
 /// The size of a block: the one its model carries, or the default one.
@@ -356,7 +342,7 @@ fn entity_of(model: &GmdlModel, root: u32, id: u32) -> u32 {
     }
 }
 
-/// The component of every block of the flow.
+/// The component of every entity of the flow.
 ///
 /// The flow of a model is often several chains that meet nowhere. Each one
 /// of them is a component.
@@ -400,6 +386,27 @@ fn entities_of(model: &GmdlModel, root: u32) -> HashMap<u32, u32> {
         .collect()
 }
 
+/// The component of every block of the flow.
+///
+/// The blocks of a container are one entity: they move together, and they
+/// belong to the same chain of the flow.
+fn block_components(
+    model: &GmdlModel,
+    root: u32,
+    edges: &[(u32, u32)],
+) -> (HashMap<u32, u32>, HashMap<u32, usize>) {
+    let entities = entities_of(model, root);
+    // The flow between the entities: two blocks of the same container are
+    // one entity, and they move together.
+    let entity_edges: Vec<(u32, u32)> = edges
+        .iter()
+        .filter_map(|(from, to)| Some((entities.get(from)?, entities.get(to)?)))
+        .map(|(from, to)| (*from, *to))
+        .collect();
+    let components = components_of(&entity_edges);
+    (entities, components)
+}
+
 /// Put the components of the flow at the same height.
 ///
 /// Every source of the flow starts the picture: the reader sees all of them
@@ -413,15 +420,7 @@ fn align_components(
     positions: &mut [Position],
     edges: &[(u32, u32)],
 ) {
-    let entities = entities_of(model, root);
-    // The flow between the entities: two blocks of the same container are
-    // one entity, and they move together.
-    let entity_edges: Vec<(u32, u32)> = edges
-        .iter()
-        .filter_map(|(from, to)| Some((entities.get(from)?, entities.get(to)?)))
-        .map(|(from, to)| (*from, *to))
-        .collect();
-    let component = components_of(&entity_edges);
+    let (entities, component) = block_components(model, root, edges);
     if component.is_empty() {
         return;
     }
@@ -454,6 +453,146 @@ fn align_components(
         };
         if let Some(shift) = shifts.get(id) {
             position.y += shift;
+        }
+    }
+}
+
+/// The box of every component of the flow: the blocks it holds and the
+/// frames of the containers it holds.
+///
+/// A container is drawn around the blocks it holds, so the frame of the
+/// container is what the component occupies on the canvas.
+fn component_boxes(
+    model: &GmdlModel,
+    root: u32,
+    positions: &[Position],
+    entities: &HashMap<u32, u32>,
+    components: &HashMap<u32, usize>,
+) -> HashMap<usize, (i32, i32, i32, i32)> {
+    let frames = frames_of(model, root, positions);
+    let mut boxes: HashMap<usize, (i32, i32, i32, i32)> = HashMap::new();
+    for position in positions {
+        let Some(entity) = entities.get(&position.id) else {
+            continue;
+        };
+        let Some(component) = components.get(entity) else {
+            continue;
+        };
+        let rect = match model.block(position.id) {
+            Some(block) if block.is_container() => frames.get(&position.id).copied(),
+            _ => Some((
+                position.x,
+                position.y,
+                position.width.unwrap_or(DEFAULT_WIDTH),
+                position.height.unwrap_or(DEFAULT_HEIGHT),
+            )),
+        };
+        let Some((x, y, width, height)) = rect else {
+            continue;
+        };
+        boxes
+            .entry(*component)
+            .and_modify(|corners| {
+                corners.0 = corners.0.min(x);
+                corners.1 = corners.1.min(y);
+                corners.2 = corners.2.max(x + width);
+                corners.3 = corners.3.max(y + height);
+            })
+            .or_insert((x, y, x + width, y + height));
+    }
+    boxes
+}
+
+/// Move the components of the flow that share the canvas apart.
+///
+/// The crate the composition uses does not separate the chains of the flow
+/// that meet nowhere: two of them can end up in the same columns. The chains
+/// that start the picture together have to move apart, or one of them lands
+/// on top of the other. The picture grows only where it has to.
+fn separate_components(
+    model: &GmdlModel,
+    root: u32,
+    positions: &mut [Position],
+    edges: &[(u32, u32)],
+) {
+    let (entities, components) = block_components(model, root, edges);
+    if components.is_empty() {
+        return;
+    }
+    let boxes = component_boxes(model, root, positions, &entities, &components);
+    // The components, from left to right.
+    let mut order: Vec<usize> = boxes.keys().copied().collect();
+    order.sort_by_key(|id| (boxes[id].0, boxes[id].1, *id));
+    // The shift of every component: the one that overlaps a component that
+    // is already placed moves to the right of it.
+    let mut shifts: HashMap<usize, i32> = HashMap::new();
+    for (index, id) in order.iter().enumerate() {
+        let (left, top, right, bottom) = boxes[id];
+        let mut shift = 0;
+        for other in order.iter().take(index) {
+            let (other_left, other_top, other_right, other_bottom) = boxes[other];
+            let other_shift = shifts.get(other).copied().unwrap_or(0);
+            let (other_left, other_right) = (other_left + other_shift, other_right + other_shift);
+            if left + shift >= other_right
+                || other_left >= right + shift
+                || top >= other_bottom
+                || other_top >= bottom
+            {
+                continue;
+            }
+            shift = shift.max(other_right + GAP_X - (left + shift));
+        }
+        if shift != 0 {
+            shifts.insert(*id, shift);
+        }
+    }
+    if shifts.is_empty() {
+        return;
+    }
+    for position in positions.iter_mut() {
+        let Some(entity) = entities.get(&position.id) else {
+            continue;
+        };
+        let Some(component) = components.get(entity) else {
+            continue;
+        };
+        if let Some(shift) = shifts.get(component) {
+            position.x += shift;
+        }
+    }
+}
+
+/// Put the frame of every container on the canvas.
+///
+/// The frame of a container is the box of the blocks it holds, with the
+/// margin that separates them. The frame follows the blocks: a container
+/// that moves apart from them no longer holds them.
+fn place_frames(model: &GmdlModel, root: u32, positions: &mut Vec<Position>) {
+    let frames = frames_of(model, root, positions);
+    for block in &model.blocks {
+        if !block.is_container() || block.id == root {
+            continue;
+        }
+        let Some((x, y, width, height)) = frames.get(&block.id).copied() else {
+            continue;
+        };
+        match positions
+            .iter_mut()
+            .find(|position| position.id == block.id)
+        {
+            Some(position) => {
+                position.x = x;
+                position.y = y;
+                position.width = Some(width);
+                position.height = Some(height);
+            }
+            None => positions.push(Position {
+                id: block.id,
+                x,
+                y,
+                width: Some(width),
+                height: Some(height),
+            }),
         }
     }
 }
@@ -509,18 +648,20 @@ impl FreeGrid {
 /// The blocks that no link reaches have no place in the flow: they go in a
 /// grid, and the shape of the grid and the side it goes are the ones that
 /// leave the picture as square as possible.
-fn place_free(positions: &mut Vec<Position>, model: &GmdlModel, free: &[u32]) {
+///
+/// Every column of the grid is as wide as the widest block of it, and every
+/// row as tall as the tallest block of it: a block that is small does not
+/// make the grid bigger.
+fn place_free(positions: &mut [Position], model: &GmdlModel, free: &[u32]) {
     if free.is_empty() {
         return;
     }
-    // The size of the cells of the grid: the biggest of the free blocks.
-    let mut cell_width = 0;
-    let mut cell_height = 0;
-    for id in free {
-        let (width, height) = size_of(model, *id);
-        cell_width = cell_width.max(width);
-        cell_height = cell_height.max(height);
-    }
+    // The size of every block of the grid.
+    let mut order: Vec<(u32, i32, i32)> = free
+        .iter()
+        .map(|id| (*id, size_of(model, *id).0, size_of(model, *id).1))
+        .collect();
+    let sizes: Vec<(i32, i32)> = order.iter().map(|(_, width, height)| (*width, *height)).collect();
     // The box of everything else: the flow and the frames around it.
     let flow = box_of(
         positions
@@ -532,8 +673,7 @@ fn place_free(positions: &mut Vec<Position>, model: &GmdlModel, free: &[u32]) {
     let mut best: Option<FreeGrid> = None;
     for columns in 1..=free.len() {
         let rows = free.len().div_ceil(columns);
-        let width = columns as i32 * (cell_width + GAP_X) - GAP_X;
-        let height = rows as i32 * (cell_height + GAP_Y) - GAP_Y;
+        let (width, height, _) = grid_of(&sizes, columns, rows);
         for side in [Side::Left, Side::Above] {
             let (total_width, total_height) = match (&flow, side) {
                 (None, _) => (width, height),
@@ -554,7 +694,7 @@ fn place_free(positions: &mut Vec<Position>, model: &GmdlModel, free: &[u32]) {
                 total_width,
                 total_height,
             };
-            if best.as_ref().map_or(true, |other| candidate.squarer_than(other)) {
+            if best.as_ref().is_none_or(|other| candidate.squarer_than(other)) {
                 best = Some(candidate);
             }
         }
@@ -568,15 +708,52 @@ fn place_free(positions: &mut Vec<Position>, model: &GmdlModel, free: &[u32]) {
         (Some((left, top, _, _)), Side::Above) => (*left, *top - GAP_Y - grid.height),
         (None, _) => (0, 0),
     };
-    for (index, id) in free.iter().enumerate() {
+    let rows = free.len().div_ceil(grid.columns);
+    let (_, _, offsets) = grid_of(&sizes, grid.columns, rows);
+    for (index, (id, _, _)) in order.iter().enumerate() {
         let column = index % grid.columns;
         let row = index / grid.columns;
         let Some(position) = positions.iter_mut().find(|position| position.id == *id) else {
             continue;
         };
-        position.x = origin_x + column as i32 * (cell_width + GAP_X);
-        position.y = origin_y + row as i32 * (cell_height + GAP_Y);
+        position.x = origin_x + offsets.0[column];
+        position.y = origin_y + offsets.1[row];
     }
+}
+
+/// The shape of a grid of blocks: its width, its height, and the place of
+/// every column and every row inside it.
+///
+/// A column is as wide as the widest block of it, and a row as tall as the
+/// tallest block of it.
+fn grid_of(
+    sizes: &[(i32, i32)],
+    columns: usize,
+    rows: usize,
+) -> (i32, i32, (Vec<i32>, Vec<i32>)) {
+    let mut column_widths = vec![0; columns];
+    let mut row_heights = vec![0; rows];
+    for (index, (width, height)) in sizes.iter().enumerate() {
+        let column = index % columns;
+        let row = index / columns;
+        column_widths[column] = column_widths[column].max(*width);
+        row_heights[row] = row_heights[row].max(*height);
+    }
+    let mut column_offsets = Vec::with_capacity(columns);
+    let mut x = 0;
+    for width in &column_widths {
+        column_offsets.push(x);
+        x += width + GAP_X;
+    }
+    let mut row_offsets = Vec::with_capacity(rows);
+    let mut y = 0;
+    for height in &row_heights {
+        row_offsets.push(y);
+        y += height + GAP_Y;
+    }
+    let width: i32 = column_widths.iter().sum::<i32>() + (columns as i32 - 1) * GAP_X;
+    let height: i32 = row_heights.iter().sum::<i32>() + (rows as i32 - 1) * GAP_Y;
+    (width, height, (column_offsets, row_offsets))
 }
 
 /// The box that holds a set of positions: its corners.
@@ -638,7 +815,8 @@ fn frames_of(
 /// that separates them.
 ///
 /// A container that holds another container holds that container's frame, so
-/// the frames are taken from the innermost out.
+/// the frames are taken from the innermost out. A container that holds
+/// nothing has no frame around it: the frame is the container itself.
 fn frame_of(
     container: u32,
     model: &GmdlModel,
@@ -651,6 +829,14 @@ fn frame_of(
         .filter(|block| block.owner == container && block.id != container)
         .map(|block| block.id)
         .collect();
+    if children.is_empty() {
+        // A container that holds nothing is a box of its own: the frame is
+        // the container, without a margin around it.
+        let (x1, y1, x2, y2) = boxes.get(&container).copied()?;
+        let frame = (x1, y1, x2 - x1, y2 - y1);
+        frames.insert(container, frame);
+        return Some(frame);
+    }
     let mut box_of: Option<(i32, i32, i32, i32)> = None;
     for child in children {
         let corners = match frames.get(&child) {

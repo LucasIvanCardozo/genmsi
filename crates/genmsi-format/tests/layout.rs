@@ -137,6 +137,34 @@ fn a_container_grows_to_hold_the_blocks_it_owns() {
 }
 
 #[test]
+fn the_blocks_that_no_link_reaches_are_at_the_top() {
+    // A model with a chain and a block that is in no flow: the block that is
+    // in no flow starts the picture, it does not finish it.
+    let text = "<gmodel versioncode=\"1\"><gclasses/><modules>\
+         <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\">\
+         <links><link frommoduleid=\"2\" fromioid=\"1\" tomoduleid=\"3\" toioid=\"1\"/></links><inputs/><outputs/></module>\
+         <module moduleid=\"1\" moduleclass=\"Note\" owner=\"0\" caption=\"Nota\" name=\"Nota\" kind=\"A\">\
+         <inputs/><outputs/><props/></module>\
+         <module moduleid=\"2\" moduleclass=\"Clock\" owner=\"0\" caption=\"Clock\" name=\"Clock\" kind=\"A\">\
+         <outputs><output ioid=\"1\" name=\"Salida1\" caption=\"\" mylabel=\"L1\"/></outputs>\
+         <props/></module>\
+         <module moduleid=\"3\" moduleclass=\"Terminate\" owner=\"0\" caption=\"Terminate\" name=\"Terminate\" kind=\"A\">\
+         <inputs><input ioid=\"1\" name=\"Entrada1\" caption=\"\" mylabel=\"L1\"/></inputs>\
+         <props/></module>\
+         </modules></gmodel>";
+    let mut model = genmsi_format::parse_str(text).expect("the model parses");
+    compose_incomplete(&mut model).expect("composed");
+    let (_, y_note, _, _) = layout_of(&model, 1).expect("placed");
+    let (_, y_clock, _, _) = layout_of(&model, 2).expect("placed");
+    let (_, y_terminate, _, _) = layout_of(&model, 3).expect("placed");
+    // The note starts the picture: it is above the flow.
+    assert!(
+        y_note < y_clock && y_clock < y_terminate,
+        "the note starts the picture: {y_note}, the flow: {y_clock}, {y_terminate}"
+    );
+}
+
+#[test]
 fn the_blocks_follow_the_flow_across_the_border_of_a_container() {
     // Two containers, and a link that goes from the block of one to the
     // block of the other: the flow crosses the border, and the containers

@@ -166,6 +166,40 @@ fn compose_with(model: &GmdlModel, root: u32, ranker: Ranker) -> Vec<Position> {
             height: Some(height),
         });
     }
+    // The blocks that no link reaches have no place in the flow: dagre
+    // leaves them without a rank and puts them in the last row, at the
+    // bottom of the picture. They go to the first row instead, at the top:
+    // the picture starts with them and the flow goes down from there.
+    let edges = flow::flow_edges_for(model);
+    let orphans: Vec<u32> = model
+        .blocks
+        .iter()
+        .filter(|block| block.id != root && !block.is_container())
+        .filter(|block| block.owner == root)
+        .filter(|block| !edges.iter().any(|(from, to)| *from == block.id || *to == block.id))
+        .map(|block| block.id)
+        .collect();
+    if !orphans.is_empty() {
+        let flow_blocks: Vec<&Position> = positions
+            .iter()
+            .filter(|position| !orphans.contains(&position.id))
+            .collect();
+        let first = flow_blocks.iter().map(|position| position.y).min().unwrap_or(0);
+        // The row of the blocks that are in no flow: the tallest of them, so
+        // the row above the flow is free of them.
+        let height = positions
+            .iter()
+            .filter(|position| orphans.contains(&position.id))
+            .map(|position| position.height.unwrap_or(DEFAULT_HEIGHT))
+            .max()
+            .unwrap_or(DEFAULT_HEIGHT)
+            + GAP_Y;
+        for position in &mut positions {
+            if orphans.contains(&position.id) {
+                position.y = first - height - GAP_Y;
+            }
+        }
+    }
     // The containers: the frame of each one is the box of the blocks it
     // holds, with the margin that separates them. The frames are computed
     // from the innermost out.

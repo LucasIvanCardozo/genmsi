@@ -147,6 +147,9 @@ pub fn measure(model: &GmdlModel, positions: &[Position]) -> Composition {
                 continue;
             }
             if rects[first].intersects(&rects[second]) {
+                if std::env::var("GENMSI_DEBUG_OVERLAPS").is_ok() {
+                    eprintln!("SOLAPE {first} {:?} y {second} {:?}", rects[first], rects[second]);
+                }
                 measure.overlaps += 1;
             }
         }

@@ -619,3 +619,26 @@ El criterio de S9 (menos de la mitad de los cruces) ya no lo cumple el árbol
 apretado (352 contra 383 de la línea base): el criterio que manda ahora es el
 de la lectura. Queda dicho, y el otro rango sigue a una línea de distancia
 (`Ranker::NetworkSimplex`) por si el lector prefiera la imagen compacta.
+
+### L20 — El "flex end": los bloques que están en ningún flujo
+
+El usuario probó la app con `modelocomedor.gmdl` (el modelo de la Facultad) y
+dijo que el reacomodamiento dejaba las cosas "como flex end, cuando debería
+ser flex start".
+
+La causa está en el crate: **los bloques que ningún enlace alcanza no reciben
+rango** (el recorrido del crate no los visita) y dagre los deja en la
+**última fila**, o sea, al final de la imagen. Eran las notas del modelo
+(los bloques 1 a 18, sin un solo enlace): la hilera larga que se veía **abajo**.
+
+La corrección (L20, `cfd14f3`): los bloques que están en ningún flujo y viven
+en la raíz van a la **primera fila**, arriba del flujo, con su propia fila. Los
+que viven dentro de un contenedor se quedan con él (moverlos rompería el marco
+de su contenedor).
+
+La medida no cambia: 1 bloque pisado, 0 fuera de su contenedor, 276 cruces y
+225 enlaces por encima de un bloque.
+
+De paso se volvió al **network simplex**: los rangos son los mismos que con el
+árbol apretado (el corte de filas es la profundidad del flujo), pero cruza 76
+enlaces menos (`80f687f`).

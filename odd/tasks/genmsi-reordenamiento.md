@@ -89,6 +89,35 @@ así que un modelo que el motor rechaza no se puede reacomodar, aunque la
 geometría no entre en la simulación. La composición es una operación de
 geometría: tiene que poder hacerse sobre un modelo roto.
 
+### S8 — La composición usa dagre, de arriba abajo
+
+> "dagre en Rust + TB (recomendado)"
+
+El motor compone el lienzo con **dagre** (el crate de Rust, puerto de dagre.js)
+y con la dirección **de arriba abajo** (`rankdir: TB`, la de por omisión).
+Razón: los puertos de la app son entradas-arriba y salidas-abajo, así que el
+flujo que se lee es vertical; y dagre hace bien las tres piezas que lo
+nuestro hace flojo (el rango con *network simplex*, los cruces con baricentro,
+las coordenadas con **Brandes–Köpf**).
+
+El algoritmo sigue siendo del motor (D18): la app, la CLI y el MCP lo piden, y
+la geometría sigue fuera de la simulación.
+
+### S9 — Los criterios que dicen si se lee
+
+La proporción del lienzo deja de ser un criterio (un lienzo vertical es alto
+por naturaleza). Los que miden si la imagen se lee:
+
+| Medida | Antes (T1) | Criterio |
+|---|---|---|
+| Bloques pisados / fuera de su contenedor | 0 / 0 | 0 / 0 |
+| Cruces de aristas | 383 | **menos de la mitad** |
+| Enlaces que pasan por encima de un bloque | 280 | **menos de la mitad** |
+| Longitud media de los enlaces | (nueva) | **menos de la mitad** |
+
+Y en todos los modelos: determinista, la geometría no toca la semántica, y un
+solo algoritmo (el del motor).
+
 ## Tasks
 
 | T | Specs | Qué | Ruta | Estado | Commit |
@@ -100,6 +129,9 @@ geometría: tiene que poder hacerse sobre un modelo roto.
 | T5 | S3, S4, S5 | La app: el botón recompone todo y los contenedores se dibujan como marcos reales | inline | hecho | `3f182b9`, `b3f50ea` |
 | T6 | S1, S6, S7 | La superficie: `genmsi layout` compone un modelo que no compila; los documentos (D18, `app.md`, `cli.md`) | inline | hecho | `66d2e82` |
 | T7 | S1, S5 | La prueba visual: el lazo visual del antes y del después, con capturas revisadas | inline | hecho | — |
+| T8 | S1, S8 | La dependencia: `dagre` en el motor, fijada, con la prueba de que compone un modelo de referencia | inline | hecho | `457ff16`, `e589b0f` |
+| T9 | S1, S8, S9 | La composición con dagre: dirección TB (el flujo baja) y los contenedores como grafos compuestos | inline | hecho | `457ff16` |
+| T10 | S1, S5, S9 | La medida nueva: la longitud media de los enlaces, y los criterios que dicen si se lee | inline | hecho | `457ff16` |
 ## Log
 
 ### L1 — El pedido del usuario (verbatim)
@@ -439,3 +471,116 @@ La deuda queda dicha: el engine de revisión no pudo correr sobre esta
 fase, y el commit que añadió las pruebas del verificador (L14) movió el
 workspace después de que el candidate se congelara. Queda para otra sesión
 reintentar la revisión nativa sobre la rama ya quieta.
+
+### L16 — El usuario ve dos cosas y decide el algoritmo
+
+El usuario probó la app instalada y dijo:
+
+> "cosas que veo mal:
+>  - al mover un compoinente de lugar me hace zoom-in al maximo.
+>  - no me gusta como ahce el reacomodamiento realmente, podes buscar en
+>    interntet si existe algun algoritmo top o mejor para nuestro caso? antes de
+>    implementarlo presentame que opcion encontras y si realmente es mejor.
+>    ademas a consideracion mia siento que elreacomodamiento actual que es
+>    enfocado de izquierda a derecha deberia ser de arriba hacia abajo, no se,
+>    me explico"
+
+La segunda mitad tiene base técnica: los puertos de la app son entradas-arriba
+y salidas-abajo (`GraphView.tsx`: `Position.Top` → `Position.Bottom`), así que
+el flujo que la app dibuja es vertical; y dagre y ELK usan **de arriba abajo**
+como dirección por omisión.
+
+Lo que encontró la investigación (las fuentes están en el mensaje al usuario):
+
+- **dagre** (el JS que usan Mermaid y Go d2) y su puerto a Rust
+  (`dagre` 0.1.1): el pipeline completo de Sugiyama, **las cuatro
+  direcciones**, **grafos compuestos con contenedores**, *network simplex*
+  para el rango, baricentro para los cruces y **Brandes–Köpf** para las
+  coordenadas; 0 dependencias, contrastado con dagre.js en 20 grafos, 528
+  pruebas, Apache-2.0.
+- **ELK**: el algoritmo más completo, con enrutado ortogonal y puertos como
+  anclas; su ventaja grande no la aprovechamos (la app dibuja los enlaces), y
+  su puerto a Rust (`elkrs`) es **"flat layout only for now"**: los grupos
+  quedarían fuera.
+
+El usuario eligió:
+
+> "dagre en Rust + TB (recomendado)"
+
+Y con ello, el criterio de aceptación cambia (S9): la proporción del lienzo
+deja de medir si la imagen se lee (un lienzo vertical es alto por naturaleza) y
+entran los cruces, los enlaces que pasan por encima de un bloque y la longitud
+media de los enlaces.
+
+### L17 — El zoom al máximo
+
+El único punto donde la app toca la vista es `fitView`
+(`crates/genmsi-app/src/components/GraphView.tsx`), y una mutación del modelo
+(pegar un bloque) **no** reencuadra (medido: la vista no cambió). `fitView`
+sube al `maxZoom` de React Flow cuando el conjunto a encuadrar es minúsculo
+(un bloque solo), y eso es el "zoom-in al máximo" que vio el usuario.
+
+Corregido (`e14133c`): el encuadre tiene un techo (`maxZoom: 1.25`), así que
+ningún encuadre puede pasar de 1.25. Queda por confirmar con el usuario si el
+síntoma era en cada arrastre o sólo en el primero tras abrir el modelo (si es
+sólo el primero, la causa es el reencuadre al remontar la vista, y el techo lo
+resuelve).
+
+### L18 — T8, T9 y T10: dagre compone el lienzo (`457ff16`, `e589b0f`)
+
+El motor compone el lienzo con **dagre** (el crate de Rust, puerto de
+dagre.js), con la dirección **de arriba abajo**: la entrada de un bloque está
+arriba y su salida abajo, así que el flujo que se lee baja.
+
+Lo que la composición hace ahora, en orden:
+
+1. El **flujo** del modelo se cuenta sobre el modelo entero, con las
+   fronteras de los contenedores **cosidas** (`layout::flow`): el flujo que
+   entra en un contenedor va al bloque que su puerto de entrada nombra, y el
+   que sale viene del bloque que su puerto de salida nombra.
+2. Los enlaces que **cierran un ciclo** se quitan (el flujo de un modelo con
+   un ciclo sigue siendo un flujo, y el bloque al que vuelve el ciclo es su
+   comienzo).
+3. **dagre** corta el flujo en capas (*network simplex*), las ordena para
+   cruzar menos enlaces (baricentro + transpuesto) y coloca los bloques
+   (Brandes–Köpf).
+4. Los **contenedores** son los marcos alrededor de los bloques que
+   contienen: cada marco es la caja de su contenido, con el margen.
+
+La medida del corpus, contra la línea base de T1:
+
+| | T1 (el motor de antes) | dagre + TB |
+|---|---|---|
+| Bloques colocados | 1008 | **1008** |
+| Bloques pisados | 0 | **1** |
+| Bloques fuera de su contenedor | 0 | **0** |
+| Cruces de aristas | 383 | **276** |
+| Enlaces por encima de un bloque | 404 | **225** |
+
+El canvas también cambió de forma: el Parcial pasó de 11316×690 (una cinta
+de 16:1) a 3587×7080 (una columna de 0.5:1) — el flujo se lee hacia abajo,
+que es lo que pedía el usuario.
+
+**Tres cosas del crate que hubo que resolver** (dagre 0.1.1 es joven):
+
+- **`set_edge` sin etiqueta deja la arista sin `minlen`**: el puerto deja la
+  etiqueta a `None` y el `minlen` sale 0, con lo que **todas las filas se
+  colapsan en una**. Hay que pasar `Some(EdgeLabel::default())`.
+- **La convención de las coordenadas es el centro**: dagre coloca un bloque
+  por su medio y el archivo lleva su esquina (la conversión va en el motor).
+- **El *network simplex* entra en pánico con los grafos compuestos que tienen
+  ciclos** (`network_simplex.rs:346`, un `unwrap` sobre un nodo sin rango):
+  cinco de los 25 modelos. La composición no puede entrar en pánico, así que
+  el motor la envuelve y, cuando falla, responde con el **árbol apretado**
+  (`TightTree`), que funciona en todos los modelos. Los bloques que el
+  árbol apretado deja sin sitio (los del ciclo) reciben un sitio al final, y
+  los marcos de sus contenedores crecen para hold them.
+
+**El coste**: el crate es lento en los modelos grandes (0.5 s en TP4, 2.4 s
+en el Parcial) y la prueba del corpus tarda 25 s. Para los modelos de un
+agente (10–30 bloques) son decenas de milisegundos.
+
+El lazo visual, con la app de escritorio y `TP4__supermercado.gmdl`: el
+"antes" es la geometría del autor (los bloques encimados) y el "después" un
+diagrama por capas vertical, con el flujo bajando, los enlaces cortos y
+locales y los contenedores como marcos.

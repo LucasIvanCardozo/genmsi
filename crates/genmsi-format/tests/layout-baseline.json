@@ -3,80 +3,80 @@
     {
       "from_scratch": {
         "blocks": 107,
-        "crossings": 140,
-        "edge_length": 798.2378153724965,
+        "crossings": 112,
+        "edge_length": 586.6896852359537,
         "edges": 123,
-        "height": 6768,
+        "height": 7080,
         "isolated": 18,
         "outside": 0,
-        "over_blocks": 47,
+        "over_blocks": 36,
         "overlaps": 0,
-        "width": 5423
+        "width": 3587
       },
       "model": "Parcial 6-11-23__Veron - Parcial.gmdl",
       "recomposed": {
         "blocks": 107,
-        "crossings": 136,
-        "edge_length": 782.1969601331048,
+        "crossings": 116,
+        "edge_length": 613.2494918277278,
         "edges": 123,
-        "height": 6735,
+        "height": 7157,
         "isolated": 18,
         "outside": 0,
-        "over_blocks": 47,
+        "over_blocks": 36,
         "overlaps": 0,
-        "width": 4978
+        "width": 3716
       }
     },
     {
       "from_scratch": {
         "blocks": 81,
-        "crossings": 35,
-        "edge_length": 368.7856253575006,
+        "crossings": 25,
+        "edge_length": 256.61472962530536,
         "edges": 74,
-        "height": 1806,
+        "height": 1836,
         "isolated": 13,
         "outside": 0,
-        "over_blocks": 16,
+        "over_blocks": 17,
         "overlaps": 0,
-        "width": 4118
+        "width": 3583
       },
       "model": "Parcial 8-11-21__ParcialMikelModelos.gmdl",
       "recomposed": {
         "blocks": 81,
-        "crossings": 37,
-        "edge_length": 383.0036533626391,
+        "crossings": 26,
+        "edge_length": 268.59376926657194,
         "edges": 74,
-        "height": 1927,
+        "height": 1997,
         "isolated": 13,
         "outside": 0,
-        "over_blocks": 15,
+        "over_blocks": 16,
         "overlaps": 0,
-        "width": 3764
+        "width": 3257
       }
     },
     {
       "from_scratch": {
         "blocks": 95,
-        "crossings": 11,
-        "edge_length": 751.2397995499018,
+        "crossings": 10,
+        "edge_length": 747.0210511870348,
         "edges": 44,
         "height": 1758,
         "isolated": 58,
         "outside": 0,
-        "over_blocks": 13,
+        "over_blocks": 11,
         "overlaps": 0,
         "width": 9174
       },
       "model": "Problema 1__semaforo-1.gmdl",
       "recomposed": {
         "blocks": 95,
-        "crossings": 17,
-        "edge_length": 688.4424725927215,
+        "crossings": 16,
+        "edge_length": 681.2842477631036,
         "edges": 44,
-        "height": 1810,
+        "height": 1800,
         "isolated": 58,
         "outside": 0,
-        "over_blocks": 12,
+        "over_blocks": 10,
         "overlaps": 0,
         "width": 8077
       }
@@ -111,136 +111,136 @@
     {
       "from_scratch": {
         "blocks": 86,
-        "crossings": 37,
-        "edge_length": 483.3223790771349,
+        "crossings": 3,
+        "edge_length": 287.196146759752,
         "edges": 84,
-        "height": 3192,
+        "height": 3378,
         "isolated": 15,
         "outside": 0,
-        "over_blocks": 22,
+        "over_blocks": 18,
         "overlaps": 0,
-        "width": 4098
+        "width": 3178
       },
       "model": "TP10__tp10.gmdl",
       "recomposed": {
         "blocks": 86,
-        "crossings": 41,
-        "edge_length": 500.26536312755326,
+        "crossings": 7,
+        "edge_length": 321.53713052131195,
         "edges": 84,
-        "height": 3375,
+        "height": 3627,
         "isolated": 15,
         "outside": 0,
-        "over_blocks": 22,
+        "over_blocks": 18,
         "overlaps": 0,
-        "width": 4325
+        "width": 3731
       }
     },
     {
       "from_scratch": {
         "blocks": 39,
-        "crossings": 15,
-        "edge_length": 388.30613070139,
+        "crossings": 20,
+        "edge_length": 360.58780838941107,
         "edges": 41,
-        "height": 2058,
+        "height": 2154,
         "isolated": 7,
         "outside": 0,
-        "over_blocks": 17,
+        "over_blocks": 15,
         "overlaps": 0,
-        "width": 2252
+        "width": 1763
       },
       "model": "TP2__problema1.gmdl",
       "recomposed": {
         "blocks": 39,
-        "crossings": 14,
-        "edge_length": 376.1001144775865,
+        "crossings": 13,
+        "edge_length": 368.3395372468394,
         "edges": 41,
-        "height": 2047,
+        "height": 2178,
         "isolated": 7,
         "outside": 0,
-        "over_blocks": 17,
+        "over_blocks": 14,
         "overlaps": 0,
-        "width": 2149
+        "width": 1752
       }
     },
     {
       "from_scratch": {
         "blocks": 88,
-        "crossings": 20,
-        "edge_length": 428.8883824372717,
+        "crossings": 9,
+        "edge_length": 209.93643644870465,
         "edges": 93,
-        "height": 4062,
+        "height": 4212,
         "isolated": 9,
         "outside": 0,
-        "over_blocks": 28,
+        "over_blocks": 30,
         "overlaps": 0,
-        "width": 3133
+        "width": 1641
       },
       "model": "TP3__aeropuerto.gmdl",
       "recomposed": {
         "blocks": 88,
-        "crossings": 27,
-        "edge_length": 455.9484534745462,
+        "crossings": 12,
+        "edge_length": 226.66870072765607,
         "edges": 93,
-        "height": 4041,
+        "height": 4273,
         "isolated": 9,
         "outside": 0,
-        "over_blocks": 25,
+        "over_blocks": 27,
         "overlaps": 0,
-        "width": 3755
+        "width": 2034
       }
     },
     {
       "from_scratch": {
         "blocks": 81,
-        "crossings": 40,
-        "edge_length": 692.9958265610289,
+        "crossings": 22,
+        "edge_length": 366.8689660846376,
         "edges": 64,
-        "height": 4038,
+        "height": 4326,
         "isolated": 25,
         "outside": 0,
-        "over_blocks": 23,
+        "over_blocks": 24,
         "overlaps": 0,
-        "width": 4733
+        "width": 2732
       },
       "model": "TP4__supermercado.gmdl",
       "recomposed": {
         "blocks": 81,
-        "crossings": 40,
-        "edge_length": 688.8236767882711,
+        "crossings": 22,
+        "edge_length": 374.61196983161193,
         "edges": 64,
-        "height": 3871,
+        "height": 4410,
         "isolated": 25,
         "outside": 0,
-        "over_blocks": 22,
+        "over_blocks": 25,
         "overlaps": 0,
-        "width": 4936
+        "width": 2831
       }
     },
     {
       "from_scratch": {
         "blocks": 51,
-        "crossings": 18,
-        "edge_length": 469.89879690153026,
+        "crossings": 28,
+        "edge_length": 397.70268657424293,
         "edges": 49,
-        "height": 3264,
+        "height": 3366,
         "isolated": 12,
         "outside": 0,
-        "over_blocks": 11,
+        "over_blocks": 15,
         "overlaps": 0,
-        "width": 2612
+        "width": 1640
       },
       "model": "TP5__burgerShop.gmdl",
       "recomposed": {
         "blocks": 51,
-        "crossings": 18,
-        "edge_length": 482.5247648937111,
+        "crossings": 31,
+        "edge_length": 414.2821702663717,
         "edges": 49,
-        "height": 3143,
+        "height": 3333,
         "isolated": 12,
         "outside": 0,
-        "over_blocks": 12,
+        "over_blocks": 16,
         "overlaps": 0,
-        "width": 3001
+        "width": 1849
       }
     },
     {
@@ -382,7 +382,7 @@
       "from_scratch": {
         "blocks": 17,
         "crossings": 0,
-        "edge_length": 164.76492600991884,
+        "edge_length": 128.41446068063405,
         "edges": 13,
         "height": 588,
         "isolated": 2,
@@ -395,14 +395,14 @@
       "recomposed": {
         "blocks": 17,
         "crossings": 0,
-        "edge_length": 155.28991406737342,
+        "edge_length": 132.649082689317,
         "edges": 13,
-        "height": 604,
+        "height": 636,
         "isolated": 2,
         "outside": 0,
         "over_blocks": 0,
         "overlaps": 0,
-        "width": 826
+        "width": 822
       }
     },
     {
@@ -435,28 +435,28 @@
     {
       "from_scratch": {
         "blocks": 82,
-        "crossings": 32,
-        "edge_length": 434.7628073163529,
+        "crossings": 43,
+        "edge_length": 273.39624977162777,
         "edges": 88,
-        "height": 2466,
+        "height": 3540,
         "isolated": 13,
         "outside": 0,
-        "over_blocks": 31,
+        "over_blocks": 34,
         "overlaps": 0,
-        "width": 4108
+        "width": 2118
       },
       "model": "TP8__mecanicos.gmdl",
       "recomposed": {
         "blocks": 82,
-        "crossings": 36,
-        "edge_length": 461.8915037688544,
+        "crossings": 46,
+        "edge_length": 295.55032558433936,
         "edges": 88,
-        "height": 2640,
+        "height": 3717,
         "isolated": 13,
         "outside": 0,
-        "over_blocks": 31,
+        "over_blocks": 36,
         "overlaps": 0,
-        "width": 4649
+        "width": 2342
       }
     },
     {
@@ -490,27 +490,27 @@
       "from_scratch": {
         "blocks": 67,
         "crossings": 3,
-        "edge_length": 226.9942744217456,
+        "edge_length": 214.57726882907136,
         "edges": 60,
-        "height": 1512,
+        "height": 1542,
         "isolated": 7,
         "outside": 0,
         "over_blocks": 12,
         "overlaps": 0,
-        "width": 3174
+        "width": 2838
       },
       "model": "TP9__tp9.gmdl",
       "recomposed": {
         "blocks": 67,
         "crossings": 3,
-        "edge_length": 234.3789235426011,
+        "edge_length": 223.2561971599251,
         "edges": 60,
-        "height": 1618,
+        "height": 1649,
         "isolated": 7,
         "outside": 0,
         "over_blocks": 10,
         "overlaps": 0,
-        "width": 3024
+        "width": 2729
       }
     },
     {
@@ -598,7 +598,7 @@
       "from_scratch": {
         "blocks": 13,
         "crossings": 0,
-        "edge_length": 216.747049364505,
+        "edge_length": 136.3542842651195,
         "edges": 11,
         "height": 1020,
         "isolated": 2,
@@ -611,14 +611,14 @@
       "recomposed": {
         "blocks": 13,
         "crossings": 0,
-        "edge_length": 193.10574755328182,
+        "edge_length": 138.10909620464233,
         "edges": 11,
-        "height": 1021,
+        "height": 1053,
         "isolated": 2,
         "outside": 0,
-        "over_blocks": 0,
+        "over_blocks": 1,
         "overlaps": 0,
-        "width": 474
+        "width": 439
       }
     },
     {
@@ -652,27 +652,27 @@
       "from_scratch": {
         "blocks": 37,
         "crossings": 0,
-        "edge_length": 307.66284337396013,
+        "edge_length": 166.57370935549494,
         "edges": 30,
         "height": 1428,
         "isolated": 9,
         "outside": 0,
         "over_blocks": 2,
         "overlaps": 0,
-        "width": 2300
+        "width": 2150
       },
       "model": "monorriel__monorriel.gmdl",
       "recomposed": {
         "blocks": 37,
         "crossings": 1,
-        "edge_length": 328.61509806151264,
+        "edge_length": 175.23961807342644,
         "edges": 30,
         "height": 1536,
         "isolated": 9,
         "outside": 0,
         "over_blocks": 3,
         "overlaps": 0,
-        "width": 2208
+        "width": 2056
       }
     }
   ],
@@ -680,25 +680,25 @@
   "totals": {
     "from_scratch": {
       "blocks": 1008,
-      "crossings": 352,
+      "crossings": 276,
       "edge_length": 0.0,
       "edges": 876,
       "height": 0,
       "isolated": 246,
       "outside": 0,
-      "over_blocks": 233,
+      "over_blocks": 225,
       "overlaps": 1,
       "width": 0
     },
     "recomposed": {
       "blocks": 1008,
-      "crossings": 373,
+      "crossings": 296,
       "edge_length": 0.0,
       "edges": 876,
       "height": 0,
       "isolated": 246,
       "outside": 0,
-      "over_blocks": 226,
+      "over_blocks": 222,
       "overlaps": 2,
       "width": 0
     }

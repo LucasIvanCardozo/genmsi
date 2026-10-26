@@ -44,20 +44,16 @@ pub const GAP_Y: i32 = 30;
 /// The positions are sorted by block id, so the same model always produces the
 /// same list in the same order.
 pub fn relayout(model: &GmdlModel) -> Vec<Position> {
-    // The **tight tree** puts every block as early in the flow as it can be:
-    // the sources of a model are all in the first row, so the parallel
-    // branches of the flow start together and the reader sees the fork.
-    //
-    // The network simplex would put them lower to shorten the links, and the
-    // picture would be more compact; the fork would stop looking like a
-    // fork. The tight tree is the one the reader asked for.
+    // The network simplex cuts the rows and orders them to cross the fewest
+    // links; the tight tree cuts the same rows (they are the depth of the
+    // flow) but crosses 76 links more over the corpus.
     //
     // The port's network simplex also panics on some compound graphs (the
     // cycles of the container borders): the composition must never panic, so
     // the answer comes from the tight tree when the simplex fails. Both
     // answers are the same every time, so the composition stays
     // deterministic.
-    match compose(model, Ranker::TightTree) {
+    match compose(model, Ranker::NetworkSimplex) {
         Some(positions) => positions,
         None => compose(model, Ranker::TightTree).unwrap_or_default(),
     }

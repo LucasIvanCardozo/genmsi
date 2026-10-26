@@ -584,3 +584,38 @@ El lazo visual, con la app de escritorio y `TP4__supermercado.gmdl`: el
 "antes" es la geometría del autor (los bloques encimados) y el "después" un
 diagrama por capas vertical, con el flujo bajando, los enlaces cortos y
 locales y los contenedores como marcos.
+
+### L19 — El flujo empieza arriba: el árbol apretado
+
+El usuario vio el lienzo reacomodado y dijo que los bloques estaban como
+"flex end" cuando deberían estar como "flex start": "esas tres columnas
+deberían estar empezando de arriba, no abajo".
+
+Tenía razón, y la causa no era de maquetación: el **network simplex** de dagre
+minimiza la longitud total de los enlaces, y para lograrlo **empuja los
+orígenes hacia abajo** (acortar un enlace pesa más que dejar las ramas
+alineadas). En la captura, la columna izquierda arrancaba más abajo que las
+otras dos porque ese nodo fuente lo había bajado el algoritmo.
+
+El rango que hace lo contrario es el **árbol apretado** (`TightTree`): cada
+bloque queda tan arriba en el flujo como puede estar, así que las fuentes de
+un modelo están todas en la primera fila y **las ramas paralelas del flujo
+arrancan juntas**: el lector ve el fork, no una secuencia.
+
+El coste (dicho con números, sobre el corpus):
+
+| | network simplex | árbol apretado |
+|---|---|---|
+| Cruces de aristas | **276** | 352 |
+| Enlaces por encima de un bloque | **225** | 233 |
+| Proporción del lienzo (TP8) | 0.6 | **1.7** |
+| Las ramas arrancan juntas | no | **sí** |
+
+Se eligió el árbol apretado: la lectura del flujo importa más que 76 cruces,
+y la imagen además queda más equilibrada (una proporción de 1.7 se parece a la
+del autor, 1.1, y la de 0.6 no).
+
+El criterio de S9 (menos de la mitad de los cruces) ya no lo cumple el árbol
+apretado (352 contra 383 de la línea base): el criterio que manda ahora es el
+de la lectura. Queda dicho, y el otro rango sigue a una línea de distancia
+(`Ranker::NetworkSimplex`) por si el lector prefiera la imagen compacta.

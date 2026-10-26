@@ -43,10 +43,10 @@ fn a_model_without_geometry_is_composed() {
     assert!(is_composed(&model));
 }
 
-/// Whether a place comes before another one in the reading order: a column
-/// first, and inside it, from top to bottom.
+/// Whether a place comes before another one in the reading order: the flow
+/// goes down, so the row comes first and, inside a row, the column.
 fn before(first: (i32, i32), second: (i32, i32)) -> bool {
-    first.0 < second.0 || (first.0 == second.0 && first.1 < second.1)
+    first.1 < second.1 || (first.1 == second.1 && first.0 < second.0)
 }
 
 #[test]

@@ -235,11 +235,18 @@ top and its output at its bottom, so the flow a reader follows goes down. The
 flow is counted over the whole model, with the borders of the containers
 spliced, so a link that crosses a container says where the flow goes.
 
+The layers are cut with the **tight tree**, not with the network simplex: the
+simplex minimises the length of the links and, to do it, pushes the sources
+down, so the parallel branches of a flow stop starting together and the reader
+no longer sees the fork. The tight tree leaves every block as early in the
+flow as it can be.
+
 The measure lives in the engine (`genmsi_format::measure`) and the corpus
 test compares the composition against a committed baseline: a change to the
 algorithm shows in the baseline as a change in the numbers. Against the first
-composition, the corpus went from 383 to 276 crossings and from 404 to 225
-links that pass over a block.
+composition, the corpus went from 383 to 352 crossings and from 404 to 233
+links that pass over a block (with the network simplex: 276 y 225, con las
+ramas descuadradas).
 
 Rationale: the session the user ran asked for a simpler model and wrote it
 with two Python scripts, because the MCP had no way to build a model and the

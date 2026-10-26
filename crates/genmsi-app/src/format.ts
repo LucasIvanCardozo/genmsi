@@ -18,6 +18,20 @@ export function number(value: number): string {
 }
 
 /**
+ * A number with a fixed number of decimals, the way the original writes it.
+ *
+ * The mean of a queue is a number that a reader compares with other means:
+ * three decimals are noise there, and one is enough. The report of the CLI
+ * keeps its own format (`number`): this one is for the charts.
+ */
+export function decimals(value: number, places = 1): string {
+  if (!Number.isFinite(value)) {
+    return (0).toFixed(places).replace(".", ",");
+  }
+  return value.toFixed(places).replace(".", ",");
+}
+
+/**
  * A duration as a literal chronometer: `h:mm:ss`.
  *
  * The report of the CLI prints its times as plain seconds, which is what a

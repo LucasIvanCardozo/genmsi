@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import ErrorNotice from "./components/ErrorNotice";
+import AppHeader from "./components/AppHeader";
 import MonitorView from "./components/MonitorView";
-import RunConsole from "./components/RunConsole";
 import Toolbar from "./components/Toolbar";
 import { useApp } from "./state/store";
 
@@ -14,20 +13,18 @@ const NOTICE_MS = 8000;
 /**
  * The app's shell.
  *
- * The header carries the console of the run; the toolbar holds the commands
- * of the model —the ones that open it and the ones that edit it—; the body
+ * The header carries the identity of the work and the console of the run;
+ * the toolbar holds the commands of the model —the ones that open it and
+ * the ones that edit it—; the body
  * is the window of the simulation: the graph of the model, the reproduction of
  * the run and its report, all in one place.
  */
 export default function App() {
   const {
     model,
-    status,
-    error,
     dirty,
     canUndo,
     canRedo,
-    pendingSave,
     savedMessage,
     notice,
     currentPath,
@@ -47,8 +44,6 @@ export default function App() {
     relayout,
     addBlock,
     deleteSelection,
-    confirmSave,
-    dismissSave,
     clearSavedMessage,
     watchModel,
     stopWatching,
@@ -161,60 +156,28 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col bg-slate-100 text-slate-900">
-      <header className="flex flex-wrap items-center gap-5 border-b border-slate-200 bg-white px-5 py-2.5">
-        <div className="flex items-baseline gap-2">
-          <span className="text-base font-semibold tracking-tight">GenMSI</span>
-          <span className="text-[11px] text-slate-500">Simulación GPSS</span>
-        </div>
+      <AppHeader />
 
-        {/* The console of the run: it hugs the right side of the header, and
-            the title of the model follows it. */}
-        <div className="ml-auto">
-          <RunConsole />
-        </div>
-
-        <div className="flex items-center gap-3 text-xs text-slate-500">
-          {model !== null && <span className="font-medium text-slate-700">{model.title}</span>}
-          {status === "loading" && <span>Cargando…</span>}
-        </div>
-      </header>
+      <Toolbar
+        dirty={dirty}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        hasModel={model !== null}
+        onNew={() => void newModel()}
+        onSave={() => void save()}
+        onSaveAs={() => void saveAs()}
+        onUndo={() => void undo()}
+        onRedo={() => void redo()}
+        onRelayout={() => {
+          // The picture is composed again: the reader has to see the new
+          // one whole, not the piece of the old one he was looking at.
+          void relayout().then(() => setFitSignal((current) => current + 1));
+        }}
+        onFit={() => setFitSignal((current) => current + 1)}
+        onDelete={() => void deleteSelection()}
+      />
 
       <main className="flex flex-1 flex-col gap-3 overflow-hidden p-4">
-        {error !== null && <ErrorNotice message={error} />}
-        {savedMessage !== null && (
-          <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-900">
-            {savedMessage}
-          </p>
-        )}
-        {notice !== null && (
-          <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs text-sky-900">
-            {notice}
-          </p>
-        )}
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Toolbar
-            dirty={dirty}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            hasModel={model !== null}
-            pendingSave={pendingSave}
-            onNew={() => void newModel()}
-            onSave={() => void save()}
-            onSaveAs={() => void saveAs()}
-            onUndo={() => void undo()}
-            onRedo={() => void redo()}
-            onRelayout={() => {
-              // The picture is composed again: the reader has to see the new
-              // one whole, not the piece of the old one he was looking at.
-              void relayout().then(() => setFitSignal((current) => current + 1));
-            }}
-            onFit={() => setFitSignal((current) => current + 1)}
-            onDelete={() => void deleteSelection()}
-            onConfirmSave={() => void confirmSave()}
-            onDismissSave={dismissSave}
-          />
-        </div>
 
         <MonitorView actions={actions} fitSignal={fitSignal} />
       </main>

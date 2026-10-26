@@ -221,6 +221,10 @@ export interface AppState {
   relayout: () => Promise<void>;
   /** Set the seed of the next run. */
   setSeed: (seed: number) => void;
+  /** Say whether the seed is the one the app draws or the one the reader
+   * chose. Drawing a seed makes every run a different run; a chosen seed
+   * makes it the same run every time. */
+  setSeedAuto: (auto: boolean) => void;
   /** Set the horizon of the next run. */
   setUntil: (until: number | null) => void;
   /** Set the `START` of the next run. */
@@ -964,6 +968,9 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   setSeed: (seed: number) => set({ seed, seedIsAuto: false }),
+
+  // The reader fixed the seed: the run repeats instead of drawing a new one.
+  setSeedAuto: (auto: boolean) => set({ seedIsAuto: auto }),
 
   setUntil: (until: number | null) => set({ until }),
 

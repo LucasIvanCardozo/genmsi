@@ -1,31 +1,47 @@
-import { Eraser, LayoutGrid, Redo2, Save, Scan, Undo2 } from "lucide-react";
+import {
+  Copy,
+  Eraser,
+  FilePlus2,
+  LayoutGrid,
+  Redo2,
+  Save,
+  Scan,
+  Undo2,
+} from "lucide-react";
 import ModelBar from "./ModelBar";
 import { useApp } from "../state/store";
+import {
+  groupLabel,
+  groupRule,
+  iconButton,
+  numberField,
+  textButton,
+} from "./chrome";
 
 /**
- * The commands of the app.
+ * The commands of the app, in one dense row.
  *
- * Every button is one operation: the undo stack takes one entry per press,
- * and the button is disabled when the operation is not possible.
+ * The row is split by what the commands **do**, and every group says what
+ * it is: *archivo* opens and saves the model, *edición* changes it, *vista*
+ * looks at it, and *corrida* holds the three numbers the next run takes.
+ * A flat strip of fifteen buttons explained nothing; these four names say
+ * it in four words.
  *
- * The controls of the model —the one that is open, «Abrir…» and the ones
- * opened lately— are here, with the editing actions: they are commands of
- * the model, like the others, and the toolbar has the room for them.
- *
- * The seed, the horizon and the `START` of the run live here too: they are
- * the three numbers the next run takes, and the seed is a 64-bit one, so its
- * field is wide enough to read it whole. The horizon comes with the 3600 of
- * the original: a run without a horizon lasts until the engine runs out of
- * patience. The `START` comes with the one of the original: it is the
- * counter of terminations of the run, and the original has it in the panel
- * of its simulator, next to the clock of the run.
+ * The commands that have an icon and no doubt about it keep only the icon:
+ * the toolbar is a keyboard's echo, and the space it takes is the space the
+ * graph does not get. The seed, the horizon and the `START` of the run live
+ * here too: they are the three numbers the next run takes, and the seed is
+ * a 64-bit one, so its field is wide enough to read it whole. The horizon
+ * comes with the 3600 of the original: a run without a horizon lasts until
+ * the engine runs out of patience. The `START` comes with the one of the
+ * original: it is the counter of terminations of the run, and the original
+ * has it in the panel of its simulator, next to the clock of the run.
  */
 export default function Toolbar({
   dirty,
   canUndo,
   canRedo,
   hasModel,
-  pendingSave,
   onNew,
   onSave,
   onSaveAs,
@@ -34,8 +50,6 @@ export default function Toolbar({
   onRelayout,
   onFit,
   onDelete,
-  onConfirmSave,
-  onDismissSave,
 }: {
   /** Whether the model has changes that were not saved. */
   dirty: boolean;
@@ -45,8 +59,6 @@ export default function Toolbar({
   canRedo: boolean;
   /** Whether a model is open. */
   hasModel: boolean;
-  /** The path of a save that waits for the user's confirmation. */
-  pendingSave: string | null;
   /** Start a new, empty model. */
   onNew: () => void;
   /** Save the model. */
@@ -63,161 +75,179 @@ export default function Toolbar({
   onFit: () => void;
   /** Delete the selected blocks. */
   onDelete: () => void;
-  /** Answer the confirmation of a save with yes. */
-  onConfirmSave: () => void;
-  /** Answer the confirmation of a save with no. */
-  onDismissSave: () => void;
 }) {
   // The two numbers of the next run: the seed and the horizon. They are read
   // from the store with selectors, so a change of the run does not redraw
   // the toolbar.
   const seed = useApp((state) => state.seed);
+  const seedIsAuto = useApp((state) => state.seedIsAuto);
   const until = useApp((state) => state.until);
   const start = useApp((state) => state.start);
   const setSeed = useApp((state) => state.setSeed);
+  const setSeedAuto = useApp((state) => state.setSeedAuto);
   const setUntil = useApp((state) => state.setUntil);
   const setStart = useApp((state) => state.setStart);
 
-  const button =
-    "flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300";
-
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-      <ModelBar />
-
+    <div className="flex h-[38px] shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4">
+      {/* The file commands. */}
       <div className="flex items-center gap-1.5">
-        <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-          Semilla
-        </label>
-        <input
-          aria-label="Semilla"
-          type="number"
-          min={1}
-          value={seed}
-          onChange={(event) => setSeed(Number(event.target.value) || 1)}
-          className="w-48 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-mono text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-        />
-        <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-          Hasta
-        </label>
-        <input
-          aria-label="Hasta"
-          type="number"
-          min={0}
-          placeholder="—"
-          title="El horizonte de la corrida, en tiempo simulado. Por defecto 3600, como el reloj del original; vacío es una corrida sin tope."
-          value={until ?? ""}
-          onChange={(event) => setUntil(event.target.value === "" ? null : Number(event.target.value))}
-          className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-mono text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-        />
-        <label className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-          Inicio
-        </label>
-        <input
-          aria-label="Inicio"
-          type="number"
-          min={1}
-          step={1}
-          value={start}
-          title="El START de la corrida: cuántas unidades de terminación la terminan. Por defecto 1, como el campo «Start» del simulador del original."
-          onChange={(event) => setStart(Number(event.target.value) || 1)}
-          className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-mono text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-        />
+        <span className={groupLabel}>Archivo</span>
+        <button
+          type="button"
+          className={iconButton}
+          onClick={onNew}
+          title="Un modelo nuevo"
+          aria-label="Un modelo nuevo"
+        >
+          <FilePlus2 className="size-[14px]" aria-hidden />
+        </button>
+        <ModelBar />
+        <button
+          type="button"
+          className={iconButton}
+          onClick={onSave}
+          disabled={!hasModel}
+          title={dirty ? "El modelo tiene cambios sin guardar" : "El modelo está guardado"}
+          aria-label="Guardar el modelo"
+        >
+          <Save className="size-[14px]" aria-hidden />
+        </button>
+        <button
+          type="button"
+          className={textButton}
+          onClick={onSaveAs}
+          disabled={!hasModel}
+          title="Guardar el modelo con el diálogo del sistema"
+        >
+          <Copy className="size-[13px]" aria-hidden />
+          Guardar como…
+        </button>
       </div>
 
-      <span className="mx-1 h-5 w-px bg-slate-200" aria-hidden />
+      <span className={groupRule} aria-hidden />
 
-      <button type="button" className={button} onClick={onNew}>
-        Nuevo
-      </button>
-      <button
-        type="button"
-        className={button}
-        onClick={onSave}
-        disabled={!hasModel || (dirty && pendingSave !== null)}
-        title={dirty ? "El modelo tiene cambios sin guardar" : "El modelo está guardado"}
-      >
-        <Save className="size-3.5" aria-hidden />
-        Guardar{dirty ? "•" : ""}
-      </button>
-      <button
-        type="button"
-        className={button}
-        onClick={onSaveAs}
-        disabled={!hasModel}
-        title="Guardar el modelo con el diálogo del sistema"
-      >
-        Guardar como…
-      </button>
+      {/* The commands that change the model. */}
+      <div className="flex items-center gap-1.5">
+        <span className={groupLabel}>Edición</span>
+        <button
+          type="button"
+          className={iconButton}
+          onClick={onUndo}
+          disabled={!canUndo}
+          title="Deshacer (Ctrl+Z)"
+          aria-label="Deshacer"
+        >
+          <Undo2 className="size-[14px]" aria-hidden />
+        </button>
+        <button
+          type="button"
+          className={iconButton}
+          onClick={onRedo}
+          disabled={!canRedo}
+          title="Rehacer (Ctrl+Shift+Z)"
+          aria-label="Rehacer"
+        >
+          <Redo2 className="size-[14px]" aria-hidden />
+        </button>
+        <button
+          type="button"
+          className={iconButton}
+          onClick={onDelete}
+          disabled={!hasModel}
+          title="Borrar los bloques seleccionados (Supr)"
+          aria-label="Borrar los bloques seleccionados"
+        >
+          <Eraser className="size-[14px]" aria-hidden />
+        </button>
+      </div>
 
-      <span className="mx-1 h-5 w-px bg-slate-200" aria-hidden />
+      <span className={groupRule} aria-hidden />
 
-      <button
-        type="button"
-        className={button}
-        onClick={onUndo}
-        disabled={!canUndo}
-        title="Deshacer (Ctrl+Z)"
-      >
-        <Undo2 className="size-3.5" aria-hidden />
-        Deshacer
-      </button>
-      <button
-        type="button"
-        className={button}
-        onClick={onRedo}
-        disabled={!canRedo}
-        title="Rehacer (Ctrl+Shift+Z)"
-      >
-        <Redo2 className="size-3.5" aria-hidden />
-        Rehacer
-      </button>
-      <button
-        type="button"
-        className={button}
-        onClick={onFit}
-        disabled={!hasModel}
-        title="Encuadrar el grafo"
-      >
-        <Scan className="size-3.5" aria-hidden />
-        Encuadrar
-      </button>
-      <button
-        type="button"
-        className={button}
-        onClick={onDelete}
-        disabled={!hasModel}
-        title="Borrar los bloques seleccionados (Supr)"
-      >
-        <Eraser className="size-3.5" aria-hidden />
-        Borrar
-      </button>
-      <button
-        type="button"
-        className={button}
-        onClick={onRelayout}
-        disabled={!hasModel}
-        title="Reordenar el grafo en capas"
-      >
-        <LayoutGrid className="size-3.5" aria-hidden />
-        Reacomodar
-      </button>
+      {/* The commands that look at the model. */}
+      <div className="flex items-center gap-1.5">
+        <span className={groupLabel}>Vista</span>
+        <button
+          type="button"
+          className={iconButton}
+          onClick={onFit}
+          disabled={!hasModel}
+          title="Encuadrar el grafo"
+          aria-label="Encuadrar el grafo"
+        >
+          <Scan className="size-[14px]" aria-hidden />
+        </button>
+        <button
+          type="button"
+          className={iconButton}
+          onClick={onRelayout}
+          disabled={!hasModel}
+          title="Reordenar el grafo en capas"
+          aria-label="Reordenar el grafo en capas"
+        >
+          <LayoutGrid className="size-[14px]" aria-hidden />
+        </button>
+      </div>
 
-      {pendingSave !== null && (
-        <span className="flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">
-          El motor no compila este modelo. ¿Guardarlo de todos modos?
-          <button
-            type="button"
-            className="rounded-md bg-amber-600 px-2 py-1 font-medium text-white hover:bg-amber-500"
-            onClick={onConfirmSave}
+      {/* The three numbers of the next run, at the other end of the row. */}
+      <div className="ml-auto flex items-center gap-2.5">
+        <label className="flex items-center gap-1.5">
+          <span className={groupLabel}>Semilla</span>
+          <input
+            aria-label="Semilla"
+            type="number"
+            min={1}
+            value={seed}
+            onChange={(event) => setSeed(Number(event.target.value) || 1)}
+            className={`${numberField} w-24`}
+          />
+          {/* The lock of the seed: checked, the run repeats itself; unchecked,
+              every run draws its own seed, and the field shows which one it
+              was. Typing a seed checks it, because a seed the reader chose
+              is a seed the reader fixed. */}
+          <span
+            className="flex items-center gap-1"
+            title="Fijar la semilla: la corrida se repite en vez de sortear una nueva"
           >
-            Guardar
-          </button>
-          <button type="button" className="px-1 text-amber-800" onClick={onDismissSave}>
-            Cancelar
-          </button>
-        </span>
-      )}
+            <input
+              type="checkbox"
+              aria-label="Fijar la semilla"
+              checked={!seedIsAuto}
+              onChange={(event) => setSeedAuto(!event.target.checked)}
+              className="size-3.5 accent-indigo-600"
+            />
+            <span className={groupLabel}>Fijar</span>
+          </span>
+        </label>
+        <label className="flex items-center gap-1.5">
+          <span className={groupLabel}>Hasta</span>
+          <input
+            aria-label="Hasta"
+            type="number"
+            min={0}
+            placeholder="—"
+            title="El horizonte de la corrida, en tiempo simulado. Por defecto 3600, como el reloj del original; vacío es una corrida sin tope."
+            value={until ?? ""}
+            onChange={(event) =>
+              setUntil(event.target.value === "" ? null : Number(event.target.value))
+            }
+            className={`${numberField} w-[52px]`}
+          />
+        </label>
+        <label className="flex items-center gap-1.5">
+          <span className={groupLabel}>START</span>
+          <input
+            aria-label="START"
+            type="number"
+            min={1}
+            step={1}
+            value={start}
+            title="El START de la corrida: cuántas unidades de terminación la terminan. Por defecto 1, como el panel del simulador del original. El original no admite un Start de cero («El Start debe ser mayor a cero») y el campo tampoco."
+            onChange={(event) => setStart(Number(event.target.value) || 1)}
+            className={`${numberField} w-11`}
+          />
+        </label>
+      </div>
     </div>
   );
 }

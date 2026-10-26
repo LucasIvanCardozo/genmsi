@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { number } from "../format";
 import { advance, clockWithCrossings, frameAt, stateAt, type ReplayState } from "../monitor/replay";
 import { useApp } from "../state/store";
 import { FLIGHT_SECONDS, MIN_WALL_FLIGHT, travellersAt, type Move } from "../monitor/balls";
@@ -7,7 +6,7 @@ import { graphOf, routeOf, visibleLinks } from "../graph/graph";
 import { countsOf } from "../monitor/counts";
 import { useLive, type LiveBall, type LiveCounts } from "../monitor/live";
 import ClassList from "./ClassList";
-import DiagnosticsPanel from "./DiagnosticsPanel";
+import StatusLine from "./StatusLine";
 import GraphView, { type GraphActions } from "./GraphView";
 import MonitorCharts from "./MonitorCharts";
 import PropertiesPanel from "./PropertiesPanel";
@@ -17,7 +16,7 @@ import ReportView from "./ReportView";
 type Panel = "reproduccion" | "graficos" | "reporte";
 
 /** The part of the lateral panel the window shows. */
-type Aside = "bloque" | "estado" | "bloques";
+type Aside = "bloque" | "bloques";
 
 /**
  * The window of the simulation: the model, its run and its report.
@@ -58,13 +57,19 @@ export default function MonitorView({
     selectedBlockIds,
     catalogue,
     diagnostics,
+    error,
+    notice,
+    savedMessage,
+    pendingSave,
+    confirmSave,
+    dismissSave,
     addBlock,
     setPlayhead,
     setPlaying,
     apply,
   } = useApp();
   const [panel, setPanel] = useState<Panel>("reproduccion");
-  const [aside, setAside] = useState<Aside>("estado");
+  const [aside, setAside] = useState<Aside>("bloque");
   // A block the reader picks brings its properties forward: the lateral
   // panel follows the selection.
   useEffect(() => {
@@ -315,7 +320,6 @@ export default function MonitorView({
               {(
                 [
                   { id: "bloque", label: "Bloque" },
-                  { id: "estado", label: "Estado" },
                   { id: "bloques", label: "Bloques" },
                 ] as const
               ).map((candidate) => (
@@ -345,8 +349,6 @@ export default function MonitorView({
                   }
                   onSetCaption={(id, caption) => void apply({ op: "setCaption", id, caption })}
                 />
-              ) : aside === "estado" ? (
-                <StatePanel state={state} />
               ) : (
                 <ClassList
                   catalogue={catalogue}
@@ -373,9 +375,25 @@ export default function MonitorView({
         ) : (
           <ReportView report={report} state={state} figures={state?.figures ?? null} />
         ))}
-      {/* The diagnostics live at the foot of the window: a discreet line
-          under the picture, not a band that takes the height of the graph. */}
-      <DiagnosticsPanel diagnostics={diagnostics} />
+      {/* The status line lives at the foot of the window: a discreet line
+          under the picture, not a band that takes the height of the graph.
+          It is the only band of the app: the diagnostics, the failure of
+          the last run, the confirmation of a save and the question of the
+          engine are all said here. */}
+      <StatusLine
+        diagnostics={diagnostics}
+        failure={
+          error !== null
+            ? { message: error, kind: "error" }
+            : notice !== null
+              ? { message: notice, kind: "notice" }
+              : null
+        }
+        saved={savedMessage}
+        pendingSave={pendingSave}
+        onConfirmSave={() => void confirmSave()}
+        onDismissSave={dismissSave}
+      />
     </div>
   );
 }
@@ -388,66 +406,3 @@ export default function MonitorView({
  * utilization) are **not** here: the engine computes them and the document
  * does not carry them.
  */
-function StatePanel({ state }: { state: ReplayState | null }) {
-  if (state === null) {
-    return <p className="text-xs text-slate-500">Sin estado.</p>;
-  }
-  const queues = Object.entries(state.queues);
-  const facilities = Object.entries(state.facilities);
-  const storages = Object.entries(state.storages);
-  return (
-    <div className="flex flex-col gap-4 text-xs">
-      <section>
-        <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          Colas
-        </h3>
-        {queues.length === 0 ? (
-          <p className="text-slate-400">Ninguna.</p>
-        ) : (
-          <ul className="flex flex-col gap-1">
-            {queues.map(([name, content]) => (
-              <li key={name} className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-slate-700">{name}</span>
-                <span className="font-mono text-slate-900">{number(content)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      <section>
-        <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          Facilities
-        </h3>
-        {facilities.length === 0 ? (
-          <p className="text-slate-400">Ninguna.</p>
-        ) : (
-          <ul className="flex flex-col gap-1">
-            {facilities.map(([name, owner]) => (
-              <li key={name} className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-slate-700">{name}</span>
-                <span className="font-mono text-slate-900">
-                  {owner === null ? "libre" : `tx ${owner}`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      {storages.length > 0 && (
-        <section>
-          <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-            Almacenes
-          </h3>
-          <ul className="flex flex-col gap-1">
-            {storages.map(([name, units]) => (
-              <li key={name} className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-slate-700">{name}</span>
-                <span className="font-mono text-slate-900">{number(units)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-    </div>
-  );
-}

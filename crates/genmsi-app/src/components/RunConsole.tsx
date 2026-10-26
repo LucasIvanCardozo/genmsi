@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Pause, Play, RotateCcw, Square } from "lucide-react";
+import { Cpu, Pause, Play, RotateCcw, Square } from "lucide-react";
 import { chronometer } from "../format";
 import { useLive } from "../monitor/live";
 import { SPEEDS, frameAt } from "../monitor/replay";
 import { useApp } from "../state/store";
 import { isTauri } from "../engine";
+import { groupRule, iconButton, textButton } from "./chrome";
 
 /**
  * What the cancel button says about what it can do.
@@ -117,14 +118,14 @@ export default function RunConsole() {
   };
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
       <button
         type="button"
         onClick={() => void onSimulate()}
         disabled={!hasModel || running || loading || busy !== null}
-        className="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+        className={textButton}
       >
-        <Play className="size-3.5" aria-hidden />
+        <Cpu className="size-[13px]" aria-hidden />
         {busy === "simular" ? "Simulando…" : "Simular"}
       </button>
 
@@ -132,9 +133,9 @@ export default function RunConsole() {
         type="button"
         onClick={() => void onRun()}
         disabled={!hasModel || running || loading || busy !== null}
-        className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+        className="flex h-[26px] items-center gap-1.5 rounded-md bg-indigo-600 px-2.5 text-[11.5px] font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-300"
       >
-        <Play className="size-3.5" aria-hidden />
+        <Play className="size-[13px]" aria-hidden />
         {busy === "ejecutar" ? "Ejecutando…" : "Ejecutar"}
       </button>
 
@@ -148,9 +149,9 @@ export default function RunConsole() {
             onClick={() => void cancelRun()}
             disabled={!canCancel || cancelling}
             title={CANCEL_EXPLANATION}
-            className="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+            className={textButton}
           >
-            <Square className="size-3" aria-hidden />
+            <Square className="size-[11px]" aria-hidden />
             {cancelling ? "Cancelando…" : "Cancelar"}
           </button>
           <span className="text-[11px] text-slate-500" title={CANCEL_EXPLANATION}>
@@ -159,18 +160,23 @@ export default function RunConsole() {
         </span>
       )}
 
+      {/* The transport of the reproduction is its own group: it plays what
+          the run already recorded, and it is not the same thing as the
+          button that records it. */}
+      <span className={groupRule} aria-hidden />
+
       <button
         type="button"
         onClick={() => setPlaying(!playing)}
         disabled={monitor === null}
         aria-label={playing ? "Pausar la reproducción" : "Reproducir la traza"}
         title={playing ? "Pausar la reproducción" : "Reproducir la traza"}
-        className="flex size-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+        className={iconButton}
       >
         {playing ? (
-          <Pause className="size-3.5" aria-hidden />
+          <Pause className="size-[14px]" aria-hidden />
         ) : (
-          <Play className="size-3.5" aria-hidden />
+          <Play className="size-[14px]" aria-hidden />
         )}
       </button>
 
@@ -180,19 +186,19 @@ export default function RunConsole() {
         disabled={monitor === null}
         aria-label="Volver al principio"
         title="Volver al principio"
-        className="flex size-8 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+        className={iconButton}
       >
-        <RotateCcw className="size-3.5" aria-hidden />
+        <RotateCcw className="size-[14px]" aria-hidden />
       </button>
 
-      <label className="flex items-center gap-1.5 text-xs text-slate-500">
+      <label className="flex items-center">
         <span className="sr-only">Velocidad</span>
         <select
           aria-label="Velocidad"
           value={speed}
           onChange={(event) => setSpeed(Number(event.target.value))}
           disabled={monitor === null}
-          className="w-16 rounded-md border border-slate-300 bg-white px-1.5 py-1 text-xs font-mono text-slate-800 outline-none focus:border-slate-500 disabled:cursor-not-allowed disabled:text-slate-400"
+          className="h-[26px] w-11 rounded-md border border-slate-300 bg-white px-1.5 text-[11px] font-mono text-slate-800 outline-none focus:border-slate-500 disabled:cursor-not-allowed disabled:text-slate-400"
         >
           {SPEEDS.map((option) => (
             <option key={option} value={option}>
@@ -203,7 +209,7 @@ export default function RunConsole() {
       </label>
 
       <span
-        className="font-mono text-xs text-slate-800"
+        className="font-mono text-[12.5px] font-medium text-slate-800"
         title="El tiempo de la corrida en el que está la reproducción"
       >
         {chronometer(shown)}
@@ -218,7 +224,7 @@ export default function RunConsole() {
         value={shown}
         onChange={(event) => seek(Number(event.target.value))}
         disabled={monitor === null}
-        className="w-32 accent-indigo-600 disabled:cursor-not-allowed"
+        className="w-[120px] accent-indigo-600 disabled:cursor-not-allowed"
       />
     </div>
   );

@@ -100,6 +100,10 @@ export interface TableFigure {
   samples: number;
   /** The largest value tabulated. */
   maxValue: number;
+  /** The sum of the values tabulated, as the engine's table keeps it. */
+  sum: number;
+  /** The sum of the squares of the values tabulated. */
+  sumSquares: number;
   /** The values that fell beyond the last interval. */
   overflow: number;
   /** How many values fell in each interval. */
@@ -396,7 +400,13 @@ export function applyChange(figures: Figures, change: FigureChange): Figures {
       const table: TableFigure = {
         samples: (before?.samples ?? 0) + 1,
         maxValue: Math.max(before?.maxValue ?? 0, change.value),
-        overflow: before?.overflow ?? 0,
+        sum: (before?.sum ?? 0) + change.value,
+        sumSquares: (before?.sumSquares ?? 0) + change.value * change.value,
+        // The last interval of a table is the class of the values that do
+        // not fit in the others: the engine counts them apart.
+        overflow:
+          (before?.overflow ?? 0) +
+          (change.intervals > 1 && change.index === change.intervals - 1 ? 1 : 0),
         frequencies,
       };
       return { ...figures, tables: { ...figures.tables, [change.name]: table } };

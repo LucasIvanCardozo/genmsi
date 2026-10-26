@@ -11,7 +11,6 @@ import {
   buildTransitions,
   checkFidelity,
   frameAt,
-  mergeSeries,
   stateAt,
   type ModelDocumentLike,
   type ReportDocumentLike,
@@ -19,6 +18,7 @@ import {
   type TraceEventLike,
 } from "../src/monitor/replay.ts";
 import { FLIGHT_SECONDS } from "../src/monitor/balls.ts";
+import { seriesFrom } from "../src/monitor/series.ts";
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = path.resolve(appDir, "../..");
@@ -172,16 +172,83 @@ test("the series of an entity tells every instant its value changes", () => {
 
 test("the rows of a chart carry the value each entity had at that instant", () => {
   const index = buildIndex(smallTrace, smallReport, smallModel);
-  const rows = mergeSeries(["qA"], index.queuePoints);
+  // The queue was entered at the instant zero, so the series starts there.
+  const rows = seriesFrom(["qA"], index.queuePoints, 10);
   assert.deepEqual(rows, [
     { time: 0, qA: 1 },
     { time: 1, qA: 0 },
+    { time: 10, qA: 0 },
   ]);
-  const facilities = mergeSeries(["F"], index.facilityPoints);
+  // The facility was taken at the second 3: the series says it was free
+  // before that, and the axis of the chart starts at zero.
+  const facilities = seriesFrom(["F"], index.facilityPoints, 10);
   assert.deepEqual(facilities, [
+    { time: 0, F: 0 },
     { time: 3, F: 1 },
     { time: 4, F: 0 },
+    { time: 10, F: 0 },
   ]);
+});
+
+test("the index carries the wait of every transaction that left a queue", () => {
+  const index = buildIndex(smallTrace, smallReport, smallModel);
+  // The transaction entered the queue at 0 and left it at 1: it waited a
+  // second, and that is the sample of the distribution of the waits.
+  assert.deepEqual(index.waits.get("qA"), [{ time: 1, wait: 1 }]);
+});
+
+test("the index carries the instants the transactions were created", () => {
+  const trace: TraceDocumentLike = {
+    ...smallTrace,
+    events: [event(0, 1, 0, "Generate", "generate"), ...smallTrace.events],
+  };
+  const report: ReportDocumentLike = {
+    ...smallReport,
+    blocks: [{ line: 1, node: 0, class: "Generate", current: 0, entries: 1 }, ...smallReport.blocks],
+  };
+  const index = buildIndex(trace, report, smallModel);
+  assert.deepEqual(index.generateTimes, [0]);
+});
+
+test("the index carries the units of a storage over the time", () => {
+  const model: ModelDocumentLike = {
+    blocks: [
+      { id: 5, properties: [{ name: "Storage", value: "alm" }] },
+      { id: 6, properties: [{ name: "Storage", value: "alm" }] },
+    ],
+  };
+  const report: ReportDocumentLike = {
+    blocks: [
+      { line: 1, node: 5, class: "Enter", current: 0, entries: 1 },
+      { line: 2, node: 6, class: "Leave", current: 0, entries: 1 },
+    ],
+    entities: { queues: {} },
+  };
+  const trace: TraceDocumentLike = {
+    ...smallTrace,
+    events: [event(0, 1, 0, "Enter", "leave"), event(2, 1, 1, "Leave", "enter")],
+  };
+  const index = buildIndex(trace, report, model);
+  assert.deepEqual(index.storagePoints.get("alm"), [
+    { time: 0, value: 1 },
+    { time: 2, value: 0 },
+  ]);
+});
+
+test("the index carries the size of a chain over the time", () => {
+  const model: ModelDocumentLike = {
+    blocks: [{ id: 7, properties: [{ name: "Chain", value: "cad" }] }],
+  };
+  const report: ReportDocumentLike = {
+    blocks: [{ line: 1, node: 7, class: "Link", current: 0, entries: 1 }],
+    entities: { queues: {} },
+  };
+  const trace: TraceDocumentLike = {
+    ...smallTrace,
+    events: [event(0, 1, 0, "Link", "enter")],
+  };
+  const index = buildIndex(trace, report, model);
+  assert.deepEqual(index.chainPoints.get("cad"), [{ time: 0, value: 1 }]);
 });
 
 test("a transaction that backs up is counted in the block it came from", () => {

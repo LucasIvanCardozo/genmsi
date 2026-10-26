@@ -33,6 +33,7 @@
  */
 import { applyChange, closeFigures, emptyFigures, type FigureChange, type Figures } from "./stats.ts";
 import { FLIGHT_SECONDS, firstMoveAfter } from "./balls.ts";
+import type { SeriesPoint } from "./series.ts";
 
 /** One event of the trace, as the replay reads it. */
 export interface TraceEventLike {
@@ -255,16 +256,19 @@ export interface Frame {
   change: StateChange | null;
 }
 
-/** One point of an entity's series: its value at one instant. */
-export interface SeriesPoint {
-  /** The simulated time. */
-  time: number;
-  /** The value of the entity (the content of a queue, the busy state of a facility). */
-  value: number;
-}
+export type { SeriesPoint, SeriesRow } from "./series.ts";
 
-/** The rows of a chart: the instants of the entities and the value of each. */
-export type SeriesRow = { time: number } & Record<string, number>;
+// The old chart of the section still asks for the merge of the series by
+// this name; the new one asks for the series itself.
+export { seriesFrom as mergeSeries } from "./series.ts";
+
+/** One wait of a queue: the time a transaction waited before leaving it. */
+export interface WaitSample {
+  /** The simulated time of the departure. */
+  time: number;
+  /** The time the transaction waited in the queue. */
+  wait: number;
+}
 
 /** The index of a run: what the replay reads, computed once. */
 export interface ReplayIndex {
@@ -284,6 +288,14 @@ export interface ReplayIndex {
   queuePoints: Map<string, SeriesPoint[]>;
   /** The instants each facility's state changes, with the state it takes. */
   facilityPoints: Map<string, SeriesPoint[]>;
+  /** The instants each storage's units change, with the units it takes. */
+  storagePoints: Map<string, SeriesPoint[]>;
+  /** The instants each chain's size changes, with the size it takes. */
+  chainPoints: Map<string, SeriesPoint[]>;
+  /** The wait of every transaction that left each queue. */
+  waits: Map<string, WaitSample[]>;
+  /** The instants the transactions of the run were created. */
+  generateTimes: number[];
   /** Whether the trace may have been cut by its record limit. */
   truncated: boolean;
   /** How many records the trace kept. */
@@ -419,6 +431,12 @@ export function buildIndex(
   const facilities: string[] = [];
   const storages: string[] = [];
   const blocks: number[] = [];
+  // The wait of every transaction that left a queue: the distribution of the
+  // waits of the queue is the histogram of these numbers.
+  const waits = new Map<string, WaitSample[]>();
+  // The instants the transactions of the run were created: the number of them
+  // at an instant is the number of instants that are not after it.
+  const generateTimes: number[] = [];
   // The name the engine resolved when a transaction waited for an entity.
   const learned = new Map<number, string>();
   // When every transaction entered each queue, to know how long it waited
@@ -540,13 +558,19 @@ export function buildIndex(
           const given = units.get(entityBlock) ?? 1;
           change.queue = { name: entity, delta: -given };
           const entered = recall(enqueuedAt, entity, event.xact, event.time);
+          const waited = event.time - entered;
           change.figure = {
             kind: "queue-dequeue",
             name: entity,
             time: event.time,
-            waited: event.time - entered,
+            waited,
             units: given,
           };
+          // The wait of this transaction is one sample of the distribution
+          // of the waits of the queue.
+          const samples = waits.get(entity) ?? [];
+          samples.push({ time: event.time, wait: waited });
+          waits.set(entity, samples);
           forget(enqueuedAt, entity, event.xact);
           if (!seen.queue.has(entity)) {
             seen.queue.add(entity);
@@ -736,6 +760,7 @@ export function buildIndex(
       // A generator counts an entry for every transaction it creates, which
       // is what the engine's report counts for its block.
       change.entered_count = index;
+      generateTimes.push(event.time);
     } else if (event.event === "leave" || event.event === "terminate") {
       change.left = index;
       if (!seen.block.has(index)) {
@@ -774,7 +799,9 @@ export function buildIndex(
 
   const queuePoints = new Map<string, SeriesPoint[]>();
   const facilityPoints = new Map<string, SeriesPoint[]>();
-  collectPoints(frames, queuePoints, facilityPoints);
+  const storagePoints = new Map<string, SeriesPoint[]>();
+  const chainPoints = new Map<string, SeriesPoint[]>();
+  collectPoints(frames, queuePoints, facilityPoints, storagePoints, chainPoints);
 
   return {
     frames,
@@ -785,6 +812,10 @@ export function buildIndex(
     blocks,
     queuePoints,
     facilityPoints,
+    storagePoints,
+    chainPoints,
+    waits,
+    generateTimes,
     truncated: trace.truncated,
     records: trace.records,
     limit: trace.limit,
@@ -1188,6 +1219,8 @@ function collectPoints(
   frames: Frame[],
   queuePoints: Map<string, SeriesPoint[]>,
   facilityPoints: Map<string, SeriesPoint[]>,
+  storagePoints: Map<string, SeriesPoint[]>,
+  chainPoints: Map<string, SeriesPoint[]>,
 ): void {
   let state = emptyState();
   for (const frame of frames) {
@@ -1209,47 +1242,26 @@ function collectPoints(
       });
       facilityPoints.set(change.facility.name, list);
     }
-  }
-}
-
-/**
- * The rows of a chart: the instants of the entities, with the value of each.
- *
- * The rows are the union of the instants of the chosen entities, and the
- * value of an entity is the one it had at that instant.
- */
-export function mergeSeries(
-  entities: string[],
-  points: Map<string, SeriesPoint[]>,
-  until = Number.POSITIVE_INFINITY,
-): SeriesRow[] {
-  const times = new Set<number>();
-  for (const name of entities) {
-    for (const point of points.get(name) ?? []) {
-      if (point.time <= until) {
-        times.add(point.time);
-      }
+    if (change.storage !== undefined) {
+      const list = storagePoints.get(change.storage.name) ?? [];
+      list.push({
+        time: frame.time,
+        value: state.storages[change.storage.name] ?? 0,
+      });
+      storagePoints.set(change.storage.name, list);
+    }
+    // The size of a chain is in the figures: the chain has no state of its
+    // own, its size is the number of members it holds.
+    if (
+      change.figure !== undefined &&
+      (change.figure.kind === "chain-enter" || change.figure.kind === "chain-leave")
+    ) {
+      const name = change.figure.name;
+      const list = chainPoints.get(name) ?? [];
+      list.push({ time: frame.time, value: state.figures.chains[name]?.content ?? 0 });
+      chainPoints.set(name, list);
     }
   }
-  const sorted = [...times].sort((a, b) => a - b);
-  const cursors = new Map<string, number>();
-  const values = new Map<string, number>();
-  const rows: SeriesRow[] = [];
-  for (const time of sorted) {
-    const row: SeriesRow = { time };
-    for (const name of entities) {
-      const list = points.get(name) ?? [];
-      let cursor = cursors.get(name) ?? 0;
-      while (cursor < list.length && list[cursor].time <= time) {
-        values.set(name, list[cursor].value);
-        cursor += 1;
-      }
-      cursors.set(name, cursor);
-      row[name] = values.get(name) ?? 0;
-    }
-    rows.push(row);
-  }
-  return rows;
 }
 
 /**

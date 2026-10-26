@@ -197,7 +197,10 @@ test("a table that tabulates values", () => {
   const table = figures.tables["tabla"];
   assert.equal(table.samples, 2);
   assert.equal(table.maxValue, 9);
+  assert.equal(table.sum, 12, "the sum of the values tabulated");
+  assert.equal(table.sumSquares, 90, "the sum of the squares of the values");
   assert.deepEqual(table.frequencies, [0, 1, 0, 1]);
+  assert.equal(table.overflow, 1, "the value in the last interval did not fit");
 });
 
 test("a switch that is set and a value that is assigned", () => {

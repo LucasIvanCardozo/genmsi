@@ -723,3 +723,52 @@ cuadrado (S11).
 La medida del lado mayor del lienzo (`largest` en `measure.rs`) baja de 60186
 a 54099 sobre el corpus: los bloques que no estaban en ningún flujo ya no
 estiran el lienzo en una hilera.
+
+### L19 — El lienzo cuadrado (S11) y el estado final
+
+El lado mayor del lienzo es el criterio que el usuario puso. La búsqueda de
+internet dio el algoritmo de referencia: Graphviz lleva el atributo `ratio` y
+el *priority method*, que ajustan la dispersión del dibujo para acercarse a
+la proporción pedida (la documentación de `ratio` dice que "el dibujo se
+escala" y que `ratio=compress` "comprime la disposición inicial para que
+entre en el tamaño dado", aunque eso "reduce el equilibrio y la simetría").
+
+Aquí la geometría no se puede escalar (el motor guarda coordenadas, no
+proporciones), así que la palanca es otra: **los huecos**. La composición se
+hace dos veces: la primera con los huecos de siempre, y la segunda con los
+huecos que dejan el lienzo lo más cuadrado posible (las capas se acercan
+cuando el lienzo es alto, los bloques de una capa se acercan cuando es
+ancho). Los huecos nunca bajan de su mínimo (20 px entre capas, 10 px entre
+bloques): un enlace que el lector no ve es peor que un lienzo que no es
+cuadrado. Y el margen de los marcos de los contenedores sigue al hueco
+entre capas, o dos contenedores que se encuentran se pisan.
+
+El modelo del usuario queda así:
+
+| | antes | ahora |
+|---|---|---|
+| Lienzo | 3145 × 1776 | **985 × 1187** |
+| Los tres `Generate` | filas 1, 9 y 14 | **fila 1, los tres** |
+| Bloques pisados | — | 0 |
+
+Sobre el corpus completo:
+
+| Medida | Antes de esta tanda | Ahora |
+|---|---|---|
+| Bloques pisados | 1 | **0** |
+| Fuera de su contenedor | 0 | 0 |
+| Cruces de aristas | 276 | **264** |
+| Enlaces por encima de un bloque | 225 | 225 |
+| Suma de los lados mayores | 60186 | **49914** (−17 %) |
+
+Lo que hizo falta, en orden:
+
+1. `e6aec89` — el zoom: el efecto que encuadra dependía del modelo, así que
+   reencuadraba con cada cambio. La regla vive ahora en `graph/frame.ts`.
+2. `24f7d9b` — las fuentes arriba (las cadenas se alinean por su inicio) y
+   los bloques que no están en ningún flujo en una rejilla al lado del flujo.
+3. `e2dfc50` — cero bloques pisados: las cadenas que se cruzan se separan,
+   y los bloques de la raíz que el layout compuesto mete dentro del marco de
+   un contenedor salen de ahí.
+4. `ad04d6d` — el lienzo cuadrado: los huecos se ajustan a la forma del
+   modelo.

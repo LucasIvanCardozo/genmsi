@@ -17,6 +17,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { graphOf, type BlockData } from "../graph/graph";
+import { decideFrame, type FrameState } from "../graph/frame";
 import { useBlockCounts } from "../monitor/live";
 import type { ModelBody } from "../types";
 import GraphEdge from "./GraphEdge";
@@ -177,9 +178,10 @@ export default function GraphView({
   const [edges, setEdges] = useState<Edge[]>([]);
   // The instance of the graph, to frame it when a model arrives.
   const instance = useRef<ReactFlowInstance<Node<BlockData>, Edge> | null>(null);
-  // The model the view was framed for: a change of the model reframes the
-  // graph, an edit of the model does not.
-  const framed = useRef<string | null>(null);
+  // The framing of the picture: a model that arrives is framed whole, and
+  // the picture is framed again when the reader asks for it. A change of the
+  // model —the reader moves a block— does not move the picture.
+  const frame = useRef<FrameState>({ framed: null, fitted: 0 });
   // The blocks the user had selected, so a change of the model does not take
   // the selection away.
   const selected = useRef<Set<string>>(new Set());
@@ -197,20 +199,16 @@ export default function GraphView({
     // The first view frames the flow of the model: the blocks that simulate.
     // The containers are the frames around them, and framing them too would
     // shrink the picture until nothing could be read.
-    const key = `${model.path}|${model.title}`;
-    if (framed.current !== key) {
-      framed.current = key;
+    const decision = decideFrame(
+      frame.current,
+      `${model.path}|${model.title}`,
+      fitSignal,
+    );
+    frame.current = decision.state;
+    if (decision.fit) {
       fitFlow(instance.current, graph.nodes);
     }
-  }, [model, extraEdges]);
-
-  // The user asks for the picture to be framed again.
-  useEffect(() => {
-    if (fitSignal === 0) {
-      return;
-    }
-    fitFlow(instance.current, graphOf(model).nodes);
-  }, [fitSignal, model]);
+  }, [model, extraEdges, fitSignal]);
   const onNodesChange = useCallback((changes: NodeChange<Node<BlockData>>[]) => {
     setNodes((current) => applyNodeChanges(changes, current));
   }, []);

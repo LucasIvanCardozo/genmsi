@@ -1175,7 +1175,7 @@ dependencies = [
 
 [[package]]
 name = "genmsi-app-desktop"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "genmsi-app-engine",
  "serde",
@@ -1199,7 +1199,7 @@ dependencies = [
 
 [[package]]
 name = "genmsi-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "genmsi-format",
  "pest",
@@ -1214,7 +1214,7 @@ dependencies = [
 
 [[package]]
 name = "genmsi-format"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dagre",
  "roxmltree",

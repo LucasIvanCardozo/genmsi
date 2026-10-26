@@ -289,3 +289,36 @@ Rationale: the figure of a block does not exist in the original's report (the
 original writes one row per statement, not one per block), so the engine has
 to publish it if anybody wants it. The user saw the consequence of the app
 making it up: a facility use that served 59 transactions showed 295.
+
+## D20 — The design of the interface is approved by the user, and only by the user
+
+Every design that is drawn for the interface of the app is a **proposal
+until the user approves it**, and the approval is **the user's alone**: no
+agent, no review, no convenience and no momentum replaces it. The rule is
+inblockable.
+
+The concrete protocol:
+
+1. The design is drawn in Pen and shown to the user.
+2. The implementation waits for the user's **explicit approval** of that
+   design.
+3. Only then is it implemented — and, when the user asks for it, in the
+   groups the user agreed to.
+
+Why: the interface is the app's face, and the person who has to live with
+it decides what it looks like. An agent that draws a design and implements
+it without asking has decided for the user something that is the user's to
+decide, and it does it in the fastest, most self-serving way: its own
+first idea. The cost of waiting for an approval is a turn; the cost of
+skipping it is work the user did not want.
+
+What this does **not** change: the diagnosis, the proposals and the
+alternatives are still the agent's job, and so is the implementation once
+the design is approved. The rule is about **who signs the design**, not
+about who thinks it up.
+
+The exception the user granted, once and for the chrome of the app (the
+header and the toolbar, `odd/tasks/genmsi-chrome-cabecera.md`): the design
+was approved after the fact — "por ahora déjalo porque me gustó" — and that
+one is closed. From here on, the approval comes **before** the
+implementation.

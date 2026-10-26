@@ -202,27 +202,51 @@ The script turns on the optional `ts` feature of `genmsi-core` and of
 The design is the app's own (the phase's decision `S2`): clarity over
 similarity with the original.
 
-- **Header**: the app's name, the model picker, the seed and the horizon, and
-  the **console of the run**: *Simular* (the model, and with it the report),
-  *Ejecutar* (the model and the trace, with the replay), the pause and play of
-  the replay, the speed, the clock and the slider of the replay. One row,
-  always visible: the controls are there before a run, disabled, and the
-  reader never has to start a run to find them.
-- **Toolbar**: the editing actions — `Nuevo`, `Guardar`, `Guardar como…`,
-  `Deshacer`, `Rehacer`, `Encuadrar`, `Borrar` and `Reacomodar`.
+- **Header**: the identity of the work and the **console of the run**. The
+  identity comes first — the mark, the name of the app, the name of the
+  model, the dot that says the work is not saved and the title the model
+  carries — and the console closes the row, at the right: *Simular* (the
+  model, and with it the report), *Ejecutar* (the model and the trace, with
+  the replay), the pause and play of the replay, the speed, the clock and
+  the slider of the replay. One row, always visible: the controls are there
+  before a run, disabled, and the reader never has to start a run to find
+  them.
+- **Toolbar**: the commands, in one dense row, split by what they do and
+  named. *Archivo* — `Nuevo`, `Abrir…`, `Recientes`, `Guardar`,
+  `Guardar como…`; *Edición* — `Deshacer`, `Rehacer`, `Borrar`; *Vista* —
+  `Encuadrar`, `Reacomodar`; and at the other end the three numbers the next
+  run takes: the seed, with the lock that says whether it repeats, the
+  horizon and the `START`. The commands that an icon explains keep only the
+  icon; the ones that a word explains keep the word.
+- **The lock of the seed**: a run that draws its own seed is a different run
+  every time; a run with the reader's seed is the same one, and can be
+  repeated. The checkbox next to the seed says which of the two it is: clear,
+  the run draws its seed and the field shows which one it was; checked, the
+  run repeats. Writing a seed checks the box, because a seed the reader
+  chose is a seed the reader fixed.
 - **One window, three panels**: *Reproducción*, *Gráficos* and *Reporte*. The
   reproduction is the graph of the model — with the geometry the model
   carries — with the run on it: the blocks the run is filling are marked,
   and the transactions that are on their way travel over the links. The
-  charts are the time series and the histograms of the run; the report is
+  charts are the numbers of the run, the series of the entities and the
+  histograms of the tables; the report is
   the engine's tables, with the numbers of the instant the replay is at.
-- **Lateral panel**: three tabs, *Bloque* (the selected block's identity and
-  its declared properties, one editor per declared type), *Estado* (the
-  queues, the facilities and the storages of the run) and *Bloques* (the
+- **Lateral panel**: two tabs, *Bloque* (the selected block's identity and
+  its declared properties, one editor per declared type) and *Bloques* (the
   classes that can be created, with what each one does and the ports and
-  properties it declares).
-- **Diagnostics**: what the model compiles to, recomputed after every
-  change, at the foot of the window.
+  properties it declares). The panel is **of the model**: the state of the
+  run is told by the report and by the charts, which say it with more
+  detail and alive with the clock. The one thing the panel said that nobody
+  else says —which transaction holds each facility— is the column *Ahora* of
+  the indicators of the facilities.
+- **Status line**: the foot of the window carries **every message of the
+  app**, and there is no band of messages at the top: the top belongs to
+  the header and to the toolbar. The line says what the model compiles to
+  (recomputed after every change), the failure of the last run, the
+  confirmation of a save and the question of the engine when it refuses to
+  save a model. What needs the eye says so with a halo: it pulses three
+  times, because the reader may be looking at the graph and not at the foot
+  of the window.
 - **Numbers**: the original's comma decimals, so a report read in the app
   and a report read in the CLI say the same thing.
 - **Text**: Spanish, neutral. The code, the file names and the documents
@@ -304,19 +328,41 @@ the run's clock: the floor is in the time of the reader, not in the model's.
 
 ### The charts read the documents
 
-The charts of the run are drawn with **Recharts** (the only charting library,
-as D8 says):
+The section of the charts is one column that scrolls: the summary of the run
+first, and then one group of charts per family of entities.
 
-- the **time series** of the queues and the facilities: the content of a
-  queue and the busy state of a facility over the time. The series is the
-  *exact* history of the entity (the instants its value changes), not a
-  sample of the trace: a queue that fills and empties between two samples
-  would be invisible in a sample, and a facility that is free for a moment
-  would look busy.
+| Group | What it shows |
+|---|---|
+| **Resumen** | The run in numbers (transactions, events, clock, how it ended, throughput, population) and the ranking of the resources that squeeze it (the utilization of the facilities, the mean content of the queues, the mean utilization of the storages). |
+| **Colas** | The content of the queues over the time, the distribution of the waits and the indicators of every queue. |
+| **Facilities** | The occupancy of every facility over the time (the intervals it was held) and its indicators. |
+| **Almacenes y cadenas** | The units in use of a storage against its capacity, and the size of a chain over the time. |
+| **Tablas** | The histogram of a table of the model (the frequencies the engine publishes, the accumulated curve, the mean and the deviation) and the list of the tables. |
+| **Bloques** | The transactions that went through each block, and the retries of each block: where the model is contended. |
+
+The charts are drawn with **Recharts** (the only charting library, as D8
+says), except the occupancy of the facilities, which is a row of colored
+intervals: a line of ones and zeros says less and takes more.
+
+- the **time series** are the *exact* history of the entity (the instants its
+  value changes), not a sample of the trace: a queue that fills and empties
+  between two samples would be invisible in a sample, and a facility that is
+  free for a moment would look busy.
+- the **axis of the time is the time of the run, from zero to its end**,
+  whatever the first change of an entity is: an axis that started at the
+  first datum would hide the time before it. The vertical line that marks
+  the instant the reader is at crosses every chart.
 - the **histogram** of every table and QTable of the model: the bars are the
   frequencies the report publishes and the curve is their running total. A
   table with more than 200 intervals is grouped, and the label says how many
   intervals each bar covers.
+
+The only numbers the charts compute are the **ratios of the engine's own
+numbers** —the mean content of a queue, the utilization of a facility, the
+mean and the deviation of a table— and every one of them says so: they are
+marked with an asterisk and the card says the formula. Each set of numbers is
+divided by **its own** time: the numbers of the instant by the clock of the
+replay, the published ones by the length of the run.
 
 ### The re-layout is explicit
 
@@ -348,9 +394,12 @@ zoom out to be seen.
 | Path | What it is |
 |---|---|
 | `crates/genmsi-app/src/engine/` | The adapter and its two backends. |
-| `crates/genmsi-app/src/components/` | The graph, the property panel, the report, the monitor, the charts, the picker, the toolbar. |
+| `crates/genmsi-app/src/components/` | The graph, the property panel, the report, the monitor, the picker, the toolbar. |
+| `crates/genmsi-app/src/components/charts/` | The charts of the run: one file per card of the section, and the pieces they share (the card, the table, the bars, the series). |
 | `crates/genmsi-app/src/edit/` | The pure parts of the editor: the property editors. |
 | `crates/genmsi-app/src/monitor/` | The replay: the projection of the trace and the state it rebuilds. |
+| `crates/genmsi-app/src/monitor/derived.ts` | The metrics the app derives from the numbers the engine publishes. |
+| `crates/genmsi-app/src/monitor/series.ts` | The series, the intervals and the histograms the charts draw. |
 | `crates/genmsi-app/src/state/store.ts` | The app's state (Zustand). |
 | `crates/genmsi-app/src/types/generated/` | The types generated from the Rust schema. |
 | `crates/genmsi-app/src/format.ts` | The numbers of the app, with the original's comma decimals. |

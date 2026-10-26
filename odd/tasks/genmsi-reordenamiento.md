@@ -118,6 +118,37 @@ por naturaleza). Los que miden si la imagen se lee:
 Y en todos los modelos: determinista, la geometría no toca la semántica, y un
 solo algoritmo (el del motor).
 
+### S10 — Las fuentes del flujo arrancan el lienzo
+
+> "viste que hay 3 generate? bueno los generate deben estar arriba, no abajo al
+> final, me explico?"
+
+Toda fuente del flujo (los bloques `Generate` del modelo) empieza el lienzo:
+las fuentes de todas las cadenas están en la primera fila, y el flujo baja
+desde ahí. El motor compone las cadenas separadas una por una y las coloca
+al lado, todas con su fuente en la misma fila.
+
+### S11 — El lienzo, lo más cuadrado posible
+
+> "el reacomodar debe intentar minimizar el numero mas alto del aspect ratio,
+> es decir al reacomodar el aspect ratio total debe ser el minimo del mas alto
+> (alto o ancho), por ejemplo: es mejor 1300x1200 que 2000x300 me explico?
+> esto haria que no se disperce tanto ya sea horizontalmente como verticalmente"
+
+La composición deja el lienzo con el lado mayor lo más chico que la
+estructura del modelo permita. Los bloques que no están en ningún flujo no
+ocupan una hilera entera: van en una rejilla al lado del flujo, con la forma
+que deja el lienzo más cuadrado.
+
+### S12 — El lector mueve un bloque y el lienzo no se mueve
+
+> "al tocar reacomodar, si luego muevo cualquier bloque de posicion me hace
+> zoom out al maximo"
+
+El lienzo se encuadra cuando llega un modelo y cuando el lector lo pide
+(*Reacomodar*, *Encuadrar*). Un cambio del modelo —el lector mueve un
+bloque— no lo reencuadra: la vista se queda donde el lector la dejó.
+
 ## Tasks
 
 | T | Specs | Qué | Ruta | Estado | Commit |
@@ -132,6 +163,8 @@ solo algoritmo (el del motor).
 | T8 | S1, S8 | La dependencia: `dagre` en el motor, fijada, con la prueba de que compone un modelo de referencia | inline | hecho | `457ff16`, `e589b0f` |
 | T9 | S1, S8, S9 | La composición con dagre: dirección TB (el flujo baja) y los contenedores como grafos compuestos | inline | hecho | `457ff16` |
 | T10 | S1, S5, S9 | La medida nueva: la longitud media de los enlaces, y los criterios que dicen si se lee | inline | hecho | `457ff16` |
+| T11 | S12 | El encuadre: el lienzo no se reencuadra cuando el modelo cambia (la regla vive en `graph/frame.ts`, con prueba) | inline | hecho | `e6aec89` |
+| T12 | S10, S11 | Las fuentes arriba y la rejilla de los bloques que no están en el flujo; el lado mayor del lienzo como criterio | inline | en curso | `24f7d9b` |
 ## Log
 
 ### L1 — El pedido del usuario (verbatim)
@@ -642,3 +675,51 @@ La medida no cambia: 1 bloque pisado, 0 fuera de su contenedor, 276 cruces y
 De paso se volvió al **network simplex**: los rangos son los mismos que con el
 árbol apretado (el corte de filas es la profundidad del flujo), pero cruza 76
 enlaces menos (`80f687f`).
+
+### L18 — El usuario ve dos cosas más (verbatim)
+
+> "bien pero cosas que pasan:
+>  - al tocar reacomodar, si luego muevo cualquier bloque de posicion me hace
+>    zoom out al maximo y todavia no entendiste bien loq ue quise decir porque
+>    por ejemplo viste que hay 3 generate? bueno los generate deben estar
+>    arriba, no abajo al final, me explico?
+>  - tambien si es posible el reacommodar debe intentar minimizar el numero
+>    mas alto del aspect ratio, es decir al reacomodar el aspect ratio total
+>    debe ser el imnimo del mas alto (alto o ancho), por ejemplo: es mejor
+>    1300x1200 que 2000x300 me epxlico? esto haria que no se disperce tanto
+>    ya sea horizontalmente como verticalmente. busca en internet algoritmos
+>    para esto, quiero el mejor, simple y eficaz"
+
+#### El zoom (S12)
+
+El bug estaba en `GraphView.tsx`: el efecto que encuadra dependía de
+`model`, así que reencuadraba con cada cambio del modelo. Como `fitSignal`
+deja de ser 0 después de *Reacomodar*, el efecto solo se activaba a partir de
+ahí: exactamente lo que el usuario vio. La regla ahora vive en
+`graph/frame.ts` (`decideFrame`), con su prueba: el lienzo se encuadra cuando
+llega un modelo y cuando el lector lo pide, nunca porque el modelo cambie.
+
+#### Las fuentes arriba (S10)
+
+El modelo que el usuario tenía abierto (`modelocomedor.gmdl`) tiene tres
+`Generate` (19, 22 y 38) y tres cadenas separadas: 19→20→21, 22→…→37 y
+38→…→43. El motor las componía **terminadas al mismo nivel**: 22 quedaba en
+la fila 1, 38 en la fila 9 y 19 en la fila 14.
+
+La causa está en el crate: `dagre` 0.1.1 asigna los rangos desde el final
+(`layout/rank/util.rs::longest_path` da rango 0 a cada sumidero), y su
+`normalize_ranks` (`layout/util.rs:188`) hace un único desplazamiento global:
+todas las cadenas terminan en la misma fila y sus inicios quedan escalonados.
+El crate no separa tampoco los componentes horizontalmente (no existe un
+`separateComponents` ✗) y su layout compuesto mete bloques de la raíz dentro
+del marco de un contenedor.
+
+La corrección: componer las cadenas separadas una por una (cada una con su
+rango propio) y alinearlas por su inicio, de modo que todas las fuentes
+quedan en la primera fila; y poner los bloques que no están en ningún flujo
+en una rejilla al lado del flujo, con la forma que deja el lienzo más
+cuadrado (S11).
+
+La medida del lado mayor del lienzo (`largest` en `measure.rs`) baja de 60186
+a 54099 sobre el corpus: los bloques que no estaban en ningún flujo ya no
+estiran el lienzo en una hilera.

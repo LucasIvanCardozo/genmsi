@@ -1,403 +1,246 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useMemo } from "react";
 import { number } from "../format";
-import { mergeSeries, type ReplayIndex } from "../monitor/replay";
 import { useLive } from "../monitor/live";
-import type { Figures } from "../monitor/stats";
-import type { ReportDocument, Table } from "../types";
-
-/** How many bars a histogram has at most. */
-export const MAX_BARS = 200;
-
-/** How many entities a time series shows at once by default. */
-const DEFAULT_SERIES = 3;
-
-/** One bar of a histogram: an interval (or a group of intervals) of a table. */
-export interface HistogramBar {
-  /** The range of the interval, as the report prints it. */
-  label: string;
-  /** The transactions the interval holds. */
-  frequency: number;
-  /** The accumulated share of the samples, in percent. */
-  accumulated: number;
-}
-
-/** The histogram of one table of the model. */
-export interface Histogram {
-  /** The name of the table. */
-  name: string;
-  /** The bars of the histogram. */
-  bars: HistogramBar[];
-  /** How many intervals each bar covers (one when the table is drawn as it is). */
-  group: number;
-  /** The values the table recorded. */
-  samples: number;
-}
+import { countAt } from "../monitor/series.ts";
+import { closeFigures } from "../monitor/stats.ts";
+import type { ReplayIndex, ReplayState } from "../monitor/replay";
+import type { ModelBody, ReportDocument } from "../types";
+import BlockRanking from "./charts/BlockRanking.tsx";
+import ChainSeries from "./charts/ChainSeries.tsx";
+import ChartCard from "./charts/ChartCard.tsx";
+import { blockRows } from "./charts/blocks.ts";
+import {
+  chainsOf,
+  facilitiesOf,
+  queuesOf,
+  storagesOf,
+} from "./charts/entities.ts";
+import FacilityTable from "./charts/FacilityTable.tsx";
+import FacilityTimeline from "./charts/FacilityTimeline.tsx";
+import QueueSeries from "./charts/QueueSeries.tsx";
+import QueueTable from "./charts/QueueTable.tsx";
+import ResourceRanking from "./charts/ResourceRanking.tsx";
+import RetryRanking from "./charts/RetryRanking.tsx";
+import RunSummary from "./charts/RunSummary.tsx";
+import StorageSeries from "./charts/StorageSeries.tsx";
+import TableHistogram from "./charts/TableHistogram.tsx";
+import TablesList from "./charts/TablesList.tsx";
+import WaitDistribution from "./charts/WaitDistribution.tsx";
 
 /**
- * The histogram of a table.
+ * The charts of the run.
  *
- * The bars are the **published frequencies** and the accumulated curve is
- * their running total: no metric the engine computes is derived here. A
- * table with more intervals than the chart has bars is grouped, and the
- * label says how many intervals each bar covers.
+ * The section is one column that scrolls: the summary of the run first,
+ * and then one group of charts per family of entities.
  *
- * The frequencies of the instant can be given instead, so the histogram
- * grows while the run is replayed: they are the engine's own arithmetic,
- * rebuilt from the samples the trace carries.
- */
-export function histogramOf(table: Table, frequencies?: number[]): Histogram {
-  const counts = frequencies ?? table.frequencies;
-  const total =
-    frequencies === undefined
-      ? table.samples
-      : counts.reduce((sum, count) => sum + count, 0);
-  const group = Math.max(1, Math.ceil(table.intervals / MAX_BARS));
-  const samples = Math.max(total, 1);
-  const bars: HistogramBar[] = [];
-  let cumulative = 0;
-  for (let index = 0; index < counts.length; index += group) {
-    let frequency = 0;
-    const last = Math.min(index + group, counts.length);
-    for (let step = index; step < last; step += 1) {
-      frequency += counts[step];
-    }
-    cumulative += frequency;
-    const low = index === 0 ? 0 : table.first + (index - 1) * table.width + 1;
-    const high = table.first + (last - 1) * table.width;
-    bars.push({
-      label: `${number(low)} - ${number(high)}`,
-      frequency,
-      accumulated: (cumulative / samples) * 100,
-    });
-  }
-  return { name: table.name, bars, group, samples: total };
-}
-
-/** The tables of the model: the ones of `TABULATE` and the ones of the queues. */
-function tablesOf(report: ReportDocument | null): { name: string; table: Table }[] {
-  if (report === null) {
-    return [];
-  }
-  const tables = Object.values(report.entities.tables).map((table) => ({
-    name: table.name,
-    table,
-  }));
-  const qtables = Object.values(report.entities.qtables).map((table) => ({
-    name: table.name,
-    table,
-  }));
-  return [...tables, ...qtables];
-}
-
-/** The number of an axis: the simulated time, rounded to a second. */
-function axisTime(value: number): string {
-  return String(Math.round(value));
-}
-
-/**
- * The charts of the run: the time series of the entities and the histograms
- * of the tables.
- *
- * The time series comes from the replay (the state over the run, rebuilt by
+ * The time series come from the replay (the state over the run, rebuilt by
  * walking the trace) and the histograms come from the report document (the
- * published frequencies). The charts read the documents; they compute
- * nothing that the engine computes.
+ * published frequencies). The charts read the documents; the only numbers
+ * they compute are the ratios of the engine's numbers, and those say so.
+ *
+ * Every chart that has the time in its axis starts at **zero**: the axis
+ * is the time of the run, from 0 to its end, and the vertical line marks
+ * the instant the reader is at.
  */
 export default function MonitorCharts({
   report,
   monitor,
-  figures,
+  state,
+  model,
 }: {
-  report: ReportDocument | null;
+  /** The report of the run. */
+  report: ReportDocument;
+  /** The index of the replay. */
   monitor: ReplayIndex;
-  /** The figures of the run at the instant the replay is at. */
-  figures?: Figures | null;
+  /** The state of the replay at the instant the reader is at. */
+  state: ReplayState | null;
+  /** The model of the run, for the names of the blocks. */
+  model: ModelBody | null;
 }) {
-  const tables = useMemo(() => tablesOf(report), [report]);
-  const [selectedQueues, setSelectedQueues] = useState<string[]>([]);
-  const [selectedFacilities, setSelectedFacilities] = useState<string[]>([]);
-  const [selectedTable, setSelectedTable] = useState<string | null>(null);
   // The clock of the replay: the charts show the run as it is now, not the
   // run as it will be.
-  const clock = useLive((state) => state.clock);
+  const clock = useLive((live) => live.clock);
+  // The figures of the entities at this instant, with the integrals that are
+  // still open closed at the clock: the area of a queue is the area it has
+  // covered so far.
+  const closed = useMemo(
+    () => (state === null ? null : closeFigures(state.figures, clock)),
+    [state, clock],
+  );
+  // The time the numbers were measured over: the clock for the numbers of
+  // the instant, the length of the run for the published ones. Each set of
+  // numbers is divided by its own time.
+  const elapsed = {
+    live: clock - report.start_time,
+    published: report.end_time - report.start_time,
+  };
 
-  // A new run has its own entities: the selection follows the run.
-  useEffect(() => {
-    setSelectedQueues(monitor.queues.slice(0, DEFAULT_SERIES));
-    setSelectedFacilities(monitor.facilities.slice(0, DEFAULT_SERIES));
-    setSelectedTable(tables[0]?.name ?? null);
-  }, [monitor, tables]);
-
-  const queueData = useMemo(
-    () => mergeSeries(selectedQueues, monitor.queuePoints, clock),
-    [monitor, selectedQueues, clock],
+  const queues = useMemo(
+    () => queuesOf(report, closed, elapsed),
+    [report, closed, elapsed.live, elapsed.published],
+  );
+  const facilities = useMemo(
+    () => facilitiesOf(report, closed, elapsed),
+    [report, closed, elapsed.live, elapsed.published],
+  );
+  const storages = useMemo(
+    () => storagesOf(report, closed, elapsed),
+    [report, closed, elapsed.live, elapsed.published],
+  );
+  const chains = useMemo(
+    () => chainsOf(report, closed, elapsed),
+    [report, closed, elapsed.live, elapsed.published],
+  );
+  const blocks = useMemo(
+    () => blockRows(report, model, state),
+    [report, model, state],
   );
 
-  const facilityData = useMemo(
-    () => mergeSeries(selectedFacilities, monitor.facilityPoints, clock),
-    [monitor, selectedFacilities, clock],
-  );
-
-  const histogram = useMemo(() => {
-    const found = tables.find((candidate) => candidate.name === selectedTable);
-    if (found === undefined) {
-      return null;
-    }
-    // The frequencies of the instant, when the replay knows the table's
-    // samples.
-    const live = figures?.tables[found.table.name]?.frequencies;
-    return histogramOf(found.table, live);
-  }, [tables, selectedTable, figures]);
+  const hasTables =
+    Object.keys(report.entities.tables).length +
+      Object.keys(report.entities.qtables).length >
+    0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto">
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <header className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold text-slate-800">
-            Contenido de las colas a lo largo del tiempo
-          </h3>
+          <h3 className="text-sm font-semibold text-slate-800">La corrida en números</h3>
           <span className="text-[11px] text-slate-500">
-            {queueData.length} instantes en que cambia el estado
+            Los números del instante, con el reloj de la reproducción
           </span>
         </header>
-        <EntityPicker
-          entities={monitor.queues}
-          selected={selectedQueues}
-          onToggle={(name) =>
-            setSelectedQueues((current) =>
-              current.includes(name)
-                ? current.filter((candidate) => candidate !== name)
-                : [...current, name],
-            )
-          }
+        <RunSummary
+          report={report}
+          state={state}
+          clock={clock}
+          generated={countAt(monitor.generateTimes, clock)}
         />
-        {selectedQueues.length === 0 ? (
-          <p className="py-6 text-center text-xs text-slate-400">
-            Elige una cola para verla.
-          </p>
-        ) : (
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={queueData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
-                <CartesianGrid stroke="#f1f5f9" />
-                <XAxis
-                  dataKey="time"
-                  tickFormatter={axisTime}
-                  fontSize={10}
-                  minTickGap={40}
-                />
-                <YAxis fontSize={10} allowDecimals={false} />
-                <Tooltip
-                  formatter={(value) => number(Number(value))}
-                  labelFormatter={(value) => `t = ${number(Number(value))}`}
-                />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                {selectedQueues.map((name) => (
-                  <Line
-                    key={name}
-                    type="stepAfter"
-                    dataKey={name}
-                    stroke="#4f46e5"
-                    strokeWidth={1.75}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        )}
       </section>
 
-      {monitor.facilities.length > 0 && (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <header className="mb-2">
-            <h3 className="text-sm font-semibold text-slate-800">
-              Facilities a lo largo del tiempo
-            </h3>
-            <p className="text-[11px] text-slate-500">
-              1 cuando la facility está ocupada, 0 cuando está libre. Cada
-              escalón es un cambio del estado.
-            </p>
-          </header>
-          <EntityPicker
-            entities={monitor.facilities}
-            selected={selectedFacilities}
-            onToggle={(name) =>
-              setSelectedFacilities((current) =>
-                current.includes(name)
-                  ? current.filter((candidate) => candidate !== name)
-                  : [...current, name],
-              )
-            }
-          />
-          {selectedFacilities.length === 0 ? (
-            <p className="py-6 text-center text-xs text-slate-400">
-              Elige una facility para verla.
-            </p>
-          ) : (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={facilityData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
-                  <CartesianGrid stroke="#f1f5f9" />
-                  <XAxis
-                    dataKey="time"
-                    tickFormatter={axisTime}
-                    fontSize={10}
-                    minTickGap={40}
-                  />
-                  <YAxis fontSize={10} domain={[0, 1]} ticks={[0, 1]} />
-                  <Tooltip
-                    formatter={(value) => (Number(value) === 1 ? "ocupada" : "libre")}
-                    labelFormatter={(value) => `t = ${number(Number(value))}`}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  {selectedFacilities.map((name) => (
-                    <Line
-                      key={name}
-                      type="stepAfter"
-                      dataKey={name}
-                      stroke="#0d9488"
-                      strokeWidth={1.75}
-                      dot={false}
-                      isAnimationActive={false}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </section>
-      )}
+      <ChartCard
+        title="Los recursos que aprietan"
+        subtitle="El recurso que más aprieta es el que más se acerca al 100 % o el que más cola carga."
+        badge="derivado del reporte"
+        badgeClass="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+        footnote="Utilización = tiempo ocupado / tiempo de la corrida. Contenido medio = área / tiempo de la corrida."
+      >
+        <ResourceRanking report={report} live={closed} elapsed={elapsed} />
+      </ChartCard>
 
-      {tables.length > 0 && (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <header className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="text-sm font-semibold text-slate-800">
-              Histograma de las tablas del modelo
-            </h3>
-            <div className="flex flex-wrap gap-1">
-              {tables.map((candidate) => (
-                <button
-                  key={candidate.name}
-                  type="button"
-                  onClick={() => setSelectedTable(candidate.name)}
-                  className={[
-                    "rounded-md border px-2 py-1 text-[11px] font-medium transition",
-                    candidate.name === selectedTable
-                      ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                      : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50",
-                  ].join(" ")}
-                >
-                  {candidate.name}
-                </button>
-              ))}
-            </div>
-          </header>
-          {histogram === null ? (
-            <p className="py-6 text-center text-xs text-slate-400">Elige una tabla.</p>
-          ) : (
-            <>
-              <p className="mb-2 text-[11px] text-slate-500">
-                Las barras son las frecuencias de la tabla y la curva es su suma
-                acumulada, sobre {number(histogram.samples)} valores.
-                {histogram.group > 1 && (
-                  <> Cada barra cubre {histogram.group} intervalos.</>
-                )}
-              </p>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={histogram.bars} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
-                    <CartesianGrid stroke="#f1f5f9" />
-                    <XAxis
-                      dataKey="label"
-                      fontSize={10}
-                      minTickGap={30}
-                      interval="preserveStartEnd"
-                    />
-                    <YAxis yAxisId="left" fontSize={10} allowDecimals={false} />
-                    <YAxis yAxisId="right" orientation="right" fontSize={10} domain={[0, 100]} />
-                    <Tooltip
-                      formatter={(value, name) =>
-                        name === "acumulado"
-                          ? `${number(Number(value))} %`
-                          : number(Number(value))
-                      }
-                    />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar
-                      yAxisId="left"
-                      dataKey="frequency"
-                      name="frecuencia"
-                      fill="#6366f1"
-                      isAnimationActive={false}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="stepAfter"
-                      dataKey="accumulated"
-                      name="acumulado"
-                      stroke="#ea580c"
-                      strokeWidth={1.75}
-                      dot={false}
-                      isAnimationActive={false}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </>
-          )}
-        </section>
-      )}
-    </div>
-  );
-}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <ChartCard
+          title="Contenido de las colas a lo largo del tiempo"
+          subtitle="Cada escalón es un instante en que la cola cambia: no es una muestra, es la historia exacta."
+          badge="replay"
+        >
+          <QueueSeries monitor={monitor} queues={queues} clock={clock} />
+        </ChartCard>
 
-/** The entities the user chooses to see in the time series. */
-function EntityPicker({
-  entities,
-  selected,
-  onToggle,
-}: {
-  entities: string[];
-  selected: string[];
-  onToggle: (name: string) => void;
-}) {
-  if (entities.length === 0) {
-    return null;
-  }
-  return (
-    <div className="mb-2 flex flex-wrap gap-1">
-      {entities.map((name) => {
-        const active = selected.includes(name);
-        return (
-          <button
-            key={name}
-            type="button"
-            onClick={() => onToggle(name)}
-            className={[
-              "rounded-md border px-2 py-1 text-[11px] font-medium transition",
-              active
-                ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                : "border-slate-300 bg-white text-slate-500 hover:bg-slate-50",
-            ].join(" ")}
+        <ChartCard
+          title="Distribución de las esperas"
+          subtitle="Cada barra son las transacciones que esperaron ese tiempo; la curva, su acumulada."
+          badge="derivado de la traza"
+          badgeClass="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+        >
+          <WaitDistribution monitor={monitor} clock={clock} />
+        </ChartCard>
+
+        <ChartCard
+          title="Indicadores por cola"
+          subtitle="Los indicadores con * se derivan del reporte del motor: el área y el tiempo total, divididos por el tiempo de la corrida."
+        >
+          <QueueTable queues={queues} />
+        </ChartCard>
+
+        {facilities.length > 0 && (
+          <ChartCard
+            title="Ocupación de las facilities a lo largo del tiempo"
+            subtitle="Cada tramo es un intervalo: el color es la facility ocupada, el gris la libre."
+            badge="replay"
           >
-            {name}
-          </button>
-        );
-      })}
+            <FacilityTimeline
+              monitor={monitor}
+              facilities={facilities}
+              clock={clock}
+            />
+          </ChartCard>
+        )}
+
+        {facilities.length > 0 && (
+          <ChartCard
+            title="Indicadores por facility"
+            subtitle="La utilización y el servicio medio se derivan del reporte del motor; las interrupciones y los reintentos los cuenta el motor."
+          >
+            <FacilityTable facilities={facilities} />
+          </ChartCard>
+        )}
+
+        {storages.length > 0 && (
+          <ChartCard
+            title="Unidades en uso — almacén"
+            subtitle="Las unidades ocupadas en cada instante y el límite del almacén: cuando la curva toca el límite, el modelo está bloqueado."
+            badge="replay"
+          >
+            <StorageSeries monitor={monitor} storages={storages} clock={clock} />
+          </ChartCard>
+        )}
+
+        {chains.length > 0 && (
+          <ChartCard
+            title="Tamaño de la cadena"
+            subtitle="Cuántas transacciones hay encadenadas a la vez: la cadena crece cuando una entra y mengua cuando sale."
+            badge="replay"
+          >
+            <ChainSeries monitor={monitor} chains={chains} clock={clock} />
+          </ChartCard>
+        )}
+
+        {hasTables && (
+          <ChartCard
+            title="Histograma de la tabla"
+            subtitle="La tabla del modelo: cada barra es un intervalo de valores y la curva su acumulada. La banda es la desviación."
+            badge="reporte del motor"
+          >
+            <TableHistogram report={report} live={closed} />
+          </ChartCard>
+        )}
+
+        {hasTables && (
+          <ChartCard
+            title="Las tablas del modelo"
+            subtitle="Cada tabla que el modelo tabula, con lo que el motor publica de ella."
+            badge="reporte del motor"
+          >
+            <TablesList report={report} live={closed} />
+          </ChartCard>
+        )}
+
+        <ChartCard
+          title="Transacciones por bloque"
+          subtitle="Cuántas transacciones pasaron por cada bloque. La barra más larga es donde se acumula el trabajo."
+          badge="reporte del motor"
+          footnote="Un bloque del modelo puede ser varios del programa: la cifra es la de la fila que cuenta el bloque, para no contarla cinco veces."
+        >
+          <BlockRanking rows={blocks} />
+        </ChartCard>
+
+        <ChartCard
+          title="Reintentos por bloque — la contención"
+          subtitle="Un reintento es un intento que no pudo entrar: el bloque estaba ocupado o no había unidades. No es un error: es la señal del cuello de botella."
+          badge="reporte del motor"
+          badgeClass="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
+        >
+          <RetryRanking rows={blocks} />
+        </ChartCard>
+      </div>
+
+      <p className="px-1 text-[11px] text-slate-400">
+        Las cifras en violeta son las del instante que marca el reloj; las
+        demás son las que el motor publicó para la corrida completa. El tiempo
+        de todos los gráficos empieza en 0 y termina en{" "}
+        {number(report.end_time - report.start_time)} s.
+      </p>
     </div>
   );
 }

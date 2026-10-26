@@ -136,3 +136,28 @@ libre para los comandos.
   - **Lo único que se perdía no se pierde**: la columna **«Ahora»** de los
     indicadores por facility dice quién la tiene en el instante (*libre* /
     *tx 3*), en el color de las cifras vivas.
+
+## Entrega — las unidades de revisión
+
+La rama `feature/genmsi-reordenamiento` lleva el trabajo de estas dos
+features en diez commits, y cada commit compila y pasa sus tests por sí
+solo (comprobado commit por commit):
+
+| Commit | Unidad |
+| --- | --- |
+| `ddb068e` | las métricas derivadas de la corrida |
+| `d32c7fe` | las series de la corrida |
+| `ef941ef` | las figuras del instante |
+| `2d9b4cf` | las cartas de los gráficos |
+| `d9805f7` | las series de los gráficos |
+| `f903eae` | las tablas y las esperas de los gráficos |
+| `d251e1e` | la sección de los gráficos |
+| `dcdb9c2` | el marco de la app (cabecera, barra, pie y panel lateral) |
+| `b8a51f5` | la documentación |
+| `8e89058` | la versión 0.2.0 |
+
+**La frontera de la entrega**: las unidades 1 a 7 son la feature de los
+gráficos y la unidad 8 es la del chrome; la 9 es la documentación de las
+dos y la 10 es la versión. Un pull request con el todo son casi diez mil
+líneas: si se abre, va apilado —un PR por unidad, del monitor hacia la
+app— para que quien revisa no tenga que leerlo todo de una vez.

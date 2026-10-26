@@ -90,6 +90,7 @@ fn total(rows: &[(String, Both)], from_scratch: bool) -> Composition {
         total.crossings += one.crossings;
         total.isolated += one.isolated;
         total.over_blocks += one.over_blocks;
+        total.largest += one.largest;
     }
     total
 }
@@ -97,13 +98,13 @@ fn total(rows: &[(String, Both)], from_scratch: bool) -> Composition {
 /// Print the table of the corpus.
 fn print_table(rows: &[(String, Both)]) {
     println!(
-        "{:<48} {:>7} {:>7} {:>7} {:>6} {:>7} {:>7} {:>12} {:>6}",
-        "model", "bloques", "aristas", "solapes", "fuera", "cruces", "aislados", "lienzo", "ratio"
+        "{:<48} {:>7} {:>7} {:>7} {:>6} {:>7} {:>7} {:>12} {:>7} {:>6}",
+        "model", "bloques", "aristas", "solapes", "fuera", "cruces", "aislados", "lienzo", "mayor", "ratio"
     );
     for (name, both) in rows {
         let one = both.from_scratch;
         println!(
-            "{:<48} {:>7} {:>7} {:>7} {:>6} {:>7} {:>7} {:>12} {:>6.1}",
+            "{:<48} {:>7} {:>7} {:>7} {:>6} {:>7} {:>7} {:>12} {:>7} {:>6.1}",
             name,
             one.blocks,
             one.edges,
@@ -112,6 +113,7 @@ fn print_table(rows: &[(String, Both)]) {
             one.crossings,
             one.isolated,
             format!("{}x{}", one.width, one.height),
+            one.largest,
             one.ratio()
         );
     }
@@ -125,9 +127,9 @@ fn print_table(rows: &[(String, Both)]) {
 /// One line with the numbers of a measure.
 fn summary(one: &Composition) -> String {
     format!(
-        "bloques {} aristas {} solapes {} fuera {} cruces {} aislados {} por-encima {}",
+        "bloques {} aristas {} solapes {} fuera {} cruces {} aislados {} por-encima {} mayor {}",
         one.blocks, one.edges, one.overlaps, one.outside, one.crossings, one.isolated,
-        one.over_blocks
+        one.over_blocks, one.largest
     )
 }
 
@@ -170,6 +172,7 @@ fn value(one: &Composition) -> serde_json::Value {
         "edge_length": one.edge_length,
         "width": one.width,
         "height": one.height,
+        "largest": one.largest,
     })
 }
 

@@ -38,6 +38,12 @@ pub struct Composition {
     pub width: i32,
     /// The height of the canvas.
     pub height: i32,
+    /// The largest side of the canvas: the one the reader feels.
+    ///
+    /// A picture that is very wide and very short has to be read zoomed
+    /// out, and the same happens with a picture that is very tall. The
+    /// composition tries to leave the smallest largest side it can.
+    pub largest: i32,
 }
 
 impl Composition {
@@ -135,6 +141,7 @@ pub fn measure(model: &GmdlModel, positions: &[Position]) -> Composition {
         }
         measure.width = right - left;
         measure.height = bottom - top;
+        measure.largest = measure.width.max(measure.height);
     }
     // The blocks that sit on each other. A block and the container that owns
     // it share the canvas by design: the container is the frame around it.

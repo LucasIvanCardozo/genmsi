@@ -136,31 +136,71 @@ fn a_container_grows_to_hold_the_blocks_it_owns() {
     assert!(!(x1 < x2 + w2 && x2 < x1 + w1 && y1 < y2 + h2 && y2 < y1 + h1));
 }
 
-#[test]
-fn the_blocks_that_no_link_reaches_are_at_the_top() {
-    // A model with a chain and a block that is in no flow: the block that is
-    // in no flow starts the picture, it does not finish it.
+/// A model with two chains of different lengths and four blocks that are
+/// in no flow.
+fn two_chains() -> GmdlModel {
     let text = "<gmodel versioncode=\"1\"><gclasses/><modules>\
          <module moduleid=\"0\" moduleclass=\"main\" owner=\"0\" caption=\"Modelo\" name=\"Modelo1\" kind=\"C\">\
-         <links><link frommoduleid=\"2\" fromioid=\"1\" tomoduleid=\"3\" toioid=\"1\"/></links><inputs/><outputs/></module>\
+         <links>\
+         <link frommoduleid=\"2\" fromioid=\"1\" tomoduleid=\"3\" toioid=\"1\"/>\
+         <link frommoduleid=\"3\" fromioid=\"2\" tomoduleid=\"4\" toioid=\"1\"/>\
+         <link frommoduleid=\"5\" fromioid=\"1\" tomoduleid=\"6\" toioid=\"1\"/>\
+         </links><inputs/><outputs/></module>\
          <module moduleid=\"1\" moduleclass=\"Note\" owner=\"0\" caption=\"Nota\" name=\"Nota\" kind=\"A\">\
          <inputs/><outputs/><props/></module>\
-         <module moduleid=\"2\" moduleclass=\"Clock\" owner=\"0\" caption=\"Clock\" name=\"Clock\" kind=\"A\">\
+         <module moduleid=\"2\" moduleclass=\"Generate\" owner=\"0\" caption=\"Genera\" name=\"Genera\" kind=\"A\">\
          <outputs><output ioid=\"1\" name=\"Salida1\" caption=\"\" mylabel=\"L1\"/></outputs>\
          <props/></module>\
-         <module moduleid=\"3\" moduleclass=\"Terminate\" owner=\"0\" caption=\"Terminate\" name=\"Terminate\" kind=\"A\">\
+         <module moduleid=\"3\" moduleclass=\"Logic\" owner=\"0\" caption=\"Logica\" name=\"Logica\" kind=\"A\">\
+         <inputs><input ioid=\"1\" name=\"Entrada1\" caption=\"\" mylabel=\"L1\"/></inputs>\
+         <outputs><output ioid=\"2\" name=\"Salida1\" caption=\"\" mylabel=\"L1\"/></outputs>\
+         <props/></module>\
+         <module moduleid=\"4\" moduleclass=\"Terminate\" owner=\"0\" caption=\"Termina\" name=\"Termina\" kind=\"A\">\
          <inputs><input ioid=\"1\" name=\"Entrada1\" caption=\"\" mylabel=\"L1\"/></inputs>\
          <props/></module>\
+         <module moduleid=\"5\" moduleclass=\"Generate\" owner=\"0\" caption=\"Genera\" name=\"Genera\" kind=\"A\">\
+         <outputs><output ioid=\"1\" name=\"Salida1\" caption=\"\" mylabel=\"L1\"/></outputs>\
+         <props/></module>\
+         <module moduleid=\"6\" moduleclass=\"Terminate\" owner=\"0\" caption=\"Termina\" name=\"Termina\" kind=\"A\">\
+         <inputs><input ioid=\"1\" name=\"Entrada1\" caption=\"\" mylabel=\"L1\"/></inputs>\
+         <props/></module>\
+         <module moduleid=\"7\" moduleclass=\"Note\" owner=\"0\" caption=\"Nota\" name=\"Nota\" kind=\"A\">\
+         <inputs/><outputs/><props/></module>\
+         <module moduleid=\"8\" moduleclass=\"Table\" owner=\"0\" caption=\"Tabla\" name=\"Tabla\" kind=\"A\">\
+         <inputs/><outputs/><props/></module>\
+         <module moduleid=\"9\" moduleclass=\"Table\" owner=\"0\" caption=\"Tabla\" name=\"Tabla\" kind=\"A\">\
+         <inputs/><outputs/><props/></module>\
          </modules></gmodel>";
-    let mut model = genmsi_format::parse_str(text).expect("the model parses");
+    genmsi_format::parse_str(&text).expect("the model parses")
+}
+
+#[test]
+fn the_sources_of_the_flow_start_in_the_same_row() {
+    // Two chains of different lengths: their sources start the picture
+    // together, so the reader sees every start of the flow in the first row.
+    let mut model = two_chains();
     compose_incomplete(&mut model).expect("composed");
-    let (_, y_note, _, _) = layout_of(&model, 1).expect("placed");
-    let (_, y_clock, _, _) = layout_of(&model, 2).expect("placed");
-    let (_, y_terminate, _, _) = layout_of(&model, 3).expect("placed");
-    // The note starts the picture: it is above the flow.
+    let (_, y_first, _, _) = layout_of(&model, 2).expect("placed");
+    let (_, y_second, _, _) = layout_of(&model, 5).expect("placed");
+    assert_eq!(
+        y_first, y_second,
+        "the sources of the flow start in the same row: {y_first}, {y_second}"
+    );
+}
+
+#[test]
+fn the_blocks_that_are_in_no_flow_do_not_stretch_the_picture_in_a_row() {
+    // The blocks that no link reaches have no place in the flow: they go in
+    // a grid beside it, not in a row that stretches the picture.
+    let mut model = two_chains();
+    compose_incomplete(&mut model).expect("composed");
+    let rows: Vec<i32> = [1, 7, 8, 9]
+        .iter()
+        .map(|id| layout_of(&model, *id).expect("placed").1)
+        .collect();
     assert!(
-        y_note < y_clock && y_clock < y_terminate,
-        "the note starts the picture: {y_note}, the flow: {y_clock}, {y_terminate}"
+        rows.windows(2).any(|pair| pair[0] != pair[1]),
+        "the blocks that are in no flow are not all in the same row: {rows:?}"
     );
 }
 

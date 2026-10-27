@@ -15,11 +15,12 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - `ports`: `nombre@x%,y%` con el ancla normalizada a la huella. `none` = sin puertos.
 - Las dos zonas viven **dentro** de la silueta, nunca la invaden.
 
-**Las tres reglas del contrato v2 que este grupo cumple**
+**Las reglas del contrato v2 que este grupo cumple**
 
-- **§2.1 — ancho útil.** La partición izquierda/derecha se usa cuando el ancho útil (la huella menos 6 px de aire por lado) llega a 60 px. `Clock` (38 px útiles), `FunctionDist` (52 px) y `MFunctionDist` (60 px, pero con la caja inscrita del círculo por debajo) van apilados: rótulo arriba, cifra abajo, en la misma columna. `Terminate` también va apilado, aunque su ancho útil llegue a 72 px, porque rótulo y cifra no caben en el mismo lado (60 + 30 > 72): es la regla general de §2.1, «el texto y la cifra se colocan donde caben».
+- **§2.1 — ancho útil.** La partición izquierda/derecha se usa cuando el ancho útil (la huella menos 6 px de aire por lado) llega a 60 px. `Clock` (38 px útiles) va apilado: rótulo arriba, cifra abajo, en la misma columna. `Terminate` también va apilado, aunque su ancho útil llegue a 72 px, porque rótulo y cifra no caben en el mismo lado (60 + 30 > 72): es la regla general de §2.1, «el texto y la cifra se colocan donde caben». `FunctionDist` y `MFunctionDist` llevan el nombre en dos líneas, así que su rótulo ocupa la banda central y su cifra el borde inferior.
 - **§2.2 — el subtítulo.** Sólo existe en bloques de 40 px de alto o más. Los nueve bloques de menos de 40 px (`Advance`, `Buffer`, `Queue`, `Depart`, `Logic`, `InitialLS`, `Mark`, `Variable`, `VariableA`) llevan **una sola línea** con el nombre de la clase.
-- **§6.3 — la cifra.** Una línea de 10-11 px monoespaciada. Las 23 zonas de cifra de este grupo miden **30 px de ancho o más** (el mínimo de §6.3 para una línea), así que **ninguna clase usa la forma apilada** y ninguna cifra se trunca. `Clock` reserva la zona (30 px) pero la deja vacía: es una declaración sin entidad.
+- **§2.3 — el nombre completo.** El nombre de la clase se escribe **entero**: en una línea si cabe en su zona, y en dos si no cabe (la zona necesita 24 px de alto para las dos). Ningún nombre de este grupo se corta con puntos suspensivos.
+- **§6.3 — la cifra.** Una línea de 10-11 px monoespaciada. La zona de cifra mide **el ancho de su propio texto más 2 px de aire** (§6.3 v3), así que **ninguna clase usa la forma apilada** y ninguna cifra se trunca. `Clock` reserva la zona pero la deja vacía: es una declaración sin entidad.
 - **§3.1 — la silueta toca el puerto.** Las 26 anclas de este grupo caen **en el borde** de su silueta, así que no hace falta la excepción de la burbuja centrada en el ancla.
 
 **Colores de familia**
@@ -38,9 +39,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - **Operación**: `Advance` placa base · `Buffer` placa con ranura · `Assign` hoja con pestaña · `Mark` tarjeta con lengüeta · `Counter` paralelogramo · `Priority` cuerpo con cuello · `SaveValue` cajón con lengüeta · `InitiaSV` cajón con lengüeta · `Logic` cuerpo con interruptor · `InitialLS` cuerpo con interruptor · `Variable`/`VariableN`/`VariableA` cinta de datos · `Function`/`FunctionExpon`/`MFunction` tarjeta de gráfica · `FunctionDist` elipse con abanico · `MFunctionDist` elipse con aros.
 - **Anotación** (§5.2): `Note` hoja con esquina doblada. Es la doceava familia y sólo contiene `Note`: sale de Operación porque una anotación no es un paso del flujo.
 
-**Lo que no se puede evitar, y por qué**
+**Lo que cambia con el nombre entero**
 
-- `FunctionDist` y `MFunctionDist`: su nombre de clase no cabe en el ancho útil de un círculo de 64/72 px ni en una línea ni en dos, así que llega truncado («Functio…», «MFuncti…»). Es el precio de la variante circular; el nombre completo está en el rótulo de la ficha del catálogo y en la lista de bloques.
+- `FunctionDist` y `MFunctionDist`: su nombre de clase no cabe en una línea de un círculo de 64/72 px, así que **va en dos líneas** («Function» y «Dist», «MFunction» y «Dist») y la zona de rótulo crece a 24 px de alto. Para que el texto no pise el dibujo, el abanico de `FunctionDist` sube a la parte alta de la elipse y los aros de `MFunctionDist` bajan al centro. La cifra baja al borde inferior del círculo. El nombre se lee entero: ya no llega truncado.
 - `Clock`: la tabla «todo lo demás» de la feature le asignaría el par dentro/pasadas, pero el contrato §2 deja la cifra vacía en una declaración sin entidad y un reloj no recibe transacciones: se entrega la zona reservada y vacía.
 - `Generate`: la caja de emisión sube de y=35 a y=20 (el catálogo original la dibuja a y=35) para que el rótulo y la cifra compartan banda horizontal; el ancla del puerto no cambia y la silueta sigue siendo la del original unida a un cuerpo más alto.
 
@@ -75,9 +76,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0%
 - path: M32 0 A32 32 0 1 1 32 64 A32 32 0 1 1 32 0 Z
 - details: none
-- label: 6,16,52,11
+- label: 5,16,54,11
 - figure: 14,34,36,11
-- note: Circulo limpio, la forma de sumidero que se lee de un vistazo: el flujo entra por arriba y se cierra. El editor original lo dibujaba como una elipse de 64 con un rectangulo pegado al lado; esa pieza es adorno y no se lleva, porque hacia la silueta irregular y el anillo del fondo no significaba nada para quien lee. El puerto de entrada conserva su ancla exacta del original (32,0), que en un circulo es justo el vertice superior; por eso la huella de la clase pasa de 84x64 a 64x64. El rotulo y la cifra van en bandas apiladas porque el ancho util del circulo no da para los dos en el mismo lado.
+- note: Circulo limpio, la forma de sumidero que se lee de un vistazo: el flujo entra por arriba y se cierra. El editor original lo dibujaba como una elipse de 64 con un rectangulo pegado al lado; esa pieza es adorno y no se lleva, porque hacia la silueta irregular y el anillo del fondo no significaba nada para quien lee. El puerto de entrada conserva su ancla exacta del original (32,0), que en un circulo es justo el vertice superior; por eso la huella de la clase pasa de 84x64 a 64x64. El rotulo y la cifra van en bandas apiladas porque el ancho util del circulo no da para los dos en el mismo lado. La zona de rotulo se ensancha a 54 px: la caja inscrita del circulo da de sobra a esa altura, y «Terminate» (48,6 px) cabe entero en una linea.
 
 ## Queue
 - family: Cola
@@ -86,9 +87,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@36%,0% ; Salida1@36%,100%
 - path: M 0 0 H 70 A 27 16 0 0 1 70 32 L 0 32 Z
 - details: M 70 3 L 70 29 ; M 76 11 L 76 21 ; M 81 11 L 81 21 ; M 86 11 L 86 21
-- label: 5,7,30,12
+- label: 5,7,31,12
 - figure: 37,7,30,12
-- note: caja con remate redondeado a la derecha, la silueta de la familia Cola; las tres marcas del remate son los que esperan, así que rótulo y cifra se quedan en el cuerpo, y la entrada y la salida comparten el 36% del ancho
+- note: caja con remate redondeado a la derecha, la silueta de la familia Cola; las tres marcas del remate son los que esperan, así que rótulo y cifra se quedan en el cuerpo, y la entrada y la salida comparten el 36% del ancho. El rotulo se ensancha 1 px: «Queue» mide 27 px de monoespaciada y la zona necesita 31 para que quepa entero.
 
 ## Depart
 - family: Cola
@@ -97,9 +98,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@36%,0% ; Salida1@36%,100%
 - path: M 0 0 H 70 A 27 16 0 0 1 70 32 L 0 32 Z
 - details: M 70 3 L 70 29 ; M 76 9 L 85 16 ; M 76 23 L 85 16
-- label: 5,7,30,12
-- figure: 37,7,30,12
-- note: la misma caja de Queue con galón de salida en el remate, la figura del catálogo original; el galón vive en el remate, así que la cifra se queda en el cuerpo, y entrada y salida comparten el 36% del ancho
+- label: 5,7,41,12
+- figure: 47,7,20,12
+- note: la misma caja de Queue con galón de salida en el remate, la figura del catálogo original; el galón vive en el remate, así que la cifra se queda en el cuerpo, y entrada y salida comparten el 36% del ancho. El rotulo se ensancha a 41 px para que «Depart» quepa entero en una linea, y la zona de cifra baja a 20 px (para que la cola muestre su contenido, que son hasta tres cifras) sin mover su borde derecho.
 
 ## Advance
 - family: Operación
@@ -152,9 +153,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0% ; Salida1@50%,100%
 - path: M 6 0 H 74 L 94 34 A 6 6 0 0 1 88 40 H 26 A 6 6 0 0 1 20 34 L 0 6 A 6 6 0 0 1 6 0 Z
 - details: M 30 31 L 30 37 ; M 35 31 L 35 37 ; M 40 31 L 40 37
-- label: 20,8,34,24
-- figure: 55,22,30,12
-- note: placa inclinada, el paralelogramo del catálogo original: el flujo entra por arriba y sale por abajo, y las tres rayas del pie son el contador; la pendiente manda el rótulo a la derecha y la cifra a la banda baja, y los puertos van al 50% del ancho
+- label: 20,8,44,24
+- figure: 65,22,20,12
+- note: placa inclinada, el paralelogramo del catálogo original: el flujo entra por arriba y sale por abajo, y las tres rayas del pie son el contador; la pendiente manda el rótulo a la derecha y la cifra a la banda baja, y los puertos van al 50% del ancho. El rotulo pasa a 44 px de ancho para que «Counter» quepa en una linea, y la zona de cifra baja a 20 px (para el valor que cuenta) conservando su borde derecho.
 
 ## Priority
 - family: Operación
@@ -163,9 +164,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0% ; Salida1@50%,100%
 - path: M 32 0 H 56 A 6 6 0 0 1 62 6 V 20 H 82 A 6 6 0 0 1 88 26 V 46 A 6 6 0 0 1 82 52 H 6 A 6 6 0 0 1 0 46 V 26 A 6 6 0 0 1 6 20 H 26 V 6 A 6 6 0 0 1 32 0 Z
 - details: M 34 12 L 34 18 ; M 42 8 L 42 18 ; M 50 4 L 50 18
-- label: 8,24,40,22
+- label: 4,22,50,22
 - figure: 54,28,30,14
-- note: cuerpo con cuello elevado, la silueta del catálogo original; las tres barras del cuello son los niveles de prioridad y el rótulo vive en el cuerpo, con los puertos al 50% del ancho, sobre el cuello
+- note: cuerpo con cuello elevado, la silueta del catálogo original; las tres barras del cuello son los niveles de prioridad y el rótulo vive en el cuerpo, con los puertos al 50% del ancho, sobre el cuello. El cuerpo da 50 px utiles: el rotulo ocupa 44 px («Priority», 43,2 px) y la cifra 30, y los dos caben de lado en el mismo sitio de antes.
 
 ## SaveValue
 - family: Operación
@@ -174,9 +175,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0% ; Salida1@50%,100%
 - path: M 8 0 H 92 A 8 8 0 0 1 100 8 V 20 A 8 8 0 0 1 92 28 H 84 V 45 H 16 V 28 H 8 A 8 8 0 0 1 0 20 V 8 A 8 8 0 0 1 8 0 Z
 - details: M 24 36 L 76 36
-- label: 8,3,52,22
+- label: 8,3,54,22
 - figure: 62,10,30,14
-- note: cajón con lengüeta abajo, el espejo de Assign: asignar empuja hacia fuera y guardar deja el valor en el cajón; la cifra es el valor guardado y la lengüeta lleva la ranura, con la entrada y la salida al 50% del ancho
+- note: cajón con lengüeta abajo, el espejo de Assign: asignar empuja hacia fuera y guardar deja el valor en el cajón; la cifra es el valor guardado y la lengüeta lleva la ranura, con la entrada y la salida al 50% del ancho. El rotulo ocupa 54 px del cajon para que «SaveValue» quepa entero, y la zona de cifra conserva su sitio y su ancho para el valor que guarda.
 
 ## InitiaSV
 - family: Operación
@@ -207,9 +208,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: none
 - path: M 7 0 H 63 A 7 7 0 0 1 70 7 V 8 H 88 A 8 8 0 0 1 96 16 V 24 H 70 V 25 A 7 7 0 0 1 63 32 H 7 A 7 7 0 0 1 0 25 V 7 A 7 7 0 0 1 7 0 Z
 - details: M 76 20 L 88 12
-- label: 5,7,32,12
-- figure: 37,7,30,12
-- note: el mismo interruptor de Logic en placa apagada, porque fija el valor de partida; sin puertos no hay ancla que repartir, y la cifra es el valor inicial del interruptor
+- label: 5,4,44,24
+- figure: 49,7,18,12
+- note: el mismo interruptor de Logic en placa apagada, porque fija el valor de partida; sin puertos no hay ancla que repartir, y la cifra es el valor inicial del interruptor. «InitialLS» no cabe en una linea del cuerpo, asi que va en dos («Initial» e «LS») y la zona de rotulo sube a 24 px de alto; la zona de cifra baja a 18 px (los de su texto, «on») sin mover su borde derecho.
 
 ## Variable
 - family: Operación
@@ -229,9 +230,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: none
 - path: M 0 0 H 104 L 120 20 L 104 40 H 0 Z
 - details: M 108 14 L 108 26
-- label: 8,6,52,24
+- label: 8,6,54,24
 - figure: 66,10,30,14
-- note: la misma cinta de Variable, más alta: la silueta comparte familia y la diferencia de altura dice el tipo; sin puertos no hay ancla, y con 40 px ya caben rótulo y subtítulo
+- note: la misma cinta de Variable, más alta: la silueta comparte familia y la diferencia de altura dice el tipo; sin puertos no hay ancla, y con 40 px ya caben rótulo y subtítulo. El rotulo se ensancha a 54 px para que «VariableN» quepa entero en una linea, y la cifra conserva su sitio y su ancho.
 
 ## VariableA
 - family: Operación
@@ -283,10 +284,10 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - footprint: 64x64
 - ports: none
 - path: M 0 32 A 32 32 0 1 0 64 32 A 32 32 0 1 0 0 32 Z
-- details: M 28 32 L 32 35 L 36 32 ; M 30 30.5 L 32 35 L 34 30.5 ; M 31 29.5 L 32 35 L 33 29.5
-- label: 12,8,40,22
-- figure: 16,36,32,22
-- note: elipse con el abanico de la distribución, la silueta del catálogo original; con 64 px de ancho el rótulo va arriba y la cifra abajo, en la misma columna, y el nombre llega truncado porque no cabe de otro modo en un círculo de 64 px
+- details: M 28 8 L 32 11 L 36 8 ; M 30 6.5 L 32 11 L 34 6.5 ; M 31 5.5 L 32 11 L 33 5.5
+- label: 8,20,48,24
+- figure: 18,46,30,11
+- note: elipse con el abanico de la distribución, la silueta del catálogo original; con 64 px de ancho el rótulo va arriba y la cifra abajo, en la misma columna. «FunctionDist» no cabe en una linea de un circulo de 64 px, asi que va en dos («Function» y «Dist»): la zona de rotulo ocupa 48 px de la banda central con 24 px de alto, el abanico sube a la parte alta del circulo para que el texto no lo pise, y la cifra baja al borde inferior con 30 px.
 
 ## MFunctionDist
 - family: Operación
@@ -294,10 +295,10 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - footprint: 72x72
 - ports: none
 - path: M 0 36 A 36 36 0 1 0 72 36 A 36 36 0 1 0 0 36 Z
-- details: M 30.5 37 A 5.5 5.5 0 1 0 41.5 37 A 5.5 5.5 0 1 0 30.5 37 Z ; M 33.5 37 A 2.5 2.5 0 1 0 38.5 37 A 2.5 2.5 0 1 0 33.5 37 Z
-- label: 15,9,42,22
-- figure: 18,44,36,22
-- note: elipse con aros concéntricos en la banda media, la silueta del catálogo original; en un círculo de 72 px el rótulo va arriba y la cifra abajo, y el nombre llega truncado por lo mismo que en FunctionDist
+- details: M 30.5 45 A 5.5 5.5 0 1 1 41.5 45 A 5.5 5.5 0 1 1 30.5 45 Z ; M 33.5 45 A 2.5 2.5 0 1 1 38.5 45 A 2.5 2.5 0 1 1 33.5 45 Z
+- label: 9,14,54,24
+- figure: 24,52,30,11
+- note: elipse con aros concéntricos en la banda media, la silueta del catálogo original; en un círculo de 72 px el rótulo va arriba y la cifra abajo. «MFunctionDist» va en dos lineas («MFunction» y «Dist»): la zona de rotulo ocupa 54 px de la banda central con 24 px de alto, los aros bajan al centro de la elipse para que el texto no los pise, y la cifra va al borde inferior con 30 px.
 
 ## Note
 - family: Anotación

@@ -19,6 +19,7 @@ Uso:
 from __future__ import annotations
 
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -50,6 +51,407 @@ FAMILIAS = [
 
 # Los entregables, en el orden en que se leen.
 GRUPOS = ["A-lineal.md", "B-entidad.md", "C-grupos.md"]
+
+# --------------------------------------------------------------------------
+# La medida del nombre (contrato v2 §2.3)
+#
+# El nombre de una clase se escribe entero: en una linea si cabe en su zona
+# de texto, y en dos si no cabe. La medida es la misma que mide la app
+# (`src/graph/catalogue.ts`): el nombre va en la monoespaciada de 9 px, que
+# mide 0,6 em por caracter, y deja 4 px de aire dentro de su zona.
+# --------------------------------------------------------------------------
+
+TAMANO_ROTULO = 9.0
+EM_MONOESPACADA = 0.6
+AIRE_ZONA = 4.0
+ALTO_LINEA = 11.0
+AIRE_ENTRE_LINEAS = 2.0
+# Dos lineas de 9 px, con el aire del diseno entre ellas: 11 + 2 + 11.
+ALTO_DOS_LINEAS = 2 * ALTO_LINEA + AIRE_ENTRE_LINEAS
+
+
+def ancho_texto(texto: str) -> float:
+    """El ancho de un texto en la monoespaciada del diseno."""
+    return len(texto.strip()) * EM_MONOESPACADA * TAMANO_ROTULO
+
+
+def ancho_nombre(nombre: str) -> float:
+    """El ancho que el nombre de la clase necesita."""
+    return len(nombre) * EM_MONOESPACADA * TAMANO_ROTULO
+
+
+def partir_nombre(nombre: str, ancho: float) -> tuple[str, str] | None:
+    """Las dos lineas en que se escribe un nombre que no cabe en uno.
+
+    El corte es el de la app (`src/graph/node.ts`): en un espacio, si el
+    nombre tiene uno; si no, donde una mayuscula empieza una palabra
+    («RemoveNumber» se parte en «Remove» y «Number», no en «Remov» y
+    «eNumber»); y si no hay ni una cosa ni la otra, dentro de la palabra, en
+    el punto que equilibra mejor las dos lineas.
+
+    Devuelve `None` cuando el nombre no se puede partir en dos lineas que
+    quepan.
+    """
+    mejor: tuple | None = None
+    for indice in range(1, len(nombre)):
+        primera, segunda = nombre[:indice], nombre[indice:]
+        if not primera.strip() or not segunda.strip():
+            continue
+        candidato = (
+            primera,
+            segunda,
+            # Un corte en un espacio conserva la palabra entera: el mejor es
+            # el que cierra la primera linea, y el siguiente el que abre la
+            # segunda. Un corte en una mayuscula conserva las palabras de un
+            # nombre en camel case, y vale lo mismo que el del espacio.
+            2 if primera.endswith(" ") else (
+                1 if segunda.startswith(" ") or _mayuscula_empieza_palabra(nombre, indice) else 0
+            ),
+            ancho_texto(primera) <= ancho and ancho_texto(segunda) <= ancho,
+            abs(len(primera) - len(segunda)),
+        )
+        if mejor is None or _corte_gana(candidato, mejor):
+            mejor = candidato
+    if mejor is None:
+        return None
+    return mejor[0], mejor[1]
+
+
+MASCULAS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+MINUSCULAS_Y_DIGITOS = "abcdefghijklmnopqrstuvwxyz0123456789"
+
+
+def _mayuscula_empieza_palabra(nombre: str, indice: int) -> bool:
+    """El corte cae donde una mayuscula empieza una palabra.
+
+    Los nombres de las clases van en camel case, y la mayuscula es donde el
+    nombre dice que acaba una palabra.
+    """
+    letra = nombre[indice] if indice < len(nombre) else ""
+    if letra not in MASCULAS:
+        return False
+    antes = nombre[indice - 1] if indice > 0 else ""
+    return antes in MINUSCULAS_Y_DIGITOS
+
+
+def _corte_gana(candidato: tuple, mejor: tuple) -> bool:
+    """Un corte es mejor que otro si sus dos lineas caben, si esta en un
+    espacio y si equilibra mejor las dos lineas."""
+    if candidato[3] != mejor[3]:
+        return candidato[3]
+    if candidato[2] != mejor[2]:
+        return candidato[2] > mejor[2]
+    return candidato[4] < mejor[4]
+
+
+def lineas_del_nombre(clase: render.Clase) -> list[str]:
+    """Las lineas en que se escribe el nombre de la clase.
+
+    Una si cabe en la zona, dos si no: el nombre nunca se corta.
+    """
+    ancho = clase.label[2] - AIRE_ZONA
+    if ancho_nombre(clase.nombre) <= ancho:
+        return [clase.nombre]
+    partes = partir_nombre(clase.nombre, ancho)
+    return list(partes) if partes is not None else []
+
+
+# --------------------------------------------------------------------------
+# La silueta: el `d` del path, en coordenadas de la huella
+#
+# El generador comprueba que las zonas viven **dentro** de la silueta
+# rellena, y no dentro de su huella: el texto se dibuja ahi, y el texto no
+# puede salirse de la figura.
+# --------------------------------------------------------------------------
+
+def _leer_path(d: str) -> list[list[tuple[float, float]]]:
+    """Los contornos de un path, como listas de puntos.
+
+    El diseno usa solo `M`, `L`, `H`, `V`, `A`, `C` y `Z`, y todos en
+    coordenadas absolutas: basta con aplanar los arcos y las curvas.
+    """
+    fichas = re.findall(r"[A-Za-z]|-?\d*\.?\d+", d)
+    contornos: list[list[tuple[float, float]]] = []
+    contorno: list[tuple[float, float]] = []
+    x = y = 0.0
+    inicio = (0.0, 0.0)
+    i = 0
+    comando = ""
+    while i < len(fichas):
+        ficha = fichas[i]
+        if re.fullmatch(r"[A-Za-z]", ficha):
+            comando = ficha
+            i += 1
+            if comando == "Z":
+                if contorno:
+                    contorno.append(inicio)
+                    contornos.append(contorno)
+                    contorno = []
+                x, y = inicio
+                continue
+        if comando == "M":
+            x, y = float(fichas[i]), float(fichas[i + 1])
+            i += 2
+            if contorno:
+                contornos.append(contorno)
+            contorno = [(x, y)]
+            inicio = (x, y)
+            comando = "L"
+        elif comando == "L":
+            x, y = float(fichas[i]), float(fichas[i + 1])
+            i += 2
+            contorno.append((x, y))
+        elif comando == "H":
+            x = float(fichas[i])
+            i += 1
+            contorno.append((x, y))
+        elif comando == "V":
+            y = float(fichas[i])
+            i += 1
+            contorno.append((x, y))
+        elif comando == "C":
+            p1 = (float(fichas[i]), float(fichas[i + 1]))
+            p2 = (float(fichas[i + 2]), float(fichas[i + 3]))
+            p3 = (float(fichas[i + 4]), float(fichas[i + 5]))
+            i += 6
+            contorno.extend(_curva((x, y), p1, p2, p3))
+            x, y = p3
+        elif comando == "A":
+            rx, ry, giro, grande, suave, ex, ey = (float(fichas[i + k]) for k in range(7))
+            i += 7
+            contorno.extend(_arco((x, y), rx, ry, giro, int(grande), int(suave), ex, ey))
+            x, y = ex, ey
+        else:
+            raise ValueError(f"comando desconocido en el path: {comando!r} ({d})")
+    if contorno:
+        contornos.append(contorno)
+    return contornos
+
+
+def _curva(p0, p1, p2, p3, pasos: int = 16) -> list[tuple[float, float]]:
+    """Una curva cubica, aplanada en segmentos."""
+    puntos = []
+    for i in range(1, pasos + 1):
+        t = i / pasos
+        m = 1 - t
+        puntos.append((
+            m**3 * p0[0] + 3 * m * m * t * p1[0] + 3 * m * t * t * p2[0] + t**3 * p3[0],
+            m**3 * p0[1] + 3 * m * m * t * p1[1] + 3 * m * t * t * p2[1] + t**3 * p3[1],
+        ))
+    return puntos
+
+
+def _arco(p0, rx, ry, giro, grande, suave, ex, ey, pasos: int = 24) -> list[tuple[float, float]]:
+    """Un arco eliptico, aplanado en segmentos (SVG: de punto a punto)."""
+    if rx == 0 or ry == 0:
+        return [(ex, ey)]
+    ang = math.radians(giro)
+    cos, sen = math.cos(ang), math.sin(ang)
+    dx, dy = (p0[0] - ex) / 2.0, (p0[1] - ey) / 2.0
+    xp = cos * dx + sen * dy
+    yp = -sen * dx + cos * dy
+    rx, ry = abs(rx), abs(ry)
+    lameta = xp * xp / (rx * rx) + yp * yp / (ry * ry)
+    if lameta > 1:
+        escala = math.sqrt(lameta)
+        rx, ry = rx * escala, ry * escala
+    numerador = rx * rx * ry * ry - rx * rx * yp * yp - ry * ry * xp * xp
+    denominador = rx * rx * yp * yp + ry * ry * xp * xp
+    co = math.sqrt(max(0.0, numerador / denominador)) if denominador else 0.0
+    if grande == suave:
+        co = -co
+    cxp = co * rx * yp / ry
+    cyp = -co * ry * xp / rx
+    cx = cos * cxp - sen * cyp + (p0[0] + ex) / 2.0
+    cy = sen * cxp + cos * cyp + (p0[1] + ey) / 2.0
+
+    def angulo(ux, uy, vx, vy) -> float:
+        largo = math.hypot(ux, uy) * math.hypot(vx, vy)
+        if largo == 0:
+            return 0.0
+        a = math.acos(max(-1.0, min(1.0, (ux * vx + uy * vy) / largo)))
+        return -a if ux * vy - uy * vx < 0 else a
+
+    t1 = angulo(1, 0, (xp - cxp) / rx, (yp - cyp) / ry)
+    delta = angulo((xp - cxp) / rx, (yp - cyp) / ry, (-xp - cxp) / rx, (-yp - cyp) / ry)
+    if suave == 0 and delta > 0:
+        delta -= 2 * math.pi
+    elif suave == 1 and delta < 0:
+        delta += 2 * math.pi
+    puntos = []
+    for i in range(1, pasos + 1):
+        t = t1 + delta * i / pasos
+        puntos.append((
+            cos * rx * math.cos(t) - sen * ry * math.sin(t) + cx,
+            sen * rx * math.cos(t) + cos * ry * math.sin(t) + cy,
+        ))
+    return puntos
+
+
+def _vueltas(contornos, x, y) -> int:
+    """Las vueltas del punto alrededor de la silueta."""
+    vueltas = 0
+    for contorno in contornos:
+        for k in range(len(contorno) - 1):
+            x0, y0 = contorno[k]
+            x1, y1 = contorno[k + 1]
+            if y0 <= y:
+                if y1 > y and (x1 - x0) * (y - y0) - (x - x0) * (y1 - y0) > 0:
+                    vueltas += 1
+            elif y1 <= y and (x1 - x0) * (y - y0) - (x - x0) * (y1 - y0) < 0:
+                vueltas -= 1
+    return vueltas
+
+
+def _en_borde(contornos, x, y, eps: float = 0.05) -> bool:
+    """El punto esta en el borde de la silueta."""
+    for contorno in contornos:
+        for k in range(len(contorno) - 1):
+            x0, y0 = contorno[k]
+            x1, y1 = contorno[k + 1]
+            cruz = (x1 - x0) * (y - y0) - (y1 - y0) * (x - x0)
+            if abs(cruz) > eps:
+                continue
+            if (min(x0, x1) - eps <= x <= max(x0, x1) + eps
+                    and min(y0, y1) - eps <= y <= max(y0, y1) + eps):
+                return True
+    return False
+
+
+def _corta_caja(a, b, caja) -> bool:
+    """El segmento `a`-`b` corta el interior de la caja."""
+    x, y, ancho, alto = caja
+    x0, y0 = a
+    x1, y1 = b
+    dx, dy = x1 - x0, y1 - y0
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, x0 - x), (dx, x + ancho - x0), (-dy, y0 - y), (dy, y + alto - y0)):
+        if p == 0:
+            if q < 0:
+                return False
+            continue
+        t = q / p
+        if p < 0:
+            if t > t1:
+                return False
+            t0 = max(t0, t)
+        else:
+            if t < t0:
+                return False
+            t1 = min(t1, t)
+    return t1 > t0 + 1e-9
+
+
+def _zona_dentro(contornos, caja) -> tuple[bool, str]:
+    """La caja esta dentro de la silueta rellena?"""
+    x, y, ancho, alto = caja
+    esquinas = [(x, y), (x + ancho, y), (x + ancho, y + alto), (x, y + alto)]
+    for px, py in esquinas:
+        if _vueltas(contornos, px, py) == 0 and not _en_borde(contornos, px, py):
+            return False, f"la esquina ({px:g},{py:g}) se sale de la silueta"
+    for contorno in contornos:
+        for k in range(len(contorno) - 1):
+            if _corta_caja(contorno[k], contorno[k + 1], caja):
+                return False, "la silueta corta la zona"
+    return True, ""
+
+
+def problema_trazo(clase: render.Clase) -> str | None:
+    """Los trazos interiores tienen que vivir dentro de la silueta.
+
+    Un trazo que asoma por fuera del borde parece un trozo suelto: es la
+    marca del parametro de la multifunlcaci6n por par6metro, que se salia
+    media pixela por encima del peine.
+    """
+    if not clase.path or not clase.details:
+        return None
+    contornos = _leer_path(clase.path)
+    for detalle in clase.details:
+        for contorno in _leer_path(detalle):
+            for x, y in contorno:
+                if _vueltas(contornos, x, y) == 0 and not _en_borde(contornos, x, y):
+                    return (
+                        f"{clase.nombre}: el trazo interior se sale de la silueta "
+                        f"en ({x:g},{y:g})"
+                    )
+    return None
+
+
+def problema_corte(clase: render.Clase) -> str | None:
+    """El nombre se parte donde empieza una palabra.
+
+    Los nombres de las clases van en camel case, y la mayuscula es donde el
+    nombre dice que acaba una palabra: cuando el nombre no cabe en una
+    linea, las dos lineas tienen que caer en una mayuscula, para que las
+    palabras enteras se lean («Remove» y «Number», no «Remov» y «eNumber»).
+
+    Los nombres que son una sola palabra («Multifurcacion») no tienen
+    mayuscula: se parten donde mejor queden, y no hay nada que exigir. La
+    mayuscula que se queda sola al final del nombre («MultifurcacionP») es un
+    sufijo, no el principio de una palabra, y tampoco exige nada.
+    """
+    ancho = clase.label[2] - AIRE_ZONA
+    if ancho_nombre(clase.nombre) <= ancho:
+        return None
+    cortes = [
+        indice
+        for indice in range(1, len(clase.nombre))
+        if _mayuscula_empieza_palabra(clase.nombre, indice)
+        # Una mayuscula que se queda sola al final del nombre es un sufijo
+        # («MultifurcacionP»), no el principio de una palabra.
+        and len(clase.nombre) - indice >= 2
+    ]
+    if not cortes:
+        return None
+    for indice in cortes:
+        if (ancho_texto(clase.nombre[:indice]) <= ancho
+                and ancho_texto(clase.nombre[indice:]) <= ancho):
+            return None
+    mejor = min(
+        cortes,
+        key=lambda indice: max(ancho_texto(clase.nombre[:indice]), ancho_texto(clase.nombre[indice:])),
+    )
+    return (
+        f"{clase.nombre}: el nombre se partiria dentro de una palabra: la zona de "
+        f"texto tiene {clase.label[2]:g} px (util {ancho:g} px) y el corte en "
+        f"«{clase.nombre[:mejor]}»/«{clase.nombre[mejor:]}» necesita "
+        f"{max(ancho_texto(clase.nombre[:mejor]), ancho_texto(clase.nombre[mejor:])):g} px"
+    )
+
+
+def problema_rotulo(clase: render.Clase) -> str | None:
+    """El nombre de la clase tiene que caber en su zona de texto.
+
+    En una linea, o en dos si la zona tiene sitio para las dos. El nombre
+    nunca se corta: el generador no escribe el modulo si una clase no
+    cumple la regla.
+    """
+    ancho_zona = clase.label[2]
+    ancho = ancho_zona - AIRE_ZONA
+    necesita = ancho_nombre(clase.nombre)
+    if necesita <= ancho:
+        return None
+    if clase.label[3] < ALTO_DOS_LINEAS:
+        return (
+            f"{clase.nombre}: el nombre necesita {necesita:g} px y la zona de texto "
+            f"tiene {ancho_zona:g} px (util {ancho:g} px), y la zona es demasiado baja "
+            f"para las dos lineas ({clase.label[3]:g} px de {ALTO_DOS_LINEAS:g} px)"
+        )
+    lineas = partir_nombre(clase.nombre, ancho)
+    if lineas is None:
+        return (
+            f"{clase.nombre}: el nombre necesita {necesita:g} px y la zona de texto "
+            f"tiene {ancho_zona:g} px (util {ancho:g} px): no cabe en dos lineas"
+        )
+    for linea in lineas:
+        if ancho_texto(linea) > ancho:
+            return (
+                f"{clase.nombre}: el nombre necesita {necesita:g} px y la zona de "
+                f"texto tiene {ancho_zona:g} px (util {ancho:g} px): la linea "
+                f"«{linea}» necesita {ancho_texto(linea):g} px"
+            )
+    return None
+
 
 
 def cargar_clases() -> list[render.Clase]:
@@ -100,11 +502,35 @@ def verificar(clases: list[render.Clase]) -> list[str]:
                 problemas.append(
                     f"{clase.nombre}: zona de texto fuera ({clase.label} en {w}x{h})"
                 )
+            # el nombre de la clase tiene que caber en su zona, en una linea
+            # o en dos (contrato v2 §2.3)
+            problema = problema_rotulo(clase)
+            if problema is not None:
+                problemas.append(problema)
+            # y las dos lineas tienen que caer donde empieza una palabra
+            problema = problema_corte(clase)
+            if problema is not None:
+                problemas.append(problema)
+            # y la zona tiene que vivir dentro de la silueta rellena
+            contornos = _leer_path(clase.path)
+            dentro, porque = _zona_dentro(contornos, clase.label)
+            if not dentro:
+                problemas.append(
+                    f"{clase.nombre}: la zona de texto se sale de la silueta "
+                    f"({clase.label} en {w}x{h}): {porque}"
+                )
         if clase.figure is not None:
             fx, fy, fw, fh = clase.figure
             if fx < 0 or fy < 0 or fx + fw > w + 0.5 or fy + fh > h + 0.5:
                 problemas.append(
                     f"{clase.nombre}: zona de cifra fuera ({clase.figure} en {w}x{h})"
+                )
+            contornos = _leer_path(clase.path)
+            dentro, porque = _zona_dentro(contornos, clase.figure)
+            if not dentro:
+                problemas.append(
+                    f"{clase.nombre}: la zona de cifra se sale de la silueta "
+                    f"({clase.figure} en {w}x{h}): {porque}"
                 )
             if clase.label is not None:
                 lx, ly, lw, lh = clase.label
@@ -117,6 +543,10 @@ def verificar(clases: list[render.Clase]) -> list[str]:
                     f"{clase.nombre}: puerto {puerto.nombre} fuera de la huella "
                     f"({puerto.x}%,{puerto.y}%)"
                 )
+        # los trazos interiores tampoco salen de la silueta
+        problema = problema_trazo(clase)
+        if problema is not None:
+            problemas.append(problema)
     faltan = sorted(clases_del_catalogo() - {c.nombre for c in clases})
     sobran = sorted({c.nombre for c in clases} - clases_del_catalogo())
     if faltan:

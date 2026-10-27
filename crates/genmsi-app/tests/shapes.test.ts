@@ -12,6 +12,15 @@ import {
   shapeOf,
   type Zone,
 } from "../src/graph/shapes.ts";
+import { monospaceWidth } from "../src/graph/catalogue.ts";
+import {
+  LABEL_SIZE,
+  LINE_AIR,
+  LINE_HEIGHT,
+  ZONE_AIR,
+  labelLines,
+  type FootprintZone,
+} from "../src/graph/node.ts";
 
 /** The classes the catalogue of the engine declares. */
 function catalogueClasses(): string[] {
@@ -225,6 +234,44 @@ test("the text and the figure of a class never overlap", () => {
       continue;
     }
     assert.ok(!overlaps(shape.label, figure), `${name}: the text and the figure overlap`);
+  }
+});
+
+test("the name of every class fits its zone, in one line or in two", () => {
+  // The name of a class is never cut: it is written whole, in one line when
+  // it fits its zone, and in two lines when it does not (contract v2 §2.3).
+  // The measure is the one of the design: the name is monospaced, and the
+  // zone leaves 4 px of air inside it.
+  for (const [name, shape] of Object.entries(BLOCK_SHAPES)) {
+    const zone: FootprintZone = {
+      left: shape.label.x,
+      top: shape.label.y,
+      width: shape.label.width,
+      height: shape.label.height,
+    };
+    const room = zone.width - ZONE_AIR;
+    const lines = labelLines(name, zone);
+    assert.ok(lines.length === 1 || lines.length === 2, `${name}: one line or two`);
+    assert.equal(lines.join(""), name, `${name}: the whole name is written`);
+    assert.ok(!lines.join("").includes("…"), `${name}: the name is never cut`);
+    if (lines.length === 1) {
+      assert.ok(
+        monospaceWidth(name, LABEL_SIZE) <= room,
+        `${name}: the name fits in one line (${monospaceWidth(name, LABEL_SIZE)} of ${room})`,
+      );
+      continue;
+    }
+    // Two lines: the zone has to hold them, and both have to fit it.
+    assert.ok(
+      zone.height >= 2 * LINE_HEIGHT + LINE_AIR,
+      `${name}: the zone holds two lines (${zone.height} of ${2 * LINE_HEIGHT + LINE_AIR})`,
+    );
+    for (const line of lines) {
+      assert.ok(
+        monospaceWidth(line.trim(), LABEL_SIZE) <= room,
+        `${name}: the line "${line}" fits the zone (${monospaceWidth(line.trim(), LABEL_SIZE)} of ${room})`,
+      );
+    }
   }
 });
 

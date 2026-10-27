@@ -9,6 +9,12 @@ un mosaico.
 > "Decisión = rombo" y "rótulo a la izquierda, cifra a la derecha" sin
 > excepción: ambas cosas son falsas para 8 de 10 clases de Decisión y para
 > 15 clases de 32 px de alto, y por eso los grupos se desviaran.
+>
+> **[v4] La v4 añade §2.3 y §2.4**: el nombre de la clase se escribe **entero**
+> (en una línea o en dos, nunca cortado con puntos suspensivos) y las zonas se
+> comprueban **dentro de la silueta rellena**, no dentro de su huella. El
+> generador deja de escribir el módulo cuando una de las 66 clases no cumple
+> la regla.
 
 ## 1. Qué se rediseña
 
@@ -40,8 +46,9 @@ Todo bloque se divide en tres zonas, y el diseño las respeta:
 
 - **Zona de texto**: a la izquierda. Lleva el nombre de la clase (la
   `caption` del bloque, o el nombre de la clase si no tiene) y, debajo, el
-  subtítulo. Se **trunca** con puntos suspensivos; nunca desborda la
-  silueta.
+  subtítulo. El nombre se escribe **entero** (§2.3): en una línea si cabe en
+  la zona, y en dos si no cabe. Nunca se corta con puntos suspensivos y nunca
+  desborda la silueta.
 - **Zona de cifra**: a la derecha. Lleva la cifra viva de la familia. Es
   monoespaciada y del color de la familia. Si no hay cifra (la corrida no
   alcanzó el bloque, o la clase es una declaración sin entidad), la zona
@@ -81,6 +88,71 @@ Afecta a 15 clases con puerto arriba y abajo (`Advance`, `Buffer`, `Queue`,
 `Depart`, `Seize`, `Release`, `Return`, `Enter`, `Leave`, `Logic`, `Loop`,
 `Preempt`, `Gather`, `Assemble`, `Split`) y a las dos `Multifurcacion` de
 20 px.
+
+### 2.3 — El nombre de la clase se escribe entero
+
+El nombre de la clase es lo que identifica al bloque, y **no se corta nunca**
+con puntos suspensivos: un bloque que dice «Genera…» no dice qué es. El
+nombre se escribe **entero** dentro de su propia silueta:
+
+- en **una línea**, si el ancho del nombre cabe en la zona de texto; o
+- en **dos líneas**, si no cabe.
+
+La medida es la del diseño, y es la misma que mide la app
+(`src/graph/catalogue.ts`): el nombre va en la **monoespaciada de 9 px**, que
+mide **0,6 em por carácter**.
+
+| Medida del nombre | Valor |
+|---|---|
+| Tipografía | monoespaciada (0,6 em por carácter) |
+| Tamaño | 9 px |
+| Ancho de un nombre de `n` caracteres | `n × 0,6 × 9` px |
+| Aire que el texto deja dentro de su zona | 4 px (2 a cada lado) |
+| Alto de una línea | 11 px |
+| Aire entre dos líneas | 2 px |
+| Alto de una zona con dos líneas | 24 px (11 + 2 + 11) |
+
+**La regla que el generador hace cumplir.** Para cada una de las 66 clases:
+
+- el ancho del nombre es `≤ ancho de la zona de texto − 4` (el nombre cabe en
+  una línea), **o**
+- el nombre se puede partir en dos líneas, cada una de `≤ ancho de la zona −
+  4`, y la zona de texto mide **24 px de alto o más**.
+
+El generador **no escribe** el módulo si una clase no cumple la regla, y
+entrega el nombre de la clase, el ancho que el nombre necesita y el ancho que
+la zona tiene.
+
+**Dónde cae el corte.** El corte lo pone la app, y es el mismo en las 66
+clases:
+
+1. en un **espacio**, si el nombre tiene uno y las dos mitades caben en la
+   zona (el espacio se queda con la línea a la que pertenece);
+2. si no, donde una **mayúscula empieza una palabra**: los nombres de las
+   clases van en camel case, y la mayúscula es donde el nombre dice que
+   acaba una palabra. «RemoveNumber» se parte en «Remove» y «Number», y no
+   en «Remov» y «eNumber»;
+3. si el nombre no tiene ni espacios ni mayúsculas, se parte **dentro de la
+   palabra**, en el punto que equilibra mejor las dos líneas: es lo que pasa
+   con `Multifurcacion` y `MultifurcacionP`, que son una sola palabra.
+
+**La zona tiene que dar para ese corte.** El generador comprueba, además de
+que el nombre cabe, que **el corte en la mayúscula quepa en la zona**: un
+nombre partido dentro de una palabra («Remov» y «eNumber») es un nombre
+cortado, y el nombre de la clase se lee entero. Los nombres que son una sola
+palabra («Multifurcacion`) no tienen mayúscula, y en los que la tienen al
+final («MultifurcacionP») es un sufijo: en los dos casos no hay nada que
+exigir, y el nombre se parte dentro de la palabra.
+
+Un nombre que ocupa dos líneas **no deja sitio para el subtítulo**: el nombre
+de la clase importa más que su subtítulo.
+
+### 2.4 — Las zonas viven dentro de la silueta
+
+La zona de texto y la zona de cifra están **dentro de la silueta rellena**,
+no dentro de su huella: el texto se dibuja ahí, y el texto no puede salirse
+de la figura ni pisar un puerto. El generador lo comprueba sobre el `path` de
+cada clase, no sobre su caja.
 
 ## 3. La silueta
 

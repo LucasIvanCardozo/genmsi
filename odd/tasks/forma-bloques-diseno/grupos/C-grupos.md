@@ -18,8 +18,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 **Las reglas del contrato v2 que este grupo cumple**
 
 - **§2.1 — ancho útil.** La partición izquierda/derecha se usa cuando el ancho útil de la silueta llega a 60 px. Se apilan (rótulo arriba, cifra abajo, en la misma columna) las siete clases cuya caja de texto no llega a 60 px: `Test`, `Transfer`, `GateF`, `GateL`, `GateM` y `GateS` (caja inscrita del rombo: 32 y 38 px de ancho) y `Loop` (la columna de entrada/salida parte el cuerpo en dos tramos de 33 px). También se apilan las tres de la familia **Selección**: el embudo no da 54+30 px en un mismo lado. Las otras quince clases van con el rótulo a la izquierda y la cifra a la derecha.
-- **§2.2 — el subtítulo.** Sólo existe en bloques de 40 px de alto o más. Los bloques de menos de 40 px (`Loop`, `Split`, `Assemble`, `Gather`, `Multifurcacion`, `MultifurcacionP`) llevan **una sola línea** con el nombre de la clase.
-- **§6.3 — la cifra.** Una línea de monoespaciada de 10,5 px. Las 25 zonas de cifra de este grupo miden **30 px de ancho o más** (el mínimo de §6.3 para una línea), así que **ninguna clase usa la forma apilada** y ninguna cifra se trunca. El par de siempre va en una línea (`2/19`).
+- **§2.2 — el subtítulo.** Sólo existe en bloques de 40 px de alto o más. Los bloques de menos de 40 px (`Loop`, `Split`, `Assemble`, `Gather`) llevan **una sola línea** con el nombre de la clase, y los que llevan el nombre en dos líneas (`Multifurcacion`, `MultifurcacionP`, `RemoveNumber`, `RemoveTrans`, `ExamineNumber`) no llevan subtítulo: el nombre ocupa las dos líneas de su zona.
+- **§2.3 — el nombre entero.** El nombre de la clase se escribe **entero**: en una línea si cabe en su zona, y en dos si no cabe (la zona necesita 24 px de alto para las dos, y el corte lo pone la app en el punto que equilibra las dos líneas). Ningún nombre de este grupo se corta con puntos suspensivos.
+- **§6.3 — la cifra.** Una línea de monoespaciada de 10,5 px. La zona de cifra mide **el ancho de su propio texto más 2 px de aire** (§6.3 v3), así que **ninguna clase usa la forma apilada** y ninguna cifra se trunca. El par de siempre va en una línea (`2/19`).
 - **§5.1 — una familia es una familia de variantes.** Cada clase nombra su variante en la línea `note`.
 - **§3.1 — la silueta toca el puerto.** Las 40 anclas de este grupo caen en el borde de su silueta, salvo las cinco que el catálogo declara en el interior de una burbuja: la entrada de `JoinMe` y `JoinNumber` en (50,7) y la salida de `RemoveMe`, `RemoveNumber` y `RemoveTrans` en (50,43). Esas cinco son la **excepción única** que el contrato v2 declara: la burbuja se dibuja **centrada en el ancla** y el puerto queda dentro de ella. Las salidas de `Scan`, `Examine` y `ExamineNumber` caen sobre la arista de la cuña de su variante «caja sobre cuña», no dentro del relleno.
 
@@ -40,7 +41,10 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - `Test` y `Transfer`: la caja inscrita del rombo de 64×64 es de 32×32 px. Caben el rótulo (12 px) y la cifra (11 px), pero **no cabe el subtítulo** (10 px más): harían falta 34 px y hay 32. Es el caso más apretado del grupo y la razón de que el rombo lleve sólo una línea.
 - `GateF`, `GateL`, `GateM` y `GateS`: la caja inscrita del rombo es de 38×24 px. El rótulo (12 px) y la cifra (11 px) la llenan, así que **tampoco caben subtítulo**, aunque el bloque mida 48 px de alto; la cifra va en una línea (zona de 34 px) y no apilada, porque la caja inscrita no da para las 22 px de alto de la forma apilada más el rótulo y el subtítulo.
 - `Multifurcacion` y `MultifurcacionP`: la clase es de 80×20 px en el catálogo, pero la app dibuja el nodo con un mínimo de 32 px de alto. Con la huella desnuda de 20 px quedarían 8 px útiles entre los puntos de puerto y no cabría ni el rótulo, así que **la entrega usa la huella dibujada de 80×32**; los anclajes no cambian, porque siguen en el borde superior y en el inferior. Es la desviación que anuncia la advertencia A2 de la auditoría.
-- Siete clases tienen el nombre **truncado** con puntos suspensivos, porque la zona de cifra (30 px) se come el ancho útil: `Multifurcacion` y `MultifurcacionP` (`Multi…`), `RemoveNumber` (`Remove…`), `RemoveTrans` (`RemoveT…`), `Assemble` (`Asse…`), `Examine` y `ExamineNumber` (`Exami…`). El nombre completo está en el rótulo de la ficha del catálogo y en la lista de bloques; `Test`, `Transfer`, `GateF`…`GateS`, `Loop`, `Split`, `JoinMe`, `JoinNumber`, `RemoveMe`, `Gather`, `Match`, `Scan`, `Alter`, `Select`, `SelectSNA` y `SelectL` caben enteros.
+**Lo que cambia con el nombre entero**
+
+- Cinco clases tienen el nombre **en dos líneas**, porque no caben en una sola de su zona: `Multifurcacion` («Multifu» y «rcacion»), `MultifurcacionP` («Multifu» y «rcacionP»), `RemoveNumber` («Remove» y «Number»), `RemoveTrans` («Remove» y «Trans») y `ExamineNumber` («Examine» y «Number»). Sus zonas de rótulo crecen a 24 px de alto, y las dos del peine estrechan su cifra a los 26 px de su propio texto, sin mover el borde derecho. El nombre se lee entero: ya no llega truncado.
+- `Multifurcacion` y `MultifurcacionP`: el nombre va en dos líneas sobre la corona del peine, y la cifra se queda a su derecha. El peine no cambia de silueta. Los dos nombres son **una sola palabra** (el peine no tiene mayúscula que separe dos palabras, y la P final es un sufijo), así que su nombre se parte dentro de la palabra: es el precio de que el peine se lea de un vistazo.
 - `Transfer` y `SelectSNA` llevan su rótulo a 9 px (los demás, de 10 a 11) porque son los nombres más largos que aún caben enteros en su zona.
 
 ---
@@ -52,9 +56,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0% ; Salida1@100%,50% ; Salida2@0%,50%
 - path: M32 0 L64 32 L32 64 L0 32 Z
 - details: M32 6 L37 10.5 L32 15 L27 10.5 Z
-- label: 10,22,44,12
-- figure: 17,35,30,11
-- note: Variante «rombo» de la familia Decisión: el único rombo exacto de la familia, el del catálogo original; la entrada baja por el vértice superior (32,0) y las dos salidas salen por los vértices izquierdo y derecho (0,32) y (64,32), que son las tres anclas de la tabla; el rombo anidado de arriba conserva el «doble rombo» del original y, como la caja inscrita del rombo mide 32 px de ancho (menos de 60), el rótulo va en la banda superior y la cifra en la inferior, en la misma columna. La cifra va en una línea y no apilada: la caja inscrita de 32×32 admite de sobra la zona de una línea de 30 px, y la forma apilada de 14×22 tampoco ayudaría, porque con el subtítulo harían falta 44 px de alto y sólo hay 32.
+- label: 8,25,48,12
+- figure: 17,38,30,11
+- note: Variante «rombo» de la familia Decisión: el único rombo exacto de la familia, el del catálogo original; la entrada baja por el vértice superior (32,0) y las dos salidas salen por los vértices izquierdo y derecho (0,32) y (64,32), que son las tres anclas de la tabla; el rombo anidado de arriba conserva el «doble rombo» del original y, como la caja inscrita del rombo mide 32 px de ancho (menos de 60), el rótulo va en la banda superior y la cifra en la inferior, en la misma columna. La cifra va en una línea y no apilada: la caja inscrita de 32×32 admite de sobra la zona de una línea de 30 px, y la forma apilada de 14×22 tampoco ayudaría, porque con el subtítulo harían falta 44 px de alto y sólo hay 32. El rombo da 48 px de ancho util a la altura de la banda de rotulo, y la cifra baja a la banda de abajo sin perder su sitio.
 
 ## Transfer
 - family: Decisión
@@ -63,9 +67,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0% ; Salida1@100%,50% ; Salida2@0%,50%
 - path: M32 0 L64 32 L32 64 L0 32 Z
 - details: M28 7 L36 11 L28 15
-- label: 10,22,44,12
-- figure: 17,35,30,11
-- note: Variante «rombo» de la familia Decisión, la misma silueta de Test: lo que la distingue es la punta de flecha de la corona, que dice que el flujo se reenvía; las tres anclas son las de la tabla (32,0), (64,32) y (0,32), en los vértices, y la caja inscrita de 32 px de ancho obliga al rótulo arriba y la cifra abajo. La cifra va en una línea (zona de 30 px) y no apilada: la apilada de 14×22 cabría de sobra en la caja inscrita, pero no resuelve el problema del subtítulo, que necesita 44 px de alto de los 32 que hay.
+- label: 8,25,48,12
+- figure: 17,38,30,11
+- note: Variante «rombo» de la familia Decisión, la misma silueta de Test: lo que la distingue es la punta de flecha de la corona, que dice que el flujo se reenvía; las tres anclas son las de la tabla (32,0), (64,32) y (0,32), en los vértices, y la caja inscrita de 32 px de ancho obliga al rótulo arriba y la cifra abajo. La cifra va en una línea (zona de 30 px) y no apilada: la apilada de 14×22 cabría de sobra en la caja inscrita, pero no resuelve el problema del subtítulo, que necesita 44 px de alto de los 32 que hay. El rombo da 48 px de ancho util a la altura de la banda de rotulo, y la cifra baja a la banda de abajo sin perder su sitio.
 
 ## GateF
 - family: Decisión
@@ -129,9 +133,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada@50%,0% ; Salida1@0%,100% ; SalidaProb2@25%,100% ; SalidaProb3@50%,100% ; SalidaProb4@75%,100% ; SalidaProb5@100%,100%
 - path: M2 0 H78 L80 40 L70 30 L60 40 L50 30 L40 40 L30 30 L20 40 L10 30 L0 40 Z
 - details: none
-- label: 4,9,72,11
-- figure: 4,21,72,10
-- note: Variante «peine de la multifurcacion» de la familia Decisión: los cinco dientes son exactamente las cinco salidas (0,32), (20,32), (40,32), (60,32) y (80,32) y la entrada sigue en el borde superior (40,0); la clase es de 20 px de alto en el catálogo, pero el peine necesita sitio para sus dos bandas de texto, así que la entrega usa una huella dibujada de 80×40 (la app dibuja el nodo con 32 px de alto mínimo, y aquí hacen falta 40 para que el rótulo y la cifra no se pisen); el texto va en banda propia sobre la corona (rótulo arriba, cifra abajo) porque el nombre completo (64 px) más la cifra (27 px) no caben de lado en 80 px, y las dos bandas caben en la franja superior de 24 px que deja la corona; el nombre ya no llega truncado.
+- label: 2,6,48,24
+- figure: 50,9,26,10
+- note: Variante «peine de la multifurcacion» de la familia Decisión: los cinco dientes son exactamente las cinco salidas (0,32), (20,32), (40,32), (60,32) y (80,32) y la entrada sigue en el borde superior (40,0); la clase es de 20 px de alto en el catálogo, pero el peine necesita sitio para sus dos bandas de texto, así que la entrega usa una huella dibujada de 80×40 (la app dibuja el nodo con 32 px de alto mínimo, y aquí hacen falta 40 para que el rótulo y la cifra no se pisen); el texto va en banda propia sobre la corona (rótulo arriba, cifra abajo) porque el nombre completo (64 px) más la cifra (27 px) no caben de lado en 80 px, y las dos bandas caben en la franja superior de 24 px que deja la corona; el nombre ya no llega truncado. «Multifurcacion» no cabe en una linea de la corona, asi que va en dos («Multifu» y «rcacion»): la zona de rotulo ocupa 48 px y 24 px de alto sobre la corona, y la cifra se queda a su derecha con 26 px.
 
 ## MultifurcacionP
 - family: Decisión
@@ -139,10 +143,10 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - footprint: 80x40
 - ports: Entrada@50%,0% ; Salida1@0%,100% ; SalidaProb2@25%,100% ; SalidaProb3@50%,100% ; SalidaProb4@75%,100% ; SalidaProb5@100%,100%
 - path: M2 0 H78 L80 40 L70 30 L60 40 L50 30 L40 40 L30 30 L20 40 L10 30 L0 40 Z
-- details: M4 3 H20 ; M14.5 2 A2.5 2.5 0 1 1 9.5 2 A2.5 2.5 0 1 1 14.5 2 Z
-- label: 4,9,72,11
-- figure: 4,21,72,10
-- note: Variante «peine de la multifurcacion», la misma silueta de la otra multifurcación: lo que la distingue es el raíl y la perilla del parámetro sobre la corona, y no un nombre distinto; las cinco salidas y la entrada tienen las mismas anclas del catálogo, y también se entrega sobre la huella dibujada de 80×40 (la clase es de 20 px), con el texto en banda propia sobre la corona por lo mismo que en la otra multifurcación, y el raíl y la perilla aparte, en la esquina superior izquierda, sobre la banda, para que no se pisen con el rótulo.
+- details: M56 4.5 H72 ; M64.5 4.5 A2.5 2.5 0 1 1 59.5 4.5 A2.5 2.5 0 1 1 64.5 4.5 Z
+- label: 2,6,48,24
+- figure: 50,9,26,10
+- note: Variante «peine de la multifurcacion», la misma silueta de la otra multifurcación: lo que la distingue es el raíl y la perilla del parámetro sobre la corona, y no un nombre distinto; las cinco salidas y la entrada tienen las mismas anclas del catálogo, y también se entrega sobre la huella dibujada de 80×40 (la clase es de 20 px), con el texto en banda propia sobre la corona por lo mismo que en la otra multifurcación, y el raíl y la perilla aparte, en la esquina superior izquierda, sobre la banda, para que no se pisen con el rótulo. «MultifurcacionP» va en dos lineas («Multifu» y «rcacionP»): la zona de rotulo ocupa 48 px y 24 px de alto sobre la corona, la cifra se queda a su derecha con 26 px, y el raíl y la perilla del parametro quedan en la esquina, sobre la banda.
 
 ## Split
 - family: Decisión
@@ -195,9 +199,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0% ; Salida1@50%,86% ; Salida2@100%,20%
 - path: M0 10 L10 0 H90 L100 10 V36 H0 Z M43 43 A7 7 0 1 1 57 43 A7 7 0 1 1 43 43 Z
 - details: M8 31 H92 ; M12 33 V36 M18 33 V36 M24 33 V36
-- label: 6,8,58,21
+- label: 8,6,40,24
 - figure: 67,16,30,11
-- note: Variante «cuerpo achaflanado con burbuja»: igual que RemoveMe, con las tres rayas del contador bajo la línea de la lista, que dicen «N en lugar de uno»; la salida (50,43) sigue en el centro de la burbuja, que por eso se dibuja centrada en el ancla (excepción de §3.1), y las anclas de la entrada (50,0) y de la salida lateral (100,10) son las del catálogo.
+- note: Variante «cuerpo achaflanado con burbuja»: igual que RemoveMe, con las tres rayas del contador bajo la línea de la lista, que dicen «N en lugar de uno»; la salida (50,43) sigue en el centro de la burbuja, que por eso se dibuja centrada en el ancla (excepción de §3.1), y las anclas de la entrada (50,0) y de la salida lateral (100,10) son las del catálogo. «RemoveNumber» no cabe en una linea del cuerpo, asi que va en dos («Remove» y «Number»), la zona de rotulo sube a 24 px de alto por encima de la linea de la lista, y la cifra conserva su sitio y su ancho.
 
 ## RemoveTrans
 - family: Grupo
@@ -206,9 +210,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0% ; Salida1@50%,86% ; Salida2@100%,20%
 - path: M0 10 L10 0 H90 L100 10 V36 H0 Z M43 43 A7 7 0 1 1 57 43 A7 7 0 1 1 43 43 Z
 - details: M8 31 H92 ; M14 35 L26 32
-- label: 6,8,58,21
+- label: 8,6,40,24
 - figure: 67,16,30,11
-- note: Variante «cuerpo achaflanado con burbuja»: el mismo cuerpo de RemoveMe con una sola raya diagonal bajo la línea, la transacción concreta que sale del grupo; la entrada sube por el borde superior (50,0), la salida lateral por el borde derecho (100,10) y la otra salida queda en el centro de la burbuja, dibujada centrada en el ancla (excepción de §3.1).
+- note: Variante «cuerpo achaflanado con burbuja»: el mismo cuerpo de RemoveMe con una sola raya diagonal bajo la línea, la transacción concreta que sale del grupo; la entrada sube por el borde superior (50,0), la salida lateral por el borde derecho (100,10) y la otra salida queda en el centro de la burbuja, dibujada centrada en el ancla (excepción de §3.1). «RemoveTrans» no cabe en una linea del cuerpo, asi que va en dos («Remove» y «Trans»), la zona de rotulo sube a 24 px de alto por encima de la linea de la lista, y la cifra conserva su sitio y su ancho.
 
 ## Assemble
 - family: Grupo
@@ -217,9 +221,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0% ; Salida1@50%,100%
 - path: M0 4 L4 0 H84 L88 4 L72 32 H16 Z
 - details: none
-- label: 9,6,38,12
-- figure: 49,7,30,11
-- note: Variante «embudo» de la familia Grupo: muchas entradas entran por el borde superior (44,0) y el lote sale por el borde inferior (44,32), y el cuerpo se estrecha hacia abajo como en la cuña del editor original; con 32 px de alto no cabe subtítulo, así que va sólo el rótulo, y el ancho útil (76 px) da para la partición izquierda/derecha.
+- label: 12,13,48,12
+- figure: 52,1,26,11
+- note: Variante «embudo» de la familia Grupo: muchas entradas entran por el borde superior (44,0) y el lote sale por el borde inferior (44,32), y el cuerpo se estrecha hacia abajo como en la cuña del editor original; con 32 px de alto no cabe subtítulo, así que va sólo el rótulo, y el ancho útil (76 px) da para la partición izquierda/derecha. El embudo da 48 px de ancho util en su banda media, y la cifra sube a la banda alta, a la derecha, con 26 px (los de su texto), para no pisar el puerto de salida.
 
 ## Gather
 - family: Grupo
@@ -228,9 +232,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0% ; Salida1@50%,100%
 - path: M14 0 H74 L88 28 L84 32 H4 L0 28 Z
 - details: none
-- label: 10,9,36,12
+- label: 11,9,38,12
 - figure: 49,13,30,11
-- note: Variante «embudo invertido» de la familia Grupo, el gemelo de Assemble: el grupo se reúne en la base ancha y la entrada (44,0) queda en el borde superior corto; con 32 px de alto sólo cabe el rótulo, y el texto y la cifra se reparten en la banda ancha del cuerpo, por encima de la salida de abajo.
+- note: Variante «embudo invertido» de la familia Grupo, el gemelo de Assemble: el grupo se reúne en la base ancha y la entrada (44,0) queda en el borde superior corto; con 32 px de alto sólo cabe el rótulo, y el texto y la cifra se reparten en la banda ancha del cuerpo, por encima de la salida de abajo. El rotulo se ensancha a 38 px para que «Gather» (32,4 px) quepa entero, y la zona de cifra conserva su sitio y su ancho.
 
 ## Match
 - family: Grupo
@@ -261,9 +265,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0% ; Salida1@25%,83% ; Salida2@75%,83%
 - path: M8 0 H72 L78 6 V32 H80 L40 48 L0 32 H2 V6 Z
 - details: none
-- label: 3,8,41,22
+- label: 3,8,42,22
 - figure: 46,10,30,11
-- note: Variante «caja sobre cuña»: la misma horquilla de Scan, con la caja más ancha y sin detalle en la cuña; la cuña se dimensiona para que sus dos rectas pasen justo por (20,40) y (60,40), las anclas de salida del catálogo, así que los puertos quedan sobre la arista y no dentro del relleno.
+- note: Variante «caja sobre cuña»: la misma horquilla de Scan, con la caja más ancha y sin detalle en la cuña; la cuña se dimensiona para que sus dos rectas pasen justo por (20,40) y (60,40), las anclas de salida del catálogo, así que los puertos quedan sobre la arista y no dentro del relleno. El rotulo se ensancha a 42 px para que «Examine» (37,8 px) quepa entero en una linea.
 
 ## ExamineNumber
 - family: Grupo
@@ -272,9 +276,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0% ; Salida1@25%,83% ; Salida2@75%,83%
 - path: M8 0 H72 L78 6 V32 H80 L40 48 L0 32 H2 V6 Z
 - details: M36 40 V46 M40 40 V46 M44 40 V46
-- label: 3,8,41,22
+- label: 3,8,43,24
 - figure: 46,10,30,11
-- note: Variante «caja sobre cuña», igual que Examine, con las tres rayas de conteo dentro de la cuña (el número que se examina, no la transacción); los anclajes (20,40) y (60,40) siguen sobre las rectas de la cuña, que es lo que exige §3.1.
+- note: Variante «caja sobre cuña», igual que Examine, con las tres rayas de conteo dentro de la cuña (el número que se examina, no la transacción); los anclajes (20,40) y (60,40) siguen sobre las rectas de la cuña, que es lo que exige §3.1. «ExamineNumber» no cabe en una linea de la caja, asi que va en dos («Examine» y «Number») y la zona de rotulo sube a 24 px de alto, por encima de la cuña.
 
 ## Alter
 - family: Grupo

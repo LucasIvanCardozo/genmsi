@@ -442,8 +442,41 @@ def ancho_minimo_figura(texto: str) -> float:
     return ancho_figura(texto) + 2
 
 
+# La medida del nombre de la clase: monoespaciada, 0,6 em por caracter
+# (contrato v4 §2.3), a 9 px como el rotulo.
+EM_NOMBRE = 0.6
+TAMANO_NOMBRE = 9
+# El aire que la zona de texto deja alrededor del texto (contrato v4 §2.3).
+AIRE = 4
+# Dos lineas de 9 px con 2 px de aire entre ellas.
+ALTO_DOS_LINEAS = 24
+
+
+def ancho_nombre(nombre: str) -> float:
+    """El ancho del nombre de una clase, con la medida del diseno."""
+    return len(nombre) * EM_NOMBRE * TAMANO_NOMBRE
+
+
+def el_nombre_cabe(nombre: str, zona: tuple[float, float, float, float]) -> bool:
+    """Si el nombre cabe en la zona, en una linea o en dos.
+
+    El nombre entero, nunca cortado: o cabe en una linea, o se parte en
+    dos que caben las dos, y la zona es alta para las dos.
+    """
+    x, y, ancho, alto = zona
+    util = ancho - AIRE
+    if ancho_nombre(nombre) <= util:
+        return True
+    if alto < ALTO_DOS_LINEAS:
+        return False
+    for corte in range(1, len(nombre)):
+        if ancho_nombre(nombre[:corte]) <= util and ancho_nombre(nombre[corte:]) <= util:
+            return True
+    return False
+
+
 def verificar(clases: list[Clase]) -> list[str]:
-    """Las reglas que el contrato v2 impone, comprobadas sobre las entregas.
+    """Las reglas que el contrato v4 impone, comprobadas sobre las entregas.
 
     El verificador es la red de seguridad del padre: los grupos se revisan a
     sí mismos, pero la comprobación final la hace el integrador, sobre las
@@ -462,6 +495,13 @@ def verificar(clases: list[Clase]) -> list[str]:
             lx, ly, lw, lh = c.label
             if lx < 0 or ly < 0 or lx + lw > w + 0.5 or ly + lh > h + 0.5:
                 problemas.append(f"{c.nombre}: zona de texto fuera ({c.label} en {w}x{h})")
+        if c.label:
+            if not el_nombre_cabe(c.nombre, c.label):
+                problemas.append(
+                    f"{c.nombre}: el nombre no cabe en la zona de texto "
+                    f"({c.label}); necesita {ancho_nombre(c.nombre):.1f} px y la zona "
+                    f"tiene {c.label[2]:.1f} px"
+                )
         if c.figure:
             fx, fy, fw, fh = c.figure
             texto = CIFRA.get(c.nombre, CIFRA_POR_DEFECTO)
@@ -685,7 +725,7 @@ def main() -> int:
         for p in problemas:
             print(f"  {p}", file=sys.stderr)
         return 1
-    print("reglas del contrato v2: OK", file=sys.stderr)
+    print("reglas del contrato v4: OK", file=sys.stderr)
     return 0
 
 

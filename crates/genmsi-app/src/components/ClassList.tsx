@@ -3,6 +3,7 @@ import {
   fitTitle,
   groupByFamily,
   thumbnailOf,
+  THUMBNAIL_BOX,
   type CatalogueEntry,
 } from "../graph/catalogue";
 import type { CatalogueDocument } from "../types";
@@ -47,7 +48,7 @@ export default function ClassList({
       {groups.map((group) => (
         <section
           key={group.family ?? "otras"}
-          className="flex flex-col gap-2 px-3.5 pb-1.5 pt-3"
+          className="flex flex-col gap-2 px-0 pb-1.5 pt-3"
         >
           <h3
             className="text-[11px] font-bold"
@@ -55,7 +56,7 @@ export default function ClassList({
           >
             {group.family ?? "Otras clases"}
           </h3>
-          <ul className="grid grid-cols-2 gap-x-3 gap-y-1">
+          <ul className="grid grid-cols-2 gap-x-2 gap-y-1">
             {group.entries.map((entry) => (
               <li key={entry.className}>
                 <ClassCard entry={entry} onAdd={onAdd} />
@@ -78,6 +79,10 @@ export default function ClassList({
  * The silhouette is the thumbnail: the very path the canvas draws, scaled
  * with its proportion, without fill and without background — only the
  * outline, in the light tone of the family (S6).
+ *
+ * The thumbnail is big — 56×28 px, the box of the helper — so the class is
+ * recognised by its shape before its name is read. The paddings of the list
+ * are trimmed to pay for it: the text of the cell keeps the width it had.
  */
 function ClassCard({
   entry,
@@ -103,13 +108,13 @@ function ClassCard({
         event.dataTransfer.effectAllowed = "copy";
       }}
       onClick={() => onAdd(entry.className)}
-      className="flex w-full cursor-grab items-center gap-2 rounded-md border border-transparent px-1.5 py-[5px] text-left transition hover:border-indigo-200 hover:bg-indigo-50/50 active:cursor-grabbing"
+      className="flex w-full cursor-grab items-center gap-1.5 rounded-md border border-transparent px-1 py-[5px] text-left transition hover:border-indigo-200 hover:bg-indigo-50/50 active:cursor-grabbing"
     >
       {thumbnail !== null && (
         <svg
-          width={40}
-          height={20}
-          viewBox="0 0 40 20"
+          width={THUMBNAIL_BOX.width}
+          height={THUMBNAIL_BOX.height}
+          viewBox={`0 0 ${THUMBNAIL_BOX.width} ${THUMBNAIL_BOX.height}`}
           aria-hidden="true"
           focusable="false"
           className="shrink-0"

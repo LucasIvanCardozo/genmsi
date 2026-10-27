@@ -119,8 +119,13 @@ export function groupByFamily(
   return listed;
 }
 
-/** The box the thumbnail of a class is drawn in. */
-export const THUMBNAIL_BOX = { width: 40, height: 20 } as const;
+/**
+ * The box the thumbnail of a class is drawn in.
+ *
+ * The silhouette is 56×28 pixels: big enough to be recognised at a glance,
+ * which is the whole point of the thumbnail (S3).
+ */
+export const THUMBNAIL_BOX = { width: 56, height: 28 } as const;
 
 /** What the list draws for a class: its silhouette, scaled into the box. */
 export interface Thumbnail {
@@ -177,12 +182,47 @@ export function thumbnailOf(className: string): Thumbnail | null {
 }
 
 /**
+ * The width of the panel that holds the list.
+ *
+ * The panel is 400 px wide (`src/components/MonitorView.tsx`); the list
+ * takes all of it.
+ */
+export const PANEL_WIDTH = 400;
+
+/**
+ * The horizontal padding of a family group (`px-0`).
+ *
+ * The panel already gives the list its air: the group adds none, and the
+ * room it leaves goes to the text of the cells.
+ */
+export const GROUP_PADDING = 0;
+
+/** The gap between the two columns of a group (`gap-x-2`). */
+export const COLUMN_GAP = 8;
+
+/** The horizontal padding of a cell of the list (`px-1`). */
+export const CELL_PADDING = 4;
+
+/** The gap between the thumbnail of a cell and its text (`gap-1.5`). */
+export const CELL_GAP = 6;
+
+/**
  * The width of the text of a cell of the list.
  *
  * It is the width the design measures: the panel of 400 px, in two columns,
- * leaves 120 px of text beside the 40 px of the thumbnail.
+ * leaves 126 px of text beside the 56 px of the thumbnail.
+ *
+ * The measurement does not count the padding of the body of the panel
+ * (16 px per side): the list does not depend on it, and the panel's owner
+ * may trim it. With it, the text of the cell is 110 px wide — wider than
+ * the 104 px it had when the thumbnail was 40 px wide, so the bigger
+ * thumbnail costs the text nothing.
  */
-export const CELL_TEXT_WIDTH = 120;
+export const CELL_TEXT_WIDTH =
+  (PANEL_WIDTH - 2 * GROUP_PADDING - COLUMN_GAP) / 2 -
+  2 * CELL_PADDING -
+  CELL_GAP -
+  THUMBNAIL_BOX.width;
 
 /** The size of the name of the class, in pixels. */
 export const NAME_SIZE = 11;

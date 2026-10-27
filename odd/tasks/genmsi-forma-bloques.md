@@ -129,20 +129,20 @@ números antes y después.
 | T3 | S3, S5 | Pen: la pestaña Bloques con mini preview | inline | hecha |
 | T4 | S4, S5 | Pen: el bloque del lienzo con su dato vivo por familia | inline | hecha |
 | T5 | S2, S6, S7 | Pen: el lenguaje común (colores, tipografía, glifos) | inline | hecha |
-| T6 | S1-S10 | Revisión del diseño con el usuario | inline | en curso |
+| T6 | S1-S10 | Revisión del diseño con el usuario | inline | hecha (aprobado: «Perfecto! ahora si me encanta todo!») |
 | T7 | S2, S7, S8 | El contrato de diseño y la verdad de los puertos (`contrato.md`, `puertos.md`) | inline | hecha |
 | T8 | S2, S4, S7, S8, S9 | Grupo A (lineal): 24 clases — `Generate`, `Terminate`, `Queue`, `Depart`, las 18 de `Operacion` y `Note` | delegada (`gentle-ai-worker`) | hecha (corregida con el v2) |
 | T9 | S2, S4, S7, S8, S9 | Grupo B (entidad): 17 clases — recursos, depósitos, tablas, cadenas | delegada (`gentle-ai-worker`) | hecha (corregida con el v2) |
 | T10 | S2, S4, S7, S8, S9 | Grupo C (grupos y decisiones): 25 clases — decisiones, grupos, selecciones | delegada (`gentle-ai-worker`) | hecha (corregida con el v2) |
 | T11 | S2, S4, S8, S9 | Auditoría de las reglas: puertos, zonas de texto, cifras, coherencia de familias | delegada (`gentle-ai-verify`) | hecha (10 bloqueantes) |
 | T12 | S2, S3, S4, S8, S9 | Integrar las tres propuestas en Pen y revisar la coherencia | inline | hecha |
-| T13 | S2, S6, S7, S8, S9 | Código: `src/graph/shapes.ts` (la forma por clase) + tests + el generador que lo produce | delegada (`gentle-ai-worker`) | en curso |
-| T14 | S2, S8, S9 | Código: el nodo del lienzo dibujado con la forma, las zonas y los puertos en su ancla | delegada (`gentle-ai-worker`) | pendiente (2.ª ronda) |
-| T15 | S3 | Código: la lista del catálogo a dos columnas, con la miniatura y el título | delegada (`gentle-ai-worker`) | pendiente (2.ª ronda) |
-| T16 | S4 | Código: el dato vivo por bloque (`src/monitor/figures.ts` + el almacén vivo) | delegada (`gentle-ai-worker`) | en curso |
-| T17 | S7 | Motor: la huella de cada clase, y el bloque nuevo que nace con ella | delegada (`gentle-ai-worker`) | en curso |
-| T18 | S10 | Verificación: la simulación no cambia + la revisión visual | inline | pendiente |
-| T19 | S1-S10 | Documentación (`docs/app.md`) y el cierre de la feature | inline | pendiente |
+| T13 | S2, S6, S7, S8, S9 | Código: `src/graph/shapes.ts` (la forma por clase) + tests + el generador que lo produce | delegada (`gentle-ai-worker`) | hecha (`bb8a6e2`) |
+| T14 | S2, S8, S9 | Código: el nodo del lienzo dibujado con la forma, las zonas y los puertos en su ancla | delegada (`gentle-ai-worker`) | hecha (`0f52be4`) |
+| T15 | S3 | Código: la lista del catálogo a dos columnas, con la miniatura y el título | delegada (`gentle-ai-worker`) | hecha (`e96627b`) |
+| T16 | S4 | Código: el dato vivo por bloque (`src/monitor/figures.ts` + el almacén vivo) | delegada (`gentle-ai-worker`) | hecha (`f198658`) |
+| T17 | S7 | Motor: la huella de cada clase, y el bloque nuevo que nace con ella | delegada (`gentle-ai-worker`) | hecha (`6da5841`) |
+| T18 | S10 | Verificación: la simulación no cambia + la revisión visual | inline | hecha |
+| T19 | S1-S10 | Documentación (`docs/app.md`) y el cierre de la feature | inline | hecha (`8cc0198`) |
 
 **Por qué se delega.** La unidadTrigger es el **paralelismo**: las tres
 unidades de la primera ronda (la forma, el motor y los datos vivos) tocan
@@ -682,6 +682,32 @@ compila y pasa sus tests por sí solo.
 | Commit | Unidad |
 | --- | --- |
 | `73ecbb6` | la especificación de la feature |
+| `4a7469a` | el límite de la rebanada de esta feature |
+| `6da5841` | el motor: la huella de cada clase (`crates/genmsi-format`, `crates/genmsi-core`) |
+| `f198658` | la figura viva de cada bloque (`src/monitor/figures.ts`, el almacén vivo) |
+| `bb8a6e2` | la forma de cada clase (el diseño, el generador y `src/graph/shapes.ts`) |
+| `0f52be4` | el nodo del lienzo dibujado con la forma (`src/graph/node.ts`, `GraphView.tsx`) |
+| `e96627b` | la lista del catálogo a dos columnas (`src/graph/catalogue.ts`, `ClassList.tsx`) |
+| `8cc0198` | el guion de la revisión visual y la documentación |
 
-El resto de la tabla se completa con cada commit, y el último cierra la
-feature.
+**El orden de la revisión.** El motor va antes que la app porque la app
+dibuja con la huella que el motor publica; la forma va antes que el nodo
+porque el nodo la dibuja; y el guion de la revisión visual va al final
+porque es el que demuestra todo lo demás.
+- L39 — **La entrega: ocho commits, y la feature se cierra.** Cada commit
+  compila y pasa sus tests por si solo, y la tabla de la entrega dice el
+  orden de la revision. La **simulacion no cambio**: el diff del motor,
+  fuera de los tests, son los dos campos nuevos de la huella y las tres
+  cifras del diseno aprobado; la huella solo se lee al crear un bloque y
+  al publicar el documento del catalogo, nunca en la simulacion. Las
+  cifras de la corrida siguen viniendo del motor, y la app no inventa
+  ninguna.
+
+  La **revision visual** pasa entera (17 capturas, ningun paso fallo) y
+  las ultimas correcciones fueron de maquetacion, no de diseno: la
+  etiqueta se escribia en la caja del bloque en vez de en la caja de la
+  forma (por eso se salia de la silueta y por eso el nombre se cortaba
+  de mas), y la forma se estiraba a la caja del bloque viejo (por eso el
+  `Terminate` salia elipse). Ahora la forma manda: se dibuja en su
+  propia huella, con su proporcion, y el texto y los puertos viajan con
+  esa misma transformada.

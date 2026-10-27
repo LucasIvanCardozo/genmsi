@@ -15,6 +15,14 @@ class: string,
  */
 title: string, 
 /**
+ * Canvas width of a block of this class, in the original's own units.
+ */
+width: number, 
+/**
+ * Canvas height of a block of this class, in the original's own units.
+ */
+height: number, 
+/**
  * Input ports, in file order.
  */
 inputs: Array<CataloguePort>, 

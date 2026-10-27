@@ -404,6 +404,10 @@ pub struct CatalogueClass {
     pub class: String,
     /// What the class does, in the words of the interface.
     pub title: String,
+    /// Canvas width of a block of this class, in the original's own units.
+    pub width: i32,
+    /// Canvas height of a block of this class, in the original's own units.
+    pub height: i32,
     /// Input ports, in file order.
     pub inputs: Vec<CataloguePort>,
     /// Output ports, in file order.
@@ -467,6 +471,8 @@ pub fn catalogue_document() -> CatalogueDocument {
         .map(|class| CatalogueClass {
             class: class.class.to_string(),
             title: class.title.to_string(),
+            width: class.width,
+            height: class.height,
             inputs: catalogue_ports(class.inputs),
             outputs: catalogue_ports(class.outputs),
             properties: catalogue_properties(class.properties),
@@ -866,6 +872,35 @@ mod tests {
         let document = trace_document(&result, 1);
         assert_eq!(document.records, 1);
         assert!(document.truncated);
+    }
+
+    /// The catalogue tells the client how big a block of each class is.
+    ///
+    /// The footprint comes from the original editor's class library: a
+    /// client that draws a block needs it, and it must not guess it.
+    #[test]
+    fn the_catalogue_document_carries_the_footprint_of_every_class() {
+        let document = catalogue_document();
+        let footprint = |class: &str| {
+            let class = document
+                .classes
+                .iter()
+                .find(|entry| entry.class == class)
+                .expect("the class is in the catalogue");
+            (class.width, class.height)
+        };
+        assert_eq!(footprint("Test"), (64, 64));
+        assert_eq!(footprint("Generate"), (120, 63));
+        assert_eq!(footprint("Queue"), (97, 32));
+        assert_eq!(footprint("Multifurcacion"), (80, 40));
+        assert_eq!(footprint("Terminate"), (64, 64));
+        assert!(
+            document
+                .classes
+                .iter()
+                .all(|class| class.width > 0 && class.height > 0),
+            "every class of the catalogue declares a footprint"
+        );
     }
 
     #[test]

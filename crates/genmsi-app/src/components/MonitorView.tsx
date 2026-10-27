@@ -4,6 +4,7 @@ import { useApp } from "../state/store";
 import { FLIGHT_SECONDS, MIN_WALL_FLIGHT, travellersAt, type Move } from "../monitor/balls";
 import { graphOf, routeOf, visibleLinks } from "../graph/graph";
 import { countsOf } from "../monitor/counts";
+import { figureBlockOf, figuresOf } from "../monitor/figures";
 import { useLive, type LiveBall, type LiveCounts } from "../monitor/live";
 import ClassList from "./ClassList";
 import StatusLine from "./StatusLine";
@@ -127,14 +128,32 @@ export default function MonitorView({
     [transitions, edges],
   );
 
+  // The blocks of the model, as the figures read them: the class of the
+  // block and the properties it declares.
+  const figureBlocks = useMemo(
+    () => (model === null ? [] : model.blocks.map((block) => figureBlockOf(block))),
+    [model],
+  );
+
   // What the animation needs to publish the picture, kept up to date without
   // restarting the animation.
-  const live = useRef({ counts, edges, moves: [] as Move[], times: [] as number[] });
+  const live = useRef({
+    counts,
+    edges,
+    moves: [] as Move[],
+    times: [] as number[],
+    figures: state?.figures ?? null,
+    report,
+    blocks: figureBlocks,
+  });
   live.current = {
     counts,
     edges,
     moves: (transitions?.moves ?? []) as Move[],
     times: transitions?.times ?? [],
+    figures: state?.figures ?? null,
+    report,
+    blocks: figureBlocks,
   };
 
   // The clock of the replay: the time the run has reached, kept up to date
@@ -180,7 +199,23 @@ export default function MonitorView({
         list.push(ball);
       }
     }
-    useLive.getState().publish({ clock, counts: current.counts, balls });
+    // The figure every block shows: the figure of the entity it operates
+    // on, and the pair of always for the block that operates on none. It is
+    // read with the clock of this instant, because the occupancy of a
+    // resource is the time it was held over the time the run has reached.
+    const blockFigures = figuresOf(current.blocks, {
+      figures: current.figures,
+      report: current.report,
+      clock,
+      counts: current.counts,
+    });
+    useLive.getState().publish({
+      clock,
+      counts: current.counts,
+      balls,
+      figures: current.figures ?? undefined,
+      blockFigures,
+    });
   };
 
   useEffect(() => {
@@ -315,7 +350,7 @@ export default function MonitorView({
               extraEdges={links}
             />
           </div>
-          <aside className="flex w-80 shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <aside className="flex w-[400px] shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
             <div className="flex gap-1 border-b border-slate-200 px-2 pt-2">
               {(
                 [

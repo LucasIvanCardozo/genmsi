@@ -703,10 +703,55 @@ dibuja los 66 bloques).
 | ID | Specs | Tarea | Ruta | Estado |
 |---|---|---|---|---|
 | T20 | S2, S8, S9 | La maqueta del texto dentro de la forma | delegada | hecha |
-| T21 | S2, S8, S9 | La forma se dibuja a su tamano: ni encogida ni recortada | delegada | en curso |
-| T22 | S2, S8 | El diseno: la zona de texto de cada clase abriga su nombre | delegada | en curso |
-| T23 | S3 | Las miniaturas de la lista, de 40x20 a 56x28 | delegada | en curso |
+| T21 | S2, S8, S9 | La forma se dibuja a su tamano: ni encogida ni recortada | delegada | hecha (`9919eda`) |
+| T22 | S2, S8 | El diseno: la zona de texto de cada clase abriga su nombre | delegada | hecha (`64536bb`) |
+| T23 | S3 | Las miniaturas de la lista, de 40x20 a 56x28 | delegada | hecha (`d2dc248`) |
 | T24 | S10 | El banco de pruebas: el modelo con las 66 clases | inline | hecha |
+
+- L39 — **La entrega: ocho commits, y la feature se cierra.** Cada commit
+  compila y pasa sus tests por si solo, y la tabla de la entrega dice el
+  orden de la revision. La **simulacion no cambio**: el diff del motor,
+  fuera de los tests, son los dos campos nuevos de la huella y las tres
+  cifras del diseno aprobado; la huella solo se lee al crear un bloque y
+  al publicar el documento del catalogo, nunca en la simulacion. Las
+  cifras de la corrida siguen viniendo del motor, y la app no inventa
+  ninguna.
+
+  La **revision visual** pasa entera (17 capturas, ningun paso fallo) y
+  las ultimas correcciones fueron de maquetacion, no de diseno: la
+  etiqueta se escribia en la caja del bloque en vez de en la caja de la
+  forma (por eso se salia de la silueta y por eso el nombre se cortaba
+  de mas), y la forma se estiraba a la caja del bloque viejo (por eso el
+  `Terminate` salia elipse). Ahora la forma manda: se dibuja en su
+  propia huella, con su proporcion, y el texto y los puertos viajan con
+  esa misma transformada.
+- L40 — **La segunda ronda, medida.** El lector instalo la app y dijo tres
+  cosas; la medicion dio la causa de las tres:
+
+  | Queja | Causa medida |
+  |---|---|
+  | las figuras se ven cortadas | la figura se encogia para caber en la caja legacy del modelo |
+  | el borde no tiene el mismo grosor | el trazo escalaba con la figura: 2 px en unas, 0,8 en las encogidas |
+  | hay texto que se corta | **30 de 66** clases tienen el nombre mas ancho que su zona |
+
+  La regla que queda: **la forma es la verdad**. Se dibuja a su tamano, uno
+  a uno, sin escalarla ni recortarla; el nombre va entero, en una linea o en
+  dos, y el corte cae en la mayuscula que empieza una palabra. El generador
+  del diseno **rechaza** cualquier clase que no cumpla la regla, y ahora
+  tambien cualquier trazo interior que se salga de la silueta (el boton del
+  parametro de la multifunclacion asomaba por el borde del peine, y el rayo
+  del preempt salia de su galon).
+
+  57 clases caben en una linea y 9 en dos: `InitialLS`, `FunctionDist`,
+  `MFunctionDist`, `StorageUse`, `RemoveNumber`, `RemoveTrans` y
+  `ExamineNumber` se parten en su mayuscula; los dos peinees
+  (`Multifurcacion` y `MultifurcacionP`) se parten dentro de la palabra,
+  porque su nombre es una sola palabra y no cabe en un peine de 80 px.
+
+  El **banco** de las 66 clases es la idea del lector y resulto ser el
+  instrumento del diagnostico: sin el, las 66 siluetas se veian mezcladas
+  con la geometria vieja de los modelos y no se podia judging nada. Con el,
+  la causa salio a la vista en una captura.
 
 ## Entrega — las unidades de revisión
 
@@ -725,25 +770,12 @@ compila y pasa sus tests por sí solo.
 | `0f52be4` | el nodo del lienzo dibujado con la forma (`src/graph/node.ts`, `GraphView.tsx`) |
 | `e96627b` | la lista del catálogo a dos columnas (`src/graph/catalogue.ts`, `ClassList.tsx`) |
 | `8cc0198` | el guion de la revisión visual y la documentación |
+| `c05587b` | el banco de pruebas: el modelo con las 66 clases |
+| `64536bb` | el diseño: el nombre de cada clase, escrito entero |
+| `9919eda` | la app: la figura se dibuja a su tamaño |
+| `d2dc248` | las miniaturas de la lista, de 40x20 a 56x28 |
 
 **El orden de la revisión.** El motor va antes que la app porque la app
 dibuja con la huella que el motor publica; la forma va antes que el nodo
 porque el nodo la dibuja; y el guion de la revisión visual va al final
 porque es el que demuestra todo lo demás.
-- L39 — **La entrega: ocho commits, y la feature se cierra.** Cada commit
-  compila y pasa sus tests por si solo, y la tabla de la entrega dice el
-  orden de la revision. La **simulacion no cambio**: el diff del motor,
-  fuera de los tests, son los dos campos nuevos de la huella y las tres
-  cifras del diseno aprobado; la huella solo se lee al crear un bloque y
-  al publicar el documento del catalogo, nunca en la simulacion. Las
-  cifras de la corrida siguen viniendo del motor, y la app no inventa
-  ninguna.
-
-  La **revision visual** pasa entera (17 capturas, ningun paso fallo) y
-  las ultimas correcciones fueron de maquetacion, no de diseno: la
-  etiqueta se escribia en la caja del bloque en vez de en la caja de la
-  forma (por eso se salia de la silueta y por eso el nombre se cortaba
-  de mas), y la forma se estiraba a la caja del bloque viejo (por eso el
-  `Terminate` salia elipse). Ahora la forma manda: se dibuja en su
-  propia huella, con su proporcion, y el texto y los puertos viajan con
-  esa misma transformada.

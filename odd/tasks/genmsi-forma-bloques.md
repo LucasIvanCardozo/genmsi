@@ -671,3 +671,17 @@ miembros de un grupo. `Select` y `SelectSNA` quedan en «todo lo demás».
   el diseno**: dos columnas, agrupadas por familia con su color, la
   silueta real de cada clase como miniatura sin relleno, el nombre y el
   titulo.
+
+## Entrega — las unidades de revisión
+
+La rama `feature/genmsi-forma-bloques` nace de `feature/genmsi-reordenamiento`,
+así que **arrastra los 38 commits de la feature anterior**; el trabajo de
+esta feature empieza en `73ecbb6` (el límite de la rebanada). Cada commit
+compila y pasa sus tests por sí solo.
+
+| Commit | Unidad |
+| --- | --- |
+| `73ecbb6` | la especificación de la feature |
+
+El resto de la tabla se completa con cada commit, y el último cierra la
+feature.

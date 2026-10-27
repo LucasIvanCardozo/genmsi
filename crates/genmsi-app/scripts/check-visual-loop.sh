@@ -35,6 +35,9 @@ MODEL="fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl"
 # The model of the monitor: it has queues, facilities and tables, so the
 # charts of the run have something to draw.
 MONITOR_MODEL="fixtures/models/TP4__supermercado.gmdl"
+# The bench of the shapes: every class of the catalogue, unconnected, in a
+# grid. It is made by `scripts/make-catalogue-model.py`.
+CATALOGUE_MODEL="crates/genmsi-app/fixtures/catalogo-clases.gmdl"
 REFUSED="fixtures/models/TP9__tp9.gmdl"
 # The copy the loop edits: the development work directory is the only place
 # the development path writes.
@@ -308,6 +311,14 @@ agent-browser screenshot "$SHOTS/16-monitor-graficos.png"
 agent-browser click '[data-monitor-panel="reporte"]'
 agent-browser wait --text "Colas"
 agent-browser screenshot "$SHOTS/17-monitor-reporte.png"
+
+# The bench of the shapes: the 66 classes of the catalogue, unconnected, so
+# that every silhouette is seen with the same eye. The model does not
+# compile (a GPSS with no links is not a model), and the app says so in
+# the status line while it draws every block.
+open_model "$CATALOGUE_MODEL"
+agent-browser wait --text "catalogo-clases"
+agent-browser screenshot "$SHOTS/18-banco-clases.png"
 
 agent-browser close
 echo "==> the visual loop ran; the screenshots are in $SHOTS"

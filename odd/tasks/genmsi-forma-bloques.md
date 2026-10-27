@@ -672,6 +672,42 @@ miembros de un grupo. `Select` y `SelectSNA` quedan en «todo lo demás».
   silueta real de cada clase como miniatura sin relleno, el nombre y el
   titulo.
 
+## Segunda ronda — lo que el lector vio
+
+El lector instaló la app y dijo tres cosas: las figuras se ven **cortadas**
+y con el **borde de distinto grosor**, hay clases cuyo **texto se corta**, y
+las miniaturas de la lista estan **muy chicas**. La medicion dio la causa:
+
+- La figura se dibujaba **encogida para caber en la caja legacy** que el
+  modelo le guardaba. De ahi salia todo: el borde de 2 px en unas figuras y
+  de 0,8 en otras (el trazo escalaba con la figura), el texto encogido con
+  la figura (el `Note` de un modelo viejo era ilegible) y las figuras que
+  parecian cortadas.
+- **30 de las 66 clases** tienen el nombre mas ancho que su zona de texto:
+  `MultifurcacionP` (81 px de nombre en 72 de zona), `ExamineNumber`,
+  `FacilityUse`, `InitialLS`, `Depart`... El nombre se cortaba con elipsis.
+- Las miniaturas eran de 40x20.
+
+La regla que queda: **la forma es la verdad**. Se dibuja a su tamano, uno a
+uno, sin escalarla ni recortarla; el texto va en una linea o en dos, nunca
+cortado; y el generador del diseno **rechaza** cualquier clase cuyo nombre
+no quepa en su zona.
+
+El **banco de pruebas** es la idea del lector: un modelo con las 66 clases,
+sin conectar, en rejilla, para verlas todas con la misma vista. Lo genera
+`crates/genmsi-app/scripts/make-catalogue-model.py` con la sesion del propio
+motor, asi que es un modelo valido por construccion (no compila: un GPSS
+sin enlaces no es un modelo, y la app lo dice en la linea de estado mientras
+dibuja los 66 bloques).
+
+| ID | Specs | Tarea | Ruta | Estado |
+|---|---|---|---|---|
+| T20 | S2, S8, S9 | La maqueta del texto dentro de la forma | delegada | hecha |
+| T21 | S2, S8, S9 | La forma se dibuja a su tamano: ni encogida ni recortada | delegada | en curso |
+| T22 | S2, S8 | El diseno: la zona de texto de cada clase abriga su nombre | delegada | en curso |
+| T23 | S3 | Las miniaturas de la lista, de 40x20 a 56x28 | delegada | en curso |
+| T24 | S10 | El banco de pruebas: el modelo con las 66 clases | inline | hecha |
+
 ## Entrega — las unidades de revisión
 
 La rama `feature/genmsi-forma-bloques` nace de `feature/genmsi-reordenamiento`,

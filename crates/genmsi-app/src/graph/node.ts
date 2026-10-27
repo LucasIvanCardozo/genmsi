@@ -6,12 +6,13 @@
  * ports (S2, S8, S9). This module turns that truth into what the node of
  * the canvas needs:
  *
- * - the **fit** of the silhouette in the box of the block: the shape keeps
- *   its own proportion and sits in the middle of the box, so a block whose
- *   box is bigger than the class keeps the shape of the class in the middle
- *   instead of stretching it (a circle stays a circle);
+ * - the **size of the node**, which is the footprint of the class: the
+ *   shape is the truth, and it is drawn one to one, never scaled and never
+ *   cropped;
  * - the **zones**, in the pixels of the shape's own footprint, so the text
- *   lands inside the silhouette whatever the box of the block is;
+ *   lands inside the silhouette;
+ * - the **lines of the rótulo**: a name that does not fit its zone is
+ *   written on two lines, and no character of it is ever cut;
  * - the **ports**, at the anchor the original editor gave them, placed in
  *   the shape's own frame;
  * - the **text that fits a zone**, measured with the measure of the design
@@ -23,7 +24,7 @@
  * this module says.
  */
 import { portSpread } from "./graph.ts";
-import { truncate } from "./catalogue.ts";
+import { monospaceWidth, truncate } from "./catalogue.ts";
 import {
   familyColors,
   shapeOf,
@@ -70,32 +71,11 @@ export interface FootprintZone {
   height: number;
 }
 
-/** The box a block is drawn in, in pixels. */
-export interface BlockBox {
-  /** The width of the box. */
+/** The size of the node of a block, in pixels. */
+export interface NodeSize {
+  /** The width of the node. */
   width: number;
-  /** The height of the box. */
-  height: number;
-}
-
-/**
- * How the silhouette of a class sits in the box of a block.
- *
- * The shape keeps its own proportion: it is drawn at the size of its
- * footprint, or smaller when the box of the block cannot hold it, and it
- * sits in the middle of the box. A block whose box is bigger than the
- * shape keeps the shape of its class in the middle, untouched.
- */
-export interface ShapeFit {
-  /** The scale of the footprint inside the box. */
-  scale: number;
-  /** How far the silhouette is from the left border of the box. */
-  offsetX: number;
-  /** How far the silhouette is from the top border of the box. */
-  offsetY: number;
-  /** The width of the silhouette once scaled. */
-  width: number;
-  /** The height of the silhouette once scaled. */
+  /** The height of the node. */
   height: number;
 }
 
@@ -135,7 +115,7 @@ export interface FigureOfBlock {
  * Below it, the block carries the rótulo alone: the caption would not fit
  * inside the silhouette.
  */
-const SUBTITLE_HEIGHT = 20;
+export const SUBTITLE_HEIGHT = 20;
 
 /** The size of the rótulo, in pixels: the size the design uses. */
 export const LABEL_SIZE = 9;
@@ -153,10 +133,18 @@ export const FIGURE_SIZE = 10;
  * its zone, and it is what keeps the last letter of a cut word off the
  * edge of the silhouette.
  */
-const ZONE_AIR = 4;
+export const ZONE_AIR = 4;
 
 /** The height of a line of the text of a block, in pixels. */
-const LINE_HEIGHT = 11;
+export const LINE_HEIGHT = 11;
+
+/**
+ * The air between two lines of the same text, in pixels.
+ *
+ * It is the air the design sheet leaves between the two lines of a name
+ * that does not fit in one of them.
+ */
+export const LINE_AIR = 2;
 
 /**
  * The size of the dot of a port, in pixels.
@@ -213,29 +201,26 @@ export function zoneOf(zone: Zone): FootprintZone {
 }
 
 /**
- * How the silhouette of a class sits in the box of a block.
+ * The size of the node of a class: the footprint of the class, one to one.
  *
- * The silhouette keeps its own proportion: it is drawn at the size of its
- * footprint, and it only shrinks when the box of the block cannot hold it
- * (a note of 80×80 in a box of 116×32 is drawn as a 32×32 sheet in the
- * middle). A block whose box is bigger than the shape keeps the shape of
- * its class in the middle, without stretching it.
+ * The shape is the truth: a block is drawn at the size of its class, with
+ * its own proportion, and never scaled to the box the model happens to
+ * carry. A block whose model carries an older, smaller box is drawn at the
+ * size of its class: the model is not rewritten, and the reader can lay
+ * the canvas out again with the relayout command of the toolbar.
+ *
+ * A class the shapes module does not know, and every container, keep the
+ * box of the model: they are drawn as the plain rectangle.
  */
-export function fitOf(shape: BlockShape, box: BlockBox): ShapeFit {
-  const { width, height } = shape.footprint;
-  // A box that is not measured yet draws the shape at its own size.
-  const boxWidth = box.width > 0 ? box.width : width;
-  const boxHeight = box.height > 0 ? box.height : height;
-  const scale = Math.min(1, boxWidth / width, boxHeight / height);
-  const drawnWidth = width * scale;
-  const drawnHeight = height * scale;
-  return {
-    scale,
-    offsetX: (boxWidth - drawnWidth) / 2,
-    offsetY: (boxHeight - drawnHeight) / 2,
-    width: drawnWidth,
-    height: drawnHeight,
-  };
+export function nodeSizeOf(className: string, container = false): NodeSize | null {
+  if (container) {
+    return null;
+  }
+  const shape = shapeOf(className);
+  if (shape === undefined) {
+    return null;
+  }
+  return { width: shape.footprint.width, height: shape.footprint.height };
 }
 
 /**
@@ -278,8 +263,9 @@ export function sideOf(anchor: PortAnchor): PortSide {
  * The anchor comes from the shape of the class: a `Test` leaves by the right
  * vertex of its diamond, and a `Multifurcacion` spreads its five exits
  * along its bottom edge (S8). The anchor is a fraction of the footprint of
- * the class, so the port sits in the shape's own frame and follows it when
- * the silhouette keeps its proportion in the box of the block.
+ * the class, so the port sits in the shape's own frame, and the block is
+ * drawn at the size of that footprint: the port falls on the very point of
+ * the silhouette it belongs to.
  *
  * A port the shape does not know keeps the place the ports used to have,
  * spread along the side: a link that loses its handle is a link the reader
@@ -344,14 +330,116 @@ export function figureText(
 }
 
 /**
- * The rótulo of a block, cut to the width of its zone.
+ * The lines the rótulo of a block is written on.
  *
- * The measure is the one of the design (`catalogue.ts`), and the cut is the
- * one of the design sheet: the name is cut with an ellipsis when it does
- * not fit in the zone, and a name that fits is never cut.
+ * The name of a class does not always fit in one line of its zone. When it
+ * does not fit, it is written on two lines, and no character of it is lost:
+ * the name of a class is never cut with an ellipsis.
+ *
+ * The measure is the one of the design (`catalogue.ts`): the name is
+ * monospaced, and the zone is the one the class declares.
  */
-export function labelText(name: string, zone: FootprintZone): string {
-  return truncate(name, zone.width - ZONE_AIR, LABEL_SIZE);
+export function labelLines(name: string, zone: FootprintZone): string[] {
+  const room = zone.width - ZONE_AIR;
+  if (monospaceWidth(name, LABEL_SIZE) <= room) {
+    return [name];
+  }
+  return splitInTwo(name, room);
+}
+
+/**
+ * The name of a class, in two lines that fit the zone.
+ *
+ * The break is at a space when the name has one and the two halves fit
+ * there; otherwise the name is broken in the middle, at the point that
+ * balances the two lines best. The space of the break stays with the line
+ * it belongs to, so the two lines together are the whole name.
+ */
+function splitInTwo(name: string, room: number): string[] {
+  const width = (part: string): number => monospaceWidth(part.trim(), LABEL_SIZE);
+  let best: Break | undefined;
+  for (let index = 1; index < name.length; index += 1) {
+    const first = name.slice(0, index);
+    const second = name.slice(index);
+    if (first.trim() === "" || second.trim() === "") {
+      continue;
+    }
+    const candidate: Break = {
+      first,
+      second,
+      // A break at a space keeps the word whole: the space that ends the
+      // first line is the best one, and the space that starts the second
+      // line is the next best. A break at a capital keeps the words of a
+      // name whole too: "RemoveNumber" breaks as "Remove" and "Number",
+      // not as "Remov" and "eNumber".
+      kind: first.endsWith(" ")
+        ? 2
+        : second.startsWith(" ")
+          ? 1
+          : isCapitalBreak(name, index)
+            ? 1
+            : 0,
+      fits: width(first) <= room && width(second) <= room,
+      balance: Math.abs(first.length - second.length),
+    };
+    if (best === undefined || breaksBetter(candidate, best)) {
+      best = candidate;
+    }
+  }
+  if (best === undefined) {
+    // A name of one character cannot be broken in two.
+    return [name];
+  }
+  return [best.first, best.second];
+}
+
+/** One way of breaking a name in two lines. */
+interface Break {
+  /** The first line of the name. */
+  first: string;
+  /** The second line of the name. */
+  second: string;
+  /** How good the place of the break is: 2 is a space at the end of the
+   * first line, 1 is a space at the start of the second one or a capital
+   * that starts a word, and 0 is a break inside a word. */
+  kind: number;
+  /** Whether both lines fit the zone. */
+  fits: boolean;
+  /** How far the two lines are from being the same length. */
+  balance: number;
+}
+
+/**
+ * Whether a break falls where a capital starts a word.
+ *
+ * The names of the classes are written in camel case, and the capital is
+ * where the name says a word ends.
+ */
+function isCapitalBreak(name: string, index: number): boolean {
+  const letter = name[index];
+  if (letter === undefined || !/[A-Z]/.test(letter)) {
+    return false;
+  }
+  const before = name[index - 1];
+  return before !== undefined && /[a-z0-9]/.test(before);
+}
+
+/**
+ * Whether one break of a name is better than another.
+ *
+ * A break whose two lines fit the zone wins over one whose lines do not; a
+ * break at a space wins over one at a capital, and one at a capital wins
+ * over one inside a word; and, between two breaks of the same kind, the one
+ * that balances the two lines wins.
+ */
+function breaksBetter(candidate: Break, best: Break): boolean {
+  if (candidate.fits !== best.fits) {
+    return candidate.fits;
+  }
+  if (candidate.kind !== best.kind) {
+    return candidate.kind > best.kind;
+  }
+  return candidate.balance < best.balance;
 }
 
 /**
@@ -375,14 +463,43 @@ export function figureZoneText(text: string, zone: FootprintZone): string {
 }
 
 /**
- * The line the rótulo is written on, as the baseline of its text.
+ * The lines the rótulo is written on, as the baselines of its text.
  *
  * The rótulo goes on the first line of the zone of the label, at the top of
  * it: that leaves the second line for the caption, and it keeps the text
- * away from the edge of the silhouette.
+ * away from the edge of the silhouette. A name that needs two lines takes
+ * the second line too, with the air the design leaves between two lines.
  */
-export function labelBaseline(zone: FootprintZone): number {
-  return zone.top + Math.min(LABEL_SIZE, zone.height - 3);
+export function labelBaselines(zone: FootprintZone, lines: number): number[] {
+  const first = zone.top + Math.min(LABEL_SIZE, zone.height - 3);
+  const baselines: number[] = [];
+  for (let index = 0; index < lines; index += 1) {
+    baselines.push(first + index * (LINE_HEIGHT + LINE_AIR));
+  }
+  return baselines;
+}
+
+/**
+ * The height the lines of the rótulo take, in pixels.
+ *
+ * A line of text is `LINE_HEIGHT` high and two lines have `LINE_AIR` of
+ * air between them: two lines take 24 px, which is what a zone needs to
+ * carry a name that does not fit in one of them.
+ */
+export function labelHeight(lines: number): number {
+  return lines * LINE_HEIGHT + Math.max(0, lines - 1) * LINE_AIR;
+}
+
+/**
+ * Whether the caption has its place under the lines of the rótulo.
+ *
+ * The caption goes on the second line of the zone of the label. A name that
+ * needed two lines takes that line as well, and then the caption has no
+ * place: the name of the class matters more than its caption.
+ */
+export function captionFits(zone: FootprintZone, lines: number): boolean {
+  const baselines = labelBaselines(zone, lines);
+  return captionBaseline(zone) > baselines[baselines.length - 1];
 }
 
 /**

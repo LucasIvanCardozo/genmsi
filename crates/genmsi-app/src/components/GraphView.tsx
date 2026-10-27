@@ -2,7 +2,6 @@ import {
   useCallback,
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -32,16 +31,17 @@ import {
   LABEL_SIZE,
   PORT_SIZE,
   captionBaseline,
+  captionFits,
   captionText,
   drawingOf,
   figureBaseline,
   figureText,
   figureZoneText,
-  fitOf,
-  labelBaseline,
-  labelText,
+  labelBaselines,
+  labelHeight,
+  labelLines,
+  nodeSizeOf,
   portPlacements,
-  type BlockBox,
   type PortSide,
 } from "../graph/node";
 import { useBlockCounts, useBlockFigure } from "../monitor/live";
@@ -80,6 +80,11 @@ const NOTE_LABEL_COLOR = "#475569";
  * holds it, with the zones where the rótulo and the figure go, and with the
  * anchor of each of its ports (S2, S8, S9). A class the shape module does
  * not know keeps the plain rounded rectangle, so the canvas never breaks.
+ *
+ * The silhouette is the truth: it is drawn at the size of its own class, one
+ * to one, without being scaled and without being cropped. The node of the
+ * graph has that very size, so the drawing, the selection and the MiniMap
+ * all agree on where the block is.
  */
 function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
   const container = data.kind === "C";
@@ -94,28 +99,7 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
   // The figure of the block: the number of the entity it operates on, or the
   // pair of always.
   const figure = useBlockFigure(Number(id));
-  // The box the block is drawn in: the model says how big the block is, and
-  // the silhouette keeps its own proportion inside that box.
-  const [box, setBox] = useState<BlockBox>({ width: 0, height: 0 });
-  const frame = useRef<HTMLDivElement | null>(null);
   const clip = useId().replace(/[^a-zA-Z0-9_-]/g, "");
-  useLayoutEffect(() => {
-    const element = frame.current;
-    if (element === null) {
-      return;
-    }
-    const measure = (): void => {
-      const width = element.clientWidth;
-      const height = element.clientHeight;
-      setBox((current) =>
-        current.width === width && current.height === height ? current : { width, height },
-      );
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
 
   if (
     drawing.fallback ||
@@ -212,26 +196,33 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
 
   const shape = drawing.shape;
   const colors = drawing.colors;
-  // The box the block is drawn in. Before the box is measured the shape is
-  // drawn at its own size, and the measurement only moves it.
-  const width = box.width > 0 ? box.width : shape.footprint.width;
-  const height = box.height > 0 ? box.height : shape.footprint.height;
-  // How the silhouette sits in that box: it keeps its own proportion, and
-  // it is centred in the box when the box is bigger than the shape.
-  const fit = fitOf(shape, { width, height });
+  // The size of the block: the footprint of its class, one to one. The
+  // silhouette is never scaled and never cropped.
+  const width = shape.footprint.width;
+  const height = shape.footprint.height;
   // The ports of the block, at the anchor the shape declares.
   const inputs = portPlacements(shape, data.inputs, "top");
   const outputs = portPlacements(shape, data.outputs, "bottom");
-  // The text of the block, cut to the zone it goes in.
-  const label = labelText(data.title, drawing.label);
+  // The zone of the label, in the pixels of the footprint of the class.
+  const labelZone = drawing.label;
+  // The rótulo of the block: the name of the class, in one line when it
+  // fits its zone and in two lines when it does not. No character of it is
+  // ever cut.
+  const lines = labelLines(data.title, labelZone);
+  const baselines = labelBaselines(labelZone, lines.length);
+  // The caption keeps its own place, the second line of the zone, and it is
+  // cut to the zone as it always was.
   const caption =
-    drawing.subtitle && data.subtitle !== "" ? captionText(data.subtitle, drawing.label) : "";
+    drawing.subtitle &&
+    captionFits(labelZone, lines.length) &&
+    data.subtitle !== ""
+      ? captionText(data.subtitle, labelZone)
+      : "";
   const text =
     drawing.figure === null ? "" : figureZoneText(figureText(figure, counts), drawing.figure);
 
   return (
     <div
-      ref={frame}
       className={[
         "relative h-full w-full",
         note ? "opacity-70" : "",
@@ -242,22 +233,23 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
           footprint of the class: the path is the one the shape module
           declares, the details are the strokes inside it, and the text goes
           in the zones the shape declares, which are inside the silhouette.
-          The whole group keeps the proportion of the shape inside the box
-          of the block, so a circle stays a circle. */}
+          Nothing is scaled: the viewBox is the footprint of the class, so a
+          circle stays a circle and every figure keeps the width of its
+          stroke. */}
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full"
         viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label={data.subtitle !== "" ? `${data.title} ${data.subtitle}` : data.title}
       >
         <defs>
           <clipPath id={`label-${clip}`}>
             <rect
-              x={drawing.label.left}
-              y={drawing.label.top}
-              width={drawing.label.width}
-              height={drawing.label.height}
+              x={labelZone.left}
+              y={labelZone.top}
+              width={labelZone.width}
+              height={Math.max(labelZone.height, labelHeight(lines.length))}
             />
           </clipPath>
           {drawing.figure !== null && (
@@ -271,70 +263,72 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
             </clipPath>
           )}
         </defs>
-        <g transform={`translate(${fit.offsetX} ${fit.offsetY}) scale(${fit.scale})`}>
+        <path
+          d={shape.path}
+          fill={colors.relleno}
+          stroke={colors.borde}
+          strokeWidth={2}
+          strokeLinejoin="round"
+        />
+        {shape.details.map((detail, index) => (
           <path
-            d={shape.path}
-            fill={colors.relleno}
+            key={index}
+            d={detail}
+            fill="none"
             stroke={colors.borde}
-            strokeWidth={2}
-            strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke"
+            strokeWidth={1.8}
+            strokeLinecap="round"
           />
-          {shape.details.map((detail, index) => (
-            <path
-              key={index}
-              d={detail}
-              fill="none"
-              stroke={colors.borde}
-              strokeWidth={1.8}
-              strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-            />
-          ))}
-          {/* The rótulo, on the first line of the zone of the label. */}
+        ))}
+        {/* The rótulo, on the lines of the zone of the label. The name is
+            monospaced, as the design declares it and as the measure of the
+            zone assumes. */}
+        {lines.map((line, index) => (
           <text
-            x={drawing.label.left + 2}
-            y={labelBaseline(drawing.label)}
+            key={index}
+            className="font-mono"
+            x={labelZone.left + 2}
+            y={baselines[index]}
             fontSize={LABEL_SIZE}
             fontWeight={600}
             fill={note ? NOTE_LABEL_COLOR : LABEL_COLOR}
             clipPath={`url(#label-${clip})`}
             style={note ? { fontStyle: "italic" } : undefined}
           >
-            {label}
+            {line}
           </text>
-          {/* The caption, on the second line of the same zone, and only
-              when the zone has room for it. */}
-          {caption !== "" && (
-            <text
-              x={drawing.label.left + 2}
-              y={captionBaseline(drawing.label)}
-              fontSize={CAPTION_SIZE}
-              fill={CAPTION_COLOR}
-              clipPath={`url(#label-${clip})`}
-            >
-              {caption}
-            </text>
-          )}
-          {/* The live figure of the block, in the zone the shape declares
-              and in the colour of its family. The zone is reserved even
-              when the block has no figure, so the rótulo does not move
-              when it appears. */}
-          {drawing.figure !== null && text !== "" && (
-            <text
-              className="font-mono"
-              x={drawing.figure.left + drawing.figure.width - 2}
-              y={figureBaseline(drawing.figure)}
-              textAnchor="end"
-              fontSize={FIGURE_SIZE}
-              fontWeight={700}
-              fill={colors.acento}
-              clipPath={`url(#figure-${clip})`}
-            >
-              {text}
-            </text>
-          )}
-        </g>
+        ))}
+        {/* The caption, on the second line of the same zone, and only
+            when the zone has room for it. */}
+        {caption !== "" && (
+          <text
+            x={labelZone.left + 2}
+            y={captionBaseline(labelZone)}
+            fontSize={CAPTION_SIZE}
+            fill={CAPTION_COLOR}
+            clipPath={`url(#label-${clip})`}
+          >
+            {caption}
+          </text>
+        )}
+        {/* The live figure of the block, in the zone the shape declares
+            and in the colour of its family. The zone is reserved even
+            when the block has no figure, so the rótulo does not move
+            when it appears. */}
+        {drawing.figure !== null && text !== "" && (
+          <text
+            className="font-mono"
+            x={drawing.figure.left + drawing.figure.width - 2}
+            y={figureBaseline(drawing.figure)}
+            textAnchor="end"
+            fontSize={FIGURE_SIZE}
+            fontWeight={700}
+            fill={colors.acento}
+            clipPath={`url(#figure-${clip})`}
+          >
+            {text}
+          </text>
+        )}
       </svg>
       {/* The ports, each one at the anchor the shape declares: the flow
           leaves the block by the very point the original editor put it. */}
@@ -346,8 +340,8 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
           id={String(port.ioid)}
           title={port.name}
           style={{
-            left: `${fit.offsetX + port.x * fit.width}px`,
-            top: `${fit.offsetY + port.y * fit.height}px`,
+            left: `${port.x * width}px`,
+            top: `${port.y * height}px`,
             right: "auto",
             bottom: "auto",
             transform: "translate(-50%, -50%)",
@@ -367,8 +361,8 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
           id={String(port.ioid)}
           title={port.name}
           style={{
-            left: `${fit.offsetX + port.x * fit.width}px`,
-            top: `${fit.offsetY + port.y * fit.height}px`,
+            left: `${port.x * width}px`,
+            top: `${port.y * height}px`,
             right: "auto",
             bottom: "auto",
             transform: "translate(-50%, -50%)",
@@ -449,7 +443,18 @@ export default function GraphView({
   useEffect(() => {
     const graph = graphOf(model);
     setNodes(
-      graph.nodes.map((node) => ({ ...node, selected: selected.current.has(node.id) })),
+      graph.nodes.map((node) => {
+        const drawn = { ...node, selected: selected.current.has(node.id) };
+        // The block is drawn at the size of its class: the shape is the
+        // truth, and the box the model carries is not rewritten. A class
+        // the shape module does not know, and every container, keep the
+        // box of the model.
+        const size = nodeSizeOf(node.data.title, node.data.kind === "C");
+        if (size === null) {
+          return drawn;
+        }
+        return { ...drawn, style: { ...drawn.style, width: size.width, height: size.height } };
+      }),
     );
     // The links are drawn by the component that carries the balls.
     setEdges([

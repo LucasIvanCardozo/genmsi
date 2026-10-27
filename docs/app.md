@@ -233,12 +233,32 @@ similarity with the original.
   the engine's tables, with the numbers of the instant the replay is at.
 - **Lateral panel**: two tabs, *Bloque* (the selected block's identity and
   its declared properties, one editor per declared type) and *Bloques* (the
-  classes that can be created, with what each one does and the ports and
-  properties it declares). The panel is **of the model**: the state of the
+  catalogue of the classes that can be created). The panel is 400 px wide.
+  The *Bloques* tab is a **catalogue in two columns**, grouped by the family
+  the class belongs to (the family is a header that spans both columns, in
+  the family's colour), and **each entry carries the silhouette of its
+  class** as its thumbnail — the very shape the canvas draws, with no fill
+  and no background, only the outline — with the name of the class in
+  monospace and, below it, what the class does. There is no search field:
+  the two columns and the family groups are what make the catalogue
+  browsable. The panel is **of the model**: the state of the
   run is told by the report and by the charts, which say it with more
   detail and alive with the clock. The one thing the panel said that nobody
   else says —which transaction holds each facility— is the column *Ahora* of
   the indicators of the facilities.
+- **Every block has the shape of its class**: the canvas does not draw a
+  rounded rectangle for everything. Each class has a **silhouette** — the
+  diamond of a *Test*, the comb of a *Multifurcacion*, the clean circle of
+  a *Terminate* — drawn in the light tone of its family, with the interior
+  strokes that give the shape its character, and the block's **name and its
+  live figure** inside it, in the zones the class reserves, never on top of
+  a port. The **ports leave where the class says**: the output of a *Test*
+  goes out of the right vertex of its diamond, and the five exits of a
+  *Multifurcacion* spread along its bottom edge. The shape of a class, its
+  zones and its anchors live in one place (`src/graph/shapes.ts`), and both
+  the canvas and the catalogue read it, so the thumbnail of the catalogue
+  cannot lie about the shape of the block. A class the shapes module does
+  not know keeps the plain rectangle, and so does every container.
 - **Status line**: the foot of the window carries **every message of the
   app**, and there is no band of messages at the top: the top belongs to
   the header and to the toolbar. The line says what the model compiles to
@@ -399,6 +419,10 @@ zoom out to be seen.
 | `crates/genmsi-app/src/edit/` | The pure parts of the editor: the property editors. |
 | `crates/genmsi-app/src/monitor/` | The replay: the projection of the trace and the state it rebuilds. |
 | `crates/genmsi-app/src/monitor/derived.ts` | The metrics the app derives from the numbers the engine publishes. |
+| `crates/genmsi-app/src/monitor/figures.ts` | The figure of every block: the number of the entity it acts on, or the default pair when it has no entity. |
+| `crates/genmsi-app/src/graph/shapes.ts` | The shape of every class: its silhouette, its interior strokes, its ports and their anchors, its text zones and its family's colours. **Generated** from the approved design, and the one place the canvas and the catalogue read the shape from. |
+| `crates/genmsi-app/src/graph/node.ts` | The pure parts of the node: where the zones fall on the block and where each port leaves from. |
+| `crates/genmsi-app/src/graph/catalogue.ts` | The pure parts of the catalogue list: the classes grouped by family, the geometry of the thumbnail and the cut of the text. |
 | `crates/genmsi-app/src/monitor/series.ts` | The series, the intervals and the histograms the charts draw. |
 | `crates/genmsi-app/src/state/store.ts` | The app's state (Zustand). |
 | `crates/genmsi-app/src/types/generated/` | The types generated from the Rust schema. |

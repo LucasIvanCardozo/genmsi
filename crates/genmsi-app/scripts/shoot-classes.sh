@@ -73,30 +73,30 @@ open_model() {
   agent-browser eval "localStorage.setItem('genmsi.recent-models', JSON.stringify(['$path']))" >/dev/null
   agent-browser reload >/dev/null
   agent-browser wait --text "GenMSI" >/dev/null
-  agent-browser eval "(() => { const b = Array.from(document.querySelectorAll('button')).find((x) => (x.getAttribute('aria-label') || '').includes('modelos abiertos')); if (!b) return 'no recent button'; b.click(); return 'menu open'; })()" >/dev/null
+  agent-browser eval "(() => { var b = Array.from(document.querySelectorAll('button')).find((x) => (x.getAttribute('aria-label') || '').includes('modelos abiertos')); if (!b) return 'no recent button'; b.click(); return 'menu open'; })()" >/dev/null
   sleep 0.5
-  agent-browser eval "(() => { const btn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes('$file')); if (!btn) return 'not in the recents'; btn.click(); return 'opened'; })()" >/dev/null
+  agent-browser eval "(() => { var btn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes('$file')); if (!btn) return 'not in the recents'; btn.click(); return 'opened'; })()" >/dev/null
   sleep 2
 }
 
 # A point of the canvas with no block on it, to press the mouse on.
 empty_spot() {
-  agent-browser eval "(() => { const w = innerWidth, h = innerHeight; for (let y = 120; y < h - 120; y += 24) { for (let x = 8; x < 220; x += 24) { const el = document.elementFromPoint(x, y); if (el && el.classList.contains('react-flow__pane')) return x + ',' + y; } } return ''; })()" | tr -d '"'
+  agent-browser eval "(() => { var w = innerWidth, h = innerHeight; for (let y = 120; y < h - 120; y += 24) { for (let x = 8; x < 220; x += 24) { var el = document.elementFromPoint(x, y); if (el && el.classList.contains('react-flow__pane')) return x + ',' + y; } } return ''; })()" | tr -d '"'
 }
 
 # The place of the block in the picture: x, y, width and height.
 node_rect() {
-  agent-browser eval "(() => { const el = document.querySelector('.react-flow__node[data-id=\"$1\"]'); if (!el) return 'none'; const r = el.getBoundingClientRect(); return [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)].join(' '); })()" | tr -d '"'
+  agent-browser eval "(() => { var el = document.querySelector('.react-flow__node[data-id=\"$1\"]'); if (!el) return 'none'; var r = el.getBoundingClientRect(); return [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)].join(' '); })()" | tr -d '"'
 }
 
 # The place of the canvas in the picture: x, y, width and height.
 pane_rect() {
-  agent-browser eval "(() => { const el = document.querySelector('.react-flow__pane'); if (!el) return 'none'; const r = el.getBoundingClientRect(); return [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)].join(' '); })()" | tr -d '"'
+  agent-browser eval "(() => { var el = document.querySelector('.react-flow__pane'); if (!el) return 'none'; var r = el.getBoundingClientRect(); return [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)].join(' '); })()" | tr -d '"'
 }
 
 # Where the block is and how much the canvas has to move for it to be seen.
 block_rect() {
-  agent-browser eval "(() => { const el = document.querySelector('.react-flow__node[data-id=\"$1\"]'); if (!el) return 'none'; const r = el.getBoundingClientRect(); const m = 16; const w = innerWidth, h = innerHeight; let dx = 0, dy = 0; if (r.left < m) dx = r.left - m; else if (r.right > w - m) dx = r.right - (w - m); if (r.top < m) dy = r.top - m; else if (r.bottom > h - m) dy = r.bottom - (h - m); return Math.round(dx) + ' ' + Math.round(dy); })()" | tr -d '"'
+  agent-browser eval "(() => { var el = document.querySelector('.react-flow__node[data-id=\"$1\"]'); if (!el) return 'none'; var r = el.getBoundingClientRect(); var m = 16; var w = innerWidth, h = innerHeight; let dx = 0, dy = 0; if (r.left < m) dx = r.left - m; else if (r.right > w - m) dx = r.right - (w - m); if (r.top < m) dy = r.top - m; else if (r.bottom > h - m) dy = r.bottom - (h - m); return Math.round(dx) + ' ' + Math.round(dy); })()" | tr -d '"'
 }
 
 for model in "$@"; do
@@ -121,7 +121,7 @@ for block in model["blocks"]:
     # The block is made bigger around its own middle, with the wheel of
     # the canvas: the zoom keeps the point under the pointer where it is,
     # so the block grows where it is and does not leave the picture.
-    agent-browser eval "(() => { const el = document.querySelector('.react-flow__node[data-id=\"$id\"]'); const pane = document.querySelector('.react-flow__pane'); if (!el || !pane) return 'none'; const r = el.getBoundingClientRect(); const cx = r.x + r.width / 2, cy = r.y + r.height / 2; for (let i = 0; i < 3; i++) { pane.dispatchEvent(new WheelEvent('wheel', {deltaY: -120, clientX: cx, clientY: cy, bubbles: true, cancelable: true})); } return 'ok'; })()" >/dev/null
+    agent-browser eval "(() => { var el = document.querySelector('.react-flow__node[data-id=\"$id\"]'); var pane = document.querySelector('.react-flow__pane'); if (!el || !pane) return 'none'; var r = el.getBoundingClientRect(); var cx = r.x + r.width / 2, cy = r.y + r.height / 2; for (let i = 0; i < 3; i++) { pane.dispatchEvent(new WheelEvent('wheel', {deltaY: -120, clientX: cx, clientY: cy, bubbles: true, cancelable: true})); } return 'ok'; })()" >/dev/null
     sleep 0.8
     # The place of the block is read once the zoom has settled: while it
     # moves, the picture and the rectangle do not agree.
@@ -131,7 +131,7 @@ for block in model["blocks"]:
     # The block alone in the picture: the other blocks and the links are
     # hidden while it is taken, so that the reader judges the block and
     # not its neighbours.
-    agent-browser eval "(() => { const flow = document.querySelector('.react-flow'); if (!flow) return 'no flow'; let node = flow; while (node && node.parentElement) { const parent = node.parentElement; for (const child of parent.children) { if (child !== node) child.style.visibility = 'hidden'; } node = parent; } document.querySelectorAll('.react-flow__node').forEach((n) => { if (n.getAttribute('data-id') !== '$id') n.style.visibility = 'hidden'; }); const pane = document.querySelector('.react-flow__pane'); const flow = document.querySelector('.react-flow'); if (pane && flow) { for (const child of flow.children) { if (!child.contains(pane)) child.style.visibility = 'hidden'; } } document.querySelectorAll('.react-flow__edges, .react-flow__controls, .react-flow__minimap, .react-flow__panel, .react-flow__attribution').forEach((e) => { e.style.visibility = 'hidden'; }); return 'aislado'; })()" >/dev/null
+    agent-browser eval "(() => { var lienzo = document.querySelector('.react-flow'); if (!lienzo) return 'no flow'; let node = lienzo; while (node && node.parentElement) { var parent = node.parentElement; for (var child of parent.children) { if (child !== node) child.style.visibility = 'hidden'; } node = parent; } document.querySelectorAll('.react-flow__node').forEach((n) => { if (n.getAttribute('data-id') !== '$id') n.style.visibility = 'hidden'; }); var capa = document.querySelector('.react-flow__pane'); var raiz = document.querySelector('.react-flow'); if (capa && raiz) { for (var child of raiz.children) { if (!child.contains(capa)) child.style.visibility = 'hidden'; } } document.querySelectorAll('.react-flow__edges, .react-flow__controls, .react-flow__minimap, .react-flow__panel, .react-flow__attribution').forEach((e) => { e.style.visibility = 'hidden'; }); return 'aislado'; })()" >/dev/null
     # The picture of the whole window, and the block cut out of it: the
     # picture of an element does not line up when the page moves.
     agent-browser screenshot "$OUT/.ventana.png" >/dev/null 2>&1 || continue
@@ -139,7 +139,7 @@ for block in model["blocks"]:
     # can live a little outside its own box.
     m=14
     magick "$OUT/.ventana.png" -crop "$((nw + 2 * m))x$((nh + 2 * m))+$((nx - m))+$((ny - m))" +repage "$OUT/$class.png" 2>/dev/null || true
-    agent-browser eval "(() => { document.querySelectorAll('*').forEach((e) => { if (e.style.visibility === 'hidden') e.style.visibility = ''; }); const el = document.querySelector('.react-flow__node[data-id=\"$id\"]'); const pane = document.querySelector('.react-flow__pane'); if (el && pane) { const r = el.getBoundingClientRect(); const cx = r.x + r.width / 2, cy = r.y + r.height / 2; for (let i = 0; i < 3; i++) { pane.dispatchEvent(new WheelEvent('wheel', {deltaY: 120, clientX: cx, clientY: cy, bubbles: true, cancelable: true})); } } return 'restaurado'; })()" >/dev/null
+    agent-browser eval "(() => { document.querySelectorAll('*').forEach((e) => { if (e.style.visibility === 'hidden') e.style.visibility = ''; }); var el = document.querySelector('.react-flow__node[data-id=\"$id\"]'); var pane = document.querySelector('.react-flow__pane'); if (el && pane) { var r = el.getBoundingClientRect(); var cx = r.x + r.width / 2, cy = r.y + r.height / 2; for (let i = 0; i < 3; i++) { pane.dispatchEvent(new WheelEvent('wheel', {deltaY: 120, clientX: cx, clientY: cy, bubbles: true, cancelable: true})); } } return 'restaurado'; })()" >/dev/null
   done
 done
 

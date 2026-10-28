@@ -708,6 +708,13 @@ dibuja los 66 bloques).
 | T23 | S3 | Las miniaturas de la lista, de 40x20 a 56x28 | delegada | hecha (`d2dc248`) |
 | T24 | S10 | El banco de pruebas: el modelo con las 66 clases | inline | hecha (`c05587b`) |
 | T25 | S2, S3 | El aire de la caja: el borde completo, en el lienzo y en la miniatura | inline | hecha (`4bbc3de`) |
+| T26 | S3 | La galeria: cinco modelos que corren y cubren las 66 clases | delegada | hecha (`f9aa663`) |
+| T27 | S10 | El guion de fotos: una foto real de cada clase | inline | hecha (`134fc96`) |
+| T28 | S2, S3, S8 | La ronda de pulido con el lector, componente por componente | inline | hecha |
+| T31 | S2, S7, S8 | Diseno: el peine mas ancho, la linea de la tabla, la zona del SelectF y la regla "ninguna zona sobre un trazo" | delegada | hecha (`44cc471`) |
+| T32 | S8 | App: el rotulo se achica antes de cortarse y la cifra centrada en su zona | delegada | hecha (`282014b`) |
+| T35 | S4 | Diseno: las nueve clases sin cifra posible pierden su zona reservada | delegada | hecha (`44cc471`) |
+| T36 | S4 | App: el guion tenue de una zona reservada sin cifra | delegada | hecha (`282014b`) |
 
 - L39 — **La entrega: ocho commits, y la feature se cierra.** Cada commit
   compila y pasa sus tests por si solo, y la tabla de la entrega dice el
@@ -766,6 +773,46 @@ dibuja los 66 bloques).
   (2 por lado) y los puertos se desplazan con el, porque la posicion de un
   puerto es su ancla dentro de la huella.
 
+- L42 — **La ronda de pulido, con las fotos de la app real.** El lector
+  recibio una foto de cada clase, tal como la dibuja la app durante una
+  corrida, y respondio componente por componente: 52 "perfecto" y siete
+  con cambios.
+
+  | Queja | Que se hizo |
+  |---|---|
+  | el peine no entra en una linea | el peine pasa de 80 a **144 px** y su nombre entra entero |
+  | el subtitulo de la tabla se sobrepone con su linea | la linea del encabezado baja (y=20 -> 32) |
+  | el texto del SelectF toca su ovalo | la zona se mueve a la derecha |
+  | el numero del Terminate no esta centrado | la cifra va **centrada** en su zona |
+  | que son los "..." de los bloques | el **rotulo** (el nombre que le puso el usuario) se cortaba porque la zona se habia dimensionado para el nombre de la clase |
+
+  El ultimo caso es el de fondo: la zona de texto la dimensionaba el
+  nombre de la clase (corto y fijo) y ahi iba tambien el rotulo del
+  bloque, que es del usuario y puede ser largo. Ahora el rotulo **se
+  achica antes de cortarse** (hasta 7 px) y solo se corta con elipsis si
+  no entra ni asi.
+
+  Y con el criterio que el lector aprobo ("mostrar la cifra cuando el
+  motor la publica, nunca inventar una, y no dejar un hueco que parezca
+  un error"):
+
+  - las **nueve clases que nunca pueden tener cifra** (las cinco
+    funciones, la Note, el StorageDef, la Table y la QTable) **pierden la
+    zona reservada**: un hueco que nunca se llena no es un hueco, es un
+    fallo con apariencia de fallo. El generador lo impide.
+  - una zona reservada **sin cifra muestra un guion tenue**, y solo
+    mientras la corrida corre: antes de correr, no hay nada que decir.
+
+  El generador creció otra regla: **ninguna zona de texto cruza un
+  trazo interior**. La encontro en trece clases (las tres senaladas y
+  otras doce), y las trece se arreglaron moviendo la zona, sin tocar
+  silueta, puerto ni color.
+
+  La **galeria** (cinco modelos que corren y cubren las 66 clases) y el
+  **banco** (el modelo con las 66 clases sin conectar) son el banco de
+  pruebas del diseno; el guion `shoot-classes.sh` toma la foto de cada
+  clase desde la app.
+
 ## Entrega — las unidades de revisión
 
 La rama `feature/genmsi-forma-bloques` nace de `feature/genmsi-reordenamiento`,
@@ -788,6 +835,10 @@ compila y pasa sus tests por sí solo.
 | `9919eda` | la app: la figura se dibuja a su tamaño |
 | `d2dc248` | las miniaturas de la lista, de 40x20 a 56x28 |
 | `4bbc3de` | el aire de la caja, para que el borde no se recorte |
+| `f9aa663` | la galería: cinco modelos que corren y cubren las 66 clases |
+| `134fc96` | el guion de fotos: una foto real de cada clase |
+| `44cc471` | el diseño: las zonas fuera de los trazos y sin huecos muertos |
+| `282014b` | la app: el texto que no se corta antes de tiempo y la cifra centrada |
 
 **El orden de la revisión.** El motor va antes que la app porque la app
 dibuja con la huella que el motor publica; la forma va antes que el nodo

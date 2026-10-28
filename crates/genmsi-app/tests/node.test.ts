@@ -3,19 +3,24 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  CAPTION_MIN_SIZE,
   CAPTION_SIZE,
   FIGURE_SIZE,
   LABEL_SIZE,
   LINE_AIR,
   LINE_HEIGHT,
+  NO_FIGURE,
   SUBTITLE_HEIGHT,
   ZONE_AIR,
   captionBaseline,
   captionFits,
+  captionLayout,
   captionText,
   defaultPair,
   drawingOf,
   figureBaseline,
+  figureCenterX,
+  figureLayout,
   figureText,
   figureZoneText,
   labelBaselines,
@@ -28,7 +33,7 @@ import {
   type FootprintZone,
   type PortOfBlock,
 } from "../src/graph/node.ts";
-import { monospaceWidth, textWidth } from "../src/graph/catalogue.ts";
+import { monospaceWidth, textWidth, truncate } from "../src/graph/catalogue.ts";
 import { SHAPE_CLASSES, shapeOf, type PortAnchor } from "../src/graph/shapes.ts";
 
 /** The ports of a block, as the model declares them. */
@@ -371,13 +376,126 @@ test("the caption is cut to the width of its zone", () => {
   // A caption that fits the zone is never cut.
   assert.equal(captionText("Clientes", zone(80)), "Clientes");
   // And a caption that does not fit is cut with an ellipsis.
-  const cut = captionText("Un nombre larguisimo de bloque", label);
-  assert.ok(cut.length < "Un nombre larguisimo de bloque".length, "the caption is shorter");
-  assert.ok(cut.endsWith("…"), "the cut is marked with an ellipsis");
+  const layout = captionLayout("Un nombre larguisimo de bloque", label);
+  assert.ok(layout.text.length < "Un nombre larguisimo de bloque".length, "the caption is shorter");
+  assert.ok(layout.text.endsWith("…"), "the cut is marked with an ellipsis");
   assert.ok(
-    textWidth(cut, CAPTION_SIZE) <= label.width - ZONE_AIR,
+    textWidth(layout.text, layout.size) <= label.width - ZONE_AIR,
     "the caption fits the width of its zone",
   );
+});
+
+test("a caption that fits its zone is whole, at the size of the design", () => {
+  const drawing = drawingOf("Generate");
+  assert.ok(drawing.label !== null);
+  const label = drawing.label;
+  const caption = "Clientes";
+  // The caption of the example fits the zone of the label of the class.
+  assert.ok(
+    textWidth(caption, CAPTION_SIZE) <= label.width - ZONE_AIR,
+    "the caption fits the zone at the size of the design",
+  );
+  const layout = captionLayout(caption, label);
+  assert.equal(layout.text, caption, "the caption is whole");
+  assert.equal(layout.size, CAPTION_SIZE, "the caption keeps the size of the design");
+  assert.ok(!layout.text.includes("…"), "the caption is not cut");
+});
+
+test("a caption that does not fit is drawn smaller, and keeps more of its text than before", () => {
+  const drawing = drawingOf("Generate");
+  assert.ok(drawing.label !== null);
+  const label = drawing.label;
+  const caption = "ProbClientes";
+  // The caption does not fit at the size of the design, and it does fit
+  // at the smallest size the design allows.
+  assert.ok(
+    textWidth(caption, CAPTION_SIZE) > label.width - ZONE_AIR,
+    "the caption does not fit at the size of the design",
+  );
+  assert.ok(
+    textWidth(caption, CAPTION_MIN_SIZE) <= label.width - ZONE_AIR,
+    "the caption fits at the smallest size",
+  );
+  const layout = captionLayout(caption, label);
+  assert.ok(layout.size < CAPTION_SIZE, "the caption is drawn smaller");
+  assert.ok(layout.size >= CAPTION_MIN_SIZE, "the caption does not go below the minimum size");
+  assert.equal(layout.text, caption, "the whole caption is kept");
+  // And it keeps more of its text than the rule that cut it at the size of
+  // the design.
+  const before = truncate(caption, label.width - ZONE_AIR, CAPTION_SIZE);
+  assert.ok(before.endsWith("…"), "before, the caption was cut with an ellipsis");
+  assert.ok(before.length < layout.text.length, "more of the caption is kept");
+});
+
+test("a caption that does not fit even at the smallest size is cut with an ellipsis", () => {
+  const drawing = drawingOf("Alter");
+  assert.ok(drawing.label !== null);
+  const label = drawing.label;
+  const caption = "ProbClientes";
+  // The caption does not fit at the size of the design, nor at the
+  // smallest one: then, and only then, it is cut.
+  assert.ok(
+    textWidth(caption, CAPTION_MIN_SIZE) > label.width - ZONE_AIR,
+    "the caption does not fit even at the smallest size",
+  );
+  const layout = captionLayout(caption, label);
+  assert.equal(layout.size, CAPTION_MIN_SIZE, "the caption is cut at the smallest size");
+  assert.ok(layout.text.endsWith("…"), "the cut is marked with an ellipsis");
+  assert.ok(
+    textWidth(layout.text, layout.size) <= label.width - ZONE_AIR,
+    "the cut caption fits the width of its zone",
+  );
+  // Even cut, it keeps more of the text than the rule that cut it at the
+  // size of the design.
+  const before = truncate(caption, label.width - ZONE_AIR, CAPTION_SIZE);
+  assert.ok(before.endsWith("…"), "before, the caption was cut with an ellipsis");
+  assert.ok(before.length < layout.text.length, "more of the caption is kept");
+});
+
+test("the figure is centred in its zone", () => {
+  const drawing = drawingOf("Terminate");
+  assert.ok(drawing.figure !== null);
+  const zoneOfFigure = drawing.figure;
+  const layout = figureLayout(zoneOfFigure, "3");
+  // The number sits in the middle of its zone: the round blocks read
+  // better with it.
+  assert.equal(layout.x, zoneOfFigure.left + zoneOfFigure.width / 2, "the figure is centred");
+  assert.equal(layout.anchor, "middle", "the figure is anchored in its middle");
+  assert.equal(layout.text, "3", "the figure is the number the run published");
+  assert.equal(layout.empty, false, "the zone holds a figure");
+  assert.equal(layout.y, figureBaseline(zoneOfFigure), "the figure keeps its line");
+  assert.equal(layout.size, FIGURE_SIZE, "the figure keeps the size of the design");
+  // And every class with a zone of the figure centres its figure there.
+  for (const className of SHAPE_CLASSES) {
+    const drawn = drawingOf(className);
+    if (drawn.figure === null) {
+      continue;
+    }
+    assert.equal(
+      figureCenterX(drawn.figure),
+      drawn.figure.left + drawn.figure.width / 2,
+      `${className}: the figure is centred in its zone`,
+    );
+  }
+});
+
+test("a reserved zone with no figure shows the dash, and not nothing", () => {
+  const drawing = drawingOf("Variable");
+  assert.ok(drawing.figure !== null, "the class reserves a zone of the figure");
+  const zoneOfFigure = drawing.figure;
+  // The run publishes no figure for the block: the zone shows the dash,
+  // which says there is no value here.
+  const empty = figureLayout(zoneOfFigure, "");
+  assert.equal(empty.text, NO_FIGURE, "the empty zone shows the dash");
+  assert.equal(empty.empty, true, "the zone holds no figure");
+  assert.equal(empty.x, zoneOfFigure.left + zoneOfFigure.width / 2, "the dash is in the middle of the zone");
+  // And a figure the run does publish is written as it is.
+  const shown = figureLayout(zoneOfFigure, "7");
+  assert.equal(shown.text, "7", "the figure is the number the run published");
+  assert.equal(shown.empty, false, "the zone holds a figure");
+  // A class that reserves no zone of the figure has no dash to draw.
+  const without = drawingOf("Note");
+  assert.equal(without.figure, null, "the class Note reserves no zone of the figure");
 });
 
 test("the live figure is cut to the width of its zone", () => {

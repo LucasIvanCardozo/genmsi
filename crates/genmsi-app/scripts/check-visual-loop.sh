@@ -35,6 +35,9 @@ MODEL="fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl"
 # The model of the monitor: it has queues, facilities and tables, so the
 # charts of the run have something to draw.
 MONITOR_MODEL="fixtures/models/TP4__supermercado.gmdl"
+# The bench of the shapes: every class of the catalogue, unconnected, in a
+# grid. It is made by `scripts/make-catalogue-model.py`.
+CATALOGUE_MODEL="crates/genmsi-app/fixtures/catalogo-clases.gmdl"
 REFUSED="fixtures/models/TP9__tp9.gmdl"
 # The copy the loop edits: the development work directory is the only place
 # the development path writes.
@@ -131,7 +134,10 @@ open_model() {
   agent-browser eval "localStorage.setItem('genmsi.recent-models', JSON.stringify(['$path']))" >/dev/null
   agent-browser reload >/dev/null
   agent-browser wait --text "GenMSI"
-  agent-browser find role button click --name "Recientes"
+  # The recents live behind an icon button, not one with a name: it is the
+  # "models opened lately" button of the header, and it stays disabled while
+  # the list is empty, so the recents have to be written before the reload.
+  agent-browser eval "(() => { const b = Array.from(document.querySelectorAll('button')).find((x) => (x.getAttribute('aria-label') || '').includes('modelos abiertos')); if (!b) return 'no recent button'; if (b.disabled) return 'the recent button is disabled'; b.click(); return 'menu open'; })()" >/dev/null
   agent-browser eval "(() => { const button = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes('$file')); if (!button) return 'the model is not in the recents'; button.click(); return 'opened'; })()" >/dev/null
   # The header carries the name of the model that is open.
   agent-browser wait --text "$stem"
@@ -183,11 +189,17 @@ agent-browser screenshot "$SHOTS/01-grafo.png"
 agent-browser click ".react-flow__node$FLOW_NODE"
 agent-browser screenshot "$SHOTS/02-propiedades.png"
 
+# The catalogue of the classes: the list the reader creates blocks from, in
+# two columns, each entry with the silhouette of its class as its thumbnail.
+agent-browser click '[data-monitor-aside="bloques"]'
+agent-browser wait --text "Decisi"
+agent-browser screenshot "$SHOTS/03-catalogo.png"
+
 # The run and its report: the report is one of the panels of the window.
 agent-browser find role button click --name "Simular"
 agent-browser click '[data-monitor-panel="reporte"]'
 agent-browser wait --text "Bloques"
-agent-browser screenshot "$SHOTS/03-reporte.png"
+agent-browser screenshot "$SHOTS/04-reporte.png"
 # The editing below happens on the graph, so the window goes back to it.
 agent-browser click '[data-monitor-panel="reproduccion"]'
 agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > 0"
@@ -205,7 +217,7 @@ agent-browser wait --text "Generar"
 agent-browser scrollintoview '[data-block-class="Generate"]'
 agent-browser click '[data-block-class="Generate"]'
 agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > $NODE_COUNT"
-agent-browser screenshot "$SHOTS/04-nodo-nuevo.png"
+agent-browser screenshot "$SHOTS/05-nodo-nuevo.png"
 
 # A second node, and the connection between the two: the new Generate feeds
 # the new Terminate, so the link does not replace any other one.
@@ -219,36 +231,36 @@ agent-browser wait 300
 drag_handle ".react-flow__node[data-id=\"$GENERATE_ID\"] .react-flow__handle-bottom" \
   ".react-flow__node[data-id=\"$TERMINATE_ID\"] .react-flow__handle-top"
 agent-browser wait --fn "document.querySelectorAll('.react-flow__edge').length > 9"
-agent-browser screenshot "$SHOTS/05-conectado.png"
+agent-browser screenshot "$SHOTS/06-conectado.png"
 
 # The node is dragged: one drag is one undo entry.
 POSITION_BEFORE=$(node_position "$GENERATE_ID")
 drag_node ".react-flow__node[data-id=\"$GENERATE_ID\"]" -120 -60
 agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"$GENERATE_ID\"]').style.transform !== '$POSITION_BEFORE'"
-agent-browser screenshot "$SHOTS/06-arrastrado.png"
+agent-browser screenshot "$SHOTS/07-arrastrado.png"
 
 # Undo takes the drag back.
 agent-browser press "Control+z"
 agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"$GENERATE_ID\"]').style.transform === '$POSITION_BEFORE'"
-agent-browser screenshot "$SHOTS/07-deshacer.png"
+agent-browser screenshot "$SHOTS/08-deshacer.png"
 
 # And redo puts it back.
 agent-browser press "Control+Shift+z"
 agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"$GENERATE_ID\"]').style.transform !== '$POSITION_BEFORE'"
-agent-browser screenshot "$SHOTS/08-rehacer.png"
+agent-browser screenshot "$SHOTS/09-rehacer.png"
 
 # The re-layout: the button asks the engine to compose the model, and the
 # blocks move to the layers of the flow. The composition is the engine's, the
 # same one the MCP applies before it writes a model.
 POSITION_BEFORE=$(node_position "$GENERATE_ID")
-agent-browser find role button click --name "Reacomodar"
+agent-browser find role button click --name "Reordenar el grafo en capas"
 agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"$GENERATE_ID\"]').style.transform !== '$POSITION_BEFORE'"
-agent-browser screenshot "$SHOTS/09-reacomodado.png"
+agent-browser screenshot "$SHOTS/10-reacomodado.png"
 
 # The model is saved, and the app says so.
 agent-browser find role button click --name "Guardar"
 agent-browser wait --text "Se guardó"
-agent-browser screenshot "$SHOTS/10-guardado.png"
+agent-browser screenshot "$SHOTS/11-guardado.png"
 
 # The file is reopened: the change is in the file, not only in the session.
 agent-browser open "http://127.0.0.1:$PORT/"
@@ -256,7 +268,7 @@ agent-browser wait --text "GenMSI"
 open_model "$EDITED"
 agent-browser wait --text "Puerta Banco"
 agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > $((NODE_COUNT + 1))"
-agent-browser screenshot "$SHOTS/11-reabierto.png"
+agent-browser screenshot "$SHOTS/12-reabierto.png"
 
 # A model the engine refuses: the engine's message, not an empty graph.
 open_model "$REFUSED"
@@ -264,7 +276,7 @@ agent-browser wait --text "$REFUSAL_TEXT"
 # The screenshot must show the settled state, not the transition: the previous
 # model stays on screen while the next one loads.
 agent-browser wait --fn '!document.body.innerText.includes("Cargando")'
-agent-browser screenshot "$SHOTS/12-error.png"
+agent-browser screenshot "$SHOTS/13-error.png"
 
 # 6. The monitor: the run, the replay and the charts.
 #
@@ -279,7 +291,7 @@ agent-browser wait --text "Ejecutar"
 agent-browser find role button click --name "Ejecutar"
 # The clock of the run advances: the monitor is playing the trace.
 agent-browser wait --fn "!document.body.innerText.includes('0:00:00')"
-agent-browser screenshot "$SHOTS/13-monitor.png"
+agent-browser screenshot "$SHOTS/14-monitor.png"
 
 # The replay is paused and put at the middle of the run, so the picture is
 # the same on every run: the blocks that hold transactions are marked and the
@@ -287,18 +299,26 @@ agent-browser screenshot "$SHOTS/13-monitor.png"
 agent-browser find role button click --name "Pausar la reproducción"
 set_range_middle '[aria-label="Posición de la reproducción"]'
 agent-browser wait --fn 'document.querySelector("input[aria-label=\"Posición de la reproducción\"]").value === String(Math.floor(Number(document.querySelector("input[aria-label=\"Posición de la reproducción\"]").max) / 2))'
-agent-browser screenshot "$SHOTS/14-monitor-reproduccion.png"
+agent-browser screenshot "$SHOTS/15-monitor-reproduccion.png"
 
 # The charts of the run: the time series of the entities and the histogram of
 # the tables of the model.
 agent-browser click '[data-monitor-panel="graficos"]'
 agent-browser wait --text "Histograma"
-agent-browser screenshot "$SHOTS/15-monitor-graficos.png"
+agent-browser screenshot "$SHOTS/16-monitor-graficos.png"
 
 # The report of the run, with the numbers of the instant the replay is at.
 agent-browser click '[data-monitor-panel="reporte"]'
 agent-browser wait --text "Colas"
-agent-browser screenshot "$SHOTS/16-monitor-reporte.png"
+agent-browser screenshot "$SHOTS/17-monitor-reporte.png"
+
+# The bench of the shapes: the 66 classes of the catalogue, unconnected, so
+# that every silhouette is seen with the same eye. The model does not
+# compile (a GPSS with no links is not a model), and the app says so in
+# the status line while it draws every block.
+open_model "$CATALOGUE_MODEL"
+agent-browser wait --text "catalogo-clases"
+agent-browser screenshot "$SHOTS/18-banco-clases.png"
 
 agent-browser close
 echo "==> the visual loop ran; the screenshots are in $SHOTS"

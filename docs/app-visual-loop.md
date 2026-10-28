@@ -115,7 +115,10 @@ agent-browser screenshot /tmp/genmsi-app/02-propiedades.png
 agent-browser find role button click --name "Simular"
 agent-browser click '[data-monitor-panel="reporte"]'
 agent-browser wait --text "Bloques"
-agent-browser screenshot /tmp/genmsi-app/03-reporte.png
+agent-browser click '[data-monitor-aside="bloques"]'
+agent-browser screenshot /tmp/genmsi-app/03-catalogo.png
+
+agent-browser screenshot /tmp/genmsi-app/04-reporte.png
 # The editing below happens on the graph, so the window goes back to it.
 agent-browser click '[data-monitor-panel="reproduccion"]'
 agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > 0"
@@ -138,7 +141,7 @@ agent-browser wait --text "Generar"
 agent-browser scrollintoview '[data-block-class="Generate"]'
 agent-browser click '[data-block-class="Generate"]'
 agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > 18"
-agent-browser screenshot /tmp/genmsi-app/04-nodo-nuevo.png
+agent-browser screenshot /tmp/genmsi-app/05-nodo-nuevo.png
 
 # A second node, and the connection between the two: the new Generate feeds
 # the new Terminate, so the link does not replace any other one. React Flow
@@ -158,7 +161,7 @@ agent-browser mouse down left
 agent-browser mouse move "${to_centre%,*}" "${to_centre#*,}" --duration 400 --steps 12
 agent-browser mouse up left
 agent-browser wait --fn "document.querySelectorAll('.react-flow__edge').length > 9"
-agent-browser screenshot /tmp/genmsi-app/05-conectado.png
+agent-browser screenshot /tmp/genmsi-app/06-conectado.png
 
 # The node is dragged: one drag is one undo entry.
 POSITION_BEFORE=$(node_position 39)
@@ -168,37 +171,37 @@ agent-browser mouse down left
 agent-browser mouse move $(( ${x%,*} - 120 )) $(( ${x#*,} - 60 )) --duration 400 --steps 12
 agent-browser mouse up left
 agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"39\"]').style.transform !== '$POSITION_BEFORE'"
-agent-browser screenshot /tmp/genmsi-app/06-arrastrado.png
+agent-browser screenshot /tmp/genmsi-app/07-arrastrado.png
 
 # Undo takes the drag back.
 agent-browser press "Control+z"
 agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"39\"]').style.transform === '$POSITION_BEFORE'"
-agent-browser screenshot /tmp/genmsi-app/07-deshacer.png
+agent-browser screenshot /tmp/genmsi-app/08-deshacer.png
 
 # And redo puts it back.
 agent-browser press "Control+Shift+z"
 agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"39\"]').style.transform !== '$POSITION_BEFORE'"
-agent-browser screenshot /tmp/genmsi-app/08-rehacer.png
+agent-browser screenshot /tmp/genmsi-app/09-rehacer.png
 
 # The re-layout: the button asks the engine to compose the model, and the
 # blocks move to the layers of the flow. The composition is the engine's,
 # the same one the MCP applies before it writes a model.
 POSITION_BEFORE=$(node_position 39)
-agent-browser find role button click --name "Reacomodar"
+agent-browser find role button click --name "Reordenar el grafo en capas"
 agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"39\"]').style.transform !== '$POSITION_BEFORE'"
-agent-browser screenshot /tmp/genmsi-app/09-reacomodado.png
+agent-browser screenshot /tmp/genmsi-app/10-reacomodado.png
 
 # The model is saved, and the app says so.
 agent-browser find role button click --name "Guardar"
 agent-browser wait --text "Se guardó"
-agent-browser screenshot /tmp/genmsi-app/10-guardado.png
+agent-browser screenshot /tmp/genmsi-app/11-guardado.png
 
 # The file is reopened: the change is in the file, not only in the session.
 agent-browser open http://127.0.0.1:5173/
 agent-browser wait --text "GenMSI"
 open_model "crates/genmsi-app/.devmodels/visual.gmdl"
 agent-browser wait --text "Puerta Banco"
-agent-browser screenshot /tmp/genmsi-app/11-reabierto.png
+agent-browser screenshot /tmp/genmsi-app/12-reabierto.png
 ```
 
 ### A model the engine refuses
@@ -206,7 +209,7 @@ agent-browser screenshot /tmp/genmsi-app/11-reabierto.png
 ```bash
 open_model "fixtures/models/TP9__tp9.gmdl"
 agent-browser wait --text "El modelo no compila"
-agent-browser screenshot /tmp/genmsi-app/12-error.png
+agent-browser screenshot /tmp/genmsi-app/13-error.png
 ```
 
 `agent-browser wait --text ...` is the wait to use after an action: the app
@@ -231,7 +234,7 @@ agent-browser wait --text "Ejecutar"
 agent-browser find role button click --name "Ejecutar"
 # The clock of the run advances: the monitor is playing the trace.
 agent-browser wait --fn "!document.body.innerText.includes('0:00:00')"
-agent-browser screenshot /tmp/genmsi-app/13-monitor.png
+agent-browser screenshot /tmp/genmsi-app/14-monitor.png
 
 # The replay is paused and put at the middle of the run, so the picture is
 # the same on every run. React reads the value of the input from its own
@@ -239,18 +242,18 @@ agent-browser screenshot /tmp/genmsi-app/13-monitor.png
 # is dispatched: the component sees the change.
 agent-browser find role button click --name "Pausar la reproducción"
 agent-browser eval "(() => { const input = document.querySelector('[aria-label=\"Posición de la reproducción\"]'); const max = Number(input.max); const value = String(Math.floor(max / 2)); const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set; setter.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); return value; })()"
-agent-browser screenshot /tmp/genmsi-app/14-monitor-reproduccion.png
+agent-browser screenshot /tmp/genmsi-app/15-monitor-reproduccion.png
 
 # The charts of the run: the time series of the entities and the histogram
 # of the tables.
 agent-browser click '[data-monitor-panel="graficos"]'
 agent-browser wait --text "Histograma"
-agent-browser screenshot /tmp/genmsi-app/15-monitor-graficos.png
+agent-browser screenshot /tmp/genmsi-app/16-monitor-graficos.png
 
 # The report of the run, with the numbers of the instant the replay is at.
 agent-browser click '[data-monitor-panel="reporte"]'
 agent-browser wait --text "Colas"
-agent-browser screenshot /tmp/genmsi-app/16-monitor-reporte.png
+agent-browser screenshot /tmp/genmsi-app/17-monitor-reporte.png
 ```
 
 ## 4. Look, fix, repeat

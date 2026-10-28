@@ -16,11 +16,15 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::catalogue::build_block;
+use crate::catalogue::{build_block, class_spec};
 use crate::error::FormatError;
 use crate::model::{Block, GmdlModel, Layout, Link, Port};
 
 /// Default size of a freshly created block (the original editor's small box).
+///
+/// The size of a block comes from its class (the original's class library
+/// declares the footprint of every class); this is the size of a block whose
+/// class the catalogue does not offer.
 const DEFAULT_WIDTH: i32 = 120;
 const DEFAULT_HEIGHT: i32 = 48;
 
@@ -400,12 +404,18 @@ impl EditSession {
                 format!("el bloque {container} no es un contenedor"),
             ));
         }
+        // A new block is born with the footprint of its class: the original
+        // editor's class library declares the size of every class, and the
+        // block that is drawn has to fit the shape of that class.
+        let (width, height) = class_spec(class)
+            .map(|spec| (spec.width, spec.height))
+            .unwrap_or((DEFAULT_WIDTH, DEFAULT_HEIGHT));
         let mut block = build_block(
             class,
             container,
             Some(Layout {
-                width: DEFAULT_WIDTH,
-                height: DEFAULT_HEIGHT,
+                width,
+                height,
                 x,
                 y,
             }),
@@ -1051,13 +1061,97 @@ mod tests {
         assert_eq!(block.kind, 'A');
         assert_eq!(block.name, "Advance");
         assert_eq!(block.caption, "");
-        assert_eq!(block.layout.map(|l| (l.width, l.height, l.x, l.y)), Some((120, 48, 30, 40)));
+        // A new block is born with the footprint of its class: the original
+        // editor's class library declares the `Advance` at 80x32.
+        assert_eq!(block.layout.map(|l| (l.width, l.height, l.x, l.y)), Some((80, 32, 30, 40)));
         assert_eq!(block.input(1).expect("input").name, "Entrada1");
         assert_eq!(block.input(1).expect("input").mylabel, "");
         assert_eq!(block.output(2).expect("output").name, "Salida1");
         assert_eq!(
             block.sections,
             vec![crate::SectionKind::Inputs, crate::SectionKind::Outputs, crate::SectionKind::Props]
+        );
+    }
+
+    /// A new block is born with the footprint its class declares.
+    ///
+    /// The footprint comes from the original editor's own class library
+    /// (`Genmsi_20230711.backup/gClasses.xml`): a `Test` is a diamond and is
+    /// born square, a `Generate` is wide and short, a `Multifurcacion` is a
+    /// comb and needs its own room.
+    ///
+    /// The `Multifurcacion` is drawn 144x40, the size its comb needs for the
+    /// five exits it spreads and for the whole name of the class on one line
+    /// of its crown; that is the footprint the editor draws.
+    #[test]
+    fn a_new_block_is_born_with_the_footprint_of_its_class() {
+        let cases = [
+            ("Test", 64, 64),
+            ("Generate", 120, 63),
+            ("Queue", 97, 32),
+            ("Multifurcacion", 144, 40),
+        ];
+        for (class, width, height) in cases {
+            let mut session = EditSession::new(model());
+            let ids = session
+                .apply(EditCommand::AddBlock {
+                    class: class.into(),
+                    container: 0,
+                    x: 0,
+                    y: 0,
+                })
+                .expect("adds");
+            let layout = session
+                .model()
+                .block(ids[0])
+                .expect("added")
+                .layout
+                .expect("the new block has a layout");
+            assert_eq!(
+                (layout.width, layout.height),
+                (width, height),
+                "a new {class} carries the footprint of its class"
+            );
+        }
+    }
+
+    /// The blocks a model already carries keep the geometry they came with.
+    ///
+    /// The footprint is for the blocks that are created from now on: adding a
+    /// block does not touch the ones that are already there.
+    #[test]
+    fn the_blocks_that_are_already_there_keep_their_geometry() {
+        let mut session = EditSession::new(model());
+        let before: Vec<(u32, i32, i32)> = session
+            .model()
+            .blocks
+            .iter()
+            .filter_map(|block| {
+                let layout = block.layout?;
+                Some((block.id, layout.width, layout.height))
+            })
+            .collect();
+        session
+            .apply(EditCommand::AddBlock {
+                class: "Test".into(),
+                container: 0,
+                x: 0,
+                y: 0,
+            })
+            .expect("adds");
+        let after: Vec<(u32, i32, i32)> = session
+            .model()
+            .blocks
+            .iter()
+            .filter_map(|block| {
+                let layout = block.layout?;
+                Some((block.id, layout.width, layout.height))
+            })
+            .collect();
+        assert_eq!(
+            after.iter().take(before.len()).collect::<Vec<_>>(),
+            before.iter().collect::<Vec<_>>(),
+            "the blocks that were there keep the geometry they had"
         );
     }
 

@@ -1,12 +1,12 @@
 //! The block catalogue: the classes a block can be created from.
 //!
 //! The shape of every class comes from the original editor's own class
-//! library (`Genmsi_20230711.backup/gClasses.xml`): the ports it declares
-//! (with the `ioid` and `name` the file uses) and the properties it declares
-//! (with the hint and the default value the macro code carries). The
-//! property *types* come from the original's macro configuration
-//! (`gmacroconfig.gmcfg`), and the classes the reference models in
-//! `fixtures/models` use are pinned by
+//! library (`Genmsi_20230711.backup/gClasses.xml`): the size of the block it
+//! draws (`width` and `height`), the ports it declares (with the `ioid` and
+//! `name` the file uses) and the properties it declares (with the hint and
+//! the default value the macro code carries). The property *types* come from
+//! the original's macro configuration (`gmacroconfig.gmcfg`), and the classes
+//! the reference models in `fixtures/models` use are pinned by
 //! `tests/catalogue_matches_the_reference_models.rs`.
 //!
 //! `title` is what the interface shows (neutral Spanish); the `class` name is
@@ -48,6 +48,14 @@ pub struct ClassSpec {
     pub class: &'static str,
     /// What the interface shows for the class (neutral Spanish).
     pub title: &'static str,
+    /// Canvas width of a block of this class, in the original's own units.
+    ///
+    /// The original's class library declares the size of every class
+    /// (`width` and `height`): a block of this class is born with this
+    /// footprint.
+    pub width: i32,
+    /// Canvas height of a block of this class, in the original's own units.
+    pub height: i32,
     /// Input ports, in the order the models declare them.
     pub inputs: &'static [PortSpec],
     /// Output ports, in the order the models declare them.
@@ -564,6 +572,8 @@ pub fn build_block(class: &str, owner: u32, layout: Option<Layout>) -> Result<Bl
 pub static ADVANCE: ClassSpec = ClassSpec {
     class: "Advance",
     title: "Avanzar",
+    width: 80,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingresa" },
     ],
@@ -579,6 +589,8 @@ pub static ADVANCE: ClassSpec = ClassSpec {
 pub static ALTER: ClassSpec = ClassSpec {
     class: "Alter",
     title: "Alterar",
+    width: 100,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -603,6 +615,8 @@ pub static ALTER: ClassSpec = ClassSpec {
 pub static ASSEMBLE: ClassSpec = ClassSpec {
     class: "Assemble",
     title: "Ensamblar",
+    width: 88,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Convina" },
     ],
@@ -617,6 +631,8 @@ pub static ASSEMBLE: ClassSpec = ClassSpec {
 pub static ASSIGN: ClassSpec = ClassSpec {
     class: "Assign",
     title: "Asignar",
+    width: 100,
+    height: 45,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Entrada1" },
     ],
@@ -634,6 +650,8 @@ pub static ASSIGN: ClassSpec = ClassSpec {
 pub static BUFFER: ClassSpec = ClassSpec {
     class: "Buffer",
     title: "Retener",
+    width: 88,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -646,6 +664,8 @@ pub static BUFFER: ClassSpec = ClassSpec {
 pub static CLOCK: ClassSpec = ClassSpec {
     class: "Clock",
     title: "Reloj",
+    width: 50,
+    height: 50,
     inputs: &[],
     outputs: &[],
     properties: &[
@@ -656,6 +676,8 @@ pub static CLOCK: ClassSpec = ClassSpec {
 pub static COUNTER: ClassSpec = ClassSpec {
     class: "Counter",
     title: "Contar",
+    width: 100,
+    height: 40,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso%20al%20m%F3dulo" },
     ],
@@ -672,6 +694,8 @@ pub static COUNTER: ClassSpec = ClassSpec {
 pub static DEPART: ClassSpec = ClassSpec {
     class: "Depart",
     title: "Salir de cola",
+    width: 97,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -687,6 +711,8 @@ pub static DEPART: ClassSpec = ClassSpec {
 pub static ENTER: ClassSpec = ClassSpec {
     class: "Enter",
     title: "Ingresar a depósito",
+    width: 96,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -702,6 +728,8 @@ pub static ENTER: ClassSpec = ClassSpec {
 pub static EXAMINE: ClassSpec = ClassSpec {
     class: "Examine",
     title: "Examinar grupo",
+    width: 80,
+    height: 48,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Entrada1" },
     ],
@@ -717,6 +745,8 @@ pub static EXAMINE: ClassSpec = ClassSpec {
 pub static EXAMINENUMBER: ClassSpec = ClassSpec {
     class: "ExamineNumber",
     title: "Examinar número",
+    width: 80,
+    height: 48,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Entrada1" },
     ],
@@ -733,6 +763,8 @@ pub static EXAMINENUMBER: ClassSpec = ClassSpec {
 pub static FACILITYINT: ClassSpec = ClassSpec {
     class: "FacilityInt",
     title: "Interrumpir recurso",
+    width: 120,
+    height: 40,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso%20al%20recurso" },
     ],
@@ -754,6 +786,8 @@ pub static FACILITYINT: ClassSpec = ClassSpec {
 pub static FACILITYUSE: ClassSpec = ClassSpec {
     class: "FacilityUse",
     title: "Usar recurso",
+    width: 100,
+    height: 40,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso%20al%20recurso" },
     ],
@@ -771,6 +805,8 @@ pub static FACILITYUSE: ClassSpec = ClassSpec {
 pub static FUNCTION: ClassSpec = ClassSpec {
     class: "Function",
     title: "Definir función",
+    width: 100,
+    height: 100,
     inputs: &[],
     outputs: &[],
     properties: &[
@@ -784,6 +820,8 @@ pub static FUNCTION: ClassSpec = ClassSpec {
 pub static FUNCTIONDIST: ClassSpec = ClassSpec {
     class: "FunctionDist",
     title: "Definir función de distribución",
+    width: 64,
+    height: 64,
     inputs: &[],
     outputs: &[],
     properties: &[
@@ -796,6 +834,8 @@ pub static FUNCTIONDIST: ClassSpec = ClassSpec {
 pub static FUNCTIONEXPON: ClassSpec = ClassSpec {
     class: "FunctionExpon",
     title: "Definir función exponencial",
+    width: 100,
+    height: 100,
     inputs: &[],
     outputs: &[],
     properties: &[
@@ -808,6 +848,8 @@ pub static FUNCTIONEXPON: ClassSpec = ClassSpec {
 pub static GATEF: ClassSpec = ClassSpec {
     class: "GateF",
     title: "Verificar recurso",
+    width: 112,
+    height: 48,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -824,6 +866,8 @@ pub static GATEF: ClassSpec = ClassSpec {
 pub static GATEL: ClassSpec = ClassSpec {
     class: "GateL",
     title: "Verificar llave lógica",
+    width: 102,
+    height: 48,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -840,6 +884,8 @@ pub static GATEL: ClassSpec = ClassSpec {
 pub static GATEM: ClassSpec = ClassSpec {
     class: "GateM",
     title: "Verificar etiqueta",
+    width: 102,
+    height: 48,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -856,6 +902,8 @@ pub static GATEM: ClassSpec = ClassSpec {
 pub static GATES: ClassSpec = ClassSpec {
     class: "GateS",
     title: "Verificar depósito",
+    width: 102,
+    height: 48,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -872,6 +920,8 @@ pub static GATES: ClassSpec = ClassSpec {
 pub static GATHER: ClassSpec = ClassSpec {
     class: "Gather",
     title: "Reunir",
+    width: 88,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Juntar" },
     ],
@@ -886,6 +936,8 @@ pub static GATHER: ClassSpec = ClassSpec {
 pub static GENERATE: ClassSpec = ClassSpec {
     class: "Generate",
     title: "Generar",
+    width: 120,
+    height: 63,
     inputs: &[],
     outputs: &[
         PortSpec { ioid: 1, name: "Salida1", caption: "" },
@@ -902,6 +954,8 @@ pub static GENERATE: ClassSpec = ClassSpec {
 pub static INITIASV: ClassSpec = ClassSpec {
     class: "InitiaSV",
     title: "Inicializar SaveValue",
+    width: 100,
+    height: 45,
     inputs: &[],
     outputs: &[],
     properties: &[
@@ -913,6 +967,8 @@ pub static INITIASV: ClassSpec = ClassSpec {
 pub static INITIALLS: ClassSpec = ClassSpec {
     class: "InitialLS",
     title: "Inicializar llave lógica",
+    width: 96,
+    height: 32,
     inputs: &[],
     outputs: &[],
     properties: &[
@@ -924,6 +980,8 @@ pub static INITIALLS: ClassSpec = ClassSpec {
 pub static JOINME: ClassSpec = ClassSpec {
     class: "JoinMe",
     title: "Unirse a grupo",
+    width: 100,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -938,6 +996,8 @@ pub static JOINME: ClassSpec = ClassSpec {
 pub static JOINNUMBER: ClassSpec = ClassSpec {
     class: "JoinNumber",
     title: "Agregar número a grupo",
+    width: 100,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -953,6 +1013,8 @@ pub static JOINNUMBER: ClassSpec = ClassSpec {
 pub static LEAVE: ClassSpec = ClassSpec {
     class: "Leave",
     title: "Egresar de depósito",
+    width: 96,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Entrada1" },
     ],
@@ -968,6 +1030,8 @@ pub static LEAVE: ClassSpec = ClassSpec {
 pub static LINK: ClassSpec = ClassSpec {
     class: "Link",
     title: "Encadenar",
+    width: 98,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -984,6 +1048,8 @@ pub static LINK: ClassSpec = ClassSpec {
 pub static LOGIC: ClassSpec = ClassSpec {
     class: "Logic",
     title: "Configurar llave lógica",
+    width: 96,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -999,6 +1065,8 @@ pub static LOGIC: ClassSpec = ClassSpec {
 pub static LOOP: ClassSpec = ClassSpec {
     class: "Loop",
     title: "Repetir (loop)",
+    width: 96,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1014,6 +1082,8 @@ pub static LOOP: ClassSpec = ClassSpec {
 pub static MARK: ClassSpec = ClassSpec {
     class: "Mark",
     title: "Marcar hora",
+    width: 96,
+    height: 36,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1028,6 +1098,8 @@ pub static MARK: ClassSpec = ClassSpec {
 pub static MATCH: ClassSpec = ClassSpec {
     class: "Match",
     title: "Sincronizar",
+    width: 80,
+    height: 48,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Entrada1" },
     ],
@@ -1043,6 +1115,8 @@ pub static MATCH: ClassSpec = ClassSpec {
 pub static MFUNCTION: ClassSpec = ClassSpec {
     class: "MFunction",
     title: "Definir múltiples funciones",
+    width: 100,
+    height: 100,
     inputs: &[],
     outputs: &[],
     properties: &[
@@ -1055,6 +1129,8 @@ pub static MFUNCTION: ClassSpec = ClassSpec {
 pub static MFUNCTIONDIST: ClassSpec = ClassSpec {
     class: "MFunctionDist",
     title: "Definir múltiples funciones de distribución",
+    width: 72,
+    height: 72,
     inputs: &[],
     outputs: &[],
     properties: &[
@@ -1067,6 +1143,8 @@ pub static MFUNCTIONDIST: ClassSpec = ClassSpec {
 pub static MULTIFURCACION: ClassSpec = ClassSpec {
     class: "Multifurcacion",
     title: "Multifurcación",
+    width: 144,
+    height: 40,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada", caption: "Multifurcacion" },
     ],
@@ -1091,6 +1169,8 @@ pub static MULTIFURCACION: ClassSpec = ClassSpec {
 pub static MULTIFURCACIONP: ClassSpec = ClassSpec {
     class: "MultifurcacionP",
     title: "Multifurcación por parámetro",
+    width: 144,
+    height: 40,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada", caption: "Multifurcacion" },
     ],
@@ -1115,6 +1195,8 @@ pub static MULTIFURCACIONP: ClassSpec = ClassSpec {
 pub static NOTE: ClassSpec = ClassSpec {
     class: "Note",
     title: "Nota",
+    width: 80,
+    height: 80,
     inputs: &[],
     outputs: &[],
     properties: &[],
@@ -1123,6 +1205,8 @@ pub static NOTE: ClassSpec = ClassSpec {
 pub static PREEMPT: ClassSpec = ClassSpec {
     class: "Preempt",
     title: "Interrumpir recurso",
+    width: 88,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1141,6 +1225,8 @@ pub static PREEMPT: ClassSpec = ClassSpec {
 pub static PRIORITY: ClassSpec = ClassSpec {
     class: "Priority",
     title: "Asignar prioridad",
+    width: 88,
+    height: 52,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1155,6 +1241,8 @@ pub static PRIORITY: ClassSpec = ClassSpec {
 pub static QTABLE: ClassSpec = ClassSpec {
     class: "QTable",
     title: "Definir tabla de cola",
+    width: 130,
+    height: 70,
     inputs: &[],
     outputs: &[],
     properties: &[
@@ -1169,6 +1257,8 @@ pub static QTABLE: ClassSpec = ClassSpec {
 pub static QUEUE: ClassSpec = ClassSpec {
     class: "Queue",
     title: "Entrar en cola",
+    width: 97,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1184,6 +1274,8 @@ pub static QUEUE: ClassSpec = ClassSpec {
 pub static RELEASE: ClassSpec = ClassSpec {
     class: "Release",
     title: "Liberar recurso",
+    width: 98,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1198,6 +1290,8 @@ pub static RELEASE: ClassSpec = ClassSpec {
 pub static REMOVEME: ClassSpec = ClassSpec {
     class: "RemoveMe",
     title: "Remover del grupo",
+    width: 100,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1213,6 +1307,8 @@ pub static REMOVEME: ClassSpec = ClassSpec {
 pub static REMOVENUMBER: ClassSpec = ClassSpec {
     class: "RemoveNumber",
     title: "Remover número",
+    width: 100,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1230,6 +1326,8 @@ pub static REMOVENUMBER: ClassSpec = ClassSpec {
 pub static REMOVETRANS: ClassSpec = ClassSpec {
     class: "RemoveTrans",
     title: "Remover transacciones",
+    width: 100,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Entrada1" },
     ],
@@ -1251,6 +1349,8 @@ pub static REMOVETRANS: ClassSpec = ClassSpec {
 pub static RETURN: ClassSpec = ClassSpec {
     class: "Return",
     title: "Devolver recurso",
+    width: 88,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1265,6 +1365,8 @@ pub static RETURN: ClassSpec = ClassSpec {
 pub static SAVEVALUE: ClassSpec = ClassSpec {
     class: "SaveValue",
     title: "Asignar SaveValue",
+    width: 100,
+    height: 45,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1281,6 +1383,8 @@ pub static SAVEVALUE: ClassSpec = ClassSpec {
 pub static SCAN: ClassSpec = ClassSpec {
     class: "Scan",
     title: "Escanear grupo",
+    width: 80,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1304,6 +1408,8 @@ pub static SCAN: ClassSpec = ClassSpec {
 pub static SEIZE: ClassSpec = ClassSpec {
     class: "Seize",
     title: "Tomar recurso",
+    width: 98,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1318,6 +1424,8 @@ pub static SEIZE: ClassSpec = ClassSpec {
 pub static SELECT: ClassSpec = ClassSpec {
     class: "Select",
     title: "Seleccionar de grupo",
+    width: 100,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1336,6 +1444,8 @@ pub static SELECT: ClassSpec = ClassSpec {
 pub static SELECTF: ClassSpec = ClassSpec {
     class: "SelectF",
     title: "Seleccionar recurso",
+    width: 100,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1354,6 +1464,8 @@ pub static SELECTF: ClassSpec = ClassSpec {
 pub static SELECTL: ClassSpec = ClassSpec {
     class: "SelectL",
     title: "Seleccionar llave lógica",
+    width: 100,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1372,6 +1484,8 @@ pub static SELECTL: ClassSpec = ClassSpec {
 pub static SELECTS: ClassSpec = ClassSpec {
     class: "SelectS",
     title: "Seleccionar depósito",
+    width: 100,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1390,6 +1504,8 @@ pub static SELECTS: ClassSpec = ClassSpec {
 pub static SELECTSNA: ClassSpec = ClassSpec {
     class: "SelectSNA",
     title: "Seleccionar entidad",
+    width: 100,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1410,6 +1526,8 @@ pub static SELECTSNA: ClassSpec = ClassSpec {
 pub static SPLIT: ClassSpec = ClassSpec {
     class: "Split",
     title: "Clonar transacción",
+    width: 88,
+    height: 32,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "AClonar" },
     ],
@@ -1426,6 +1544,8 @@ pub static SPLIT: ClassSpec = ClassSpec {
 pub static STORAGEDEF: ClassSpec = ClassSpec {
     class: "StorageDef",
     title: "Definir depósito",
+    width: 100,
+    height: 30,
     inputs: &[],
     outputs: &[],
     properties: &[
@@ -1437,6 +1557,8 @@ pub static STORAGEDEF: ClassSpec = ClassSpec {
 pub static STORAGEUSE: ClassSpec = ClassSpec {
     class: "StorageUse",
     title: "Usar depósito",
+    width: 100,
+    height: 42,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1455,6 +1577,8 @@ pub static STORAGEUSE: ClassSpec = ClassSpec {
 pub static TABLE: ClassSpec = ClassSpec {
     class: "Table",
     title: "Definir tabla",
+    width: 100,
+    height: 70,
     inputs: &[],
     outputs: &[],
     properties: &[
@@ -1469,6 +1593,8 @@ pub static TABLE: ClassSpec = ClassSpec {
 pub static TABULATE: ClassSpec = ClassSpec {
     class: "Tabulate",
     title: "Tabular",
+    width: 100,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1484,6 +1610,8 @@ pub static TABULATE: ClassSpec = ClassSpec {
 pub static TERMINATE: ClassSpec = ClassSpec {
     class: "Terminate",
     title: "Terminar",
+    width: 64,
+    height: 64,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1496,6 +1624,8 @@ pub static TERMINATE: ClassSpec = ClassSpec {
 pub static TEST: ClassSpec = ClassSpec {
     class: "Test",
     title: "Comparar (test)",
+    width: 64,
+    height: 64,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Entrada1" },
     ],
@@ -1513,6 +1643,8 @@ pub static TEST: ClassSpec = ClassSpec {
 pub static TRANSFER: ClassSpec = ClassSpec {
     class: "Transfer",
     title: "Transferir",
+    width: 64,
+    height: 64,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1528,6 +1660,8 @@ pub static TRANSFER: ClassSpec = ClassSpec {
 pub static UNLINK: ClassSpec = ClassSpec {
     class: "Unlink",
     title: "Desencadenar",
+    width: 98,
+    height: 50,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada1", caption: "Ingreso" },
     ],
@@ -1550,6 +1684,8 @@ pub static UNLINK: ClassSpec = ClassSpec {
 pub static VARIABLE: ClassSpec = ClassSpec {
     class: "Variable",
     title: "Definir variable",
+    width: 120,
+    height: 32,
     inputs: &[],
     outputs: &[],
     properties: &[
@@ -1561,6 +1697,8 @@ pub static VARIABLE: ClassSpec = ClassSpec {
 pub static VARIABLEN: ClassSpec = ClassSpec {
     class: "VariableN",
     title: "Definir variable normal",
+    width: 120,
+    height: 40,
     inputs: &[],
     outputs: &[],
     properties: &[
@@ -1575,6 +1713,8 @@ pub static VARIABLEN: ClassSpec = ClassSpec {
 pub static VARIABLEA: ClassSpec = ClassSpec {
     class: "VariableA",
     title: "Definir variable aleatoria",
+    width: 120,
+    height: 32,
     inputs: &[],
     outputs: &[],
     properties: &[
@@ -1584,4 +1724,47 @@ pub static VARIABLEA: ClassSpec = ClassSpec {
         PropertySpec { name: "Seed", hint: "Seed", ty: "EntityUse", subtype: "RandomSeed", unique: false },
     ],
 };
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every class carries the footprint the original's library declares.
+    ///
+    /// The size of a block is the class's own: a `Test` is a diamond and is
+    /// born square, a `Generate` is wide, a `Multifurcacion` is a comb.
+    ///
+    /// The footprint the engine publishes is the one the editor draws. It
+    /// comes from the original library, except for the three classes the
+    /// redesign of the shapes changed: a `Terminate` is a clean circle of
+    /// 64x64, and the two `Multifurcacion` classes are drawn 144x40 so
+    /// that their comb fits the five exits it spreads and the whole name of
+    /// the class on one line of its crown.
+    #[test]
+    fn every_class_declares_the_footprint_of_the_original_library() {
+        let cases = [
+            ("Test", 64, 64),
+            ("Generate", 120, 63),
+            ("Queue", 97, 32),
+            ("Multifurcacion", 144, 40),
+            ("MultifurcacionP", 144, 40),
+            ("Terminate", 64, 64),
+        ];
+        for (class, width, height) in cases {
+            let spec = class_spec(class).expect("the class is in the catalogue");
+            assert_eq!(
+                (spec.width, spec.height),
+                (width, height),
+                "the footprint of {class}"
+            );
+        }
+        for spec in CLASSES {
+            assert!(
+                spec.width > 0 && spec.height > 0,
+                "{} declares no footprint",
+                spec.class
+            );
+        }
+    }
+}
 

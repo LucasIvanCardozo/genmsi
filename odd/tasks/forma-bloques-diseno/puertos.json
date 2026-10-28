@@ -1,0 +1,1285 @@
+{
+ "Note": {
+  "footprint": {
+   "w": 80,
+   "h": 80
+  },
+  "inputs": [],
+  "outputs": []
+ },
+ "Variable": {
+  "footprint": {
+   "w": 120,
+   "h": 32
+  },
+  "inputs": [],
+  "outputs": []
+ },
+ "Assign": {
+  "footprint": {
+   "w": 100,
+   "h": 45
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 45
+   }
+  ]
+ },
+ "Buffer": {
+  "footprint": {
+   "w": 88,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 44,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 44,
+    "y": 32
+   }
+  ]
+ },
+ "Clock": {
+  "footprint": {
+   "w": 50,
+   "h": 50
+  },
+  "inputs": [],
+  "outputs": []
+ },
+ "Depart": {
+  "footprint": {
+   "w": 97,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 35,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 35,
+    "y": 32
+   }
+  ]
+ },
+ "Enter": {
+  "footprint": {
+   "w": 96,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 35,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 35,
+    "y": 32
+   }
+  ]
+ },
+ "Gather": {
+  "footprint": {
+   "w": 88,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 44,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 44,
+    "y": 32
+   }
+  ]
+ },
+ "Match": {
+  "footprint": {
+   "w": 80,
+   "h": 48
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 40,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 40,
+    "y": 48
+   }
+  ]
+ },
+ "Priority": {
+  "footprint": {
+   "w": 88,
+   "h": 52
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 44,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 44,
+    "y": 52
+   }
+  ]
+ },
+ "QTable": {
+  "footprint": {
+   "w": 130,
+   "h": 70
+  },
+  "inputs": [],
+  "outputs": []
+ },
+ "Queue": {
+  "footprint": {
+   "w": 97,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 35,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 35,
+    "y": 32
+   }
+  ]
+ },
+ "Release": {
+  "footprint": {
+   "w": 98,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 35,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 35,
+    "y": 32
+   }
+  ]
+ },
+ "Seize": {
+  "footprint": {
+   "w": 98,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 35,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 35,
+    "y": 32
+   }
+  ]
+ },
+ "StorageDef": {
+  "footprint": {
+   "w": 100,
+   "h": 30
+  },
+  "inputs": [],
+  "outputs": []
+ },
+ "Table": {
+  "footprint": {
+   "w": 100,
+   "h": 70
+  },
+  "inputs": [],
+  "outputs": []
+ },
+ "Tabulate": {
+  "footprint": {
+   "w": 100,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 50
+   }
+  ]
+ },
+ "Split": {
+  "footprint": {
+   "w": 88,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 44,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 0,
+    "y": 32
+   },
+   {
+    "name": "Salida2",
+    "x": 88,
+    "y": 32
+   }
+  ]
+ },
+ "SelectSNA": {
+  "footprint": {
+   "w": 100,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 50
+   },
+   {
+    "name": "Salida2",
+    "x": 100,
+    "y": 25
+   }
+  ]
+ },
+ "SelectS": {
+  "footprint": {
+   "w": 100,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 50
+   },
+   {
+    "name": "Salida2",
+    "x": 100,
+    "y": 25
+   }
+  ]
+ },
+ "SelectL": {
+  "footprint": {
+   "w": 100,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 50
+   },
+   {
+    "name": "Salida2",
+    "x": 100,
+    "y": 25
+   }
+  ]
+ },
+ "SelectF": {
+  "footprint": {
+   "w": 100,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 50
+   },
+   {
+    "name": "Salida2",
+    "x": 100,
+    "y": 25
+   }
+  ]
+ },
+ "Select": {
+  "footprint": {
+   "w": 100,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 50
+   }
+  ]
+ },
+ "RemoveTrans": {
+  "footprint": {
+   "w": 100,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 43
+   },
+   {
+    "name": "Salida2",
+    "x": 100,
+    "y": 10
+   }
+  ]
+ },
+ "RemoveNumber": {
+  "footprint": {
+   "w": 100,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 43
+   },
+   {
+    "name": "Salida2",
+    "x": 100,
+    "y": 10
+   }
+  ]
+ },
+ "RemoveMe": {
+  "footprint": {
+   "w": 100,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 43
+   },
+   {
+    "name": "Salida2",
+    "x": 100,
+    "y": 10
+   }
+  ]
+ },
+ "Mark": {
+  "footprint": {
+   "w": 96,
+   "h": 36
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 38,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 38,
+    "y": 36
+   }
+  ]
+ },
+ "Link": {
+  "footprint": {
+   "w": 98,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 35,
+    "y": 10
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 35,
+    "y": 40
+   }
+  ]
+ },
+ "Leave": {
+  "footprint": {
+   "w": 96,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 35,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 35,
+    "y": 32
+   }
+  ]
+ },
+ "JoinNumber": {
+  "footprint": {
+   "w": 100,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 7
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 50
+   }
+  ]
+ },
+ "JoinMe": {
+  "footprint": {
+   "w": 100,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 7
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 50
+   }
+  ]
+ },
+ "GateS": {
+  "footprint": {
+   "w": 102,
+   "h": 48
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 38,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 38,
+    "y": 48
+   },
+   {
+    "name": "Salida2",
+    "x": 0,
+    "y": 24
+   }
+  ]
+ },
+ "GateM": {
+  "footprint": {
+   "w": 102,
+   "h": 48
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 38,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 38,
+    "y": 48
+   },
+   {
+    "name": "Salida2",
+    "x": 0,
+    "y": 24
+   }
+  ]
+ },
+ "GateF": {
+  "footprint": {
+   "w": 112,
+   "h": 48
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 38,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 38,
+    "y": 48
+   },
+   {
+    "name": "Salida2",
+    "x": 0,
+    "y": 24
+   }
+  ]
+ },
+ "Examine": {
+  "footprint": {
+   "w": 80,
+   "h": 48
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 40,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 20,
+    "y": 40
+   },
+   {
+    "name": "Salida2",
+    "x": 60,
+    "y": 40
+   }
+  ]
+ },
+ "FunctionDist": {
+  "footprint": {
+   "w": 64,
+   "h": 64
+  },
+  "inputs": [],
+  "outputs": []
+ },
+ "Assemble": {
+  "footprint": {
+   "w": 88,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 44,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 44,
+    "y": 32
+   }
+  ]
+ },
+ "Terminate": {
+  "footprint": {
+   "w": 84,
+   "h": 64
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 32,
+    "y": 0
+   }
+  ],
+  "outputs": []
+ },
+ "Function": {
+  "footprint": {
+   "w": 100,
+   "h": 100
+  },
+  "inputs": [],
+  "outputs": []
+ },
+ "FunctionExpon": {
+  "footprint": {
+   "w": 100,
+   "h": 100
+  },
+  "inputs": [],
+  "outputs": []
+ },
+ "FacilityUse": {
+  "footprint": {
+   "w": 100,
+   "h": 40
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 40
+   }
+  ]
+ },
+ "Loop": {
+  "footprint": {
+   "w": 96,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 57,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 57,
+    "y": 32
+   },
+   {
+    "name": "Salida2",
+    "x": 0,
+    "y": 16
+   }
+  ]
+ },
+ "Generate": {
+  "footprint": {
+   "w": 120,
+   "h": 63
+  },
+  "inputs": [],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 33,
+    "y": 63
+   }
+  ]
+ },
+ "ExamineNumber": {
+  "footprint": {
+   "w": 80,
+   "h": 48
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 40,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 20,
+    "y": 40
+   },
+   {
+    "name": "Salida2",
+    "x": 60,
+    "y": 40
+   }
+  ]
+ },
+ "MFunctionDist": {
+  "footprint": {
+   "w": 72,
+   "h": 72
+  },
+  "inputs": [],
+  "outputs": []
+ },
+ "VariableN": {
+  "footprint": {
+   "w": 120,
+   "h": 40
+  },
+  "inputs": [],
+  "outputs": []
+ },
+ "Unlink": {
+  "footprint": {
+   "w": 98,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 55,
+    "y": 10
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 14,
+    "y": 49
+   },
+   {
+    "name": "SalidaAlt",
+    "x": 97,
+    "y": 26
+   },
+   {
+    "name": "Salida2",
+    "x": 55,
+    "y": 40
+   }
+  ]
+ },
+ "Alter": {
+  "footprint": {
+   "w": 100,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 40,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 10,
+    "y": 50
+   },
+   {
+    "name": "Salida2",
+    "x": 70,
+    "y": 50
+   }
+  ]
+ },
+ "FacilityInt": {
+  "footprint": {
+   "w": 120,
+   "h": 40
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "SalidaAlt",
+    "x": 120,
+    "y": 20
+   },
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 40
+   }
+  ]
+ },
+ "Preempt": {
+  "footprint": {
+   "w": 88,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 35,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 35,
+    "y": 32
+   },
+   {
+    "name": "SalidaAlt",
+    "x": 88,
+    "y": 32
+   }
+  ]
+ },
+ "Return": {
+  "footprint": {
+   "w": 88,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 35,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 35,
+    "y": 32
+   }
+  ]
+ },
+ "Advance": {
+  "footprint": {
+   "w": 80,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 40,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 40,
+    "y": 32
+   }
+  ]
+ },
+ "MultifurcacionP": {
+  "footprint": {
+   "w": 80,
+   "h": 20
+  },
+  "inputs": [
+   {
+    "name": "Entrada",
+    "x": 40,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 0,
+    "y": 20
+   },
+   {
+    "name": "SalidaProb2",
+    "x": 20,
+    "y": 20
+   },
+   {
+    "name": "SalidaProb3",
+    "x": 40,
+    "y": 20
+   },
+   {
+    "name": "SalidaProb4",
+    "x": 60,
+    "y": 20
+   },
+   {
+    "name": "SalidaProb5",
+    "x": 80,
+    "y": 20
+   }
+  ]
+ },
+ "Multifurcacion": {
+  "footprint": {
+   "w": 80,
+   "h": 20
+  },
+  "inputs": [
+   {
+    "name": "Entrada",
+    "x": 40,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 0,
+    "y": 20
+   },
+   {
+    "name": "SalidaProb2",
+    "x": 20,
+    "y": 20
+   },
+   {
+    "name": "SalidaProb3",
+    "x": 40,
+    "y": 20
+   },
+   {
+    "name": "SalidaProb4",
+    "x": 60,
+    "y": 20
+   },
+   {
+    "name": "SalidaProb5",
+    "x": 80,
+    "y": 20
+   }
+  ]
+ },
+ "Test": {
+  "footprint": {
+   "w": 64,
+   "h": 64
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 32,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 64,
+    "y": 32
+   },
+   {
+    "name": "Salida2",
+    "x": 0,
+    "y": 32
+   }
+  ]
+ },
+ "Transfer": {
+  "footprint": {
+   "w": 64,
+   "h": 64
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 32,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 64,
+    "y": 32
+   },
+   {
+    "name": "Salida2",
+    "x": 0,
+    "y": 32
+   }
+  ]
+ },
+ "Counter": {
+  "footprint": {
+   "w": 100,
+   "h": 40
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 40
+   }
+  ]
+ },
+ "MFunction": {
+  "footprint": {
+   "w": 100,
+   "h": 100
+  },
+  "inputs": [],
+  "outputs": []
+ },
+ "GateL": {
+  "footprint": {
+   "w": 102,
+   "h": 48
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 38,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 38,
+    "y": 48
+   },
+   {
+    "name": "Salida2",
+    "x": 0,
+    "y": 24
+   }
+  ]
+ },
+ "InitialLS": {
+  "footprint": {
+   "w": 96,
+   "h": 32
+  },
+  "inputs": [],
+  "outputs": []
+ },
+ "InitiaSV": {
+  "footprint": {
+   "w": 100,
+   "h": 45
+  },
+  "inputs": [],
+  "outputs": []
+ },
+ "Logic": {
+  "footprint": {
+   "w": 96,
+   "h": 32
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 38,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 38,
+    "y": 32
+   }
+  ]
+ },
+ "SaveValue": {
+  "footprint": {
+   "w": 100,
+   "h": 45
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 45
+   }
+  ]
+ },
+ "StorageUse": {
+  "footprint": {
+   "w": 100,
+   "h": 42
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 50,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 50,
+    "y": 40
+   }
+  ]
+ },
+ "Scan": {
+  "footprint": {
+   "w": 80,
+   "h": 50
+  },
+  "inputs": [
+   {
+    "name": "Entrada1",
+    "x": 40,
+    "y": 0
+   }
+  ],
+  "outputs": [
+   {
+    "name": "Salida1",
+    "x": 20,
+    "y": 40
+   },
+   {
+    "name": "Salida2",
+    "x": 60,
+    "y": 40
+   }
+  ]
+ },
+ "VariableA": {
+  "footprint": {
+   "w": 120,
+   "h": 32
+  },
+  "inputs": [],
+  "outputs": []
+ }
+}

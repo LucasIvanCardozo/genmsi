@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Background,
   Controls,
@@ -18,7 +25,26 @@ import {
 import "@xyflow/react/dist/style.css";
 import { graphOf, type BlockData } from "../graph/graph";
 import { decideFrame, type FrameState } from "../graph/frame";
-import { useBlockCounts } from "../monitor/live";
+import {
+  CAPTION_SIZE,
+  LABEL_SIZE,
+  PORT_SIZE,
+  STROKE_MARGIN,
+  captionBaseline,
+  captionFits,
+  captionLayout,
+  drawingOf,
+  figureLayout,
+  figureText,
+  figureZoneText,
+  labelBaselines,
+  labelHeight,
+  labelLines,
+  nodeSizeOf,
+  portPlacements,
+  type PortSide,
+} from "../graph/node";
+import { useBlockCounts, useBlockFigure, useRunHasPublished } from "../monitor/live";
 import type { ModelBody } from "../types";
 import GraphEdge from "./GraphEdge";
 
@@ -30,96 +56,350 @@ import GraphEdge from "./GraphEdge";
  * ticks.
  */
 
-/** One block of the model, drawn as a node of the graph. */
+/** The side of a handle, as React Flow names it. */
+const SIDES: Record<PortSide, Position> = {
+  top: Position.Top,
+  bottom: Position.Bottom,
+  left: Position.Left,
+  right: Position.Right,
+};
+
+/** The colour of the rótulo of a block. */
+const LABEL_COLOR = "#1e293b";
+
+/** The colour of the caption of a block, under its rótulo. */
+const CAPTION_COLOR = "#64748b";
+
+/** The colour of the rótulo of a note, which is dimmed with the block. */
+const NOTE_LABEL_COLOR = "#475569";
+
+/**
+ * One block of the model, drawn as a node of the graph.
+ *
+ * The block is drawn with the silhouette of its class: the shape module
+ * holds it, with the zones where the rótulo and the figure go, and with the
+ * anchor of each of its ports (S2, S8, S9). A class the shape module does
+ * not know keeps the plain rounded rectangle, so the canvas never breaks.
+ *
+ * The silhouette is the truth: it is drawn at the size of its own class, one
+ * to one, without being scaled and without being cropped. The node of the
+ * graph has that very size, so the drawing, the selection and the MiniMap
+ * all agree on where the block is.
+ */
 function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
   const container = data.kind === "C";
   const note = data.title === "Note";
   const spread = (count: number, index: number): string =>
     `${((index + 1) / (count + 1)) * 100}%`;
+  // How the block is drawn: its silhouette, its zones and its ports.
+  const drawing = drawingOf(data.title, container);
   // How many transactions the block holds now, and how many have gone
   // through it: the live layer answers for this block alone.
   const counts = useBlockCounts(Number(id));
+  // The figure of the block: the number of the entity it operates on, or the
+  // pair of always.
+  const figure = useBlockFigure(Number(id));
+  // The dash of an empty figure only says something while the run plays.
+  const running = useRunHasPublished();
+  const clip = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+
+  if (
+    drawing.fallback ||
+    drawing.shape === undefined ||
+    drawing.colors === undefined ||
+    drawing.label === null
+  ) {
+    // The plain block of always: the rounded rectangle the canvas drew
+    // before the redesign, with its ports spread along the edges.
+    return (
+      <div
+        className={[
+          "relative flex h-full w-full flex-col justify-center rounded-md border px-2 text-left shadow-sm",
+          container
+            ? "border-slate-300 border-dashed bg-transparent"
+            : "border-slate-400 bg-white",
+          note ? "opacity-70" : "",
+          selected ? "ring-2 ring-indigo-500" : "",
+        ].join(" ")}
+      >
+        {data.inputs.map((port, index) => (
+          <Handle
+            key={`in-${port.ioid}`}
+            type="target"
+            position={Position.Top}
+            id={String(port.ioid)}
+            title={port.name}
+            style={{ left: spread(data.inputs.length, index), top: -6 }}
+            className="!size-3 !rounded-full !border-2 !border-white !bg-slate-400"
+          />
+        ))}
+        {/* A container is entered through one of its input ports and left
+            through one of its output ports: those links start and end at the
+            container itself, so the container needs a source and a target
+            handle for them. */}
+        {container &&
+          data.inputs.map((port, index) => (
+            <Handle
+              key={`entry-${port.ioid}`}
+              type="source"
+              position={Position.Top}
+              id={`in-${port.ioid}`}
+              title={port.name}
+              style={{ left: spread(data.inputs.length, index), top: -6 }}
+              className="!size-3 !rounded-full !border-2 !border-transparent !bg-transparent"
+            />
+          ))}
+        <span
+          className={[
+            "truncate text-xs font-semibold tracking-tight",
+            container ? "text-slate-500" : "text-slate-800",
+            note ? "italic" : "",
+          ].join(" ")}
+        >
+          {data.title}
+        </span>
+        {data.subtitle !== "" && (
+          <span className="truncate text-[10px] text-slate-500">{data.subtitle}</span>
+        )}
+        {data.outputs.map((port, index) => (
+          <Handle
+            key={`out-${port.ioid}`}
+            type="source"
+            position={Position.Bottom}
+            id={String(port.ioid)}
+            title={port.name}
+            style={{ left: spread(data.outputs.length, index), bottom: -6 }}
+            className="!size-3 !rounded-full !border-2 !border-white !bg-slate-400"
+          />
+        ))}
+        {container &&
+          data.outputs.map((port, index) => (
+            <Handle
+              key={`exit-${port.ioid}`}
+              type="target"
+              position={Position.Bottom}
+              id={`out-${port.ioid}`}
+              title={port.name}
+              style={{ left: spread(data.outputs.length, index), bottom: -6 }}
+              className="!size-3 !rounded-full !border-2 !border-transparent !bg-transparent"
+            />
+          ))}
+        {/* The two numbers of the block: how many transactions are inside it
+            now, and how many have gone through it since the run started. */}
+        {counts !== undefined && counts.ever > 0 && (
+          <span className="pointer-events-none absolute right-1.5 top-1 font-mono text-[10px] leading-none text-indigo-600">
+            {counts.now}
+            <span className="text-slate-400">/{counts.ever}</span>
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  const shape = drawing.shape;
+  const colors = drawing.colors;
+  // The size of the block: the footprint of its class, one to one. The
+  // silhouette is never scaled and never cropped.
+  const width = shape.footprint.width;
+  const height = shape.footprint.height;
+  // The ports of the block, at the anchor the shape declares.
+  const inputs = portPlacements(shape, data.inputs, "top");
+  const outputs = portPlacements(shape, data.outputs, "bottom");
+  // The zone of the label, in the pixels of the footprint of the class.
+  const labelZone = drawing.label;
+  // The rótulo of the block: the name of the class, in one line when it
+  // fits its zone and in two lines when it does not. No character of it is
+  // ever cut.
+  const lines = labelLines(data.title, labelZone);
+  const baselines = labelBaselines(labelZone, lines.length);
+  // The caption keeps its own place, the second line of the zone, and it is
+  // drawn at the size of the design when it fits: a caption that does not
+  // fit is drawn smaller before it is cut, because it is the reader's own
+  // text.
+  const caption =
+    drawing.subtitle &&
+    captionFits(labelZone, lines.length) &&
+    data.subtitle !== ""
+      ? captionLayout(data.subtitle, labelZone)
+      : { text: "", size: CAPTION_SIZE };
+  // The figure of the block, centred in the zone the shape declares. A
+  // block the run publishes no figure for shows the dash of an empty
+  // figure: the zone is reserved, and the hole is not silent. The dash
+  // only appears while the run plays: before it, there is no run to say
+  // anything about the value of a block.
+  const figureZone = drawing.figure;
+  const live =
+    figureZone === null
+      ? null
+      : figureLayout(
+          figureZone,
+          running ? figureZoneText(figureText(figure, counts), figureZone) : "",
+        );
+
   return (
     <div
       className={[
-        "relative flex h-full w-full flex-col justify-center rounded-md border px-2 text-left shadow-sm",
-        container
-          ? "border-slate-300 border-dashed bg-transparent"
-          : "border-slate-400 bg-white",
+        "relative h-full w-full",
         note ? "opacity-70" : "",
         selected ? "ring-2 ring-indigo-500" : "",
       ].join(" ")}
     >
-      {data.inputs.map((port, index) => (
+      {/* The silhouette of the class and the text of its zones, drawn in the
+          footprint of the class: the path is the one the shape module
+          declares, the details are the strokes inside it, and the text goes
+          in the zones the shape declares, which are inside the silhouette.
+          Nothing is scaled: the viewBox is the footprint of the class, so a
+          circle stays a circle and every figure keeps the width of its
+          stroke. */}
+      <svg
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox={`0 0 ${width + 2 * STROKE_MARGIN} ${height + 2 * STROKE_MARGIN}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label={data.subtitle !== "" ? `${data.title} ${data.subtitle}` : data.title}
+      >
+        {/* The whole drawing lives in the footprint of the class, and the
+            group carries it the room the border needs: the outline is
+            drawn centred on the line of the shape, so without that margin
+            its outer half is cut by the box. */}
+        <g transform={`translate(${STROKE_MARGIN} ${STROKE_MARGIN})`}>
+        <defs>
+          <clipPath id={`label-${clip}`}>
+            <rect
+              x={labelZone.left}
+              y={labelZone.top}
+              width={labelZone.width}
+              height={Math.max(labelZone.height, labelHeight(lines.length))}
+            />
+          </clipPath>
+          {drawing.figure !== null && (
+            <clipPath id={`figure-${clip}`}>
+              <rect
+                x={drawing.figure.left}
+                y={drawing.figure.top}
+                width={drawing.figure.width}
+                height={drawing.figure.height}
+              />
+            </clipPath>
+          )}
+        </defs>
+        <path
+          d={shape.path}
+          fill={colors.relleno}
+          stroke={colors.borde}
+          strokeWidth={2}
+          strokeLinejoin="round"
+        />
+        {shape.details.map((detail, index) => (
+          <path
+            key={index}
+            d={detail}
+            fill="none"
+            stroke={colors.borde}
+            strokeWidth={1.8}
+            strokeLinecap="round"
+          />
+        ))}
+        {/* The rótulo, on the lines of the zone of the label. The name is
+            monospaced, as the design declares it and as the measure of the
+            zone assumes. */}
+        {lines.map((line, index) => (
+          <text
+            key={index}
+            className="font-mono"
+            x={labelZone.left + 2}
+            y={baselines[index]}
+            fontSize={LABEL_SIZE}
+            fontWeight={600}
+            fill={note ? NOTE_LABEL_COLOR : LABEL_COLOR}
+            clipPath={`url(#label-${clip})`}
+            style={note ? { fontStyle: "italic" } : undefined}
+          >
+            {line}
+          </text>
+        ))}
+        {/* The caption, on the second line of the same zone, and only
+            when the zone has room for it. It is drawn at the size of the
+            design, or smaller when that is what it takes to keep it
+            whole. */}
+        {caption.text !== "" && (
+          <text
+            x={labelZone.left + 2}
+            y={captionBaseline(labelZone)}
+            fontSize={caption.size}
+            fill={CAPTION_COLOR}
+            clipPath={`url(#label-${clip})`}
+          >
+            {caption.text}
+          </text>
+        )}
+        {/* The live figure of the block, in the middle of the zone the
+            shape declares and in the colour of its family. The zone is
+            reserved even when the block has no figure, so the rótulo does
+            not move when it appears; a block the run publishes no figure
+            for shows the dash of an empty figure, in the muted tone of
+            the family. */}
+        {live !== null && (
+          <text
+            className="font-mono"
+            x={live.x}
+            y={live.y}
+            textAnchor={live.anchor}
+            fontSize={live.size}
+            fontWeight={700}
+            fill={live.empty ? colors.acento : colors.acento}
+            opacity={live.empty ? 0.35 : 1}
+            clipPath={`url(#figure-${clip})`}
+          >
+            {live.text}
+          </text>
+        )}
+        </g>
+      </svg>
+      {/* The ports, each one at the anchor the shape declares: the flow
+          leaves the block by the very point the original editor put it. */}
+      {inputs.map((port) => (
         <Handle
           key={`in-${port.ioid}`}
           type="target"
-          position={Position.Top}
+          position={SIDES[port.side]}
           id={String(port.ioid)}
           title={port.name}
-          style={{ left: spread(data.inputs.length, index), top: -6 }}
-          className="!size-2.5 !border-0 !bg-slate-400"
+          style={{
+            left: `${STROKE_MARGIN + port.x * width}px`,
+            top: `${STROKE_MARGIN + port.y * height}px`,
+            right: "auto",
+            bottom: "auto",
+            transform: "translate(-50%, -50%)",
+            width: PORT_SIZE,
+            height: PORT_SIZE,
+            borderRadius: "50%",
+            background: colors.acento,
+            border: "2px solid #ffffff",
+          }}
         />
       ))}
-      {/* A container is entered through one of its input ports and left
-          through one of its output ports: those links start and end at the
-          container itself, so the container needs a source and a target
-          handle for them. */}
-      {container &&
-        data.inputs.map((port, index) => (
-          <Handle
-            key={`entry-${port.ioid}`}
-            type="source"
-            position={Position.Top}
-            id={`in-${port.ioid}`}
-            title={port.name}
-            style={{ left: spread(data.inputs.length, index), top: -6 }}
-            className="!size-2.5 !border-0 !bg-transparent"
-          />
-        ))}
-      <span
-        className={[
-          "truncate text-xs font-semibold tracking-tight",
-          container ? "text-slate-500" : "text-slate-800",
-          note ? "italic" : "",
-        ].join(" ")}
-      >
-        {data.title}
-      </span>
-      {data.subtitle !== "" && (
-        <span className="truncate text-[10px] text-slate-500">{data.subtitle}</span>
-      )}
-      {data.outputs.map((port, index) => (
+      {outputs.map((port) => (
         <Handle
           key={`out-${port.ioid}`}
           type="source"
-          position={Position.Bottom}
+          position={SIDES[port.side]}
           id={String(port.ioid)}
           title={port.name}
-          style={{ left: spread(data.outputs.length, index), bottom: -6 }}
-          className="!size-2.5 !border-0 !bg-slate-400"
+          style={{
+            left: `${STROKE_MARGIN + port.x * width}px`,
+            top: `${STROKE_MARGIN + port.y * height}px`,
+            right: "auto",
+            bottom: "auto",
+            transform: "translate(-50%, -50%)",
+            width: PORT_SIZE,
+            height: PORT_SIZE,
+            borderRadius: "50%",
+            background: colors.acento,
+            border: "2px solid #ffffff",
+          }}
         />
       ))}
-      {container &&
-        data.outputs.map((port, index) => (
-          <Handle
-            key={`exit-${port.ioid}`}
-            type="target"
-            position={Position.Bottom}
-            id={`out-${port.ioid}`}
-            title={port.name}
-            style={{ left: spread(data.outputs.length, index), bottom: -6 }}
-            className="!size-2.5 !border-0 !bg-transparent"
-          />
-        ))}
-      {/* The two numbers of the block: how many transactions are inside it
-          now, and how many have gone through it since the run started. */}
-      {counts !== undefined && counts.ever > 0 && (
-        <span className="pointer-events-none absolute right-1.5 top-1 font-mono text-[10px] leading-none text-indigo-600">
-          {counts.now}
-          <span className="text-slate-400">/{counts.ever}</span>
-        </span>
-      )}
     </div>
   );
 }
@@ -189,7 +469,18 @@ export default function GraphView({
   useEffect(() => {
     const graph = graphOf(model);
     setNodes(
-      graph.nodes.map((node) => ({ ...node, selected: selected.current.has(node.id) })),
+      graph.nodes.map((node) => {
+        const drawn = { ...node, selected: selected.current.has(node.id) };
+        // The block is drawn at the size of its class: the shape is the
+        // truth, and the box the model carries is not rewritten. A class
+        // the shape module does not know, and every container, keep the
+        // box of the model.
+        const size = nodeSizeOf(node.data.title, node.data.kind === "C");
+        if (size === null) {
+          return drawn;
+        }
+        return { ...drawn, style: { ...drawn.style, width: size.width, height: size.height } };
+      }),
     );
     // The links are drawn by the component that carries the balls.
     setEdges([

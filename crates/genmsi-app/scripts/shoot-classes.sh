@@ -122,17 +122,19 @@ for block in model["blocks"]:
     # the canvas: the zoom keeps the point under the pointer where it is,
     # so the block grows where it is and does not leave the picture.
     agent-browser eval "(() => { const el = document.querySelector('.react-flow__node[data-id=\"$id\"]'); const pane = document.querySelector('.react-flow__pane'); if (!el || !pane) return 'none'; const r = el.getBoundingClientRect(); const cx = r.x + r.width / 2, cy = r.y + r.height / 2; for (let i = 0; i < 3; i++) { pane.dispatchEvent(new WheelEvent('wheel', {deltaY: -120, clientX: cx, clientY: cy, bubbles: true, cancelable: true})); } return 'ok'; })()" >/dev/null
-    sleep 0.2
-    # The block alone in the picture: the other blocks and the links are
-    # hidden while it is taken, so that the reader judges the block and
-    # not its neighbours.
-    agent-browser eval "(() => { const flow = document.querySelector('.react-flow'); if (!flow) return 'no flow'; let node = flow; while (node && node.parentElement) { const parent = node.parentElement; for (const child of parent.children) { if (child !== node) child.style.visibility = 'hidden'; } node = parent; } document.querySelectorAll('.react-flow__node').forEach((n) => { if (n.getAttribute('data-id') !== '$id') n.style.visibility = 'hidden'; }); document.querySelectorAll('.react-flow__edges, .react-flow__controls, .react-flow__minimap, .react-flow__panel, .react-flow__attribution').forEach((e) => { e.style.visibility = 'hidden'; }); return 'aislado'; })()" >/dev/null
-    # The picture of the whole window, and the block cut out of it: the
-    # picture of an element does not line up when the page moves.
-    agent-browser screenshot "$OUT/.ventana.png" >/dev/null 2>&1 || continue
+    sleep 0.8
+    # The place of the block is read once the zoom has settled: while it
+    # moves, the picture and the rectangle do not agree.
     rect="$(node_rect "$id")"
     [[ "$rect" == "none" || -z "$rect" ]] && continue
     read -r nx ny nw nh <<<"$rect"
+    # The block alone in the picture: the other blocks and the links are
+    # hidden while it is taken, so that the reader judges the block and
+    # not its neighbours.
+    agent-browser eval "(() => { const flow = document.querySelector('.react-flow'); if (!flow) return 'no flow'; let node = flow; while (node && node.parentElement) { const parent = node.parentElement; for (const child of parent.children) { if (child !== node) child.style.visibility = 'hidden'; } node = parent; } document.querySelectorAll('.react-flow__node').forEach((n) => { if (n.getAttribute('data-id') !== '$id') n.style.visibility = 'hidden'; }); const pane = document.querySelector('.react-flow__pane'); const flow = document.querySelector('.react-flow'); if (pane && flow) { for (const child of flow.children) { if (!child.contains(pane)) child.style.visibility = 'hidden'; } } document.querySelectorAll('.react-flow__edges, .react-flow__controls, .react-flow__minimap, .react-flow__panel, .react-flow__attribution').forEach((e) => { e.style.visibility = 'hidden'; }); return 'aislado'; })()" >/dev/null
+    # The picture of the whole window, and the block cut out of it: the
+    # picture of an element does not line up when the page moves.
+    agent-browser screenshot "$OUT/.ventana.png" >/dev/null 2>&1 || continue
     # The picture is cut with room around the block: the text of a block
     # can live a little outside its own box.
     m=14

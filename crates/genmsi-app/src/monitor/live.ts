@@ -216,6 +216,17 @@ export function useBlockFigure(id: number): BlockFigure | undefined {
 }
 
 /**
+ * Whether the run has published anything.
+ *
+ * Before the run, the canvas shows the shapes alone: there is nothing to
+ * say about the value of a block yet, and the dash of an empty figure
+ * would say "no value" where the truth is "the run has not started".
+ */
+export function useRunHasPublished(): boolean {
+  return useLive((state) => state.clock > 0);
+}
+
+/**
  * The figures of the entities, keeping the identity of the ones that did
  * not change.
  *

@@ -13,6 +13,10 @@
  *   lands inside the silhouette;
  * - the **lines of the rótulo**: a name that does not fit its zone is
  *   written on two lines, and no character of it is ever cut;
+ * - the **caption**, drawn smaller before it is cut, because it is the
+ *   reader's own text;
+ * - the **figure**, centred in its zone, and the dash that says the run
+ *   published no figure for a block;
  * - the **ports**, at the anchor the original editor gave them, placed in
  *   the shape's own frame;
  * - the **text that fits a zone**, measured with the measure of the design
@@ -24,7 +28,7 @@
  * this module says.
  */
 import { portSpread } from "./graph.ts";
-import { monospaceWidth, truncate } from "./catalogue.ts";
+import { monospaceWidth, textWidth, truncate } from "./catalogue.ts";
 import {
   familyColors,
   shapeOf,
@@ -131,6 +135,16 @@ export const LABEL_SIZE = 9;
 
 /** The size of the caption under the rótulo, in pixels. */
 export const CAPTION_SIZE = 9;
+
+/**
+ * The smallest size the caption of a block is drawn at, in pixels.
+ *
+ * A caption that does not fit its zone at the size of the design is drawn
+ * smaller before it is cut: the caption is the reader's own text, and a
+ * caption that is cut before it has to be is noise. Below this size the
+ * caption is cut with an ellipsis.
+ */
+export const CAPTION_MIN_SIZE = 7;
 
 /** The size of the live figure, in monospaced, in pixels. */
 export const FIGURE_SIZE = 10;
@@ -457,14 +471,60 @@ function breaksBetter(candidate: Break, best: Break): boolean {
   return candidate.balance < best.balance;
 }
 
+/** How the caption of a block is drawn. */
+export interface CaptionLayout {
+  /** The text to draw in the zone of the rótulo. */
+  text: string;
+  /** The size to draw it at, in pixels. */
+  size: number;
+}
+
+/**
+ * How the caption of a block is drawn: its text and its size.
+ *
+ * The caption shares the zone of the rótulo: it goes in the second line of
+ * it, and the room it has is the width of the zone minus the air the
+ * design leaves.
+ *
+ * The caption is drawn at the size of the design when it fits. When it does
+ * not fit, it is drawn smaller — down to the smallest size the design
+ * allows — and only a caption that does not fit even there is cut with an
+ * ellipsis. The caption is the reader's own text: it is the last thing to
+ * be cut.
+ */
+export function captionLayout(caption: string, zone: FootprintZone): CaptionLayout {
+  const room = zone.width - ZONE_AIR;
+  // The width of the caption per pixel of size: the measure of the design
+  // is proportional, so the size that fits is the room divided by it.
+  const perPixel = textWidth(caption, 1);
+  if (caption === "" || room <= 0 || perPixel <= 0) {
+    return { text: caption, size: CAPTION_SIZE };
+  }
+  const size = room / perPixel;
+  if (size >= CAPTION_SIZE) {
+    return { text: caption, size: CAPTION_SIZE };
+  }
+  if (size >= CAPTION_MIN_SIZE) {
+    // The whole caption fits at a smaller size: it is drawn smaller, and
+    // not one character of it is lost.
+    return { text: caption, size: Math.floor(size * 10) / 10 };
+  }
+  // It does not fit even at the smallest size: then, and only then, it is
+  // cut with the ellipsis that says the text goes on.
+  return {
+    text: truncate(caption, room, CAPTION_MIN_SIZE),
+    size: CAPTION_MIN_SIZE,
+  };
+}
+
 /**
  * The caption of a block, cut to the width of its zone.
  *
- * The caption shares the zone of the rótulo: it goes in the second line of
- * it, and it is cut with the same measure and the same air.
+ * The text of the caption, at whatever size it has to be drawn: the size
+ * is `captionLayout`.
  */
 export function captionText(caption: string, zone: FootprintZone): string {
-  return truncate(caption, zone.width - ZONE_AIR, CAPTION_SIZE);
+  return captionLayout(caption, zone).text;
 }
 
 /**
@@ -475,6 +535,66 @@ export function captionText(caption: string, zone: FootprintZone): string {
  */
 export function figureZoneText(text: string, zone: FootprintZone): string {
   return truncate(text, zone.width, FIGURE_SIZE, true);
+}
+
+/**
+ * The dash that says the run published no figure for a block.
+ *
+ * A class that reserves the zone of the figure and a run that publishes no
+ * number for it would leave a silent hole, and a hole reads like a fault.
+ * The dash says "there is no value here": it is not a number, and it does
+ * not pretend to be one.
+ */
+export const NO_FIGURE = "—";
+
+/** How the figure of a block is drawn. */
+export interface FigureLayout {
+  /** The text to draw in the zone of the figure. */
+  text: string;
+  /** The x of the text: the middle of the zone of the figure. */
+  x: number;
+  /** The baseline of the text. */
+  y: number;
+  /** The anchor of the text: the figure is centred in its zone. */
+  anchor: "middle";
+  /** The size of the text, in pixels. */
+  size: number;
+  /** Whether the zone shows the dash of a block with no figure. */
+  empty: boolean;
+}
+
+/**
+ * How the figure of a block is drawn: its text, its place and its size.
+ *
+ * The figure is centred in the zone the shape declares: the round blocks
+ * read better with it (the `Terminate` is a circle whose number sat off to
+ * the right of its middle), and the wide blocks keep their own box for the
+ * figure, so the number stays in the middle of it.
+ *
+ * A block the run publishes no figure for shows the dash of an empty
+ * figure: the zone is reserved, and the hole it leaves is filled with a
+ * sign that says there is no value here.
+ */
+export function figureLayout(zone: FootprintZone, text: string): FigureLayout {
+  const empty = text === "";
+  return {
+    text: empty ? NO_FIGURE : text,
+    x: figureCenterX(zone),
+    y: figureBaseline(zone),
+    anchor: "middle",
+    size: FIGURE_SIZE,
+    empty,
+  };
+}
+
+/**
+ * The middle of the zone of the figure, in pixels.
+ *
+ * The figure is written in the middle of its zone: that is where the
+ * reader looks for it.
+ */
+export function figureCenterX(zone: FootprintZone): number {
+  return zone.left + zone.width / 2;
 }
 
 /**

@@ -27,15 +27,14 @@ import { graphOf, type BlockData } from "../graph/graph";
 import { decideFrame, type FrameState } from "../graph/frame";
 import {
   CAPTION_SIZE,
-  FIGURE_SIZE,
   LABEL_SIZE,
   PORT_SIZE,
   STROKE_MARGIN,
   captionBaseline,
   captionFits,
-  captionText,
+  captionLayout,
   drawingOf,
-  figureBaseline,
+  figureLayout,
   figureText,
   figureZoneText,
   labelBaselines,
@@ -45,7 +44,7 @@ import {
   portPlacements,
   type PortSide,
 } from "../graph/node";
-import { useBlockCounts, useBlockFigure } from "../monitor/live";
+import { useBlockCounts, useBlockFigure, useRunHasPublished } from "../monitor/live";
 import type { ModelBody } from "../types";
 import GraphEdge from "./GraphEdge";
 
@@ -100,6 +99,8 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
   // The figure of the block: the number of the entity it operates on, or the
   // pair of always.
   const figure = useBlockFigure(Number(id));
+  // The dash of an empty figure only says something while the run plays.
+  const running = useRunHasPublished();
   const clip = useId().replace(/[^a-zA-Z0-9_-]/g, "");
 
   if (
@@ -212,15 +213,28 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
   const lines = labelLines(data.title, labelZone);
   const baselines = labelBaselines(labelZone, lines.length);
   // The caption keeps its own place, the second line of the zone, and it is
-  // cut to the zone as it always was.
+  // drawn at the size of the design when it fits: a caption that does not
+  // fit is drawn smaller before it is cut, because it is the reader's own
+  // text.
   const caption =
     drawing.subtitle &&
     captionFits(labelZone, lines.length) &&
     data.subtitle !== ""
-      ? captionText(data.subtitle, labelZone)
-      : "";
-  const text =
-    drawing.figure === null ? "" : figureZoneText(figureText(figure, counts), drawing.figure);
+      ? captionLayout(data.subtitle, labelZone)
+      : { text: "", size: CAPTION_SIZE };
+  // The figure of the block, centred in the zone the shape declares. A
+  // block the run publishes no figure for shows the dash of an empty
+  // figure: the zone is reserved, and the hole is not silent. The dash
+  // only appears while the run plays: before it, there is no run to say
+  // anything about the value of a block.
+  const figureZone = drawing.figure;
+  const live =
+    figureZone === null
+      ? null
+      : figureLayout(
+          figureZone,
+          running ? figureZoneText(figureText(figure, counts), figureZone) : "",
+        );
 
   return (
     <div
@@ -305,34 +319,39 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
           </text>
         ))}
         {/* The caption, on the second line of the same zone, and only
-            when the zone has room for it. */}
-        {caption !== "" && (
+            when the zone has room for it. It is drawn at the size of the
+            design, or smaller when that is what it takes to keep it
+            whole. */}
+        {caption.text !== "" && (
           <text
             x={labelZone.left + 2}
             y={captionBaseline(labelZone)}
-            fontSize={CAPTION_SIZE}
+            fontSize={caption.size}
             fill={CAPTION_COLOR}
             clipPath={`url(#label-${clip})`}
           >
-            {caption}
+            {caption.text}
           </text>
         )}
-        {/* The live figure of the block, in the zone the shape declares
-            and in the colour of its family. The zone is reserved even
-            when the block has no figure, so the rótulo does not move
-            when it appears. */}
-        {drawing.figure !== null && text !== "" && (
+        {/* The live figure of the block, in the middle of the zone the
+            shape declares and in the colour of its family. The zone is
+            reserved even when the block has no figure, so the rótulo does
+            not move when it appears; a block the run publishes no figure
+            for shows the dash of an empty figure, in the muted tone of
+            the family. */}
+        {live !== null && (
           <text
             className="font-mono"
-            x={drawing.figure.left + drawing.figure.width - 2}
-            y={figureBaseline(drawing.figure)}
-            textAnchor="end"
-            fontSize={FIGURE_SIZE}
+            x={live.x}
+            y={live.y}
+            textAnchor={live.anchor}
+            fontSize={live.size}
             fontWeight={700}
-            fill={colors.acento}
+            fill={live.empty ? colors.acento : colors.acento}
+            opacity={live.empty ? 0.35 : 1}
             clipPath={`url(#figure-${clip})`}
           >
-            {text}
+            {live.text}
           </text>
         )}
         </g>

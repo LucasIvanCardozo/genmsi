@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   BLOCK_SHAPES,
+  CLASSES_WITHOUT_FIGURE,
   FAMILY_COLORS,
   SHAPE_CLASSES,
   colorsOf,
@@ -106,6 +107,297 @@ function reflect(command: PathCommand, width: number): PathCommand {
 /** Whether two zones of the footprint overlap (touching is not overlapping). */
 function overlaps(a: Zone, b: Zone): boolean {
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+/**
+ * The air a zone keeps from an interior stroke, in pixels.
+ *
+ * The rule of the design (contract v5 §2.5): the rectangle of a zone does
+ * not touch any of the interior strokes of its class.
+ */
+const STROKE_AIR = 2;
+
+/** A point of a stroke, in the pixels of the footprint. */
+type Point = [number, number];
+
+/**
+ * The points of an interior stroke, flattened into polylines.
+ *
+ * The arcs become polylines of 24 steps, the same flattening the design's
+ * generator uses, so the two agree on where a stroke is.
+ */
+function strokePolylines(d: string): Point[][] {
+  const tokens = d.match(/[A-Za-z]|-?\d*\.?\d+/g) ?? [];
+  const polylines: Point[][] = [];
+  let current: Point[] = [];
+  let cursor: Point = [0, 0];
+  let start: Point = [0, 0];
+  let letter = "";
+  let index = 0;
+  while (index < tokens.length) {
+    const token = tokens[index] ?? "";
+    if (/^[A-Za-z]$/.test(token)) {
+      letter = token;
+      index += 1;
+      if (letter === "Z") {
+        if (current.length > 0) {
+          current.push(start);
+          polylines.push(current);
+          current = [];
+        }
+        cursor = start;
+        continue;
+      }
+    }
+    if (letter === "M") {
+      cursor = [Number(tokens[index]), Number(tokens[index + 1])];
+      index += 2;
+      if (current.length > 0) {
+        polylines.push(current);
+      }
+      current = [cursor];
+      start = cursor;
+      letter = "L";
+    } else if (letter === "L") {
+      cursor = [Number(tokens[index]), Number(tokens[index + 1])];
+      index += 2;
+      current.push(cursor);
+    } else if (letter === "H") {
+      cursor = [Number(tokens[index]), cursor[1]];
+      index += 1;
+      current.push(cursor);
+    } else if (letter === "V") {
+      cursor = [cursor[0], Number(tokens[index])];
+      index += 1;
+      current.push(cursor);
+    } else if (letter === "C") {
+      const p1: Point = [Number(tokens[index]), Number(tokens[index + 1])];
+      const p2: Point = [Number(tokens[index + 2]), Number(tokens[index + 3])];
+      const p3: Point = [Number(tokens[index + 4]), Number(tokens[index + 5])];
+      index += 6;
+      current.push(...flattenCurve(cursor, p1, p2, p3));
+      cursor = p3;
+    } else if (letter === "A") {
+      const args = tokens.slice(index, index + 7).map(Number);
+      index += 7;
+      const to: Point = [args[5] ?? 0, args[6] ?? 0];
+      current.push(...flattenArc(cursor, args, to));
+      cursor = to;
+    } else {
+      throw new Error(`comando desconocido en un trazo: ${letter}`);
+    }
+  }
+  if (current.length > 0) {
+    polylines.push(current);
+  }
+  return polylines;
+}
+
+/**
+ * The points of a cubic curve, flattened.
+ *
+ * The curve goes from the point the path is at to the third control point,
+ * with the first and the second as its handles.
+ */
+function flattenCurve(from: Point, p1: Point, p2: Point, p3: Point, steps = 16): Point[] {
+  const points: Point[] = [];
+  for (let index = 1; index <= steps; index += 1) {
+    const t = index / steps;
+    const m = 1 - t;
+    points.push([
+      m * m * m * from[0] + 3 * m * m * t * p1[0] + 3 * m * t * t * p2[0] + t * t * t * p3[0],
+      m * m * m * from[1] + 3 * m * m * t * p1[1] + 3 * m * t * t * p2[1] + t * t * t * p3[1],
+    ]);
+  }
+  return points;
+}
+
+/**
+ * The points of an elliptical arc, flattened.
+ *
+ * The parametrization is the one of the SVG: the arc goes from the point
+ * `from` to the point `to`, and its radii are the ones the path declares.
+ */
+function flattenArc(from: Point, args: number[], to: Point, steps = 24): Point[] {
+  let rx = args[0] ?? 0;
+  let ry = args[1] ?? 0;
+  const rotation = args[2] ?? 0;
+  const largeArc = args[3] ?? 0;
+  const sweep = args[4] ?? 0;
+  if (rx === 0 || ry === 0) {
+    return [to];
+  }
+  const phi = (rotation * Math.PI) / 180;
+  const cos = Math.cos(phi);
+  const sin = Math.sin(phi);
+  const dx = (from[0] - to[0]) / 2;
+  const dy = (from[1] - to[1]) / 2;
+  const xp = cos * dx + sin * dy;
+  const yp = -sin * dx + cos * dy;
+  rx = Math.abs(rx);
+  ry = Math.abs(ry);
+  const lambda = (xp * xp) / (rx * rx) + (yp * yp) / (ry * ry);
+  if (lambda > 1) {
+    const scale = Math.sqrt(lambda);
+    rx *= scale;
+    ry *= scale;
+  }
+  const numerator = rx * rx * ry * ry - rx * rx * yp * yp - ry * ry * xp * xp;
+  const denominator = rx * rx * yp * yp + ry * ry * xp * xp;
+  let co = denominator === 0 ? 0 : Math.sqrt(Math.max(0, numerator / denominator));
+  if (largeArc === sweep) {
+    co = -co;
+  }
+  const cxp = (co * rx * yp) / ry;
+  const cyp = (-co * ry * xp) / rx;
+  const cx = cos * cxp - sin * cyp + (from[0] + to[0]) / 2;
+  const cy = sin * cxp + cos * cyp + (from[1] + to[1]) / 2;
+  const angle = (ux: number, uy: number, vx: number, vy: number): number => {
+    const length = Math.hypot(ux, uy) * Math.hypot(vx, vy);
+    if (length === 0) {
+      return 0;
+    }
+    const a = Math.acos(Math.max(-1, Math.min(1, (ux * vx + uy * vy) / length)));
+    return ux * vy - uy * vx < 0 ? -a : a;
+  };
+  const t1 = angle(1, 0, (xp - cxp) / rx, (yp - cyp) / ry);
+  let delta = angle((xp - cxp) / rx, (yp - cyp) / ry, (-xp - cxp) / rx, (-yp - cyp) / ry);
+  if (sweep === 0 && delta > 0) {
+    delta -= 2 * Math.PI;
+  } else if (sweep === 1 && delta < 0) {
+    delta += 2 * Math.PI;
+  }
+  const points: Point[] = [];
+  for (let index = 1; index <= steps; index += 1) {
+    const t = t1 + (delta * index) / steps;
+    points.push([
+      cos * rx * Math.cos(t) - sin * ry * Math.sin(t) + cx,
+      sin * rx * Math.cos(t) + cos * ry * Math.sin(t) + cy,
+    ]);
+  }
+  return points;
+}
+
+/** The distance from a point to the segment `a`-`b`. */
+function pointToSegment(point: Point, a: Point, b: Point): number {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const length = dx * dx + dy * dy;
+  if (length === 0) {
+    return Math.hypot(point[0] - a[0], point[1] - a[1]);
+  }
+  const t = Math.max(
+    0,
+    Math.min(1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / length),
+  );
+  return Math.hypot(point[0] - (a[0] + t * dx), point[1] - (a[1] + t * dy));
+}
+
+/** The orientation of the three points, for the test of crossing. */
+function orientation(p: Point, q: Point, r: Point): number {
+  return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+}
+
+/** Whether the point `q` is on the segment `p`-`r`. */
+function onSegment(p: Point, q: Point, r: Point): boolean {
+  return (
+    Math.min(p[0], r[0]) - 1e-9 <= q[0] &&
+    q[0] <= Math.max(p[0], r[0]) + 1e-9 &&
+    Math.min(p[1], r[1]) - 1e-9 <= q[1] &&
+    q[1] <= Math.max(p[1], r[1]) + 1e-9
+  );
+}
+
+/** Whether the segments `a`-`b` and `c`-`d` cross. */
+function segmentsCross(a: Point, b: Point, c: Point, d: Point): boolean {
+  const o1 = orientation(a, b, c);
+  const o2 = orientation(a, b, d);
+  const o3 = orientation(c, d, a);
+  const o4 = orientation(c, d, b);
+  if (o1 > 0 !== o2 > 0 && o3 > 0 !== o4 > 0) {
+    return true;
+  }
+  if (o1 === 0 && onSegment(a, c, b)) {
+    return true;
+  }
+  if (o2 === 0 && onSegment(a, d, b)) {
+    return true;
+  }
+  if (o3 === 0 && onSegment(c, a, d)) {
+    return true;
+  }
+  if (o4 === 0 && onSegment(c, b, d)) {
+    return true;
+  }
+  return false;
+}
+
+/** The distance between the segments `a`-`b` and `c`-`d`. */
+function segmentDistance(a: Point, b: Point, c: Point, d: Point): number {
+  if (segmentsCross(a, b, c, d)) {
+    return 0;
+  }
+  return Math.min(
+    pointToSegment(a, c, d),
+    pointToSegment(b, c, d),
+    pointToSegment(c, a, b),
+    pointToSegment(d, a, b),
+  );
+}
+
+/** Whether the segment `a`-`b` cuts the interior of the zone. */
+function segmentCutsZone(a: Point, b: Point, zone: Zone): boolean {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  let t0 = 0;
+  let t1 = 1;
+  const bounds: Array<[number, number]> = [
+    [-dx, a[0] - zone.x],
+    [dx, zone.x + zone.width - a[0]],
+    [-dy, a[1] - zone.y],
+    [dy, zone.y + zone.height - a[1]],
+  ];
+  for (const [p, q] of bounds) {
+    if (p === 0) {
+      if (q < 0) {
+        return false;
+      }
+      continue;
+    }
+    const t = q / p;
+    if (p < 0) {
+      if (t > t1) {
+        return false;
+      }
+      t0 = Math.max(t0, t);
+    } else {
+      if (t < t0) {
+        return false;
+      }
+      t1 = Math.min(t1, t);
+    }
+  }
+  return t1 > t0 + 1e-9;
+}
+
+/** The distance from the segment `a`-`b` to the zone. */
+function segmentToZone(a: Point, b: Point, zone: Zone): number {
+  if (segmentCutsZone(a, b, zone)) {
+    return 0;
+  }
+  const corners: Point[] = [
+    [zone.x, zone.y],
+    [zone.x + zone.width, zone.y],
+    [zone.x + zone.width, zone.y + zone.height],
+    [zone.x, zone.y + zone.height],
+  ];
+  let closest = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < corners.length; index += 1) {
+    const c = corners[index] as Point;
+    const d = corners[(index + 1) % corners.length] as Point;
+    closest = Math.min(closest, segmentDistance(a, b, c, d));
+  }
+  return closest;
 }
 
 /** The three colour levels the design settled on, one per family. */
@@ -272,6 +564,99 @@ test("the name of every class fits its zone, in one line or in two", () => {
         `${name}: the line "${line}" fits the zone (${monospaceWidth(line.trim(), LABEL_SIZE)} of ${room})`,
       );
     }
+  }
+});
+
+test("the two combs write their whole name in one line", () => {
+  // The reader looked at the real pictures and asked for it: the name of
+  // the two multifurcaciones has to fit in one line of the crown of the
+  // comb, so the comb grew until the name fits whole.
+  for (const name of ["Multifurcacion", "MultifurcacionP"]) {
+    const shape = shapeOf(name);
+    assert.ok(shape, `the module knows ${name}`);
+    const zone: FootprintZone = {
+      left: shape.label.x,
+      top: shape.label.y,
+      width: shape.label.width,
+      height: shape.label.height,
+    };
+    const lines = labelLines(name, zone);
+    assert.equal(lines.length, 1, `${name}: the name is written in one line`);
+    assert.equal(lines[0], name, `${name}: the whole name is written`);
+    assert.ok(
+      monospaceWidth(name, LABEL_SIZE) <= zone.width - ZONE_AIR,
+      `${name}: the name fits the zone (${monospaceWidth(name, LABEL_SIZE)} of ${zone.width - ZONE_AIR})`,
+    );
+  }
+});
+
+test("no zone of text or of figure sits on an interior stroke", () => {
+  // The text of a zone is drawn on top of the zone, and a stroke under the
+  // text is a text nobody can read: the subtitle of a table over the line
+  // of the table, the name of a multifurcacion over the rail of its
+  // parameter. Every zone keeps 2 px of air from every interior stroke
+  // (contract v5 §2.5).
+  //
+  // `Unlink` is the one exception the design declares: its capsule is 38 px
+  // wide and the whole name needs a zone of 36.4 px, so the 2 px of air
+  // from the seam (x=38) leaves a zone of 36 px at most and the name would
+  // be broken inside the word. The name stays whole and the zone does not
+  // cross the seam.
+  const exceptions = new Set(["Unlink"]);
+  for (const [name, shape] of Object.entries(BLOCK_SHAPES)) {
+    if (exceptions.has(name)) {
+      continue;
+    }
+    const zones: Array<{ kind: string; zone: Zone }> = [{ kind: "text", zone: shape.label }];
+    if (shape.figure !== null) {
+      zones.push({ kind: "figure", zone: shape.figure });
+    }
+    for (const { kind, zone } of zones) {
+      for (const detail of shape.details) {
+        for (const polyline of strokePolylines(detail)) {
+          for (let index = 0; index + 1 < polyline.length; index += 1) {
+            const distance = segmentToZone(polyline[index] as Point, polyline[index + 1] as Point, zone);
+            assert.ok(
+              distance >= STROKE_AIR - 1e-9,
+              `${name}: the ${kind} zone is ${distance.toFixed(1)} px from the stroke ` +
+                `«${detail}» and it needs ${STROKE_AIR} px of air`,
+            );
+          }
+        }
+      }
+    }
+  }
+});
+
+test("the classes that can never have a figure declare no zone for it", () => {
+  // The reader's criterion: show the figure when the engine publishes it,
+  // never invent one, and do not leave a reserved hole that looks like a
+  // fault. The classes the engine never walks into have no value to show,
+  // so they declare no zone of the figure at all (contract v5 §2.7).
+  //
+  // The list is the one the module publishes: the design's generator writes
+  // it, so the test does not repeat it.
+  assert.equal(CLASSES_WITHOUT_FIGURE.length, 9, "the list holds the nine classes");
+  assert.equal(new Set(CLASSES_WITHOUT_FIGURE).size, 9, "the list has no repeats");
+  for (const name of CLASSES_WITHOUT_FIGURE) {
+    const shape = shapeOf(name);
+    assert.ok(shape, `the module knows ${name}`);
+    assert.equal(shape.figure, null, `${name} declares no zone of the figure`);
+  }
+  for (const name of SHAPE_CLASSES) {
+    if (CLASSES_WITHOUT_FIGURE.includes(name)) {
+      continue;
+    }
+    const shape = shapeOf(name);
+    assert.notEqual(shape?.figure, null, `${name} declares a zone of the figure`);
+  }
+  // The three variables are not on the list: the engine publishes the value
+  // of a variable when the run assigns it.
+  for (const name of ["Variable", "VariableA", "VariableN"]) {
+    assert.ok(
+      !CLASSES_WITHOUT_FIGURE.includes(name),
+      `${name} keeps its zone of the figure`,
+    );
   }
 });
 

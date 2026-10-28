@@ -201,9 +201,9 @@ esa tolerancia.
 - ports: Entrada1@39%,0% ; Salida1@39%,100% ; SalidaAlt@100%,100%
 - path: M 16,0 H 80 L 88,32 H 16 A 16,16 0 0 1 16,0 Z
 - details: M 76,20 L 82,18
-- label: 6,9,42,12
-- figure: 49,10,30,12
-- note: El cuerpo se afila hacia el vértice inferior derecho, que es el ancla de SalidaAlt (100%,100%) de gClasses.xml; la marca de corte sobre la diagonal cuenta la interrupción. El corte arranca en x=80 para que la cifra quepa a su izquierda sin pisar el puerto. Bloque de 32 px: sólo rótulo (§2.2).
+- label: 2,9,42,12
+- figure: 44,10,30,12
+- note: El cuerpo se afila hacia el vértice inferior derecho, que es el ancla de SalidaAlt (100%,100%) de gClasses.xml; la marca de corte sobre la diagonal cuenta la interrupción. El corte arranca en x=80 para que la cifra quepa a su izquierda sin pisar el puerto. Bloque de 32 px: sólo rótulo (§2.2). El rotulo se pega al arco de la izquierda (x=2) y la cifra se queda a su derecha (x=44), para que la zona de cifra termine en x=74 y deje 2 px de aire a la marca de corte (x=76), que es lo que la regla de los trazos interiores pide (§2.5).
 
 
 ## Return
@@ -225,9 +225,9 @@ esa tolerancia.
 - ports: Entrada1@50%,0% ; Salida1@50%,100% ; Salida2@100%,50%
 - path: M 25,0 H 82 L 100,25 L 82,50 H 25 A 25,25 0 0 1 25,0 Z
 - details: M 6,25 A 5,10 0 1 0 16,25 A 5,10 0 1 0 6,25 Z ; M 91,20 L 97,25 L 91,30
-- label: 14,13,42,22
-- figure: 56,13,30,12
-- note: La punta del galón cerrado coincide con la salida lateral Salida2 (100%,50%) de gClasses.xml y la elipse de la izquierda conserva la reserva de candidatos del original. SelectF no declara entidad (Param, maximo, minimo, op), asi que su cifra es el par de siempre (contrato v2 §6.1). El rotulo se ensancha a 42 px para que «SelectF» (37,8 px) quepa entero en una linea.
+- label: 18,10,42,22
+- figure: 50,34,30,12
+- note: La punta del galón cerrado coincide con la salida lateral Salida2 (100%,50%) de gClasses.xml y la elipse de la izquierda conserva la reserva de candidatos del original. SelectF no declara entidad (Param, maximo, minimo, op), asi que su cifra es el par de siempre (contrato v2 §6.1). El rotulo se ensancha a 42 px para que «SelectF» (37,8 px) quepa entero en una linea. La zona de rotulo arranca en x=18, con 2 px de aire a la elipse de los candidatos (que llega a x=16), y la de cifra baja a la banda de abajo (y=34) para que las dos zonas no se pisen: el embudo no da los 42 px del rotulo y los 30 px de la cifra uno al lado del otro sin pisar la flecha de la punta (x=91). Es el mismo reparto que usa el embudo de `SelectL`.
 
 
 ## StorageDef
@@ -249,9 +249,9 @@ esa tolerancia.
 - ports: Entrada1@50%,0% ; Salida1@50%,95%
 - path: M 7,0 H 93 A 7,20 0 0 1 93,40 H 7 A 7,20 0 0 1 7,0 Z
 - details: M 16,33 H 82 ; M 93,0 A 4.5,20 0 0 0 93,40
-- label: 6,8,44,24
+- label: 6,6,44,24
 - figure: 54,10,32,12
-- note: El cilindro se dibuja de 0 a 40 de alto dentro de la huella de 42, porque el ancla de Salida1 (50%,95%) cae en y=40 y debe quedar sobre el borde inferior, como en el editor original (Rectangle 0,0,96,36 + Rectangle 4,4,100,40). «StorageUse» no cabe en una linea del barril, asi que va en dos («Storage» y «Use») y la zona de rotulo sube a 44 px de ancho y 24 px de alto, por encima de la linea de nivel.
+- note: El cilindro se dibuja de 0 a 40 de alto dentro de la huella de 42, porque el ancla de Salida1 (50%,95%) cae en y=40 y debe quedar sobre el borde inferior, como en el editor original (Rectangle 0,0,96,36 + Rectangle 4,4,100,40). «StorageUse» no cabe en una linea del barril, asi que va en dos («Storage» y «Use») y la zona de rotulo sube a 44 px de ancho y 24 px de alto, por encima de la linea de nivel: su borde baja a y=30, con 3 px de aire a la linea de nivel (y=33), que es lo que la regla de los trazos interiores pide (§2.5).
 
 
 ## Enter
@@ -296,10 +296,10 @@ esa tolerancia.
 - footprint: 100x70
 - ports: ninguno (declaración)
 - path: M 5,0 H 95 A 5,5 0 0 1 100,5 V 65 A 5,5 0 0 1 95,70 H 5 A 5,5 0 0 1 0,65 V 5 A 5,5 0 0 1 5,0 Z
-- details: M 0,20 H 100 ; M 14,0 V 70
+- details: M 0,32 H 100 ; M 14,0 V 70
 - label: 18,3,46,26
 - figure: none
-- note: Placa apagada de la familia Tabla: hoja con cabecera y columna de índice, como la dibujaba gClasses.xml (Line 0,16,100,16 y Line 10,0,10,65). El nombre va en la banda de cabecera y el rótulo debajo, como en el original. Sin puertos y sin cifra: es una declaración.
+- note: Placa apagada de la familia Tabla: hoja con cabecera y columna de índice, como la dibujaba gClasses.xml (Line 0,16,100,16 y Line 10,0,10,65). El nombre va en la banda de cabecera y el rótulo debajo, como en el original. Sin puertos y sin cifra: es una declaración. La linea de la cabecera baja de y=20 a y=32, para que la banda de cabecera crezca y la zona de rotulo (que llega a y=29) quede encima de ella con 3 px de aire: es lo que la regla de los trazos interiores pide (§2.5), y el subtítulo ya no se pisa con la linea de la tabla.
 
 
 ## Tabulate
@@ -320,10 +320,10 @@ esa tolerancia.
 - footprint: 130x70
 - ports: ninguno (declaración)
 - path: M 5,0 H 125 A 5,5 0 0 1 130,5 V 65 A 5,5 0 0 1 125,70 H 5 A 5,5 0 0 1 0,65 V 5 A 5,5 0 0 1 5,0 Z
-- details: M 0,20 H 130 ; M 14,0 V 70 ; M 116,7 L 122,10 L 116,13
+- details: M 0,32 H 130 ; M 14,0 V 70 ; M 116,7 L 122,10 L 116,13
 - label: 18,3,46,26
 - figure: none
-- note: Placa apagada de la familia Tabla; la flecha de la cabecera recoge el lápiz de cola que el editor original dibujaba a la derecha de QTable. No tiene puertos y, por ser una declaración, no lleva cifra.
+- note: Placa apagada de la familia Tabla; la flecha de la cabecera recoge el lápiz de cola que el editor original dibujaba a la derecha de QTable. No tiene puertos y, por ser una declaración, no lleva cifra. La linea de la cabecera baja de y=20 a y=32, como en `Table`, para que la zona de rotulo (que llega a y=29) quede encima de ella con 3 px de aire: es lo que la regla de los trazos interiores pide (§2.5), y el subtítulo ya no se pisa con la linea de la tabla.
 
 
 ## Link

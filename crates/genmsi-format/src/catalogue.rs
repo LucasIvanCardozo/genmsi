@@ -1143,7 +1143,7 @@ pub static MFUNCTIONDIST: ClassSpec = ClassSpec {
 pub static MULTIFURCACION: ClassSpec = ClassSpec {
     class: "Multifurcacion",
     title: "Multifurcación",
-    width: 80,
+    width: 144,
     height: 40,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada", caption: "Multifurcacion" },
@@ -1169,7 +1169,7 @@ pub static MULTIFURCACION: ClassSpec = ClassSpec {
 pub static MULTIFURCACIONP: ClassSpec = ClassSpec {
     class: "MultifurcacionP",
     title: "Multifurcación por parámetro",
-    width: 80,
+    width: 144,
     height: 40,
     inputs: &[
         PortSpec { ioid: 1, name: "Entrada", caption: "Multifurcacion" },
@@ -1737,16 +1737,17 @@ mod tests {
     /// The footprint the engine publishes is the one the editor draws. It
     /// comes from the original library, except for the three classes the
     /// redesign of the shapes changed: a `Terminate` is a clean circle of
-    /// 64x64, and the two `Multifurcacion` classes are drawn 80x40 so that
-    /// their comb fits the five exits it spreads.
+    /// 64x64, and the two `Multifurcacion` classes are drawn 144x40 so
+    /// that their comb fits the five exits it spreads and the whole name of
+    /// the class on one line of its crown.
     #[test]
     fn every_class_declares_the_footprint_of_the_original_library() {
         let cases = [
             ("Test", 64, 64),
             ("Generate", 120, 63),
             ("Queue", 97, 32),
-            ("Multifurcacion", 80, 40),
-            ("MultifurcacionP", 80, 40),
+            ("Multifurcacion", 144, 40),
+            ("MultifurcacionP", 144, 40),
             ("Terminate", 64, 64),
         ];
         for (class, width, height) in cases {

@@ -69,6 +69,47 @@ AIRE_ENTRE_LINEAS = 2.0
 # Dos lineas de 9 px, con el aire del diseno entre ellas: 11 + 2 + 11.
 ALTO_DOS_LINEAS = 2 * ALTO_LINEA + AIRE_ENTRE_LINEAS
 
+# El aire que una zona deja entre su borde y un trazo interior (contrato
+# v5 §2.5): el texto de la zona se dibuja encima del trazo si la zona lo
+# toca, y dos pixeles son los que hacen falta para que se lean los dos.
+AIRE_TRAZO = 2.0
+
+# Las clases que no pueden tener cifra (contrato v5 §2.7).
+#
+# Son las declaraciones que el motor nunca recorre: no hay fila del reporte
+# para ellas y no hay ningun valor que publicar, asi que una zona de cifra
+# reservada seria un hueco vacio que parece un fallo. Las tres variables NO
+# estan aqui: el motor publica el valor de una variable cuando la corrida
+# se lo asigna, y la app lo muestra.
+CLASES_SIN_CIFRA = [
+    "Function",
+    "FunctionDist",
+    "FunctionExpon",
+    "MFunction",
+    "MFunctionDist",
+    "Note",
+    "QTable",
+    "StorageDef",
+    "Table",
+]
+
+# Las excepciones de la regla de los trazos interiores, y por que estan.
+#
+# `Unlink` es el unico caso que la regla no puede cubrir: su capsula mide
+# 38 px de ancho y el nombre «Unlink» necesita 36,4 px de zona (32,4 px de
+# texto mas 4 px de aire). Los 2 px de aire que la regla pide al eslabon
+# (x=38) dejan una zona de 36 px como maximo, y el nombre dejaria de caber
+# entero en una linea. Se conserva el nombre entero —el texto acaba a
+# 2,6 px del eslabon— y la zona no lo cruza: es el unico caso en que la
+# zona llega al eslabon sin tocarlo.
+EXCEPCIONES_TRAZO = {
+    ("Unlink", "texto"): (
+        "el nombre entero («Unlink», 32,4 px) necesita una zona de 36,4 px y la "
+        "capsula mide 38 px: con los 2 px de aire del eslabon la zona no puede "
+        "ser mas ancha, y el nombre se partiria dentro de la palabra"
+    ),
+}
+
 
 def ancho_texto(texto: str) -> float:
     """El ancho de un texto en la monoespaciada del diseno."""
@@ -377,6 +418,136 @@ def problema_trazo(clase: render.Clase) -> str | None:
     return None
 
 
+def _distancia_punto_segmento(punto, a, b) -> float:
+    """La distancia del punto al segmento `a`-`b`."""
+    ax, ay = a
+    bx, by = b
+    px, py = punto
+    dx, dy = bx - ax, by - ay
+    largo = dx * dx + dy * dy
+    if largo == 0:
+        return math.hypot(px - ax, py - ay)
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / largo))
+    return math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+
+
+def _orientacion(p, q, r) -> float:
+    return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+
+
+def _en_segmento(p, q, r) -> bool:
+    """El punto `q` esta en el segmento `p`-`r`."""
+    return (
+        min(p[0], r[0]) - 1e-9 <= q[0] <= max(p[0], r[0]) + 1e-9
+        and min(p[1], r[1]) - 1e-9 <= q[1] <= max(p[1], r[1]) + 1e-9
+    )
+
+
+def _corta_segmento(a, b, c, d) -> bool:
+    """Los segmentos `a`-`b` y `c`-`d` se cortan."""
+    o1, o2 = _orientacion(a, b, c), _orientacion(a, b, d)
+    o3, o4 = _orientacion(c, d, a), _orientacion(c, d, b)
+    if ((o1 > 0) != (o2 > 0)) and ((o3 > 0) != (o4 > 0)):
+        return True
+    if o1 == 0 and _en_segmento(a, c, b):
+        return True
+    if o2 == 0 and _en_segmento(a, d, b):
+        return True
+    if o3 == 0 and _en_segmento(c, a, d):
+        return True
+    if o4 == 0 and _en_segmento(c, b, d):
+        return True
+    return False
+
+
+def _distancia_segmentos(a, b, c, d) -> float:
+    """La distancia entre los segmentos `a`-`b` y `c`-`d`."""
+    if _corta_segmento(a, b, c, d):
+        return 0.0
+    return min(
+        _distancia_punto_segmento(a, c, d),
+        _distancia_punto_segmento(b, c, d),
+        _distancia_punto_segmento(c, a, b),
+        _distancia_punto_segmento(d, a, b),
+    )
+
+
+def _distancia_segmento_caja(a, b, caja) -> float:
+    """La distancia del segmento `a`-`b` a la caja.
+
+    Cero cuando el segmento la cruza o la toca, y la distancia al borde de
+    la caja cuando vive fuera de ella.
+    """
+    if _corta_caja(a, b, caja):
+        return 0.0
+    x, y, ancho, alto = caja
+    esquinas = [(x, y), (x + ancho, y), (x + ancho, y + alto), (x, y + alto)]
+    mejor = float("inf")
+    for indice in range(4):
+        c = esquinas[indice]
+        d = esquinas[(indice + 1) % 4]
+        mejor = min(mejor, _distancia_segmentos(a, b, c, d))
+    return mejor
+
+
+def problema_zona_toca_trazo(clase: render.Clase) -> list[str]:
+    """Ninguna zona puede cruzar un trazo interior de la clase.
+
+    El texto de la zona se dibuja encima del trazo, y un trazo debajo del
+    texto es un texto ilegible: el subtítulo de una tabla encima de la linea
+    de la tabla, o el rótulo de una multifurcación encima del raíl de su
+    parámetro. La zona deja `AIRE_TRAZO` de aire entre su borde y el trazo
+    (contrato v5 §2.5).
+    """
+    if not clase.details:
+        return []
+    problemas: list[str] = []
+    zonas: list[tuple[str, tuple[float, float, float, float]]] = []
+    if clase.label is not None:
+        zonas.append(("texto", clase.label))
+    if clase.figure is not None:
+        zonas.append(("cifra", clase.figure))
+    for nombre_zona, caja in zonas:
+        for detalle in clase.details:
+            if (clase.nombre, nombre_zona) in EXCEPCIONES_TRAZO:
+                continue
+            minima = None
+            for contorno in _leer_path(detalle):
+                for indice in range(len(contorno) - 1):
+                    a, b = contorno[indice], contorno[indice + 1]
+                    distancia = _distancia_segmento_caja(a, b, caja)
+                    if minima is None or distancia < minima:
+                        minima = distancia
+            if minima is not None and minima < AIRE_TRAZO - 1e-9:
+                problemas.append(
+                    f"{clase.nombre}: la zona de {nombre_zona} "
+                    f"({caja[0]:g},{caja[1]:g},{caja[2]:g},{caja[3]:g}) toca el "
+                    f"trazo interior «{detalle}»: deja {minima:.1f} px de "
+                    f"aire y hacen falta {AIRE_TRAZO:g} px"
+                )
+    return problemas
+
+
+def problema_cifra_imposible(clase: render.Clase) -> str | None:
+    """Una clase que no puede tener cifra no declara zona de cifra.
+
+    El motor nunca recorre una declaracion: no hay fila del reporte para
+    ella y no hay ningun valor que publicar. Una zona de cifra reservada
+    seria un hueco vacio que parece un fallo (contrato v5 §2.7).
+    """
+    if clase.nombre not in CLASES_SIN_CIFRA:
+        return None
+    if clase.figure is None:
+        return None
+    return (
+        f"{clase.nombre}: declara zona de cifra "
+        f"({clase.figure[0]:g},{clase.figure[1]:g},{clase.figure[2]:g},"
+        f"{clase.figure[3]:g}) y es una clase que no puede tener cifra: el motor "
+        f"nunca la recorre y no publica ningun valor para ella, asi que la zona "
+        f"quedaria siempre vacia"
+    )
+
+
 def problema_corte(clase: render.Clase) -> str | None:
     """El nombre se parte donde empieza una palabra.
 
@@ -519,6 +690,9 @@ def verificar(clases: list[render.Clase]) -> list[str]:
                     f"{clase.nombre}: la zona de texto se sale de la silueta "
                     f"({clase.label} en {w}x{h}): {porque}"
                 )
+        # y ninguna zona puede cruzar un trazo interior (contrato v5 §2.5)
+        for problema in problema_zona_toca_trazo(clase):
+            problemas.append(problema)
         if clase.figure is not None:
             fx, fy, fw, fh = clase.figure
             if fx < 0 or fy < 0 or fx + fw > w + 0.5 or fy + fh > h + 0.5:
@@ -545,6 +719,10 @@ def verificar(clases: list[render.Clase]) -> list[str]:
                 )
         # los trazos interiores tampoco salen de la silueta
         problema = problema_trazo(clase)
+        if problema is not None:
+            problemas.append(problema)
+        # y una clase que no puede tener cifra no declara zona de cifra
+        problema = problema_cifra_imposible(clase)
         if problema is not None:
             problemas.append(problema)
     faltan = sorted(clases_del_catalogo() - {c.nombre for c in clases})
@@ -636,6 +814,7 @@ def modulo(clases: list[render.Clase]) -> str:
     )
     formas = "\n".join(clase_ts(clase) for clase in ordenadas)
     nombres = "".join(f"  {texto(clase.nombre)},\n" for clase in ordenadas)
+    sin_cifra = "".join(f"  {texto(clase)},\n" for clase in CLASES_SIN_CIFRA)
     union = "".join(f"  | {texto(familia)}\n" for familia in FAMILIAS)
 
     return f'''/**
@@ -748,6 +927,21 @@ export const BLOCK_SHAPES: Record<string, BlockShape> = {{
 /** The classes the module knows, grouped by family. */
 export const SHAPE_CLASSES: string[] = [
 {nombres}];
+
+/**
+ * The classes that can never have a figure.
+ *
+ * They are the declarations the engine never walks into: there is no row of
+ * the report for them and no value to publish, so a reserved zone of the
+ * figure would be an empty hole that looks like a fault (contract v5 §2.7).
+ * The three variables are not among them: the engine publishes the value of
+ * a variable when the run assigns it.
+ *
+ * The list lives here so that the app reads it from the module instead of
+ * repeating it: the design's generator is the one that writes it.
+ */
+export const CLASSES_WITHOUT_FIGURE: string[] = [
+{sin_cifra}];
 
 /** The shape of a class, or `undefined` when the class has no shape yet. */
 export function shapeOf(className: string): BlockShape | undefined {{

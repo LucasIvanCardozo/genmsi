@@ -65,9 +65,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: none
 - path: M 0 25 A 25 25 0 1 0 50 25 A 25 25 0 1 0 0 25 Z
 - details: M 2 25 L 6 25 ; M 44 25 L 48 25
-- label: 7,12,36,18
+- label: 8,12,34,18
 - figure: 10,32,30,12
-- note: esfera de la familia Fuente en placa apagada, con dos marcas de esfera a los lados; sin puertos no hay ancla, y al medir 50 px de ancho útil (38 px) el rótulo va arriba y la zona de cifra reservada abajo y vacía, porque es una declaración sin entidad
+- note: esfera de la familia Fuente en placa apagada, con dos marcas de esfera a los lados; sin puertos no hay ancla, y al medir 50 px de ancho útil (38 px) el rótulo va arriba y la zona de cifra reservada abajo y vacía, porque es una declaración sin entidad. La zona de rotulo mide 34 px y deja 2 px de aire a cada marca de esfera (x=6 y x=44), que es lo que la regla de los trazos interiores pide (§2.5), y «Clock» (27 px) sigue cabiendo entero en una linea.
 
 ## Terminate
 - family: Destino
@@ -153,9 +153,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0% ; Salida1@50%,100%
 - path: M 6 0 H 74 L 94 34 A 6 6 0 0 1 88 40 H 26 A 6 6 0 0 1 20 34 L 0 6 A 6 6 0 0 1 6 0 Z
 - details: M 30 31 L 30 37 ; M 35 31 L 35 37 ; M 40 31 L 40 37
-- label: 20,8,44,24
+- label: 20,4,44,24
 - figure: 65,22,20,12
-- note: placa inclinada, el paralelogramo del catálogo original: el flujo entra por arriba y sale por abajo, y las tres rayas del pie son el contador; la pendiente manda el rótulo a la derecha y la cifra a la banda baja, y los puertos van al 50% del ancho. El rotulo pasa a 44 px de ancho para que «Counter» quepa en una linea, y la zona de cifra baja a 20 px (para el valor que cuenta) conservando su borde derecho.
+- note: placa inclinada, el paralelogramo del catálogo original: el flujo entra por arriba y sale por abajo, y las tres rayas del pie son el contador; la pendiente manda el rótulo a la derecha y la cifra a la banda baja, y los puertos van al 50% del ancho. El rotulo pasa a 44 px de ancho para que «Counter» quepa en una linea, y la zona de cifra baja a 20 px (para el valor que cuenta) conservando su borde derecho. La zona de rotulo sube a y=4 para dejar 3 px de aire a las tres rayas del pie (y=31), que es lo que la regla de los trazos interiores pide (§2.5).
 
 ## Priority
 - family: Operación
@@ -253,8 +253,8 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - path: M 8 0 H 92 A 8 8 0 0 1 100 8 V 92 A 8 8 0 0 1 92 100 H 8 A 8 8 0 0 1 0 92 V 8 A 8 8 0 0 1 8 0 Z
 - details: M 16 92 L 88 92 ; M 16 92 L 16 54 ; M 20 86 L 44 60 L 62 74 L 86 56
 - label: 8,6,84,22
-- figure: 34,32,32,14
-- note: tarjeta con ejes y curva, la silueta del catálogo original; la gráfica es la firma de la función y baja a media tarjeta para dejar sitio al rótulo y a la cifra, y sin puertos no hay ancla
+- figure: none
+- note: tarjeta con ejes y curva, la silueta del catálogo original; la gráfica es la firma de la función y baja a media tarjeta para dejar sitio al rótulo, y sin puertos no hay ancla. La función no lleva zona de cifra: es una declaración que el motor nunca recorre y no publica ningún valor para ella, así que una zona reservada sería un hueco vacío que parece un fallo (§2.7).
 
 ## FunctionExpon
 - family: Operación
@@ -264,8 +264,8 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - path: M 8 0 H 92 A 8 8 0 0 1 100 8 V 92 A 8 8 0 0 1 92 100 H 8 A 8 8 0 0 1 0 92 V 8 A 8 8 0 0 1 8 0 Z
 - details: M 16 92 L 88 92 ; M 16 92 L 16 54 ; M 20 58 C 40 60 58 82 88 90
 - label: 8,6,84,22
-- figure: 34,32,32,14
-- note: la misma tarjeta de Function con la curva exponencial en lugar de la quebrada; el rótulo coge los 84 px de la banda alta para que el nombre no se corte, y la gráfica baja a media tarjeta
+- figure: none
+- note: la misma tarjeta de Function con la curva exponencial en lugar de la quebrada; el rótulo coge los 84 px de la banda alta para que el nombre no se corte, y la gráfica baja a media tarjeta. La función no lleva zona de cifra: es una declaración que el motor nunca recorre y no publica ningún valor para ella (§2.7).
 
 ## MFunction
 - family: Operación
@@ -275,8 +275,8 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - path: M 8 0 H 92 A 8 8 0 0 1 100 8 V 92 A 8 8 0 0 1 92 100 H 8 A 8 8 0 0 1 0 92 V 8 A 8 8 0 0 1 8 0 Z
 - details: M 16 92 L 88 92 ; M 16 92 L 16 54 ; M 20 86 L 44 60 L 62 74 L 86 56 ; M 20 72 L 44 44 L 62 58 L 86 44
 - label: 8,6,84,22
-- figure: 34,32,32,14
-- note: la tarjeta de Function con dos curvas, que es lo que la distingue de la simple en el catálogo original; declaración en placa apagada, y sin puertos no hay anclas
+- figure: none
+- note: la tarjeta de Function con dos curvas, que es lo que la distingue de la simple en el catálogo original; declaración en placa apagada, y sin puertos no hay anclas. La función no lleva zona de cifra: es una declaración que el motor nunca recorre y no publica ningún valor para ella, así que una zona reservada sería un hueco vacío que parece un fallo (§2.7).
 
 ## FunctionDist
 - family: Operación
@@ -286,8 +286,8 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - path: M 0 32 A 32 32 0 1 0 64 32 A 32 32 0 1 0 0 32 Z
 - details: M 28 8 L 32 11 L 36 8 ; M 30 6.5 L 32 11 L 34 6.5 ; M 31 5.5 L 32 11 L 33 5.5
 - label: 8,20,48,24
-- figure: 18,46,30,11
-- note: elipse con el abanico de la distribución, la silueta del catálogo original; con 64 px de ancho el rótulo va arriba y la cifra abajo, en la misma columna. «FunctionDist» no cabe en una linea de un circulo de 64 px, asi que va en dos («Function» y «Dist»): la zona de rotulo ocupa 48 px de la banda central con 24 px de alto, el abanico sube a la parte alta del circulo para que el texto no lo pise, y la cifra baja al borde inferior con 30 px.
+- figure: none
+- note: elipse con el abanico de la distribución, la silueta del catálogo original; con 64 px de ancho el rótulo va en la banda central. «FunctionDist» no cabe en una linea de un circulo de 64 px, asi que va en dos («Function» y «Dist»): la zona de rotulo ocupa 48 px de la banda central con 24 px de alto y el abanico sube a la parte alta del circulo para que el texto no lo pise. La función no lleva zona de cifra: es una declaración que el motor nunca recorre y no publica ningún valor para ella (§2.7).
 
 ## MFunctionDist
 - family: Operación
@@ -296,9 +296,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: none
 - path: M 0 36 A 36 36 0 1 0 72 36 A 36 36 0 1 0 0 36 Z
 - details: M 30.5 45 A 5.5 5.5 0 1 1 41.5 45 A 5.5 5.5 0 1 1 30.5 45 Z ; M 33.5 45 A 2.5 2.5 0 1 1 38.5 45 A 2.5 2.5 0 1 1 33.5 45 Z
-- label: 9,14,54,24
-- figure: 24,52,30,11
-- note: elipse con aros concéntricos en la banda media, la silueta del catálogo original; en un círculo de 72 px el rótulo va arriba y la cifra abajo. «MFunctionDist» va en dos lineas («MFunction» y «Dist»): la zona de rotulo ocupa 54 px de la banda central con 24 px de alto, los aros bajan al centro de la elipse para que el texto no los pise, y la cifra va al borde inferior con 30 px.
+- label: 9,13,54,24
+- figure: none
+- note: elipse con aros concéntricos en la banda media, la silueta del catálogo original; en un círculo de 72 px el rótulo va en la banda alta. «MFunctionDist» va en dos lineas («MFunction» y «Dist»): la zona de rotulo ocupa 54 px de la banda central con 24 px de alto, y los aros bajan al centro de la elipse para que el texto no los pise (la banda de rotulo sube a y=13 y deja 2 px de aire a los aros, y=39,5, que es lo que la regla de los trazos interiores pide, §2.5). La función no lleva zona de cifra: es una declaración que el motor nunca recorre y no publica ningún valor para ella (§2.7).
 
 ## Note
 - family: Anotación
@@ -307,6 +307,6 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: none
 - path: M 0 0 H 58 L 80 22 V 80 H 0 Z
 - details: M 58 0 V 22 H 80
-- label: 10,10,52,26
+- label: 10,10,45,26
 - figure: none
-- note: hoja con la esquina doblada, la silueta del catálogo original; cambia de familia: pasa de Operación a la familia propia «Anotación» (gris #64748b) porque una anotación no es un paso del flujo, y no tiene puertos ni cifra
+- note: hoja con la esquina doblada, la silueta del catálogo original; cambia de familia: pasa de Operación a la familia propia «Anotación» (gris #64748b) porque una anotación no es un paso del flujo, y no tiene puertos ni cifra. La zona de rotulo se estrecha a 45 px para dejar 3 px de aire al pliegue de la esquina (x=58), que es lo que la regla de los trazos interiores pide (§2.5), y «Note» (21,6 px) sigue cabiendo entero en una linea.

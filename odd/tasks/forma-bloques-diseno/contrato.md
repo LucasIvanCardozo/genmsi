@@ -15,6 +15,11 @@ un mosaico.
 > comprueban **dentro de la silueta rellena**, no dentro de su huella. El
 > generador deja de escribir el módulo cuando una de las 66 clases no cumple
 > la regla.
+>
+> **[v5] La v5 añade §2.5**: ninguna zona puede **cruzar un trazo interior**
+> de su clase. El generador lo comprueba y deja de escribir el módulo cuando
+> una zona se pone encima de un trazo: el texto de la zona se dibujaría
+> encima del trazo y no se leería.
 
 ## 1. Qué se rediseña
 
@@ -153,6 +158,125 @@ La zona de texto y la zona de cifra están **dentro de la silueta rellena**,
 no dentro de su huella: el texto se dibuja ahí, y el texto no puede salirse
 de la figura ni pisar un puerto. El generador lo comprueba sobre el `path` de
 cada clase, no sobre su caja.
+
+### [v5] 2.5 — Ninguna zona cruza un trazo interior
+
+**[v5]** Los detalles interiores de una clase (la linea de la cabecera de una
+tabla, la linea de nivel de un deposito, el rail del parametro de una
+multifurcacion, la elipse de candidatos de un `SelectF`) son **trazos** que
+se dibujan dentro de la silueta. El texto de una zona se dibuja **encima** de
+la zona, asi que una zona que cruza un trazo pone el texto encima del trazo:
+un subtitulo sobre la linea de la tabla, un rotulo sobre el rail, un nombre
+sobre la elipse de los candidatos.
+
+La regla que el generador hace cumplir, para cada una de las 66 clases y para
+**las dos** zonas (la de texto y la de cifra):
+
+- el **rectangulo** de la zona no toca ningun trazo interior de su clase;
+- y deja **2 px de aire** entre su borde y el trazo mas cercano.
+
+El generador **no escribe** el modulo si una clase no cumple la regla, y
+entrega la clase, la zona y el trazo que la zona cruza.
+
+**El aire de 2 px es el del texto, no el de una medida decorativa**: el trazo
+se dibuja con 1,8 px de grosor, y dos pixeles de aire son los que hacen que
+el texto y el trazo se lean los dos.
+
+**La unica excepcion declarada es `Unlink`.** Su capsula mide 38 px de ancho
+y el nombre entero («Unlink», 32,4 px) necesita una zona de 36,4 px: con los
+2 px de aire que el eslabon (x=38) exige, la zona mas ancha que cabe mide
+36 px, y el nombre se partiria dentro de la palabra («Unl» / «ink»). Se
+conserva el **nombre entero** —el texto acaba a 2,6 px del eslabon— y la
+zona **no lo cruza**. Es el unico caso de las 66 en que la zona llega al
+eslabon sin tocarlo, y esta declarado en el generador (`EXCEPCIONES_TRAZO`)
+y en la prueba de la app.
+
+**Lo que la regla movio.** Doce clases tenian una zona pegada o encima de un
+trazo interior; la zona se movio, y **la silueta, los puertos y los colores
+no se tocaron**:
+
+| Clase | El trazo | Lo que se movio |
+|---|---|---|
+| `Table`, `QTable` | la linea de la cabecera (y=20) | la linea baja a y=32 y la banda de cabecera crece |
+| `SelectF` | la elipse de los candidatos (x=1..16) | la zona de texto arranca en x=18 y la de cifra baja a la banda de abajo |
+| `Clock` | las dos marcas de esfera | la zona de texto se estrecha a 34 px |
+| `Counter` | las tres rayas del pie | la zona de texto sube a y=4 |
+| `MFunction` | la curva mas alta de la grafica | su zona de cifra desaparece (§2.7) |
+| `MFunctionDist` | los dos aros concentricos | su zona de cifra desaparece (§2.7) |
+| `Note` | el pliegue de la esquina | la zona de texto se estrecha a 45 px |
+| `Preempt` | la marca de corte | la zona de cifra termina en x=74 |
+| `StorageUse` | la linea de nivel | la zona de texto sube a y=6 |
+| `RemoveNumber`, `RemoveTrans` | la linea de la lista | la zona de texto sube a y=4 |
+
+Y una clase mas se movio por el nombre entero (§2.6): los dos peinees, cuyo
+rail y perilla del parametro pasan a la corona libre que queda entre el
+rotulo y la cifra.
+
+### [v5] 2.6 — El peine crece, y el nombre entero cabe en una linea
+
+**[v5]** El lector miro las pictures de verdad y pidio que el nombre de las
+dos multifurcaciones **cabe en una linea** de la corona del peine. El nombre
+mide 75,6 px (`Multifurcacion`) y 81 px (`MultifurcacionP`), asi que la zona
+de texto necesita 80 px y 86 px.
+
+La salida es la del propio diseno: **el peine crece** y su huella pasa de
+80x40 a **144x40**. Los cinco dientes se separan 36 px en vez de 20 (y siguen
+siendo los cinco puntos donde el flujo sale: 0, 36, 72, 108 y 144), la
+corona crece con ellos, el rotulo va a la izquierda (86 px) y la cifra a la
+derecha (30 px). Los dos nombres caben enteros en una linea, y el motor
+publica la huella nueva: un bloque nuevo de esas clases nace con ella.
+
+### [v5] 2.7 — Una clase que no puede tener cifra no reserva zona de cifra
+
+**[v5]** El lector pregunto que significaba el «...» de algunos bloques (el
+titulo del bloque, cortado) y acepto este criterio:
+
+> **Mostrar la cifra cuando el motor la publica; nunca inventar una; y no
+> dejar un hueco reservado que parezca un error.**
+
+La tercera parte del criterio es una regla del diseno. Una **zona de cifra
+reservada que nunca se puede llenar** es un hueco vacio en el bloque: parece
+un fallo, y ademas roba ancho al rotulo (que es justo lo que se estaba
+cortando).
+
+**Que clases pueden tener cifra.** La cifra sale del motor: la fila del
+reporte de un bloque, o el valor que publica una entidad. Un bloque que el
+motor **nunca recorre** no tiene fila ni valor: no hay nada que mostrar.
+
+**La regla que el generador hace cumplir.** Una clase de la lista de las
+**nueve que no pueden tener cifra** declara `figure: null`:
+
+| Clase | Por que no puede tener cifra |
+|---|---|
+| `Function`, `FunctionExpon`, `MFunction`, `FunctionDist`, `MFunctionDist` | son declaraciones que el motor nunca recorre: no hay fila del reporte para ellas y no hay valor que publicar |
+| `Note`, `StorageDef`, `Table`, `QTable` | lo mismo: son declaraciones, y ya declaraban `figure: null` |
+
+**Las tres variables NO estan en la lista.** `Variable`, `VariableA` y
+`VariableN` son declaraciones, pero el motor publica el valor de una variable
+cuando la corrida se lo asigna (la tabla `SAVEVALUE` del reporte) y la app lo
+muestra: su zona de cifra se queda. Cuando la corrida nunca se lo asigna, la
+app dibuja un guion tenue (otra unidad de trabajo, en la app), y no un hueco.
+
+El generador **no escribe** el modulo si una de las nueve declara zona de
+cifra, y entrega la clase y el motivo:
+
+```
+Function: declara zona de cifra (34,32,32,14) y es una clase que no puede
+tener cifra: el motor nunca la recorre y no publica ningun valor para ella,
+asi que la zona quedaria siempre vacia
+```
+
+**La lista vive en el modulo.** El generador la escribe en
+`crates/genmsi-app/src/graph/shapes.ts` (`CLASSES_WITHOUT_FIGURE`), y la
+prueba de la app la lee de ahi en vez de repetirla: hay una sola fuente de la
+verdad. La prueba comprueba las dos direcciones: las nueve declaran `figure:
+null` y **todas las demas** declaran zona de cifra.
+
+**Lo que la regla movio.** Las cinco funciones pierden su zona de cifra
+(`Function`, `FunctionExpon`, `MFunction`, `FunctionDist`, `MFunctionDist`):
+sus zonas de texto no cambian, porque ya ocupaban todo el ancho que les
+daba la silueta (84 px en la tarjeta de 100, la banda central del circulo
+en las otras dos).
 
 ## 3. La silueta
 

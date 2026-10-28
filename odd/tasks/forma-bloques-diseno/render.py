@@ -476,7 +476,7 @@ def el_nombre_cabe(nombre: str, zona: tuple[float, float, float, float]) -> bool
 
 
 def verificar(clases: list[Clase]) -> list[str]:
-    """Las reglas que el contrato v4 impone, comprobadas sobre las entregas.
+    """Las reglas que el contrato v5 impone, comprobadas sobre las entregas.
 
     El verificador es la red de seguridad del padre: los grupos se revisan a
     sí mismos, pero la comprobación final la hace el integrador, sobre las
@@ -725,7 +725,7 @@ def main() -> int:
         for p in problemas:
             print(f"  {p}", file=sys.stderr)
         return 1
-    print("reglas del contrato v4: OK", file=sys.stderr)
+    print("reglas del contrato v5: OK", file=sys.stderr)
     return 0
 
 

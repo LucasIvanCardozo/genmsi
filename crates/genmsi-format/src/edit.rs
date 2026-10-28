@@ -1080,15 +1080,16 @@ mod tests {
     /// born square, a `Generate` is wide and short, a `Multifurcacion` is a
     /// comb and needs its own room.
     ///
-    /// The `Multifurcacion` is drawn 80x40, the size its comb needs for the
-    /// five exits it spreads; that is the footprint the editor draws.
+    /// The `Multifurcacion` is drawn 144x40, the size its comb needs for the
+    /// five exits it spreads and for the whole name of the class on one line
+    /// of its crown; that is the footprint the editor draws.
     #[test]
     fn a_new_block_is_born_with_the_footprint_of_its_class() {
         let cases = [
             ("Test", 64, 64),
             ("Generate", 120, 63),
             ("Queue", 97, 32),
-            ("Multifurcacion", 80, 40),
+            ("Multifurcacion", 144, 40),
         ];
         for (class, width, height) in cases {
             let mut session = EditSession::new(model());

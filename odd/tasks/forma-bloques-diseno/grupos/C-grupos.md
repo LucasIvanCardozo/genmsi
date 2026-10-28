@@ -129,24 +129,24 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 ## Multifurcacion
 - family: Decisión
 - variant: peine de la multifurcacion
-- footprint: 80x40
+- footprint: 144x40
 - ports: Entrada@50%,0% ; Salida1@0%,100% ; SalidaProb2@25%,100% ; SalidaProb3@50%,100% ; SalidaProb4@75%,100% ; SalidaProb5@100%,100%
-- path: M2 0 H78 L80 40 L70 30 L60 40 L50 30 L40 40 L30 30 L20 40 L10 30 L0 40 Z
+- path: M2 0 H142 L144 40 L126 30 L108 40 L90 30 L72 40 L54 30 L36 40 L18 30 L0 40 Z
 - details: none
-- label: 2,6,48,24
-- figure: 50,9,26,10
-- note: Variante «peine de la multifurcacion» de la familia Decisión: los cinco dientes son exactamente las cinco salidas (0,32), (20,32), (40,32), (60,32) y (80,32) y la entrada sigue en el borde superior (40,0); la clase es de 20 px de alto en el catálogo, pero el peine necesita sitio para sus dos bandas de texto, así que la entrega usa una huella dibujada de 80×40 (la app dibuja el nodo con 32 px de alto mínimo, y aquí hacen falta 40 para que el rótulo y la cifra no se pisen); el texto va en banda propia sobre la corona (rótulo arriba, cifra abajo) porque el nombre completo (64 px) más la cifra (27 px) no caben de lado en 80 px, y las dos bandas caben en la franja superior de 24 px que deja la corona; el nombre ya no llega truncado. «Multifurcacion» no cabe en una linea de la corona, asi que va en dos («Multifu» y «rcacion»): la zona de rotulo ocupa 48 px y 24 px de alto sobre la corona, y la cifra se queda a su derecha con 26 px.
+- label: 2,4,86,24
+- figure: 110,6,30,12
+- note: Variante «peine de la multifurcacion» de la familia Decisión: los cinco dientes son exactamente las cinco salidas (0,40), (36,40), (72,40), (108,40) y (144,40) y la entrada sigue en el borde superior (72,0). El peine crece a 144×40 porque el nombre entero tiene que caber en una linea sobre la corona: «Multifurcacion» mide 75,6 px y la zona de rotulo mide 86 px (84 px utiles), de modo que el nombre ya no se parte. Los cinco dientes se separan 36 px en vez de 20, y la corona crece con ellos; el rotulo va a la izquierda (86 px) y la cifra a la derecha (30 px), con 22 px de corona libre entre los dos. La clase es de 20 px de alto en el catálogo, pero el peine necesita sitio para sus dos bandas de texto, así que la entrega usa una huella dibujada de 144×40 (la app dibuja el nodo con 32 px de alto mínimo, y aquí hacen falta 40 para que el rótulo y la cifra no se pisen).
 
 ## MultifurcacionP
 - family: Decisión
 - variant: peine de la multifurcacion
-- footprint: 80x40
+- footprint: 144x40
 - ports: Entrada@50%,0% ; Salida1@0%,100% ; SalidaProb2@25%,100% ; SalidaProb3@50%,100% ; SalidaProb4@75%,100% ; SalidaProb5@100%,100%
-- path: M2 0 H78 L80 40 L70 30 L60 40 L50 30 L40 40 L30 30 L20 40 L10 30 L0 40 Z
-- details: M56 4.5 H72 ; M64.5 4.5 A2.5 2.5 0 1 1 59.5 4.5 A2.5 2.5 0 1 1 64.5 4.5 Z
-- label: 2,6,48,24
-- figure: 50,9,26,10
-- note: Variante «peine de la multifurcacion», la misma silueta de la otra multifurcación: lo que la distingue es el raíl y la perilla del parámetro sobre la corona, y no un nombre distinto; las cinco salidas y la entrada tienen las mismas anclas del catálogo, y también se entrega sobre la huella dibujada de 80×40 (la clase es de 20 px), con el texto en banda propia sobre la corona por lo mismo que en la otra multifurcación, y el raíl y la perilla aparte, en la esquina superior izquierda, sobre la banda, para que no se pisen con el rótulo. «MultifurcacionP» va en dos lineas («Multifu» y «rcacionP»): la zona de rotulo ocupa 48 px y 24 px de alto sobre la corona, la cifra se queda a su derecha con 26 px, y el raíl y la perilla del parametro quedan en la esquina, sobre la banda.
+- path: M2 0 H142 L144 40 L126 30 L108 40 L90 30 L72 40 L54 30 L36 40 L18 30 L0 40 Z
+- details: M92 4.5 H108 ; M100 4.5 A2.5 2.5 0 1 1 95 4.5 A2.5 2.5 0 1 1 100 4.5 Z
+- label: 2,4,86,24
+- figure: 110,6,30,12
+- note: Variante «peine de la multifurcacion», la misma silueta de la otra multifurcación: lo que la distingue es el raíl y la perilla del parámetro sobre la corona, y no un nombre distinto; las cinco salidas y la entrada tienen las mismas anclas del catálogo, y también se entrega sobre la huella dibujada de 144×40 (la clase es de 20 px), con el texto en banda propia sobre la corona por lo mismo que en la otra multifurcación. «MultifurcacionP» mide 81 px y la zona de rotulo mide 86 px (84 px utiles), así que también cabe entero en una linea. El raíl y la perilla van en la corona libre que queda entre el rotulo y la cifra (x=92..108), con 4 px de aire al rotulo y 2 px a la cifra, que es lo que la regla de los trazos interiores pide (§2.5).
 
 ## Split
 - family: Decisión
@@ -199,9 +199,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0% ; Salida1@50%,86% ; Salida2@100%,20%
 - path: M0 10 L10 0 H90 L100 10 V36 H0 Z M43 43 A7 7 0 1 1 57 43 A7 7 0 1 1 43 43 Z
 - details: M8 31 H92 ; M12 33 V36 M18 33 V36 M24 33 V36
-- label: 8,6,40,24
+- label: 8,4,40,24
 - figure: 67,16,30,11
-- note: Variante «cuerpo achaflanado con burbuja»: igual que RemoveMe, con las tres rayas del contador bajo la línea de la lista, que dicen «N en lugar de uno»; la salida (50,43) sigue en el centro de la burbuja, que por eso se dibuja centrada en el ancla (excepción de §3.1), y las anclas de la entrada (50,0) y de la salida lateral (100,10) son las del catálogo. «RemoveNumber» no cabe en una linea del cuerpo, asi que va en dos («Remove» y «Number»), la zona de rotulo sube a 24 px de alto por encima de la linea de la lista, y la cifra conserva su sitio y su ancho.
+- note: Variante «cuerpo achaflanado con burbuja»: igual que RemoveMe, con las tres rayas del contador bajo la línea de la lista, que dicen «N en lugar de uno»; la salida (50,43) sigue en el centro de la burbuja, que por eso se dibuja centrada en el ancla (excepción de §3.1), y las anclas de la entrada (50,0) y de la salida lateral (100,10) son las del catálogo. «RemoveNumber» no cabe en una linea del cuerpo, asi que va en dos («Remove» y «Number»), la zona de rotulo sube a 24 px de alto y sube a y=4 para dejar 3 px de aire a la linea de la lista (y=31), que es lo que la regla de los trazos interiores pide (§2.5), y la cifra conserva su sitio y su ancho.
 
 ## RemoveTrans
 - family: Grupo
@@ -210,9 +210,9 @@ Los footprints y las anclas de puerto salen de `odd/tasks/forma-bloques-diseno/p
 - ports: Entrada1@50%,0% ; Salida1@50%,86% ; Salida2@100%,20%
 - path: M0 10 L10 0 H90 L100 10 V36 H0 Z M43 43 A7 7 0 1 1 57 43 A7 7 0 1 1 43 43 Z
 - details: M8 31 H92 ; M14 35 L26 32
-- label: 8,6,40,24
+- label: 8,4,40,24
 - figure: 67,16,30,11
-- note: Variante «cuerpo achaflanado con burbuja»: el mismo cuerpo de RemoveMe con una sola raya diagonal bajo la línea, la transacción concreta que sale del grupo; la entrada sube por el borde superior (50,0), la salida lateral por el borde derecho (100,10) y la otra salida queda en el centro de la burbuja, dibujada centrada en el ancla (excepción de §3.1). «RemoveTrans» no cabe en una linea del cuerpo, asi que va en dos («Remove» y «Trans»), la zona de rotulo sube a 24 px de alto por encima de la linea de la lista, y la cifra conserva su sitio y su ancho.
+- note: Variante «cuerpo achaflanado con burbuja»: el mismo cuerpo de RemoveMe con una sola raya diagonal bajo la línea, la transacción concreta que sale del grupo; la entrada sube por el borde superior (50,0), la salida lateral por el borde derecho (100,10) y la otra salida queda en el centro de la burbuja, dibujada centrada en el ancla (excepción de §3.1). «RemoveTrans» no cabe en una linea del cuerpo, asi que va en dos («Remove» y «Trans»), la zona de rotulo sube a 24 px de alto y sube a y=4 para dejar 3 px de aire a la linea de la lista (y=31), que es lo que la regla de los trazos interiores pide (§2.5), y la cifra conserva su sitio y su ancho.
 
 ## Assemble
 - family: Grupo

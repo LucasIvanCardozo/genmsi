@@ -892,7 +892,7 @@ mod tests {
         assert_eq!(footprint("Test"), (64, 64));
         assert_eq!(footprint("Generate"), (120, 63));
         assert_eq!(footprint("Queue"), (97, 32));
-        assert_eq!(footprint("Multifurcacion"), (80, 40));
+        assert_eq!(footprint("Multifurcacion"), (144, 40));
         assert_eq!(footprint("Terminate"), (64, 64));
         assert!(
             document

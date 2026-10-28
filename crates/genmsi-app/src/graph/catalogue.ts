@@ -127,6 +127,15 @@ export function groupByFamily(
  */
 export const THUMBNAIL_BOX = { width: 56, height: 28 } as const;
 
+/**
+ * The room the border of the silhouette needs inside the box.
+ *
+ * The outline is drawn centred on the line of the shape, so half of it
+ * falls outside. Without this room, the border is cut flat on the four
+ * sides of the thumbnail.
+ */
+export const THUMBNAIL_MARGIN = 2;
+
 /** What the list draws for a class: its silhouette, scaled into the box. */
 export interface Thumbnail {
   /** The `d` of the silhouette, in the coordinates of the footprint. */
@@ -163,10 +172,12 @@ export function thumbnailOf(className: string): Thumbnail | null {
     return null;
   }
   const { width, height } = shape.footprint;
-  const scale = Math.min(
-    THUMBNAIL_BOX.width / width,
-    THUMBNAIL_BOX.height / height,
-  );
+  // The border of the silhouette is drawn centred on its own line, so the
+  // half that falls outside the shape needs room: without it, the outline
+  // is cut flat on the four sides of the box.
+  const usableWidth = THUMBNAIL_BOX.width - 2 * THUMBNAIL_MARGIN;
+  const usableHeight = THUMBNAIL_BOX.height - 2 * THUMBNAIL_MARGIN;
+  const scale = Math.min(usableWidth / width, usableHeight / height);
   const scaledWidth = width * scale;
   const scaledHeight = height * scale;
   return {
@@ -175,8 +186,8 @@ export function thumbnailOf(className: string): Thumbnail | null {
     scale,
     width: scaledWidth,
     height: scaledHeight,
-    offsetX: (THUMBNAIL_BOX.width - scaledWidth) / 2,
-    offsetY: (THUMBNAIL_BOX.height - scaledHeight) / 2,
+    offsetX: THUMBNAIL_MARGIN + (usableWidth - scaledWidth) / 2,
+    offsetY: THUMBNAIL_MARGIN + (usableHeight - scaledHeight) / 2,
     stroke: familyColors(shape.family).borde,
   };
 }

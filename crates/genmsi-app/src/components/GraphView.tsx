@@ -30,6 +30,7 @@ import {
   FIGURE_SIZE,
   LABEL_SIZE,
   PORT_SIZE,
+  STROKE_MARGIN,
   captionBaseline,
   captionFits,
   captionText,
@@ -238,11 +239,16 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
           stroke. */}
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full"
-        viewBox={`0 0 ${width} ${height}`}
+        viewBox={`0 0 ${width + 2 * STROKE_MARGIN} ${height + 2 * STROKE_MARGIN}`}
         preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label={data.subtitle !== "" ? `${data.title} ${data.subtitle}` : data.title}
       >
+        {/* The whole drawing lives in the footprint of the class, and the
+            group carries it the room the border needs: the outline is
+            drawn centred on the line of the shape, so without that margin
+            its outer half is cut by the box. */}
+        <g transform={`translate(${STROKE_MARGIN} ${STROKE_MARGIN})`}>
         <defs>
           <clipPath id={`label-${clip}`}>
             <rect
@@ -329,6 +335,7 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
             {text}
           </text>
         )}
+        </g>
       </svg>
       {/* The ports, each one at the anchor the shape declares: the flow
           leaves the block by the very point the original editor put it. */}
@@ -340,8 +347,8 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
           id={String(port.ioid)}
           title={port.name}
           style={{
-            left: `${port.x * width}px`,
-            top: `${port.y * height}px`,
+            left: `${STROKE_MARGIN + port.x * width}px`,
+            top: `${STROKE_MARGIN + port.y * height}px`,
             right: "auto",
             bottom: "auto",
             transform: "translate(-50%, -50%)",
@@ -361,8 +368,8 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
           id={String(port.ioid)}
           title={port.name}
           style={{
-            left: `${port.x * width}px`,
-            top: `${port.y * height}px`,
+            left: `${STROKE_MARGIN + port.x * width}px`,
+            top: `${STROKE_MARGIN + port.y * height}px`,
             right: "auto",
             bottom: "auto",
             transform: "translate(-50%, -50%)",

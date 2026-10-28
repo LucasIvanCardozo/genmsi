@@ -79,6 +79,15 @@ export interface NodeSize {
   height: number;
 }
 
+/**
+ * The room the border of the silhouette needs inside the box of the block.
+ *
+ * The outline is drawn centred on the line of the shape, so the half that
+ * falls outside is cut by the box of the drawing. Two pixels on each side
+ * leave the whole border visible.
+ */
+export const STROKE_MARGIN = 2;
+
 /** How a class of block is drawn. */
 export interface BlockDrawing {
   /** The shape of the class, or `undefined` when the class is unknown. */
@@ -220,7 +229,13 @@ export function nodeSizeOf(className: string, container = false): NodeSize | nul
   if (shape === undefined) {
     return null;
   }
-  return { width: shape.footprint.width, height: shape.footprint.height };
+  // The border of the silhouette is drawn centred on its own line, so half
+  // of it falls outside the shape: the box of the block leaves that room,
+  // or the outline is cut flat on the four sides.
+  return {
+    width: shape.footprint.width + 2 * STROKE_MARGIN,
+    height: shape.footprint.height + 2 * STROKE_MARGIN,
+  };
 }
 
 /**

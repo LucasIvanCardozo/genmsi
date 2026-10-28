@@ -22,6 +22,7 @@ import {
   labelHeight,
   labelLines,
   nodeSizeOf,
+  STROKE_MARGIN,
   portPlacements,
   sideOf,
   type FootprintZone,
@@ -206,13 +207,31 @@ test("the node of a block is the footprint of its class, one to one", () => {
     assert.ok(size !== null, `the class ${className} has a size`);
     // The shape is the truth: the block is drawn at the size of its class,
     // with its own proportion, and never scaled.
-    assert.equal(size.width, shape.footprint.width, `${className}: the width is the footprint`);
-    assert.equal(size.height, shape.footprint.height, `${className}: the height is the footprint`);
-    // And the drawing of the block is that very size.
+    // The box of the block is the footprint of the class plus the room the
+    // border needs: the outline is drawn centred on the line of the shape,
+    // so without that margin its outer half is cut.
+    assert.equal(
+      size.width,
+      shape.footprint.width + 2 * STROKE_MARGIN,
+      `${className}: the width is the footprint and the room of the border`,
+    );
+    assert.equal(
+      size.height,
+      shape.footprint.height + 2 * STROKE_MARGIN,
+      `${className}: the height is the footprint and the room of the border`,
+    );
+    // And the drawing of the block is that very silhouette, drawn inside
+    // the box with the room of the border around it.
     const drawing = drawingOf(className);
     assert.ok(drawing.shape !== undefined);
-    assert.equal(drawing.shape.footprint.width, size.width);
-    assert.equal(drawing.shape.footprint.height, size.height);
+    assert.equal(
+      drawing.shape.footprint.width + 2 * STROKE_MARGIN,
+      size.width,
+    );
+    assert.equal(
+      drawing.shape.footprint.height + 2 * STROKE_MARGIN,
+      size.height,
+    );
   }
 });
 
@@ -224,8 +243,8 @@ test("the size of the block does not depend on the box the model carries", () =>
   assert.ok(shape !== undefined, "the class Note has a shape");
   const size = nodeSizeOf("Note");
   assert.ok(size !== null);
-  assert.equal(size.width, shape.footprint.width);
-  assert.equal(size.height, shape.footprint.height);
+  assert.equal(size.width, shape.footprint.width + 2 * STROKE_MARGIN);
+  assert.equal(size.height, shape.footprint.height + 2 * STROKE_MARGIN);
   // A class that is not square keeps its own proportion: nothing is
   // stretched to the box of the model.
   const wide = nodeSizeOf("Variable");

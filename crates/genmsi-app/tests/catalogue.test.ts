@@ -13,6 +13,7 @@ import {
   NAME_SIZE,
   PANEL_WIDTH,
   THUMBNAIL_BOX,
+  THUMBNAIL_MARGIN,
   fitName,
   fitTitle,
   groupByFamily,
@@ -189,10 +190,13 @@ test("the thumbnail of a square class fills the height of the box", () => {
   const footprint = BLOCK_SHAPES.Test.footprint;
   assert.equal(footprint.width, 64);
   assert.equal(footprint.height, 64);
-  assert.equal(thumb.height, THUMBNAIL_BOX.height);
-  assert.equal(thumb.width, THUMBNAIL_BOX.height);
-  assert.equal(thumb.offsetY, 0);
-  assert.equal(thumb.offsetX, (THUMBNAIL_BOX.width - THUMBNAIL_BOX.height) / 2);
+  // The square class fills the box that is left once the border has its
+  // room: without that margin the outline is cut flat on the four sides.
+  const usable = THUMBNAIL_BOX.height - 2 * THUMBNAIL_MARGIN;
+  assert.equal(thumb.height, usable);
+  assert.equal(thumb.width, usable);
+  assert.equal(thumb.offsetY, THUMBNAIL_MARGIN);
+  assert.equal(thumb.offsetX, THUMBNAIL_MARGIN + (THUMBNAIL_BOX.width - 2 * THUMBNAIL_MARGIN - usable) / 2);
 });
 
 test("the thumbnail of the list is the box of the helper", () => {

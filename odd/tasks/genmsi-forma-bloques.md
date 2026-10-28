@@ -706,7 +706,8 @@ dibuja los 66 bloques).
 | T21 | S2, S8, S9 | La forma se dibuja a su tamano: ni encogida ni recortada | delegada | hecha (`9919eda`) |
 | T22 | S2, S8 | El diseno: la zona de texto de cada clase abriga su nombre | delegada | hecha (`64536bb`) |
 | T23 | S3 | Las miniaturas de la lista, de 40x20 a 56x28 | delegada | hecha (`d2dc248`) |
-| T24 | S10 | El banco de pruebas: el modelo con las 66 clases | inline | hecha |
+| T24 | S10 | El banco de pruebas: el modelo con las 66 clases | inline | hecha (`c05587b`) |
+| T25 | S2, S3 | El aire de la caja: el borde completo, en el lienzo y en la miniatura | inline | hecha (`4bbc3de`) |
 
 - L39 — **La entrega: ocho commits, y la feature se cierra.** Cada commit
   compila y pasa sus tests por si solo, y la tabla de la entrega dice el
@@ -753,6 +754,18 @@ dibuja los 66 bloques).
   con la geometria vieja de los modelos y no se podia judging nada. Con el,
   la causa salio a la vista en una captura.
 
+- L41 — **El borde completo.** El lector vio que las figuras se veian
+  cortadas por los cuatro costados, en el lienzo y en la lista. La causa
+  era del dibujo, no del diseno: el contorno se dibuja **centrado sobre la
+  linea** de la forma, asi que la mitad exterior cae fuera de la caja y la
+  caja la recorta. Toda figura cuyo contorno tocara el borde de su huella
+  salia con los lados planos, como un trozo de algo.
+
+  El arreglo: la caja del bloque y la de la miniatura dejan **2 px de aire**
+  para el borde, y la figura se dibuja uno a uno dentro. El nodo crece 4 px
+  (2 por lado) y los puertos se desplazan con el, porque la posicion de un
+  puerto es su ancla dentro de la huella.
+
 ## Entrega — las unidades de revisión
 
 La rama `feature/genmsi-forma-bloques` nace de `feature/genmsi-reordenamiento`,
@@ -774,6 +787,7 @@ compila y pasa sus tests por sí solo.
 | `64536bb` | el diseño: el nombre de cada clase, escrito entero |
 | `9919eda` | la app: la figura se dibuja a su tamaño |
 | `d2dc248` | las miniaturas de la lista, de 40x20 a 56x28 |
+| `4bbc3de` | el aire de la caja, para que el borde no se recorte |
 
 **El orden de la revisión.** El motor va antes que la app porque la app
 dibuja con la huella que el motor publica; la forma va antes que el nodo

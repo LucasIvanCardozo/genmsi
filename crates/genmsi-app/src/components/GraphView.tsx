@@ -34,6 +34,7 @@ import {
   captionBaseline,
   captionFits,
   captionLayout,
+  containerPair,
   drawingOf,
   figureLayout,
   figureText,
@@ -115,6 +116,11 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
   // The figure of the block: the number of the entity it operates on, or the
   // pair of always.
   const figure = useBlockFigure(Number(id));
+  // A container is not a block of the listing: its figures are computed, and
+  // it shows the pair of its own —the entities inside it and the ones that
+  // went through it— even when it is empty.
+  const shown =
+    data.kind === "C" ? containerPair(counts) : figureText(figure, counts);
   // The dash of an empty figure only says something while the run plays.
   const running = useRunHasPublished();
   const clip = useId().replace(/[^a-zA-Z0-9_-]/g, "");
@@ -156,7 +162,7 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
       ? null
       : figureLayout(
           figureZone,
-          running ? figureZoneText(figureText(figure, counts), figureZone) : "",
+          running ? figureZoneText(shown, figureZone) : "",
         );
 
   return (

@@ -4,7 +4,7 @@ import { advance, advanceClock, clockWithCrossings, frameAt, stateAt, type Repla
 import { useApp } from "../state/store";
 import { FLIGHT_SECONDS, MIN_WALL_FLIGHT, travellersAt, type Move } from "../monitor/balls";
 import { graphOf, routeFor, routesOf } from "../graph/graph";
-import { countsOf } from "../monitor/counts";
+import { countsOf, countsWithContainers, crossingsOf } from "../monitor/counts";
 import { figureBlockOf, figuresOf } from "../monitor/figures";
 import { useLive, type LiveBall, type LiveCounts } from "../monitor/live";
 import ClassList from "./ClassList";
@@ -111,12 +111,22 @@ export default function MonitorView({
   // (a facility use expands into several) are added up.
   // The figures of every block: the one of the row that counts it, never the
   // sum of the rows of the block (see `src/monitor/counts.ts`).
+  // The containers have no row of the report —the engine compiles them
+  // inline—, so their figures are computed from the blocks they hold and
+  // from the link their entry door carries.
   const counts = useMemo(() => {
-    if (report === null || state === null) {
+    if (report === null || state === null || model === null) {
       return new Map<number, LiveCounts>();
     }
-    return countsOf(report.blocks, state);
-  }, [report, state]);
+    // The entities that entered each container: the count of the moves
+    // that crossed its border, up to the time the replay has reached.
+    const crossings = crossingsOf(
+      model,
+      transitions?.moves ?? [],
+      state.time,
+    );
+    return countsWithContainers(report.blocks, state, model, crossings);
+  }, [report, state, model, transitions]);
 
   // The links of the model: the canvas draws the ones of the scope the
   // reader is in, and an entity travels over the one that carries its move.
@@ -191,6 +201,7 @@ export default function MonitorView({
     figures: state?.figures ?? null,
     report,
     blocks: figureBlocks,
+    model,
   });
   live.current = {
     counts,
@@ -201,6 +212,7 @@ export default function MonitorView({
     figures: state?.figures ?? null,
     report,
     blocks: figureBlocks,
+    model,
   };
 
   // The clock of the replay: the time the run has reached, kept up to date
@@ -326,7 +338,13 @@ export default function MonitorView({
             ? advance(prevState, monitor, prev, frame)
             : stateAt(monitor, frame);
         stateRef.current = nextState;
-        live.current.counts = countsOf(report.blocks, nextState);
+        // The figures of the containers are computed with the ones of the
+        // blocks, so they are computed again with every new state.
+        const currentModel = live.current.model;
+        live.current.counts =
+          currentModel === null
+            ? countsOf(report.blocks, nextState)
+            : countsWithContainers(report.blocks, nextState, currentModel);
         live.current.figures = nextState.figures;
       }
 

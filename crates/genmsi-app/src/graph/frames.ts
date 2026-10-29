@@ -140,6 +140,11 @@ export function containerShape(size: FrameSize, ports: FramePorts): BlockShape {
     size,
     [...ports.inputs, ...ports.outputs],
     "the container is a block and not a frame around the blocks it holds: it has a box of its own, the one the model gives it, and the children of the container live in the scope of the container, not inside this box. The name of the container is its caption and the word «Contenedor» goes under it.",
+    // The container shows its figures —the entities inside it and the ones
+    // that went through it—, so the zone of the figure is always reserved,
+    // even when the plate is too small for it on its own: the figures of a
+    // container are the whole point of showing them.
+    true,
   );
 }
 
@@ -191,6 +196,7 @@ export function plainShape(size: FrameSize): BlockShape {
     size,
     [],
     "the plain plate of a block whose class the catalogue does not know: the canvas never breaks because of a class it has never heard of, and the block keeps the box the model gives it.",
+    false,
   );
 }
 
@@ -206,16 +212,18 @@ export function plainShape(size: FrameSize): BlockShape {
  * @param size the footprint of the silhouette, in pixels
  * @param ports the ports of the plate, with their anchors
  * @param note why the plate looks the way it looks
+ * @param reserveFigure whether the zone of the figure is always reserved
  */
 function plateShape(
   family: Family,
   size: FrameSize,
   ports: PortAnchor[],
   note: string,
+  reserveFigure: boolean,
 ): BlockShape {
   const width = Math.max(1, Math.round(size.width));
   const height = Math.max(1, Math.round(size.height));
-  const zones = plateZones(width, height);
+  const zones = plateZones(width, height, reserveFigure);
   return {
     family,
     variant: "rounded plate",
@@ -236,15 +244,22 @@ function plateShape(
  * under it — so the zone of the name is as tall as they are. The figure
  * only has a place when there is room for it beside the name: a zone that
  * does not fit is not reserved, and the hole it would leave is better than
- * a figure written over the name.
+ * a figure written over the name. The container asks for the zone anyway:
+ * it shows its figures, and the hole of a figure that does not fit is
+ * better than a container that cannot say how many entities it holds.
  */
-function plateZones(width: number, height: number): { label: Zone; figure: Zone | null } {
+function plateZones(
+  width: number,
+  height: number,
+  reserveFigure = false,
+): { label: Zone; figure: Zone | null } {
   // Two lines of text: the name of the block and the caption under it.
   const labelHeight = Math.max(1, Math.min(24, height - PLATE_AIR));
   // The room the figure takes beside the name, and the name that has to
   // stay whole for the figure to have a place at all.
   const room = FIGURE_WIDTH + 6;
-  const hasFigure = width - PLATE_AIR * 2 - room >= 40 && height >= 24;
+  const hasFigure =
+    reserveFigure || (width - PLATE_AIR * 2 - room >= 40 && height >= 24);
   const wanted = hasFigure ? width - PLATE_AIR * 2 - room : width - PLATE_AIR * 2;
   // The zone of the name stays inside the plate, whatever the plate is: a
   // plate too small for the air of the design keeps the air it has.
@@ -252,6 +267,9 @@ function plateZones(width: number, height: number): { label: Zone; figure: Zone 
   const top = Math.min(PLATE_AIR - 2, Math.max(0, height - 1));
   const labelWidth = Math.max(1, Math.min(wanted, width - left));
   const labelHeightInside = Math.max(1, Math.min(labelHeight, height - top));
+  // The zone of the figure is inside the plate too: a plate too small for
+  // the whole figure keeps the part of it that fits.
+  const figureLeft = Math.max(0, width - PLATE_AIR - FIGURE_WIDTH);
   return {
     label: {
       x: left,
@@ -261,9 +279,9 @@ function plateZones(width: number, height: number): { label: Zone; figure: Zone 
     },
     figure: hasFigure
       ? {
-          x: width - PLATE_AIR - FIGURE_WIDTH,
+          x: figureLeft,
           y: top,
-          width: FIGURE_WIDTH,
+          width: Math.max(1, Math.min(FIGURE_WIDTH, width - figureLeft)),
           height: 14,
         }
       : null,

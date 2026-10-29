@@ -517,6 +517,20 @@ export function defaultPair(counts: CountsOfBlock | undefined): string {
 }
 
 /**
+ * The pair of a container: how many entities are inside it, and how many
+ * have gone through it.
+ *
+ * The container is not a block of the listing, so its figures are computed
+ * and not read. Unlike a block of the listing, it shows the pair even when
+ * nothing has gone through it: a container that was just made is empty,
+ * and saying `0/0` is what the reader needs to see — the container is
+ * there, it is simply empty.
+ */
+export function containerPair(counts: CountsOfBlock | undefined): string {
+  return `${counts?.now ?? 0}/${counts?.ever ?? 0}`;
+}
+
+/**
  * The text the zone of the figure shows.
  *
  * The figure of the block comes from the live layer: the number of the

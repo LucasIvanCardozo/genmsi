@@ -565,16 +565,43 @@ CLI y el MCP) y su línea base commiteada; la geometría no entra en la
 simulación (el programa GPSS y el reporte de los modelos de referencia salen
 byte a byte iguales).
 
-### L12 — Lo que queda de esta unidad
+### L12 — El lienzo del ámbito (T6)
+
+El lienzo de un ámbito es una imagen coherente. Medido en la app corriendo
+(`TP10__tp10.gmdl`, alcance 11):
+
+- **Las puertas están junto a su bloque**: la de entrada, 10 px encima del
+  bloque al que apunta su enlace interno; la de salida, 5 px debajo del
+  bloque cuyo enlace termina en el puerto. Antes flotaban en posiciones
+  fijas (`120 + i·180`) y se movían al agregar otra puerta.
+- **Un bloque nuevo cae dentro de la imagen**: en el alcance 11, el bloque
+  nuevo queda en el modelo `(328, 577)`, debajo del bloque más bajo del
+  alcance (505), y **el lienzo lo sigue** (queda dentro de la ventana,
+  sin reencuadrar la imagen).
+- **Un bloque soltado sobre un contenedor entra en ese contenedor**: soltado
+  sobre la caja del contenedor 1 en la raíz, el bloque nuevo pertenece al
+  contenedor 1 y queda en `(63, 580)`.
+- **Arrastrar mueve sólo al bloque arrastrado**: el origen del ámbito sirve
+  para medir, no para desplazar el dibujo (el encuadre absorbe el
+  desplazamiento; desplazarlo hacía que arrastrar el bloque de la esquina
+  moviera todo el ámbito).
+
+El dibujo de los 66 bloques de actividad queda **idéntico**: el diferencial
+del DOM (silueta, texto, puertos, caja y anillo de cada nodo) da 66/66
+nodos iguales.
+
+### L13 — Lo que queda de esta unidad
 
 - **S2** (las cifras del contenedor y de sus puertas) queda sin hacer: el
   dato ya está publicado (los pares de cada enlace) pero contarlo y
   publicarlo es otra unidad, con `src/monitor/counts.ts` y un lugar donde
   escribirlo.
-- **La posición de las puertas** (hoy fijas en el código) y el **marco del
-  ámbito** como marco visible siguen siendo de otra unidad: las puertas
-  todavía son cajas sueltas en posiciones fijas (`120 + i·180, 30` y
-  `120 + i·180, 420`), y el contenido del ámbito se ve en las coordenadas
-  absolutas del modelo, no relativizado a su marco.
+- **El marco del contenedor en la lienzo del padre** sigue siendo el que
+  el modelo trae (una caja de bloque, como en los modelos de referencia):
+  cuando su contenido cambia, la caja se recalcula recién en el próximo
+  *Reacomodar*.
 - **El reordenamiento por alcance ya está** (T2 + T3): dentro de un
   contenedor se reacomoda lo que se está viendo y nada más.
+- **El lienzo del ámbito ya está** (T6): las puertas junto a su bloque, el
+  bloque nuevo dentro de la imagen, la caída dentro del contenedor y la
+  vista que sigue al bloque nuevo.

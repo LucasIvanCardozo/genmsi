@@ -405,6 +405,7 @@ export function containerAt(
  */
 const COSMETIC_COMMANDS: ReadonlySet<string> = new Set([
   "moveBlock",
+  "movePort",
   "setLayouts",
   "setCaption",
 ]);

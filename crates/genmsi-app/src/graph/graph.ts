@@ -12,7 +12,7 @@
  * - the **origin** of a scope and the **place of its doors**: a scope is a
  *   canvas of its own, its free spot is measured from its corner, and the
  *   doors of a container are drawn beside the block they join
- *   (`scopeOrigin`, `scopeBlocks`, `doorPlacement`, `freeSpotOf`);
+ *   (`scopeOrigin`, `scopeBlocks`, `doorPlace`, `freeSpotOf`);
  * - which **link** of a scope carries a move of the trace, so the entity
  *   that travels is seen crossing the border of a container (`routesOf`);
  * - where the **ports** of a block sit, so a link leaves the block by the
@@ -183,117 +183,80 @@ export function scopeOrigin(model: ModelBody, scope: number): Point {
 }
 
 /**
- * The air between a door and the block it joins, in pixels.
+ * The air between two doors that have no place yet, in pixels.
  *
- * The door and the block are neighbours, not one thing on top of the
- * other: the link that joins them is drawn between the two, and it needs
- * the room to be seen.
+ * Two doors never share a place: the reader has to be able to tell them
+ * apart.
  */
 export const DOOR_GAP = 8;
 
 /**
- * The place of a door of a container, and the block it joins.
- */
-export interface DoorPlacement {
-  /** Where the door goes, in the pixels of the model. */
-  position: Point;
-  /**
-   * The block the door joins, or `null` when the scope has no block to
-   * join it to.
-   */
-  joins: number | null;
-}
-
-/**
- * The block a door of a container joins.
+ * The place of a door of a container.
  *
- * The entry door joins the block its internal link points at: the link of
- * the scope that goes from the port to that block. The exit door joins the
- * block whose link ends at the port. When several links end at the port,
- * the first one of the model is the one the door joins: the door is one
- * door, and the picture cannot show it twice.
+ * The model carries it: the composition of the scope gave the door its
+ * place, and the reader may have dragged it since. A door that has no
+ * place yet —a new one— goes to the free spot of the scope, under the
+ * doors that are already there: two doors never share a place.
  */
-function joinedBlock(
+export function doorPlace(
   model: ModelBody,
   scope: number,
   kind: "PortIn" | "PortOut",
   ioid: number,
-): ModelBlock | null {
-  for (const edge of model.edges) {
-    if (edge.container !== scope) {
+): Point {
+  const container = model.blocks.find((block) => block.id === scope);
+  const inputs = container?.inputs ?? [];
+  const outputs = container?.outputs ?? [];
+  const port = (kind === "PortIn" ? inputs : outputs).find(
+    (candidate) => candidate.ioid === ioid,
+  );
+  if (port?.layout != null) {
+    return { x: port.layout.x, y: port.layout.y };
+  }
+  // The door has no place yet: it goes under the doors of its own kind
+  // that have one, or to the free spot of the scope when none of them has.
+  const base =
+    lowestDoorPlace(model, scope, kind) ?? freeSpotOf(model, scope).position;
+  // And under the doors that already took that place: two doors never
+  // share a place.
+  const withoutPlace = [
+    ...inputs.map((candidate) => ({ kind: "PortIn" as const, port: candidate })),
+    ...outputs.map((candidate) => ({ kind: "PortOut" as const, port: candidate })),
+  ].filter((door) => door.port.layout == null);
+  const index = withoutPlace.findIndex(
+    (door) => door.kind === kind && door.port.ioid === ioid,
+  );
+  return {
+    x: base.x,
+    y: base.y + DOOR_GAP + index * (DOOR_BOX.height + DOOR_GAP),
+  };
+}
+
+/**
+ * The place under the lowest door of the scope that has one.
+ *
+ * A door that has no place yet goes below the doors of its own kind that
+ * have one: the reader sees them apart, and none of them sits on top of
+ * another.
+ */
+function lowestDoorPlace(
+  model: ModelBody,
+  scope: number,
+  kind: "PortIn" | "PortOut",
+): Point | null {
+  const container = model.blocks.find((block) => block.id === scope);
+  const doors = kind === "PortIn" ? container?.inputs ?? [] : container?.outputs ?? [];
+  let lowest: Point | null = null;
+  for (const door of doors) {
+    const layout = door.layout;
+    if (layout === null) {
       continue;
     }
-    if (kind === "PortIn") {
-      if (edge.from_module !== scope || edge.from_ioid !== ioid) {
-        continue;
-      }
-      const block = model.blocks.find((candidate) => candidate.id === edge.to_module);
-      if (block !== undefined && block.layout !== null) {
-        return block;
-      }
-    } else {
-      if (edge.to_module !== scope || edge.to_ioid !== ioid) {
-        continue;
-      }
-      const block = model.blocks.find((candidate) => candidate.id === edge.from_module);
-      if (block !== undefined && block.layout !== null) {
-        return block;
-      }
+    if (lowest === null || layout.y + layout.height > lowest.y) {
+      lowest = { x: layout.x, y: layout.y + layout.height };
     }
   }
-  return null;
-}
-
-/**
- * The first block of a scope, in the order of the model.
- *
- * It is the block a door with no internal link is drawn beside: the editor
- * lets a port of a container stay without a link, and the door of that port
- * has no block of its own to join.
- */
-function firstBlockOfScope(model: ModelBody, scope: number): ModelBlock | null {
-  return scopeBlocks(model, scope)[0] ?? null;
-}
-
-/**
- * The door of a port of a container: where it goes and the block it joins.
- *
- * The entry door is drawn just **above** the block its internal link points
- * at, and the exit door just **below** the block whose link ends at the
- * port. A port with no internal link is drawn beside the first block of
- * the scope.
- *
- * The door has no place of its own in the model: the place it is drawn at
- * is the place of the block it joins, and nothing else. No door floats in a
- * fixed position, and none of them moves when another door is added.
- *
- * @param model the model of the picture
- * @param scope the container the doors belong to
- * @param kind whether the door is the entry one or the exit one
- * @param ioid the port the door opens or closes
- */
-export function doorPlacement(
-  model: ModelBody,
-  scope: number,
-  kind: "PortIn" | "PortOut",
-  ioid: number,
-): DoorPlacement {
-  const joined = joinedBlock(model, scope, kind, ioid);
-  const anchor = joined ?? firstBlockOfScope(model, scope);
-  if (anchor === null || anchor.layout === null) {
-    // The scope has no block to draw the door beside: the door goes to the
-    // corner of the scope, which is the only place the picture has.
-    return { position: { x: 0, y: 0 }, joins: null };
-  }
-  const layout = anchor.layout;
-  // The door is centred on the block it joins, so the link between the two
-  // is a straight line and the reader sees which block the door feeds.
-  const x = layout.x + (layout.width - DOOR_BOX.width) / 2;
-  const y =
-    kind === "PortIn"
-      ? layout.y - DOOR_BOX.height - DOOR_GAP
-      : layout.y + layout.height + DOOR_GAP;
-  return { position: { x, y }, joins: anchor.id };
+  return lowest;
 }
 
 /**
@@ -430,15 +393,15 @@ export function graphOf(
   // When inside a container, project its declared inputs and outputs as boundary port nodes
   if (parentContainer !== null) {
     for (const port of parentContainer.inputs) {
-      // The door is drawn beside the block it joins: the entry door goes
-      // just above the block its internal link points at.
-      const door = doorPlacement(model, scope, "PortIn", port.ioid);
+      // The door is drawn where the model puts it: the composition of the
+      // scope gave it its place, and the reader may have dragged it.
+      const place = doorPlace(model, scope, "PortIn", port.ioid);
       nodes.push({
         id: `in-${port.ioid}`,
         type: "bloque",
         position: {
-          x: door.position.x,
-          y: door.position.y,
+          x: place.x,
+          y: place.y,
         },
         data: {
           title: port.name || `Entrada ${port.ioid}`,
@@ -457,15 +420,14 @@ export function graphOf(
     }
 
     for (const port of parentContainer.outputs) {
-      // The exit door goes just below the block whose link ends at the
-      // port.
-      const door = doorPlacement(model, scope, "PortOut", port.ioid);
+      // The exit door is drawn where the model puts it, like the entry one.
+      const place = doorPlace(model, scope, "PortOut", port.ioid);
       nodes.push({
         id: `out-${port.ioid}`,
         type: "bloque",
         position: {
-          x: door.position.x,
-          y: door.position.y,
+          x: place.x,
+          y: place.y,
         },
         data: {
           title: port.name || `Salida ${port.ioid}`,

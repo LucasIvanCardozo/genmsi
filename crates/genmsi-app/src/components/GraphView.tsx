@@ -347,6 +347,14 @@ export interface GraphActions {
   onSelect: (ids: number[]) => void;
   /** The user moved a block. */
   onMove: (id: number, x: number, y: number) => void;
+  /** The user moved a door of a container. */
+  onMovePort: (
+    container: number,
+    ioid: number,
+    input: boolean,
+    x: number,
+    y: number,
+  ) => void;
   /** The user connected two ports. */
   onConnect: (from: number, fromIoid: number, to: number, toIoid: number) => void;
   /** The user removed a block. */
@@ -608,6 +616,19 @@ export default memo(function GraphView({
         }}
         onNodeDragStop={(_event, node) => {
           if (node.id.startsWith("in-") || node.id.startsWith("out-")) {
+            // A door is a block of the picture in its own right: it moves
+            // like one, and its place is kept.
+            const door = /^(in|out)-(\d+)$/.exec(node.id);
+            if (door !== null) {
+              const input = door[1] === "in";
+              actions.onMovePort(
+                containerId,
+                Number(door[2]),
+                input,
+                Math.round(node.position.x),
+                Math.round(node.position.y),
+              );
+            }
             return;
           }
           // The place on the canvas is the place in the model: the picture

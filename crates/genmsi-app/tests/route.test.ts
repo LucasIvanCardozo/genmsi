@@ -69,30 +69,30 @@ function modelOf(): ModelBody {
     blocks: [
       block(1, "Generate", {
         outputs: [
-          { ioid: 1, name: "Salida1", caption: "", label: null },
-          { ioid: 2, name: "Salida2", caption: "", label: null },
+          { ioid: 1, name: "Salida1", caption: "", label: null, layout: null },
+          { ioid: 2, name: "Salida2", caption: "", label: null, layout: null },
         ],
       }),
       block(2, "", {
         kind: "C",
         class: "",
-        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null }],
-        outputs: [{ ioid: 2, name: "Salida1", caption: "", label: null }],
+        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null, layout: null }],
+        outputs: [{ ioid: 2, name: "Salida1", caption: "", label: null, layout: null }],
       }),
       block(3, "Advance", {
         container: 2,
-        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null }],
+        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null, layout: null }],
         outputs: [
-          { ioid: 2, name: "Salida1", caption: "", label: null },
-          { ioid: 3, name: "Salida2", caption: "", label: null },
+          { ioid: 2, name: "Salida1", caption: "", label: null, layout: null },
+          { ioid: 3, name: "Salida2", caption: "", label: null, layout: null },
         ],
       }),
       block(4, "Terminate", {
-        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null }],
+        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null, layout: null }],
       }),
       block(5, "Queue", {
         container: 2,
-        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null }],
+        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null, layout: null }],
       }),
     ],
     edges: [

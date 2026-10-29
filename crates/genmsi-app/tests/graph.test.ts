@@ -12,6 +12,7 @@ import {
   pointOnBezier,
   portSpread,
 } from "../src/graph/graph.ts";
+import { DOOR_BOX } from "../src/graph/frames.ts";
 import type { ModelBody } from "../src/types/index.ts";
 
 /** A block of the model, as the engine publishes it. */
@@ -54,8 +55,8 @@ test("a block of the model becomes a node of the picture", () => {
     block(1, "Queue", {
       caption: "Cola de espera",
       label: "cola",
-      inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null }],
-      outputs: [{ ioid: 2, name: "Salida1", caption: "", label: null }],
+      inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null, layout: null }],
+      outputs: [{ ioid: 2, name: "Salida1", caption: "", label: null, layout: null }],
     }),
   ]);
   const { nodes } = graphOf(model);
@@ -118,8 +119,8 @@ test("the doors of a container keep their id and join their block", () => {
       kind: "C",
       class: "",
       container: 0,
-      inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null }],
-      outputs: [{ ioid: 1, name: "Salida1", caption: "", label: null }],
+      inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null, layout: null }],
+      outputs: [{ ioid: 1, name: "Salida1", caption: "", label: null, layout: null }],
     }),
   ]);
   const { nodes } = graphOf(model, 10);
@@ -129,11 +130,10 @@ test("the doors of a container keep their id and join their block", () => {
   assert.ok(exit !== undefined, "the exit door is a node");
   assert.equal(entry.data.kind, "PortIn");
   assert.equal(exit.data.kind, "PortOut");
-  // The doors are drawn beside the block they join, and not in a fixed
-  // place: this scope has no block of its own, so its doors go to the
-  // corner of the scope, which is the only place the picture has.
-  assert.deepEqual(entry.position, { x: 0, y: 0 });
-  assert.deepEqual(exit.position, { x: 0, y: 0 });
+  // The doors have no place of their own yet, so they go to the free spot
+  // of the scope, one under the other: two doors never share a place.
+  assert.deepEqual(entry.position, { x: 80, y: 80 + 8 });
+  assert.deepEqual(exit.position, { x: 80, y: 80 + 8 + DOOR_BOX.height + 8 });
   // The handle of a door is the plain id of its port: React Flow resolves
   // an edge by handle id, and a mismatch makes the edge disappear.
   assert.deepEqual(entry.data.outputs, [{ ioid: 1, name: "Entrada1" }]);
@@ -336,8 +336,8 @@ test("graphOf scopes nodes and edges by container", () => {
         kind: "C",
         class: "",
         container: 0,
-        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null }],
-        outputs: [{ ioid: 1, name: "Salida1", caption: "", label: null }],
+        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null, layout: null }],
+        outputs: [{ ioid: 1, name: "Salida1", caption: "", label: null, layout: null }],
       }),
       block(1, "Queue", { container: 0 }),
       // Inside container 10: blocks 2 and 3

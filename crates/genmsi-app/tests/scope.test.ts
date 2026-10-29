@@ -18,13 +18,10 @@ import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
 import type { ViteDevServer } from "vite";
 import {
-  DOOR_GAP,
-  doorPlacement,
   freeSpotOf,
   graphOf,
   scopeOrigin,
 } from "../src/graph/graph.ts";
-import { DOOR_BOX } from "../src/graph/frames.ts";
 import type { ModelBody } from "../src/types/index.ts";
 
 /** A block of the model, as the engine publishes it. */
@@ -106,8 +103,8 @@ function scopeModel(): ModelBody {
         class: "",
         container: 0,
         layout: { x: 50, y: 80, width: 130, height: 45 },
-        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null }],
-        outputs: [{ ioid: 2, name: "Salida1", caption: "", label: null }],
+        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null, layout: null }],
+        outputs: [{ ioid: 2, name: "Salida1", caption: "", label: null, layout: null }],
       }),
       block(11, "Queue", {
         container: 10,
@@ -195,61 +192,50 @@ test("the model keeps the absolute coordinates of the blocks of a scope", () => 
   assert.deepEqual(queue?.layout, { x: 300, y: 400, width: 100, height: 40 });
 });
 
-test("the entry door is drawn above the block its link points at", () => {
+test("a door is drawn where the model puts it", () => {
+  // The door is a block of the picture: the model carries its place, and
+  // the canvas draws it there.
   const model = scopeModel();
-  const door = doorPlacement(model, 10, "PortIn", 1);
-  // The door joins the block the internal link of the scope points at.
-  assert.equal(door.joins, 11);
-  // And it is drawn just above that block, centred on it.
-  const queue = model.blocks.find((block) => block.id === 11);
-  const layout = queue?.layout;
-  assert.ok(layout !== undefined && layout !== null);
-  assert.equal(door.position.y + DOOR_BOX.height + DOOR_GAP, layout.y);
-  assert.equal(
-    door.position.x + DOOR_BOX.width / 2,
-    layout.x + layout.width / 2,
-  );
+  const container = model.blocks.find((block) => block.id === 10);
+  assert.ok(container !== undefined);
+  container.inputs[0].layout = { x: 250, y: 300, width: 140, height: 44 };
+  const { nodes } = graphOf(model, 10);
+  const entry = nodes.find((node) => node.id === "in-1");
+  assert.deepEqual(entry?.position, { x: 250, y: 300 });
 });
 
-test("the exit door is drawn below the block whose link ends at the port", () => {
-  const model = scopeModel();
-  const door = doorPlacement(model, 10, "PortOut", 2);
-  // The door joins the block the flow leaves by.
-  assert.equal(door.joins, 12);
-  // And it is drawn just below that block, centred on it.
-  const leave = model.blocks.find((block) => block.id === 12);
-  const layout = leave?.layout;
-  assert.ok(layout !== undefined && layout !== null);
-  assert.equal(door.position.y, layout.y + layout.height + DOOR_GAP);
-  assert.equal(
-    door.position.x + DOOR_BOX.width / 2,
-    layout.x + layout.width / 2,
-  );
-});
-
-test("the doors of the picture carry the place of the block they join", () => {
+test("a door with no place goes to the free spot of the scope", () => {
+  // A door the reader has not placed yet —a new one— goes to the free
+  // spot of the scope, under the doors that are already there: two doors
+  // never share a place.
   const model = scopeModel();
   const { nodes } = graphOf(model, 10);
   const entry = nodes.find((node) => node.id === "in-1");
   const exit = nodes.find((node) => node.id === "out-2");
-  // The door is drawn where the block it joins says it goes.
-  assert.deepEqual(entry?.position, doorPlacement(model, 10, "PortIn", 1).position);
-  assert.deepEqual(exit?.position, doorPlacement(model, 10, "PortOut", 2).position);
-  // And no door is left floating in a fixed place.
-  assert.notDeepEqual(entry?.position, { x: 120, y: 30 });
-  assert.notDeepEqual(exit?.position, { x: 120, y: 420 });
+  assert.ok(entry !== undefined && exit !== undefined);
+  assert.notDeepEqual(entry.position, exit.position);
+  // And the place of the door is in the canvas of the scope.
+  const spot = freeSpotOf(model, 10).position;
+  assert.deepEqual(entry.position, { x: spot.x, y: spot.y + 8 });
+  assert.equal(exit.position.x, spot.x);
+  assert.ok(exit.position.y > entry.position.y);
 });
 
-test("a door with no internal link goes beside the first block of the scope", () => {
+test("moving a block does not move the doors", () => {
+  // The doors are blocks of their own: moving a block of the scope leaves
+  // the doors where they are.
   const model = scopeModel();
-  // A port the editor left without a link: the door has no block of its
-  // own to join, and it goes beside the first block of the scope.
-  const door = doorPlacement(model, 10, "PortIn", 7);
-  assert.equal(door.joins, 11);
-  assert.deepEqual(door.position, {
-    x: 300 + (100 - DOOR_BOX.width) / 2,
-    y: 400 - DOOR_BOX.height - DOOR_GAP,
-  });
+  const container = model.blocks.find((block) => block.id === 10);
+  assert.ok(container !== undefined);
+  container.inputs[0].layout = { x: 250, y: 300, width: 140, height: 44 };
+  const before = graphOf(model, 10);
+  const queue = model.blocks.find((block) => block.id === 11);
+  assert.ok(queue?.layout !== undefined && queue.layout !== null);
+  queue.layout = { ...queue.layout, x: 320, y: 460 };
+  const after = graphOf(model, 10);
+  const door = (graph: ReturnType<typeof graphOf>) =>
+    graph.nodes.find((node) => node.id === "in-1")?.position;
+  assert.deepEqual(door(after), door(before));
 });
 
 test("the free spot of a scope is in the scope's own space", () => {
@@ -520,7 +506,7 @@ test("a block added inside a container lands inside the picture of the scope", a
 
 test("the canvas follows the block the reader picks in the tree", async () => {
   const model = scopeModel();
-  const shell = new FakeShell(model);
+  new FakeShell(model);
   const { useApp } = await module<{
     useApp: {
       getState: () => AppState;

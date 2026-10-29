@@ -366,7 +366,43 @@ cambiar el tipo de la selección ✗ y el del portapapeles ✗ — y el `.gmdl` 
 admite que las puertas sean módulos ✗ (son `<input>` y `<output>` ✓, no
 módulos ✓), así que la identidad de la puerta tiene que ser de la app ✓.
 
-### L11 — Lo que queda de esta unidad
+### L11 — T7: las cifras del contenedor (hecho)
+
+> "El bloque de contenedor debe mostrar las instancias que estan dentro de el y
+> las totales, como lo hace el advance por ejemplo"
+
+Un contenedor es un bloque de la imagen ✓ y muestra sus cifras como cualquier
+otro ✓: **dentro/pasadas** ✓.
+
+- **Dentro** ✓ = la suma de las cifras de los bloques que el contenedor
+  contiene ✓ (una entidad está en un solo lugar ✓, así que la suma es
+  exacta ✓).
+- **Pasadas** ✓ = la cuenta de los movimientos que cruzaron la frontera del
+  contenedor ✓ (los movimientos del trace ✓ los tiene la app ✓).
+
+El contenedor **no tiene fila en el reporte** ✓ (el motor lo compila
+"inline" ✓), así que su cifra se **calcula** ✓. Y hay una trampa ✓: el total
+del bloque al que apunta la puerta de entrada **no sirve** ✓ — una cola no
+tiene total propio en el replay ✓ — y por eso el contenedor mostraba 0/0 ✓;
+los cruces del trace sí lo dicen ✓.
+
+Medido en la app corriendo (concurso de pesca, al final del replay ✓):
+
+| bloque | lo que muestra |
+|---|---|
+| Organizador (el contenedor 11) | **37/41** ✓ |
+| Generacion de pescadores (el contenedor 1, sin puerta de entrada) | 3/0 ✓ |
+| Espera hasta abrir (un bloque normal) | 0/41 ✓ |
+
+**Lo que falta** ✓: las **puertas** todavía no muestran su total ✓ (la spec
+S2 lo pide ✓: "tanto en el contenedor como en la entrada y la salida debe
+aparecer las entidades en ese bloque como las que pasaron en total por ahi" ✓).
+La cuenta de los cruces ya está ✓ — la puerta de entrada muestra las
+entidades que entraron por ella ✓ y la de salida las que salieron ✓ — pero
+falta llevarla a la puerta ✓, que tiene su propia forma ✓ y su propia zona
+de figura ✓.
+
+### L12 — Lo que queda de esta unidad
 
 - **S2** (que el contenedor y sus puertas muestren cuántas entidades los
   atravesaron) sigue sin hacer: es otra unidad, con `src/monitor/counts.ts` y

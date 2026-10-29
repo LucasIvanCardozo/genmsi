@@ -6,6 +6,7 @@ import type { FileFingerprint, ModelRef } from "../engine/adapter";
 import {
   buildIndex,
   buildTransitions,
+  frameAt,
   type ReplayIndex,
   type TransitionIndex,
 } from "../monitor/replay";
@@ -129,6 +130,8 @@ export interface AppState {
   speed: number;
   /** The blocks the user selected in the graph. */
   selectedBlockIds: number[];
+  /** The container currently shown in the canvas (0 = model root). */
+  activeContainerId: number;
   /** The blocks the user copied. */
   clipboard: number[];
   /** The seed the next run uses. */
@@ -148,6 +151,8 @@ export interface AppState {
   redoStack: EditCommand[];
   /** What the app is doing. */
   status: Status;
+  /** Unique generation token for the active run to prevent race conditions. */
+  runId: number;
   /** Whether the reader asked for the run in flight to stop. */
   cancelling: boolean;
   /** The message of the last notice, if any. */
@@ -235,6 +240,8 @@ export interface AppState {
   dismissSave: () => void;
   /** Take the notice of the last save away. */
   clearSavedMessage: () => void;
+  /** Take the error message away. */
+  clearError: () => void;
   /** Ask the host for the models opened lately. */
   loadRecentModels: () => Promise<void>;
   /** Watch the file the app has open, and reload the model when it changes. */
@@ -244,6 +251,8 @@ export interface AppState {
   /** Ask for the fingerprint of the open file, and reload the model if it
    * changed. */
   checkModelFile: () => Promise<void>;
+  /** Set which container is shown in the canvas. */
+  setActiveContainerId: (id: number) => void;
   /** Reload the model of the disk and run it again. */
   reloadFromDisk: () => Promise<void>;
 }
@@ -316,51 +325,18 @@ function failureOf(
  * The spot stays inside the picture the author left, so the graph does not
  * grow every time a block is added and the view stays readable.
  */
-function freeSpot(model: ModelBody): { x: number; y: number } {
-  const placed = model.blocks.filter((block) => block.layout !== null);
+function freeSpot(model: ModelBody, containerId = 0): { x: number; y: number } {
+  const placed = model.blocks.filter(
+    (block) => block.layout !== null && block.container === containerId && block.id !== 0,
+  );
   if (placed.length === 0) {
-    return { x: 40, y: 40 };
+    return { x: 80, y: 80 };
   }
   const left = Math.min(...placed.map((block) => block.layout?.x ?? 0));
   const bottom = Math.max(
     ...placed.map((block) => (block.layout?.y ?? 0) + (block.layout?.height ?? 0)),
   );
-  return { x: left, y: bottom + 60 };
-}
-
-/**
- * The container a point belongs to.
- *
- * A block dropped inside a container joins it; a block dropped outside any
- * container joins the model root.
- */
-function containerAt(model: ModelBody, x: number, y: number): number {
-  const root = model.blocks.find((block) => block.class === "main");
-  const containers = model.blocks.filter(
-    (block) =>
-      block.kind === "C" &&
-      block.layout !== null &&
-      block.id !== root?.id,
-  );
-  const hits = containers
-    .filter((block) => {
-      const layout = block.layout;
-      if (layout === null) {
-        return false;
-      }
-      return (
-        x >= layout.x &&
-        x <= layout.x + layout.width &&
-        y >= layout.y &&
-        y <= layout.y + layout.height
-      );
-    })
-    .sort(
-      (a, b) =>
-        (a.layout?.width ?? 0) * (a.layout?.height ?? 0) -
-        (b.layout?.width ?? 0) * (b.layout?.height ?? 0),
-    );
-  return hits[0]?.id ?? root?.id ?? 0;
+  return { x: left, y: bottom + 40 };
 }
 
 /**
@@ -370,7 +346,11 @@ function containerAt(model: ModelBody, x: number, y: number): number {
  * the program, not the geometry. The run the monitor replays is therefore
  * still the run of the model, and it stays on the screen.
  */
-const COSMETIC_COMMANDS: ReadonlySet<string> = new Set(["moveBlock", "setLayouts"]);
+const COSMETIC_COMMANDS: ReadonlySet<string> = new Set([
+  "moveBlock",
+  "setLayouts",
+  "setCaption",
+]);
 
 export const useApp = create<AppState>((set, get) => ({
   models: [],
@@ -385,12 +365,14 @@ export const useApp = create<AppState>((set, get) => ({
   playing: false,
   speed: 1,
   selectedBlockIds: [],
+  activeContainerId: 0,
   clipboard: [],
   seed: randomSeed(),
   seedIsAuto: true,
   until: DEFAULT_UNTIL,
   start: DEFAULT_START,
   status: "idle",
+  runId: 0,
   cancelling: false,
   notice: null,
   history: [],
@@ -427,10 +409,12 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   openModel: async (path: string) => {
-    set({ status: "loading", error: null, currentPath: path });
+    const runId = get().runId + 1;
+    set({ runId, status: "loading", error: null, currentPath: path });
     try {
       const state = await engine().openModel(path);
       set({
+        runId,
         model: state.model,
         diagnostics: state.diagnostics,
         currentPath: state.path,
@@ -444,6 +428,7 @@ export const useApp = create<AppState>((set, get) => ({
         playhead: 0,
         playing: false,
         selectedBlockIds: [],
+        activeContainerId: 0,
         clipboard: [],
         history: [],
         redoStack: [],
@@ -473,10 +458,12 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   newModel: async () => {
-    set({ status: "loading", error: null });
+    const runId = get().runId + 1;
+    set({ runId, status: "loading", error: null });
     try {
       const state = await engine().newModel();
       set({
+        runId,
         model: state.model,
         diagnostics: state.diagnostics,
         currentPath: state.path,
@@ -490,6 +477,7 @@ export const useApp = create<AppState>((set, get) => ({
         playhead: 0,
         playing: false,
         selectedBlockIds: [],
+        activeContainerId: 0,
         clipboard: [],
         history: [],
         redoStack: [],
@@ -503,17 +491,21 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   apply: async (command: EditCommand) => {
+    const runId = get().runId + 1;
     try {
       const state = await engine().apply(command);
       // A block that moved does not change the program, so the run stays:
       // the reader keeps the reproduction he was watching.
       const keepsRun = COSMETIC_COMMANDS.has(command.op);
       set({
+        runId,
         model: state.model,
         diagnostics: state.diagnostics,
         dirty: state.dirty,
         canUndo: state.canUndo,
         canRedo: state.canRedo,
+        history: [...get().history, command],
+        redoStack: [],
         // The model moved: the run the monitor replays is not the model any
         // more, so the replay goes away with it.
         ...(keepsRun
@@ -535,6 +527,7 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   undo: async () => {
+    const runId = get().runId + 1;
     try {
       const state = await engine().undo();
       // The command that is undone is the last one the app applied: the
@@ -543,6 +536,7 @@ export const useApp = create<AppState>((set, get) => ({
       const history = get().history;
       const undone = history[history.length - 1];
       set({
+        runId,
         model: state.model,
         diagnostics: state.diagnostics,
         dirty: state.dirty,
@@ -568,11 +562,13 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   redo: async () => {
+    const runId = get().runId + 1;
     try {
       const state = await engine().redo();
       const redoStack = get().redoStack;
       const redone = redoStack[redoStack.length - 1];
       set({
+        runId,
         model: state.model,
         diagnostics: state.diagnostics,
         dirty: state.dirty,
@@ -722,6 +718,8 @@ export const useApp = create<AppState>((set, get) => ({
    * else made. A model that does not compile leaves the app as it was, with
    * the message of the compiler.
    */
+  setActiveContainerId: (id: number) => set({ activeContainerId: id }),
+
   reloadFromDisk: async () => {
     const state = get();
     const path = state.currentPath;
@@ -758,7 +756,8 @@ export const useApp = create<AppState>((set, get) => ({
     } catch (error) {
       // The model of the disk does not compile: the app keeps the model it
       // had, and says what the compiler said.
-      set({ error: `El modelo del disco no se pudo cargar: ${messageOf(error)}` });
+      const failure = failureOf(error, "El modelo del disco no se pudo cargar");
+      set({ error: failure.error, notice: failure.notice });
       return;
     }
     // The model that arrived runs again, by the same path as the button
@@ -779,7 +778,8 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   simulate: async () => {
-    set({ status: "running", error: null, notice: null, cancelling: false });
+    const runId = get().runId + 1;
+    set({ runId, status: "running", error: null, notice: null, cancelling: false });
     // A run that draws its own seed is a new experiment every time; a run
     // with the reader's seed is the same one, so it can be repeated.
     const seed = get().seedIsAuto ? randomSeed() : get().seed;
@@ -789,6 +789,13 @@ export const useApp = create<AppState>((set, get) => ({
         start: get().start,
         until: get().until ?? undefined,
       });
+      if (get().runId !== runId) {
+        return;
+      }
+      if (get().cancelling) {
+        set({ status: "ready", cancelling: false, notice: STOPPED_NOTICE });
+        return;
+      }
       set({
         seed,
         report,
@@ -803,6 +810,9 @@ export const useApp = create<AppState>((set, get) => ({
         cancelling: false,
       });
     } catch (error) {
+      if (get().runId !== runId) {
+        return;
+      }
       // The reader stopped the run: the app does not wait for it any more
       // and says what happened.
       if (get().cancelling) {
@@ -820,7 +830,8 @@ export const useApp = create<AppState>((set, get) => ({
       set({ error: "No hay ningún modelo abierto para reproducir." });
       return;
     }
-    set({ status: "running", error: null, notice: null, cancelling: false });
+    const runId = get().runId + 1;
+    set({ runId, status: "running", error: null, notice: null, cancelling: false });
     const seed = get().seedIsAuto ? randomSeed() : get().seed;
     try {
       const options = {
@@ -833,7 +844,18 @@ export const useApp = create<AppState>((set, get) => ({
       // come from the same run. The engine is deterministic, so the trace
       // belongs to the report.
       const { report, trace } = await engine().runCurrent(options);
-      const monitor = buildIndex(trace, report, model);
+      if (get().runId !== runId) {
+        return;
+      }
+      if (get().cancelling) {
+        set({ status: "ready", cancelling: false, notice: STOPPED_NOTICE });
+        return;
+      }
+      const currentModel = get().model;
+      if (currentModel === null) {
+        return;
+      }
+      const monitor = buildIndex(trace, report, currentModel);
       // The moves of the run, read from the trace. The program blocks are
       // mapped to the blocks of the model, because a ball travels between the
       // rectangles the reader sees.
@@ -845,7 +867,7 @@ export const useApp = create<AppState>((set, get) => ({
         monitor,
         transitions,
         seed,
-        playhead: 0,
+        playhead: frameAt(monitor, monitor.startTime),
         playing: monitor.frames.length > 0,
         // The speed is a multiple of the real time, and the run starts at
         // x1: one second of model per second of screen. The reader who wants
@@ -855,6 +877,9 @@ export const useApp = create<AppState>((set, get) => ({
         cancelling: false,
       });
     } catch (error) {
+      if (get().runId !== runId) {
+        return;
+      }
       // The reader stopped the run: the app does not wait for it any more
       // and says what happened.
       if (get().cancelling) {
@@ -884,6 +909,8 @@ export const useApp = create<AppState>((set, get) => ({
 
   clearNotice: () => set({ notice: null }),
 
+  clearError: () => set({ error: null }),
+
   setPlayhead: (frame: number) => set({ playhead: frame }),
 
   setPlaying: (playing: boolean) => set({ playing }),
@@ -906,13 +933,20 @@ export const useApp = create<AppState>((set, get) => ({
     if (model === null) {
       return;
     }
-    const spot = freeSpot(model);
+    const active = get().activeContainerId;
+    if ((className === "PortIn" || className === "PortOut") && active === 0) {
+      set({
+        notice: "Las entradas y salidas de submódulo sólo pueden colocarse dentro de un contenedor.",
+      });
+      return;
+    }
+    const spot = freeSpot(model, active);
     const left = x ?? spot.x;
     const top = y ?? spot.y;
     await get().apply({
       op: "addBlock",
       class: className,
-      container: containerAt(model, left, top),
+      container: active,
       x: left,
       y: top,
     });

@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useId,
@@ -102,6 +103,85 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
   // The dash of an empty figure only says something while the run plays.
   const running = useRunHasPublished();
   const clip = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+
+  if (data.kind === "PortIn" || data.kind === "PortOut") {
+    const isEntry = data.kind === "PortIn";
+    return (
+      <div
+        className={[
+          "relative flex h-full w-full flex-col justify-center rounded-md border px-3 text-left shadow-2xs transition",
+          isEntry
+            ? "border-[#b3c4bc] bg-[#f3f6f5] text-slate-800"
+            : "border-[#deb3b7] bg-[#f9f4f4] text-slate-800",
+          selected ? "ring-2 ring-indigo-500" : "",
+        ].join(" ")}
+      >
+        <span className="truncate text-xs font-semibold text-slate-800">{data.title}</span>
+        <span className="text-[10px] text-slate-500">{isEntry ? "Entrada" : "Salida"}</span>
+        {isEntry
+          ? data.outputs.map((port) => (
+              <Handle
+                key={`out-${port.ioid}`}
+                type="source"
+                position={Position.Bottom}
+                id={String(port.ioid)}
+                title={port.name}
+                className="!size-3 !rounded-full !border-2 !border-white !bg-[#047857]"
+              />
+            ))
+          : data.inputs.map((port) => (
+              <Handle
+                key={`in-${port.ioid}`}
+                type="target"
+                position={Position.Top}
+                id={String(port.ioid)}
+                title={port.name}
+                className="!size-3 !rounded-full !border-2 !border-white !bg-[#be123c]"
+              />
+            ))}
+      </div>
+    );
+  }
+
+  if (container) {
+    return (
+      <div
+        className={[
+          "relative flex h-full w-full flex-col justify-between rounded-md border border-[#b8b7e4] bg-[#f4f4fa] px-3 py-2 text-left shadow-2xs transition cursor-pointer",
+          selected ? "ring-2 ring-indigo-500" : "",
+        ].join(" ")}
+      >
+        {data.inputs.map((port, index) => (
+          <Handle
+            key={`in-${port.ioid}`}
+            type="target"
+            position={Position.Top}
+            id={String(port.ioid)}
+            title={port.name}
+            style={{ left: spread(data.inputs.length, index), top: -6 }}
+            className="!size-3 !rounded-full !border-2 !border-white !bg-[#4338ca]"
+          />
+        ))}
+        <div className="flex flex-col min-w-0">
+          <span className="truncate text-xs font-semibold text-slate-800">
+            {data.subtitle || data.title}
+          </span>
+          <span className="text-[10px] text-slate-500">Contenedor</span>
+        </div>
+        {data.outputs.map((port, index) => (
+          <Handle
+            key={`out-${port.ioid}`}
+            type="source"
+            position={Position.Bottom}
+            id={String(port.ioid)}
+            title={port.name}
+            style={{ left: spread(data.outputs.length, index), bottom: -6 }}
+            className="!size-3 !rounded-full !border-2 !border-white !bg-[#4338ca]"
+          />
+        ))}
+      </div>
+    );
+  }
 
   if (
     drawing.fallback ||
@@ -438,11 +518,13 @@ export interface GraphActions {
  * is the one the original editor drew. Every change leaves the graph as a
  * command for the facade: the app never rewrites the file itself.
  */
-export default function GraphView({
+export default memo(function GraphView({
   model,
   actions,
   fitSignal,
   extraEdges = [],
+  containerId = 0,
+  onOpenContainer,
 }: {
   model: ModelBody;
   actions: GraphActions;
@@ -453,6 +535,10 @@ export default function GraphView({
    * way between two blocks that the model joins through a container.
    */
   extraEdges?: Edge[];
+  /** The container currently scoped in the canvas (0 = root). */
+  containerId?: number;
+  /** Navigate into a child container. */
+  onOpenContainer?: (id: number) => void;
 }) {
   const [nodes, setNodes] = useState<Node<BlockData>[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -467,7 +553,7 @@ export default function GraphView({
   const selected = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    const graph = graphOf(model);
+    const graph = graphOf(model, containerId);
     setNodes(
       graph.nodes.map((node) => {
         const drawn = { ...node, selected: selected.current.has(node.id) };
@@ -492,14 +578,14 @@ export default function GraphView({
     // shrink the picture until nothing could be read.
     const decision = decideFrame(
       frame.current,
-      `${model.path}|${model.title}`,
+      `${model.path}|${model.title}|${containerId}`,
       fitSignal,
     );
     frame.current = decision.state;
     if (decision.fit) {
       fitFlow(instance.current, graph.nodes);
     }
-  }, [model, extraEdges, fitSignal]);
+  }, [model, extraEdges, fitSignal, containerId]);
   const onNodesChange = useCallback((changes: NodeChange<Node<BlockData>>[]) => {
     setNodes((current) => applyNodeChanges(changes, current));
   }, []);
@@ -521,14 +607,32 @@ export default function GraphView({
       if (connection.sourceHandle === null || connection.targetHandle === null) {
         return;
       }
-      actions.onConnect(
-        Number(connection.source),
-        Number(connection.sourceHandle),
-        Number(connection.target),
-        Number(connection.targetHandle),
-      );
+      let from = Number(connection.source);
+      let fromIoid = Number(connection.sourceHandle);
+      if (connection.source.startsWith("in-")) {
+        from = containerId;
+        fromIoid = Number(connection.source.slice(3));
+      }
+
+      let to = Number(connection.target);
+      let toIoid = Number(connection.targetHandle);
+      if (connection.target.startsWith("out-")) {
+        to = containerId;
+        toIoid = Number(connection.target.slice(4));
+      }
+
+      if (
+        Number.isNaN(from) ||
+        Number.isNaN(fromIoid) ||
+        Number.isNaN(to) ||
+        Number.isNaN(toIoid)
+      ) {
+        return;
+      }
+
+      actions.onConnect(from, fromIoid, to, toIoid);
     },
-    [actions],
+    [actions, containerId],
   );
 
   const onDrop = useCallback(
@@ -538,9 +642,12 @@ export default function GraphView({
       if (className === "") {
         return;
       }
-      const position = projectPosition(event);
-      if (position !== null) {
-        actions.onDropBlock(className, position.x, position.y);
+      if (instance.current) {
+        const position = instance.current.screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+        actions.onDropBlock(className, Math.round(position.x), Math.round(position.y));
       }
     },
     [actions],
@@ -549,6 +656,18 @@ export default function GraphView({
   const projected = useMemo(
     () => ({ nodes, edges }),
     [nodes, edges],
+  );
+
+  const onNodeDoubleClick = useCallback(
+    (_event: React.MouseEvent, node: Node<BlockData>) => {
+      if (node.data.kind === "C") {
+        const id = Number(node.id);
+        if (id !== containerId) {
+          onOpenContainer?.(id);
+        }
+      }
+    },
+    [containerId, onOpenContainer],
   );
 
   return (
@@ -570,17 +689,35 @@ export default function GraphView({
         }}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onNodeClick={(_event, node) => actions.onSelect([Number(node.id)])}
+        onNodeDoubleClick={onNodeDoubleClick}
+        onNodeClick={(_event, node) => {
+          if (!node.id.startsWith("in-") && !node.id.startsWith("out-")) {
+            actions.onSelect([Number(node.id)]);
+          }
+        }}
         onPaneClick={() => actions.onSelect([])}
         onSelectionChange={({ nodes: picked }) => {
           selected.current = new Set(picked.map((node) => node.id));
-          actions.onSelect(picked.map((node) => Number(node.id)));
+          const validIds = picked
+            .filter((node) => !node.id.startsWith("in-") && !node.id.startsWith("out-"))
+            .map((node) => Number(node.id));
+          actions.onSelect(validIds);
         }}
-        onNodeDragStop={(_event, node) =>
-          actions.onMove(Number(node.id), Math.round(node.position.x), Math.round(node.position.y))
-        }
+        onNodeDragStop={(_event, node) => {
+          if (node.id.startsWith("in-") || node.id.startsWith("out-")) {
+            return;
+          }
+          actions.onMove(Number(node.id), Math.round(node.position.x), Math.round(node.position.y));
+        }}
         onConnect={onConnect}
-        onNodesDelete={(deleted) => actions.onRemove(deleted.map((node) => Number(node.id)))}
+        onNodesDelete={(deleted) => {
+          const blockIds = deleted
+            .filter((node) => !node.id.startsWith("in-") && !node.id.startsWith("out-"))
+            .map((node) => Number(node.id));
+          if (blockIds.length > 0) {
+            actions.onRemove(blockIds);
+          }
+        }}
         onEdgesDelete={(deleted) => {
           for (const edge of deleted) {
             const data = edge.data as
@@ -616,7 +753,7 @@ export default function GraphView({
       </ReactFlow>
     </div>
   );
-}
+});
 
 /**
  * Frame the flow of the model: the blocks that simulate.
@@ -636,19 +773,4 @@ function fitFlow(instance: ReactFlowInstance<Node<BlockData>, Edge> | null, node
     // model does not become a block the size of the window.
     maxZoom: 1.25,
   });
-}
-
-/**
- * The canvas position of a drop.
- *
- * The graph knows where the pointer is in the canvas, so a block dropped on
- * the picture lands there.
- */
-function projectPosition(event: React.DragEvent): { x: number; y: number } | null {
-  const target = event.currentTarget as HTMLElement;
-  const bounds = target.getBoundingClientRect();
-  return {
-    x: Math.round(event.clientX - bounds.left),
-    y: Math.round(event.clientY - bounds.top),
-  };
 }

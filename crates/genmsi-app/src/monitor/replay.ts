@@ -1190,7 +1190,7 @@ export function clockWithCrossings(
  */
 export function frameAt(index: ReplayIndex, time: number): number {
   const frames = index.frames;
-  if (frames.length === 0) {
+  if (frames.length === 0 || time < frames[0].time) {
     return -1;
   }
   let low = 0;

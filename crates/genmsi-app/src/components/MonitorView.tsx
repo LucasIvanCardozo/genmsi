@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { advance, clockWithCrossings, frameAt, stateAt, type ReplayState } from "../monitor/replay";
+import { ChevronRight, CornerLeftUp, Layers } from "lucide-react";
+import { advance, advanceClock, clockWithCrossings, frameAt, stateAt, type ReplayState } from "../monitor/replay";
 import { useApp } from "../state/store";
 import { FLIGHT_SECONDS, MIN_WALL_FLIGHT, travellersAt, type Move } from "../monitor/balls";
-import { graphOf, routeOf, visibleLinks } from "../graph/graph";
+import { graphOf, visibleLinkId, visibleLinks } from "../graph/graph";
 import { countsOf } from "../monitor/counts";
 import { figureBlockOf, figuresOf } from "../monitor/figures";
 import { useLive, type LiveBall, type LiveCounts } from "../monitor/live";
 import ClassList from "./ClassList";
+import ModelTree from "./ModelTree";
 import StatusLine from "./StatusLine";
 import GraphView, { type GraphActions } from "./GraphView";
 import MonitorCharts from "./MonitorCharts";
@@ -17,7 +19,7 @@ import ReportView from "./ReportView";
 type Panel = "reproduccion" | "graficos" | "reporte";
 
 /** The part of the lateral panel the window shows. */
-type Aside = "bloque" | "bloques";
+type Aside = "bloque" | "bloques" | "arbol";
 
 /**
  * The window of the simulation: the model, its run and its report.
@@ -56,6 +58,9 @@ export default function MonitorView({
     playing,
     speed,
     selectedBlockIds,
+    activeContainerId,
+    setActiveContainerId,
+    select,
     catalogue,
     diagnostics,
     error,
@@ -107,19 +112,27 @@ export default function MonitorView({
     if (report === null || state === null) {
       return new Map<number, LiveCounts>();
     }
-    // The blocks that are generators have no figure: no transaction stays
-    // inside one.
-    const generators = new Set(
-      (model?.blocks ?? [])
-        .filter((block) => block.class === "Generate")
-        .map((block) => block.id),
-    );
-    return countsOf(report.blocks, state, generators);
-  }, [report, state, model]);
+    return countsOf(report.blocks, state);
+  }, [report, state]);
 
   // The links of the model: a ball travels over the one that joins the two
   // blocks it goes from and to.
-  const edges = useMemo(() => (model === null ? [] : graphOf(model).edges), [model]);
+  const edges = useMemo(
+    () => (model === null ? [] : graphOf(model, activeContainerId).edges),
+    [model, activeContainerId],
+  );
+
+  // Precomputed O(1) route lookup map for ball travel.
+  const routes = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const edge of edges) {
+      const key = `${edge.source}->${edge.target}`;
+      if (!map.has(key)) {
+        map.set(key, edge.id);
+      }
+    }
+    return map;
+  }, [edges]);
 
   // The links the model does not draw but a ball travels over: the direct
   // way between two blocks that the model joins through a container.
@@ -135,11 +148,41 @@ export default function MonitorView({
     [model],
   );
 
+  // Breadcrumb path from root (id: 0) to activeContainerId.
+  const breadcrumbs = useMemo(() => {
+    if (model === null) return [];
+    const rootLabel = model.title.trim() || model.path?.split("/").pop() || "Modelo";
+    if (activeContainerId === 0) {
+      return [{ id: 0, label: rootLabel }];
+    }
+    const chain: { id: number; label: string }[] = [];
+    let currentId: number | null = activeContainerId;
+    const visited = new Set<number>();
+    while (currentId !== null && currentId !== 0 && !visited.has(currentId)) {
+      visited.add(currentId);
+      const searchId: number = currentId;
+      const found = model.blocks.find((b) => b.id === searchId);
+      if (found === undefined) break;
+      const label = found.caption.trim() || found.name.trim() || `Contenedor ${found.id}`;
+      chain.unshift({ id: found.id, label });
+      currentId = found.container;
+    }
+    chain.unshift({ id: 0, label: rootLabel });
+    return chain;
+  }, [model, activeContainerId]);
+
+  const parentContainerId = useMemo(() => {
+    if (model === null || activeContainerId === 0) return 0;
+    const current = model.blocks.find((b) => b.id === activeContainerId);
+    return current?.container ?? 0;
+  }, [model, activeContainerId]);
+
   // What the animation needs to publish the picture, kept up to date without
   // restarting the animation.
   const live = useRef({
     counts,
     edges,
+    routes,
     moves: [] as Move[],
     times: [] as number[],
     figures: state?.figures ?? null,
@@ -149,6 +192,7 @@ export default function MonitorView({
   live.current = {
     counts,
     edges,
+    routes,
     moves: (transitions?.moves ?? []) as Move[],
     times: transitions?.times ?? [],
     figures: state?.figures ?? null,
@@ -174,6 +218,10 @@ export default function MonitorView({
   // The playhead the monitor set itself, to tell the reader's moves from its
   // own.
   const setRef = useRef(-1);
+  const frameRef = useRef(playhead);
+  const stateRef = useRef<ReplayState | null>(state);
+  frameRef.current = playhead;
+  stateRef.current = state;
 
   // The picture of this instant: the clock, the counts of the blocks and the
   // balls that are on their way.
@@ -190,7 +238,8 @@ export default function MonitorView({
       // still flies long enough to be seen.
       speed * MIN_WALL_FLIGHT,
     )) {
-      const id = routeOf(current.edges, traveller.from, traveller.to);
+      const routeKey = `${traveller.from}->${traveller.to}`;
+      const id = current.routes.get(routeKey) ?? visibleLinkId(traveller.from, traveller.to);
       const list = balls.get(id);
       const ball: LiveBall = { xact: traveller.xact, progress: traveller.progress };
       if (list === undefined) {
@@ -228,9 +277,12 @@ export default function MonitorView({
     // second of wall clock at 1x.
     const rate = speed;
     const step = (now: number) => {
+      if (!useApp.getState().playing) {
+        return;
+      }
       const elapsed = (now - last) / 1000;
       last = now;
-      const current = useApp.getState().playhead;
+      const current = frameRef.current;
       // The reader moved the playhead (the slider of the header): the clock
       // is already where the reader put it, so it is not re-seeded from the
       // record. The playhead the monitor set itself is remembered, so the
@@ -238,45 +290,67 @@ export default function MonitorView({
       if (clockRef.current === null || current !== setRef.current) {
         clockRef.current = useLive.getState().clock;
         setRef.current = current;
-        publish(clockRef.current);
       }
-      // The replay does not skip a crossing: the clock stops at the instant
-      // of the next one, so the picture shows the transaction arriving
-      // instead of jumping over it.
-      const clock = clockWithCrossings(
-        clockRef.current,
-        elapsed,
-        rate,
-        live.current.times,
-      );
+      // At speeds up to 2x, the replay stops at crossings so instantaneous
+      // transfers are visible. At higher speeds, the reader is fast-forwarding,
+      // so the clock advances at the requested speed without throttling.
+      const clock =
+        rate <= 2
+          ? clockWithCrossings(
+              clockRef.current,
+              elapsed,
+              rate,
+              live.current.times,
+            )
+          : advanceClock(clockRef.current, elapsed, rate);
       // The clock stops at the end of the run: a run that is over does not
       // keep counting, and the picture is the picture of its last instant.
       const reached = clock >= monitor.endTime;
       clockRef.current = reached ? monitor.endTime : clock;
+
+      const frame = frameAt(monitor, clockRef.current);
+      if (frame !== frameRef.current && report !== null) {
+        const prev = frameRef.current;
+        frameRef.current = frame;
+        setRef.current = frame;
+        const prevState = stateRef.current;
+        const nextState =
+          prevState !== null && prev <= frame
+            ? advance(prevState, monitor, prev, frame)
+            : stateAt(monitor, frame);
+        stateRef.current = nextState;
+        live.current.counts = countsOf(report.blocks, nextState);
+        live.current.figures = nextState.figures;
+      }
+
       // The clock the reader sees follows the animation, so it ticks instead
       // of jumping from one record to the next.
       publish(clockRef.current);
+
       if (reached) {
         setPlayhead(monitor.frames.length - 1);
         setPlaying(false);
         return;
       }
-      const frame = frameAt(monitor, clock);
-      if (frame !== current) {
-        setRef.current = frame;
-        setPlayhead(frame);
-      }
       handle = requestAnimationFrame(step);
     };
     handle = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(handle);
-  }, [playing, monitor, speed, setPlayhead, setPlaying]);
+    return () => {
+      cancelAnimationFrame(handle);
+      if (frameRef.current !== useApp.getState().playhead) {
+        setPlayhead(frameRef.current);
+      }
+    };
+  }, [playing, monitor, speed, report, setPlayhead, setPlaying]);
 
   // A new run starts its clock again, and going back to the start does too.
   useEffect(() => {
-    clockRef.current = null;
+    clockRef.current = monitor === null ? null : monitor.startTime;
     setRef.current = -1;
     useLive.getState().reset();
+    if (monitor !== null) {
+      useLive.getState().setClock(monitor.startTime);
+    }
   }, [monitor]);
 
   // The picture follows the state of the replay.
@@ -285,14 +359,13 @@ export default function MonitorView({
   // paused, and the picture has to move with it: this effect publishes the
   // picture again every time the state of the replay changes.
   //
-  // The clock is the one the live layer holds — the animation publishes it
-  // on every frame — and it is read without subscribing, so the window is
-  // not redrawn by this effect. The animation publishes anyway, and the
-  // live layer keeps the identity of what did not change: a second
-  // publication with the same numbers is harmless.
+  // When playing, the animation step already publishes on each frame with fresh
+  // figures, so publishing here would duplicate the work.
   useEffect(() => {
-    publish(useLive.getState().clock);
-  }, [state]);
+    if (!playing) {
+      publish(useLive.getState().clock);
+    }
+  }, [state, playing]);
 
   if (model === null) {
     return (
@@ -342,13 +415,53 @@ export default function MonitorView({
 
       {panel === "reproduccion" && (
         <div className="flex min-h-0 flex-1 gap-3">
-          <div className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white p-2">
-            <GraphView
-              model={model}
-              actions={actions}
-              fitSignal={fitSignal}
-              extraEdges={links}
-            />
+          <div className="flex min-w-0 flex-1 flex-col rounded-lg border border-slate-200 bg-white p-2 overflow-hidden">
+            {/* Breadcrumbs navigation bar */}
+            <div className="mb-2 flex shrink-0 items-center justify-between border-b border-slate-100 pb-1.5 text-xs">
+              <nav aria-label="Ruta de módulos" className="flex items-center gap-1 overflow-x-auto text-slate-500">
+                <Layers className="size-3.5 text-indigo-600 shrink-0 mr-0.5" />
+                {breadcrumbs.map((crumb, idx) => (
+                  <div key={crumb.id} className="flex items-center gap-1 shrink-0">
+                    {idx > 0 && <ChevronRight className="size-3 text-slate-300" />}
+                    <button
+                      type="button"
+                      onClick={() => setActiveContainerId(crumb.id)}
+                      className={[
+                        "rounded px-1.5 py-0.5 transition font-medium text-xs",
+                        crumb.id === activeContainerId
+                          ? "bg-indigo-50 font-semibold text-indigo-900"
+                          : "text-slate-600 hover:bg-slate-100 hover:text-slate-800",
+                      ].join(" ")}
+                      title={`Ir a ${crumb.label}`}
+                    >
+                      {crumb.label}
+                    </button>
+                  </div>
+                ))}
+              </nav>
+              {activeContainerId !== 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveContainerId(parentContainerId)}
+                  className="flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600 hover:bg-slate-100 transition shadow-2xs"
+                  title="Subir al contenedor padre"
+                >
+                  <CornerLeftUp className="size-3" />
+                  Subir nivel
+                </button>
+              )}
+            </div>
+
+            <div className="min-h-0 flex-1">
+              <GraphView
+                model={model}
+                actions={actions}
+                fitSignal={fitSignal}
+                extraEdges={links}
+                containerId={activeContainerId}
+                onOpenContainer={setActiveContainerId}
+              />
+            </div>
           </div>
           <aside className="flex w-[400px] shrink-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
             <div className="flex gap-1 border-b border-slate-200 px-2 pt-2">
@@ -356,6 +469,7 @@ export default function MonitorView({
                 [
                   { id: "bloque", label: "Bloque" },
                   { id: "bloques", label: "Bloques" },
+                  { id: "arbol", label: "Árbol" },
                 ] as const
               ).map((candidate) => (
                 <button
@@ -383,11 +497,29 @@ export default function MonitorView({
                     void apply({ op: "setProperty", id, property, value })
                   }
                   onSetCaption={(id, caption) => void apply({ op: "setCaption", id, caption })}
+                  onOpenContainer={setActiveContainerId}
                 />
-              ) : (
+              ) : aside === "bloques" ? (
                 <ClassList
                   catalogue={catalogue}
                   onAdd={(className) => void addBlock(className)}
+                />
+              ) : (
+                <ModelTree
+                  model={model}
+                  activeContainerId={activeContainerId}
+                  selectedBlockIds={selectedBlockIds}
+                  onSelectContainer={(id) => setActiveContainerId(id)}
+                  onSelectBlock={(id) => {
+                    // Navigate to the block's container if it is inside one
+                    const targetBlock = model.blocks.find((b) => b.id === id);
+                    if (targetBlock && targetBlock.container !== activeContainerId) {
+                      setActiveContainerId(targetBlock.container);
+                    }
+                    select([id]);
+                    setAside("bloque");
+                  }}
+                  onAddContainer={() => void addBlock("Container")}
                 />
               )}
             </div>
@@ -428,6 +560,10 @@ export default function MonitorView({
         pendingSave={pendingSave}
         onConfirmSave={() => void confirmSave()}
         onDismissSave={dismissSave}
+        onClearFailure={() => {
+          if (error !== null) useApp.getState().clearError();
+          if (notice !== null) useApp.getState().clearNotice();
+        }}
       />
     </div>
   );

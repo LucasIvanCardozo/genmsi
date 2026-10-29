@@ -80,61 +80,145 @@ function subtitleOf(block: ModelBlock): string {
  * The nodes and the edges of the model's graph.
  *
  * The blocks are placed with the geometry the `.gmdl` carries, so the picture
- * is the one the original editor drew. The blocks the model does not place
- * are not nodes, and neither are the links that reach them.
+ * is the one the original editor drew. When containerId is provided, only
+ * the blocks and edges belonging to that container scope are returned.
  */
-export function graphOf(model: ModelBody): { nodes: Node<BlockData>[]; edges: Edge[] } {
+export function graphOf(
+  model: ModelBody,
+  containerId?: number | null,
+): { nodes: Node<BlockData>[]; edges: Edge[] } {
+  const isScoped = containerId !== undefined && containerId !== null;
+  const parentContainer =
+    isScoped && containerId !== 0
+      ? model.blocks.find((b) => b.id === containerId) ?? null
+      : null;
+
   const placed = new Map<number, ModelBlock>();
+  const scopedBlocks: ModelBlock[] = [];
+
   for (const block of model.blocks) {
-    if (block.layout !== null) {
+    if (block.layout === null) continue;
+    if (isScoped) {
+      if (block.container === containerId && block.id !== 0) {
+        placed.set(block.id, block);
+        scopedBlocks.push(block);
+      }
+    } else {
       placed.set(block.id, block);
+      scopedBlocks.push(block);
     }
   }
 
-  const nodes: Node<BlockData>[] = model.blocks
-    .filter((block) => block.layout !== null)
-    .map((block) => ({
-      id: String(block.id),
-      type: "bloque",
-      position: { x: block.layout?.x ?? 0, y: block.layout?.y ?? 0 },
-      data: {
-        title: titleOf(block),
-        subtitle: subtitleOf(block),
-        kind: block.kind,
-        inputs: block.inputs.map((port) => ({ ioid: port.ioid, name: port.name })),
-        outputs: block.outputs.map((port) => ({ ioid: port.ioid, name: port.name })),
-      },
-      style: {
-        width: Math.max(block.layout?.width ?? 100, 72),
-        height: Math.max(block.layout?.height ?? 40, 32),
-      },
-      zIndex: block.kind === "C" ? 0 : 2,
-      // A container is the frame around what it holds: the frame does not
-      // move, the blocks inside it do.
-      draggable: block.kind !== "C",
-    }));
+  const nodes: Node<BlockData>[] = scopedBlocks.map((block) => ({
+    id: String(block.id),
+    type: "bloque",
+    position: { x: block.layout?.x ?? 0, y: block.layout?.y ?? 0 },
+    data: {
+      title: titleOf(block),
+      subtitle: subtitleOf(block),
+      kind: block.kind,
+      inputs: block.inputs.map((port) => ({ ioid: port.ioid, name: port.name })),
+      outputs: block.outputs.map((port) => ({ ioid: port.ioid, name: port.name })),
+    },
+    style: {
+      width: block.kind === "C" ? 160 : Math.max(block.layout?.width ?? 100, 72),
+      height: block.kind === "C" ? 56 : Math.max(block.layout?.height ?? 40, 32),
+    },
+    zIndex: block.kind === "C" ? 0 : 2,
+    // Blocks and containers at the current level are draggable
+    draggable: isScoped ? block.id !== 0 : block.kind !== "C",
+  }));
+
+  // When inside a container, project its declared inputs and outputs as boundary port nodes
+  if (parentContainer !== null) {
+    for (let index = 0; index < parentContainer.inputs.length; index += 1) {
+      const port = parentContainer.inputs[index];
+      nodes.push({
+        id: `in-${port.ioid}`,
+        type: "bloque",
+        position: { x: 120 + index * 180, y: 30 },
+        data: {
+          title: port.name || `Entrada ${port.ioid}`,
+          subtitle: "Entrada de submódulo",
+          kind: "PortIn",
+          inputs: [],
+          outputs: [{ ioid: port.ioid, name: port.name }],
+        },
+        style: { width: 140, height: 44 },
+        zIndex: 2,
+        draggable: true,
+      });
+    }
+
+    for (let index = 0; index < parentContainer.outputs.length; index += 1) {
+      const port = parentContainer.outputs[index];
+      nodes.push({
+        id: `out-${port.ioid}`,
+        type: "bloque",
+        position: { x: 120 + index * 180, y: 420 },
+        data: {
+          title: port.name || `Salida ${port.ioid}`,
+          subtitle: "Salida de submódulo",
+          kind: "PortOut",
+          inputs: [{ ioid: port.ioid, name: port.name }],
+          outputs: [],
+        },
+        style: { width: 140, height: 44 },
+        zIndex: 2,
+        draggable: true,
+      });
+    }
+  }
 
   const edges: Edge[] = model.edges
-    .filter((edge) => placed.has(edge.from_module) && placed.has(edge.to_module))
-    .map((edge) => ({
-      id: edge.id,
-      source: String(edge.from_module),
-      sourceHandle:
-        edge.from_module === edge.container ? `in-${edge.from_ioid}` : String(edge.from_ioid),
-      target: String(edge.to_module),
-      targetHandle:
-        edge.to_module === edge.container ? `out-${edge.to_ioid}` : String(edge.to_ioid),
-      label: edge.label ?? undefined,
-      animated: false,
-      style: { stroke: "#94a3b8", strokeWidth: 1.75 },
-      labelStyle: { fontSize: 10, fill: "#64748b" },
-      labelBgStyle: { fill: "#f8fafc", fillOpacity: 0.9 },
-      data: {
-        container: edge.container,
-        from: edge.from_module,
-        fromIoid: edge.from_ioid,
-      },
-    }));
+    .filter((edge) => {
+      if (isScoped && edge.container !== containerId) {
+        return false;
+      }
+      const fromOk =
+        isScoped && containerId !== 0 && edge.from_module === containerId
+          ? parentContainer?.inputs.some((p) => p.ioid === edge.from_ioid) ?? false
+          : placed.has(edge.from_module);
+      const toOk =
+        isScoped && containerId !== 0 && edge.to_module === containerId
+          ? parentContainer?.outputs.some((p) => p.ioid === edge.to_ioid) ?? false
+          : placed.has(edge.to_module);
+      return fromOk && toOk;
+    })
+    .map((edge) => {
+      const isFromContainer = isScoped && containerId !== 0 && edge.from_module === containerId;
+      const isToContainer = isScoped && containerId !== 0 && edge.to_module === containerId;
+      const source = isFromContainer ? `in-${edge.from_ioid}` : String(edge.from_module);
+      const target = isToContainer ? `out-${edge.to_ioid}` : String(edge.to_module);
+      const sourceHandle = isFromContainer
+        ? String(edge.from_ioid)
+        : edge.from_module === edge.container
+          ? `in-${edge.from_ioid}`
+          : String(edge.from_ioid);
+      const targetHandle = isToContainer
+        ? String(edge.to_ioid)
+        : edge.to_module === edge.container
+          ? `out-${edge.to_ioid}`
+          : String(edge.to_ioid);
+
+      return {
+        id: edge.id,
+        source,
+        sourceHandle,
+        target,
+        targetHandle,
+        label: edge.label ?? undefined,
+        animated: false,
+        style: { stroke: "#94a3b8", strokeWidth: 1.75 },
+        labelStyle: { fontSize: 10, fill: "#64748b" },
+        labelBgStyle: { fill: "#f8fafc", fillOpacity: 0.9 },
+        data: {
+          container: edge.container,
+          from: edge.from_module,
+          fromIoid: edge.from_ioid,
+        },
+      };
+    });
 
   return { nodes, edges };
 }
@@ -319,36 +403,41 @@ function pointAtParameter(points: BezierPoints, t: number): { x: number; y: numb
 /** How many points of the curve are measured to know its length. */
 const SAMPLES = 64;
 
-/**
- * The point of a curve at a fraction of its length.
- *
- * The fraction is of the *length* of the curve and not of its parameter, so
- * the thing that travels over it goes at the same speed all along, which is
- * what a reader expects to see.
- */
-export function pointOnBezier(points: BezierPoints, t: number): { x: number; y: number } {
-  const fraction = t < 0 ? 0 : t > 1 ? 1 : t;
-  if (fraction === 0) {
-    return { x: points.x0, y: points.y0 };
-  }
-  if (fraction === 1) {
-    return { x: points.x3, y: points.y3 };
-  }
-  // The curve is measured in a few points, and the length of each stretch is
-  // added up: the fraction of the length is then the point wanted, found
-  // between the two measured points that hold it.
-  const measured: { x: number; y: number; length: number }[] = [];
+/** A sampled cubic bezier curve with precalculated arc-length table. */
+export interface SampledBezier {
+  points: BezierPoints;
+  totalLength: number;
+  samples: { x: number; y: number; length: number }[];
+}
+
+/** Precalculate arc-length samples for a bezier curve. */
+export function sampleBezier(points: BezierPoints): SampledBezier {
+  const samples: { x: number; y: number; length: number }[] = [];
   let length = 0;
   let previous = pointAtParameter(points, 0);
   for (let index = 1; index <= SAMPLES; index += 1) {
     const current = pointAtParameter(points, index / SAMPLES);
     length += Math.hypot(current.x - previous.x, current.y - previous.y);
-    measured.push({ x: current.x, y: current.y, length });
+    samples.push({ x: current.x, y: current.y, length });
     previous = current;
   }
-  const wanted = length * fraction;
-  let before = { x: points.x0, y: points.y0, length: 0 };
-  for (const point of measured) {
+  return { points, totalLength: length, samples };
+}
+
+/**
+ * The point of a pre-sampled curve at a fraction of its length.
+ */
+export function pointOnSampledBezier(curve: SampledBezier, t: number): { x: number; y: number } {
+  const fraction = t < 0 ? 0 : t > 1 ? 1 : t;
+  if (fraction === 0) {
+    return { x: curve.points.x0, y: curve.points.y0 };
+  }
+  if (fraction === 1) {
+    return { x: curve.points.x3, y: curve.points.y3 };
+  }
+  const wanted = curve.totalLength * fraction;
+  let before = { x: curve.points.x0, y: curve.points.y0, length: 0 };
+  for (const point of curve.samples) {
     if (point.length >= wanted) {
       const stretch = point.length - before.length;
       const part = stretch <= 0 ? 0 : (wanted - before.length) / stretch;
@@ -359,7 +448,18 @@ export function pointOnBezier(points: BezierPoints, t: number): { x: number; y: 
     }
     before = point;
   }
-  return { x: points.x3, y: points.y3 };
+  return { x: curve.points.x3, y: curve.points.y3 };
+}
+
+/**
+ * The point of a curve at a fraction of its length.
+ *
+ * The fraction is of the *length* of the curve and not of its parameter, so
+ * the thing that travels over it goes at the same speed all along, which is
+ * what a reader expects to see.
+ */
+export function pointOnBezier(points: BezierPoints, t: number): { x: number; y: number } {
+  return pointOnSampledBezier(sampleBezier(points), t);
 }
 
 /**

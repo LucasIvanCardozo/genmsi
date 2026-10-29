@@ -1,6 +1,6 @@
 import { BaseEdge, getBezierPath, type EdgeProps } from "@xyflow/react";
-import { useMemo } from "react";
-import { bezierPoints, pointOnBezier } from "../graph/graph";
+import { memo, useMemo } from "react";
+import { bezierPoints, pointOnSampledBezier, sampleBezier } from "../graph/graph";
 import { BALL_RADIUS, ballFade } from "../monitor/balls";
 import { useEdgeBalls } from "../monitor/live";
 
@@ -25,7 +25,7 @@ import { useEdgeBalls } from "../monitor/live";
  * right now. A link with no ball is not redrawn when another link's ball
  * moves.
  */
-export default function GraphEdge({
+export default memo(function GraphEdge({
   id,
   sourceX,
   sourceY,
@@ -39,22 +39,28 @@ export default function GraphEdge({
   labelStyle,
   labelBgStyle,
 }: EdgeProps) {
-  const [path, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-  });
-  // The points of the curve, so the ball can be placed on it.
-  const points = useMemo(
+  const [path, labelX, labelY] = useMemo(
     () =>
-      bezierPoints(
-        { x: sourceX, y: sourceY },
-        { x: targetX, y: targetY },
+      getBezierPath({
+        sourceX,
+        sourceY,
         sourcePosition,
+        targetX,
+        targetY,
         targetPosition,
+      }),
+    [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition],
+  );
+  // The pre-sampled curve with arc-length table, computed once per geometry.
+  const curve = useMemo(
+    () =>
+      sampleBezier(
+        bezierPoints(
+          { x: sourceX, y: sourceY },
+          { x: targetX, y: targetY },
+          sourcePosition,
+          targetPosition,
+        ),
       ),
     [sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition],
   );
@@ -73,7 +79,7 @@ export default function GraphEdge({
         markerEnd={markerEnd}
       />
       {balls.map((ball, index) => {
-        const point = pointOnBezier(points, ball.progress);
+        const point = pointOnSampledBezier(curve, ball.progress);
         return (
           <circle
             key={`${ball.xact}-${index}`}
@@ -88,4 +94,4 @@ export default function GraphEdge({
       })}
     </>
   );
-}
+});

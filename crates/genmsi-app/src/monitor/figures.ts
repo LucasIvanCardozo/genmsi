@@ -252,13 +252,18 @@ function countingRow(
   if (report === null || report === undefined) {
     return null;
   }
-  const rows = report.blocks.filter(
-    (row) => row.node === block.id && row.class === block.class,
-  );
-  if (rows.length === 0) {
-    return null;
+  let firstMatch: ReportRowLike | null = null;
+  for (const row of report.blocks) {
+    if (row.node === block.id && row.class === block.class) {
+      if (row.counts_block === true) {
+        return row;
+      }
+      if (firstMatch === null) {
+        firstMatch = row;
+      }
+    }
   }
-  return rows.find((row) => row.counts_block === true) ?? rows[0];
+  return firstMatch;
 }
 
 /**
@@ -294,12 +299,15 @@ export function figureOf(block: FigureBlock, source: FigureSource): BlockFigure 
   const counts = source.counts?.get(block.id);
 
   if (block.class === "Generate" || block.class === "Terminate") {
-    const row = countingRow(block, source.report);
-    if (row === null) {
-      return countsFigure(counts);
-    }
     const kind: EntityKind = block.class === "Generate" ? "generated" : "terminated";
-    return entityFigure(kind, null, String(row.entries));
+    if (counts !== undefined) {
+      return entityFigure(kind, null, String(counts.ever));
+    }
+    const row = countingRow(block, source.report);
+    if (row !== null) {
+      return entityFigure(kind, null, String(row.entries));
+    }
+    return countsFigure(counts);
   }
 
   const kind = ENTITY_KIND[block.class];

@@ -264,3 +264,66 @@ test("a ball travels the curve at the same speed all along", () => {
   assert.ok(Math.abs(first - second) < first * 0.2, `${first} against ${second}`);
   assert.ok(quarter.x < half.x && half.x < threeQuarters.x);
 });
+
+test("graphOf scopes nodes and edges by container", () => {
+  const model = modelOf(
+    [
+      // Root level: container 10 and block 1
+      block(10, "", {
+        kind: "C",
+        class: "",
+        container: 0,
+        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null }],
+        outputs: [{ ioid: 1, name: "Salida1", caption: "", label: null }],
+      }),
+      block(1, "Queue", { container: 0 }),
+      // Inside container 10: blocks 2 and 3
+      block(2, "Generate", { container: 10 }),
+      block(3, "Advance", { container: 10 }),
+    ],
+    [
+      // Edge in root: 1 -> 10
+      {
+        id: "0:1:1->10:1",
+        container: 0,
+        from_module: 1,
+        from_ioid: 1,
+        from_port: "Salida1",
+        to_module: 10,
+        to_ioid: 1,
+        to_port: "Entrada1",
+        label: null,
+      },
+      // Edge inside container 10: 2 -> 3
+      {
+        id: "10:2:1->3:1",
+        container: 10,
+        from_module: 2,
+        from_ioid: 1,
+        from_port: "Salida1",
+        to_module: 3,
+        to_ioid: 1,
+        to_port: "Entrada1",
+        label: null,
+      },
+    ],
+  );
+
+  // Root view: containerId = 0
+  const root = graphOf(model, 0);
+  assert.equal(root.nodes.length, 2, "root shows 2 nodes (container 10 and block 1)");
+  assert.ok(root.nodes.some((n) => n.id === "10"));
+  assert.ok(root.nodes.some((n) => n.id === "1"));
+  assert.equal(root.edges.length, 1);
+  assert.equal(root.edges[0].id, "0:1:1->10:1");
+
+  // Sub-container view: containerId = 10
+  const sub = graphOf(model, 10);
+  assert.equal(sub.nodes.length, 4, "sub-container shows blocks 2, 3 and boundary ports in-1, out-1");
+  assert.ok(sub.nodes.some((n) => n.id === "2"));
+  assert.ok(sub.nodes.some((n) => n.id === "3"));
+  assert.ok(sub.nodes.some((n) => n.id === "in-1"));
+  assert.ok(sub.nodes.some((n) => n.id === "out-1"));
+  assert.equal(sub.edges.length, 1);
+  assert.equal(sub.edges[0].id, "10:2:1->3:1");
+});

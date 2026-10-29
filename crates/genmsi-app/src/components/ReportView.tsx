@@ -37,19 +37,19 @@ function yes(value: boolean): Cell {
 }
 
 /** A yes or no the replay knows, and the engine's. */
-function either(live: boolean | undefined, value: boolean): Cell {
-  if (live === undefined) {
+function either(live: boolean | undefined, value: boolean, isReplaying = false): Cell {
+  if (!isReplaying) {
     return yes(value);
   }
-  return { text: live ? "sí" : "no", live: true };
+  return { text: (live ?? false) ? "sí" : "no", live: true };
 }
 
 /** A number the replay knows, and the engine's, for the same thing. */
-function at(live: number | undefined, value: number): Cell {
-  if (live === undefined) {
+function at(live: number | undefined, value: number, isReplaying = false): Cell {
+  if (!isReplaying) {
     return published(value);
   }
-  return { text: number(live), live: true };
+  return { text: number(live ?? 0), live: true };
 }
 
 /** A table of the report. */
@@ -146,6 +146,9 @@ export default function ReportView({
   // this instant, so the area of a queue is the area it covered so far.
   const clock = useLive((live) => live.clock);
   const closed = figures === null ? null : closeFigures(figures, clock);
+  const isReplaying = state !== null;
+  const cellAt = (live: number | undefined, value: number) => at(live, value, isReplaying);
+  const cellEither = (live: boolean | undefined, value: boolean) => either(live, value, isReplaying);
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-hidden">
@@ -235,16 +238,16 @@ export default function ReportView({
               { label: "Facilidad", value: (row) => text(row.name) },
               {
                 label: "Entries",
-                value: (row) => at(closed?.facilities[row.name]?.entries, row.entries),
+                value: (row) => cellAt(closed?.facilities[row.name]?.entries, row.entries),
               },
               {
                 label: "Ocupado",
                 value: (row) =>
-                  at(closed?.facilities[row.name]?.busyTime, row.busy_time),
+                  cellAt(closed?.facilities[row.name]?.busyTime, row.busy_time),
               },
               {
                 label: "Ocupada",
-                value: (row) => either(closed?.facilities[row.name]?.busy, row.busy),
+                value: (row) => cellEither(closed?.facilities[row.name]?.busy, row.busy),
               },
               {
                 label: "Disponible",
@@ -252,7 +255,7 @@ export default function ReportView({
               },
               {
                 label: "Inter",
-                value: (row) => at(closed?.facilities[row.name]?.inter, row.inter),
+                value: (row) => cellAt(closed?.facilities[row.name]?.inter, row.inter),
               },
             ]}
           />
@@ -264,27 +267,27 @@ export default function ReportView({
               { label: "Cola", value: (row) => text(row.name) },
               {
                 label: "Máx",
-                value: (row) => at(closed?.queues[row.name]?.max, row.max),
+                value: (row) => cellAt(closed?.queues[row.name]?.max, row.max),
               },
               {
                 label: "Contenido",
-                value: (row) => at(closed?.queues[row.name]?.content, row.content),
+                value: (row) => cellAt(closed?.queues[row.name]?.content, row.content),
               },
               {
                 label: "Entries",
-                value: (row) => at(closed?.queues[row.name]?.entries, row.entries),
+                value: (row) => cellAt(closed?.queues[row.name]?.entries, row.entries),
               },
               {
                 label: "Entries(0)",
-                value: (row) => at(closed?.queues[row.name]?.zeroEntries, row.zero_entries),
+                value: (row) => cellAt(closed?.queues[row.name]?.zeroEntries, row.zero_entries),
               },
               {
                 label: "Tiempo total",
-                value: (row) => at(closed?.queues[row.name]?.totalTime, row.total_time),
+                value: (row) => cellAt(closed?.queues[row.name]?.totalTime, row.total_time),
               },
               {
                 label: "Área",
-                value: (row) => at(closed?.queues[row.name]?.area, row.area),
+                value: (row) => cellAt(closed?.queues[row.name]?.area, row.area),
               },
             ]}
           />
@@ -296,23 +299,23 @@ export default function ReportView({
               { label: "Almacén", value: (row) => text(row.name) },
               {
                 label: "En uso",
-                value: (row) => at(closed?.storages[row.name]?.inUse, row.in_use),
+                value: (row) => cellAt(closed?.storages[row.name]?.inUse, row.in_use),
               },
               {
                 label: "Mín",
-                value: (row) => at(closed?.storages[row.name]?.minUse, row.min_use),
+                value: (row) => cellAt(closed?.storages[row.name]?.minUse, row.min_use),
               },
               {
                 label: "Máx",
-                value: (row) => at(closed?.storages[row.name]?.maxUse, row.max_use),
+                value: (row) => cellAt(closed?.storages[row.name]?.maxUse, row.max_use),
               },
               {
                 label: "Entries",
-                value: (row) => at(closed?.storages[row.name]?.entries, row.entries),
+                value: (row) => cellAt(closed?.storages[row.name]?.entries, row.entries),
               },
               {
                 label: "Área",
-                value: (row) => at(closed?.storages[row.name]?.area, row.area),
+                value: (row) => cellAt(closed?.storages[row.name]?.area, row.area),
               },
             ]}
           />
@@ -324,23 +327,23 @@ export default function ReportView({
               { label: "Cadena", value: (row) => text(row.name) },
               {
                 label: "Tamaño",
-                value: (row) => at(closed?.chains[row.name]?.content, row.content),
+                value: (row) => cellAt(closed?.chains[row.name]?.content, row.content),
               },
               {
                 label: "Máx",
-                value: (row) => at(closed?.chains[row.name]?.max, row.max),
+                value: (row) => cellAt(closed?.chains[row.name]?.max, row.max),
               },
               {
                 label: "Entries",
-                value: (row) => at(closed?.chains[row.name]?.entries, row.entries),
+                value: (row) => cellAt(closed?.chains[row.name]?.entries, row.entries),
               },
               {
                 label: "Tiempo total",
-                value: (row) => at(closed?.chains[row.name]?.totalTime, row.total_time),
+                value: (row) => cellAt(closed?.chains[row.name]?.totalTime, row.total_time),
               },
               {
                 label: "Área",
-                value: (row) => at(closed?.chains[row.name]?.area, row.area),
+                value: (row) => cellAt(closed?.chains[row.name]?.area, row.area),
               },
             ]}
           />
@@ -352,7 +355,7 @@ export default function ReportView({
               { label: "Interruptor", value: (row) => text(row.name) },
               {
                 label: "Estado",
-                value: (row) => either(closed?.logic[row.name], row.state),
+                value: (row) => cellEither(closed?.logic[row.name], row.state),
               },
             ]}
           />
@@ -364,7 +367,7 @@ export default function ReportView({
               { label: "Valor", value: (row) => text(row.name) },
               {
                 label: "Cantidad",
-                value: (row) => at(closed?.values[row.name], row.value),
+                value: (row) => cellAt(closed?.values[row.name], row.value),
               },
             ]}
           />
@@ -379,11 +382,11 @@ export default function ReportView({
               { label: "Intervalos", value: (row) => published(row.intervals) },
               {
                 label: "Muestras",
-                value: (row) => at(closed?.tables[row.name]?.samples, row.samples),
+                value: (row) => cellAt(closed?.tables[row.name]?.samples, row.samples),
               },
               {
                 label: "Máximo",
-                value: (row) => at(closed?.tables[row.name]?.maxValue, row.max_value),
+                value: (row) => cellAt(closed?.tables[row.name]?.maxValue, row.max_value),
               },
               { label: "Desbordes", value: (row) => published(row.overflow) },
             ]}
@@ -399,7 +402,7 @@ export default function ReportView({
               { label: "Intervalos", value: (row) => published(row.intervals) },
               {
                 label: "Muestras",
-                value: (row) => at(closed?.tables[row.name]?.samples, row.samples),
+                value: (row) => cellAt(closed?.tables[row.name]?.samples, row.samples),
               },
             ]}
           />

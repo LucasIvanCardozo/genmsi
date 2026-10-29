@@ -139,9 +139,8 @@ export interface EngineAdapter {
   /**
    * Ask the engine to stop the run in flight.
    *
-   * The answer says whether there was a run to stop. The engine cannot be
-   * interrupted yet: what the host does is stop waiting for the run and
-   * throw its answer away.
+   * The answer says whether there was a run to stop. The host signals the
+   * cancellation flag, stopping the run at the next event.
    */
   cancelRun(): Promise<boolean>;
   /** The block classes the editor offers to create. */

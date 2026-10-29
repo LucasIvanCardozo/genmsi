@@ -228,10 +228,32 @@ test("a generator shows the entries its row counted", () => {
   assert.equal(figure.label, "flechas generadas");
 });
 
+test("a generator shows live generated counts when counts are available", () => {
+  const liveSource: FigureSource = {
+    ...source(),
+    counts: new Map([[1, { now: 0, ever: 5 }]]),
+  };
+  const figure = entity(figureOf(block(1, "Generate"), liveSource));
+  assert.equal(figure.kind, "generated");
+  assert.equal(figure.text, "5");
+  assert.equal(figure.label, "flechas generadas");
+});
+
 test("a terminate shows the transactions that finished", () => {
   const figure = entity(figureOf(block(2, "Terminate"), source()));
   assert.equal(figure.kind, "terminated");
   assert.equal(figure.text, "10");
+  assert.equal(figure.label, "transacciones terminadas");
+});
+
+test("a terminate shows live terminated counts when counts are available", () => {
+  const liveSource: FigureSource = {
+    ...source(),
+    counts: new Map([[2, { now: 0, ever: 3 }]]),
+  };
+  const figure = entity(figureOf(block(2, "Terminate"), liveSource));
+  assert.equal(figure.kind, "terminated");
+  assert.equal(figure.text, "3");
   assert.equal(figure.label, "transacciones terminadas");
 });
 

@@ -89,8 +89,8 @@ export default function RunSummary({
         label="Caudal"
         value={`${decimals(
           live
-            ? clock > 0
-              ? generated / clock
+            ? clock - report.start_time > 0
+              ? generated / (clock - report.start_time)
               : 0
             : elapsed > 0
               ? report.transactions / elapsed

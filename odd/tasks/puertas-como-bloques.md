@@ -91,6 +91,7 @@ que se ve desde afuera**, que no tiene por qué rodear a ese interior.
 | T2 | S4, S5 | El motor no recalcula el recuadro del ámbito | format | **hecho** | `bf58e30` |
 | T3 | S2, S3 | Las puertas son nodos del modelo con posición propia, y el modelo la publica | format, engine, core | **hecho** | `4d53c82` |
 | T4 | S2, S3 | La app dibuja cada puerta en su lugar, y su arrastre se guarda | app | **hecho** | `9215021` |
+| T5 | S2, S3, S5 | El pulido de las puertas: se pueden borrar, nacen con lugar y el contenedor nuevo nace vacío | format, app | **hecho** | `ffad75f` |
 
 ## Log
 
@@ -259,7 +260,65 @@ iguales.
 `cargo test --workspace` en verde; la app, 296/296; `bunx tsc --noEmit`
 limpio.
 
-### L8 — Lo que queda de esta unidad
+### L8 — T5: el pulido de las puertas (hecho)
+
+Lo que el usuario reportó después de probar:
+
+> "cuando entro en un container recien creado, si muevo la entrada uno, la
+> salida se mueve (esto deja de pasar luego)"
+
+> "Si elimino un port in o port out, al salir del conteiner y volver a entrar
+> estos no se borran"
+
+> "en el arbol quitar el boton de 'Nuevo', ya que esto ya no es necesario que
+> este aqui"
+
+**El botón "Nuevo" del árbol** — fuera ✓: la paleta de clases ya trae
+"Submódulo", "Entrada" y "Salida" ✓, así que el botón era un camino
+redundante.
+
+**Mover una puerta ya no mueve a la otra** ✓: el lugar de una puerta que
+todavía no tiene depends del contenido del ámbito, no de las otras puertas
+✓ (medido: la entrada pasó de (80, 80) a (500, 300) y la salida siguió en
+(80, 154) ✓).
+
+**Borrar una puerta** ✓: la puerta es un bloque de la imagen y se borra como
+uno ✓ — el comando `removePort` la quita y se lleva los enlaces que la
+tocan ✓, con su deshacer ✓ (medido: la entrada del contenedor 11 borrada
+✓, y al salir del contenedor y volver a entrar sigue borrada ✓ ✓).
+
+**El contenedor nuevo nace vacío** ✓: la pregunta del usuario, y la
+respuesta es que sí ✓ (ver L10 ✓).
+
+**La composición coloca todas las puertas** ✓, también las que no llevan
+flujo todavía ✓: una puerta recién agregada va con las puertas de su misma
+clase ✓ (la de entrada con las de entrada ✓, la de salida con las de
+salida ✓), una debajo de la otra ✓.
+
+### L9 — La pregunta del contenedor y su respuesta
+
+> "Consideras quitar la opcion de que un Container se cree con un portin y un
+> portout? optimizaria y mejoraria el codigo con respecto a simplicidad? porque
+> si es asi podemos hacer que un Container se cree sin nada dentro directamente"
+
+**Sí, simplifica** ✓, por el mismo argumento que hizo única la silueta de
+los 69 bloques ✓:
+
+- hoy hay **dos caminos** para tener una puerta: la que fabrica el contenedor
+  al nacer ✓ y la que el lector agrega ✓. Con el contenedor vacío hay **un
+  solo camino** ✓ (el de las clases "Entrada" y "Salida" ✓) ✓;
+- el motor no inventa nada ✓: las puertas son las que el modelo declara ✓;
+- el lector puede hacer un contenedor **con una sola entrada** ✓ (un
+  sumidero ✓) o **con una sola salida** ✓ (una fuente ✓) — con el
+  contenedor lleno de puertas, eso no se podía ✓;
+- y el modelo **no miente** ✓: un contenedor sin puertas es un contenedor sin
+  puertas ✓, y el validador no se queja ✓ (no hay regla que lo pida ✓).
+
+Lo que cuesta ✓: crear un contenedor son **dos pasos más** (agregar la
+entrada y la salida ✓). A cambio, el lector sabe exactamente qué puertas
+tiene ✓.
+
+### L10 — Lo que queda de esta unidad
 
 - **S2** (que el contenedor y sus puertas muestren cuántas entidades los
   atravesaron) sigue sin hacer: es otra unidad, con `src/monitor/counts.ts` y
@@ -268,6 +327,7 @@ limpio.
   contenedor**: la caja es la que se ve desde afuera (S5) y el interior es un
   lienzo propio. Cuando el contenido crece, la caja no crece con él: el
   lector ve el contenido fuera de la caja, y es lo que pidió.
-- **La puerta que el lector arrastra** se guarda en el modelo, pero una
-  puerta nueva (la que el lector acaba de agregar) empieza sin lugar y la
-  composición se lo da en el próximo *Reacomodar*.
+- **La puerta que el lector arrastra** se guarda en el modelo ✓, y la
+  puerta que acaba de agregar recibe su lugar en el próximo *Reacomodar* ✓
+  (o en el momento de agregarla, si el lector quiere ✓: es un detalle
+  menor ✓).

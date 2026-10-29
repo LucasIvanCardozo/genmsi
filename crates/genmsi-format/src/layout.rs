@@ -121,13 +121,14 @@ pub fn relayout(model: &GmdlModel) -> Vec<Position> {
 /// - the **ports of the scope** are the ends of the flow: they take part in
 ///   the composition as the ends of the flow, so the block the flow enters
 ///   through is placed first and the block it leaves through is placed last;
-/// - what is written back is the scope's own: the positions of its children
-///   and its own frame, recomputed around them (the rule `place_frames`
-///   uses in the composition of the whole model).
+/// - what is written back is the scope's own: the positions of its children.
+///   **Not** its frame: the container is a box of its own, and what it holds
+///   does not change it — its size and its place are the ones the model
+///   gives it, and nothing here touches them.
 ///
-/// A scope is a canvas of its own: the positions of its children and the frame
-/// that surrounds them live in the canvas of the scope, which is where the
-/// author put them. The composition starts there, and never before it.
+/// A scope is a canvas of its own: the positions of its children live in the
+/// canvas of the scope, which is where the author put them. The composition
+/// starts there, and never before it.
 ///
 /// Nothing outside the scope is touched: a block that is not a child of the
 /// scope, and is not the scope itself, keeps the position it has.
@@ -613,12 +614,9 @@ fn compose_scope(
     // The blocks that are drawn in the grid go in a grid beside the flow, in
     // the shape that leaves the picture as square as possible.
     place_free(&mut positions, model, &grid, nodesep);
-    // The frame of the scope: the box of the blocks it owns, with the margin
-    // that separates them (the rule `place_frames` uses in the composition of
-    // the whole model).
-    if let Some(frame) = frame_of_scope(model, scope, &positions, margin) {
-        positions.push(frame);
-    }
+    // The frame of the scope is **not** composed: the container is a box of
+    // its own, and what it holds does not change it. Its size and its place
+    // are the ones the model gives it, and nothing here touches them.
     // The composition starts where the author put things, and never before
     // it: the picture has no negative coordinates.
     let (origin_x, origin_y) = scope_origin(model, children);
@@ -655,31 +653,6 @@ fn grid_of_scope(flow: &flow::ScopeFlow, children: &[u32]) -> Vec<u32> {
         .copied()
         .filter(|id| !reached.contains(id))
         .collect()
-}
-
-/// The frame of a scope: the box of the blocks it owns, with the margin that
-/// separates them.
-///
-/// The root of the model is not drawn: it has no frame. The frame of a scope
-/// is the frame of its canvas: the scope is a canvas of its own, and the
-/// blocks it owns live in it.
-fn frame_of_scope(
-    model: &GmdlModel,
-    scope: u32,
-    positions: &[Position],
-    margin: i32,
-) -> Option<Position> {
-    if model.root().is_some_and(|root| root.id == scope) {
-        return None;
-    }
-    let (left, top, right, bottom) = box_of(positions.iter())?;
-    Some(Position {
-        id: scope,
-        x: left - margin,
-        y: top - margin,
-        width: Some(right - left + 2 * margin),
-        height: Some(bottom - top + 2 * margin),
-    })
 }
 
 /// Where the picture of a scope starts: where the author put the blocks the

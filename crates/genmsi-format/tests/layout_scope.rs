@@ -94,12 +94,11 @@ fn composing_a_scope_moves_only_the_blocks_of_the_scope() {
             !positions.is_empty(),
             "{name}: the scope {scope} has nothing to compose"
         );
-        // The blocks of the scope and the scope's own frame are the ones the
-        // composition writes.
+        // The blocks of the scope are the ones the composition writes.
         let children = children_of(&model, scope);
         for position in &positions {
             assert!(
-                children.contains(&position.id) || position.id == scope,
+                children.contains(&position.id),
                 "{name}: the composition writes the block {}, which the scope {scope} does not own",
                 position.id
             );
@@ -107,7 +106,7 @@ fn composing_a_scope_moves_only_the_blocks_of_the_scope() {
         // Every other block keeps the place it had.
         let composed = composed(&model, &positions);
         for block in &model.blocks {
-            if children.contains(&block.id) || block.id == scope {
+            if children.contains(&block.id) {
                 continue;
             }
             assert_eq!(
@@ -121,17 +120,17 @@ fn composing_a_scope_moves_only_the_blocks_of_the_scope() {
 }
 
 #[test]
-fn the_composition_of_a_scope_moves_the_children_and_the_frame_of_the_scope() {
+fn the_composition_of_a_scope_moves_only_the_children() {
     // The measure of the rule: composing the scope of a container moves the
-    // children of the container and the frame of the container, and nothing
-    // else. The fishing contest has 87 blocks; 9 of them are the children of
-    // the container 1.
+    // children of the container and nothing else. The frame of the container
+    // is not a thing the composition touches: the container is a box of its
+    // own, and what it holds does not change it. The fishing contest has 87
+    // blocks; 9 of them are the children of the container 1.
     let model = model("TP10__tp10.gmdl");
     let scope = 1;
     let positions = relayout_scope(&model, scope);
     let mut moved = moved(&model, &positions);
     let mut expected = children_of(&model, scope);
-    expected.push(scope);
     expected.sort_unstable();
     moved.sort_unstable();
     assert_eq!(
@@ -140,8 +139,35 @@ fn the_composition_of_a_scope_moves_the_children_and_the_frame_of_the_scope() {
     );
     assert_eq!(
         moved.len(),
-        10,
-        "ten blocks move: the nine children and the frame"
+        9,
+        "nine blocks move: the nine children of the container"
+    );
+}
+
+#[test]
+fn the_box_of_a_container_does_not_change() {
+    // The container is a box of its own: its size and its place are the
+    // ones the model gives it. Composing its content does not touch them,
+    // and neither does composing the scope of its parent.
+    let model = model("TP10__tp10.gmdl");
+    let scope = 1;
+    let before = layout_of(&model, scope).expect("the container has a box");
+    // The composition of the container's own content.
+    let inner = composed(&model, &relayout_scope(&model, scope));
+    assert_eq!(
+        layout_of(&inner, scope),
+        Some(before),
+        "the container changed its box when its content was composed"
+    );
+
+    // And the composition of the scope of the parent, which places the
+    // container like any other block: its size does not change.
+    let outer = composed(&model, &relayout_scope(&model, 0));
+    let after = layout_of(&outer, scope).expect("the container has a box");
+    assert_eq!(
+        (after.2, after.3),
+        (before.2, before.3),
+        "the container changed its size"
     );
 }
 
@@ -331,11 +357,15 @@ fn the_composition_of_a_scope_does_not_depend_on_the_blocks_outside_it() {
 }
 
 #[test]
-fn the_composition_of_a_scope_leaves_no_block_outside_its_frame() {
-    // The measure of the house: a block that falls out of the frame of the
-    // scope that owns it is a broken composition, and two blocks that sit on
-    // each other are a picture the reader cannot read. The measure is taken
-    // over every scope of every reference model.
+fn the_composition_of_a_scope_leaves_no_block_on_another() {
+    // The measure of the house: two blocks that sit on each other are a
+    // picture the reader cannot read. The measure is taken over every scope
+    // of every reference model.
+    //
+    // The blocks of a scope do **not** have to stay inside the box of the
+    // container: the container is a box of its own, and its content is
+    // another canvas. The box of the container does not change, and the
+    // composition says so.
     for path in corpus() {
         let Ok(text) = std::fs::read_to_string(&path) else {
             continue;
@@ -359,18 +389,14 @@ fn the_composition_of_a_scope_leaves_no_block_outside_its_frame() {
             }
             let composed = composed(&model, &positions);
             let children = children_of(&model, scope);
-            let frame = layout_of(&composed, scope);
+            // The box of the container is the one the model gave it.
+            assert_eq!(
+                layout_of(&composed, scope),
+                layout_of(&model, scope),
+                "{name}: the box of the scope {scope} changed"
+            );
             for id in &children {
                 let (x, y, width, height) = layout_of(&composed, *id).expect("the block is placed");
-                if let Some((left, top, frame_width, frame_height)) = frame {
-                    assert!(
-                        x >= left
-                            && y >= top
-                            && x + width <= left + frame_width
-                            && y + height <= top + frame_height,
-                        "{name}: the block {id} fell out of the frame of the scope {scope}"
-                    );
-                }
                 for other in &children {
                     if other >= id {
                         continue;

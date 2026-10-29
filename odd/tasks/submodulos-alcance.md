@@ -197,6 +197,55 @@ y el anillo de selección **siempre en el wrapper externo**.
 - El **anillo** va en el wrapper externo de los 69: el contenedor y las
   puertas se seleccionan como cualquier otro bloque (S3).
 
+### T2 — El contrato (lo que T2 publica)
+
+`crates/genmsi-format` publica la composición **de un alcance**:
+
+```rust
+/// Compose one scope of the model: the blocks the scope owns, and nothing else.
+pub fn relayout_scope(model: &GmdlModel, scope: u32) -> Vec<Position>
+```
+
+Las reglas:
+
+- **El alcance es una caja de sus hijos.** Los bloques que compone son los
+  que el alcance posee (`block.owner == scope`), más los contenedores
+  anidados como **cajas atómicas**: su marco se toma del modelo y su
+  contenido no se mira ni se mueve.
+- **Los enlaces del alcance son los que el alcance posee**, con las
+  fronteras de los contenedores anidados cosidas (un contenedor anidado es
+  una caja atómica: su contenido no participa del orden de su padre).
+- **Los puertos del alcance son la frontera**: el puerto de entrada y el de
+  salida entran en la composición como los extremos del flujo, de modo que
+  el bloque al que entra el flujo quede arriba y el del que sale, abajo.
+- **Lo que se escribe es lo del alcance**: las posiciones de sus hijos y el
+  marco del alcance, recalculado alrededor de ellos. **Ningún bloque de
+  afuera se toca**: el alcance es el que el lector está viendo.
+- El resultado es **determinista**: el mismo modelo y el mismo alcance
+  producen las mismas posiciones, siempre.
+
+La composición del modelo entero (`relayout(model)`, la que usan la CLI y el
+MCP) **no cambia**: sigue componiendo el árbol completo y su línea base
+commiteada (`crates/genmsi-format/tests/layout-baseline.json`) sigue siendo
+la de la medida.
+
+### T3 — El contrato (lo que T3 publica)
+
+El pedido de recomposición **lleva el alcance**:
+
+- el protocolo (`crates/genmsi-app/engine/src/protocol.rs`): el pedido de
+  recomposición pasa de ser una variante sin carga a llevar el id del
+  alcance;
+- la sesión (`crates/genmsi-app/engine/src/session.rs`): recomponer un
+  alcance llama a `relayout_scope` y aplica **un** comando de posiciones
+  (las del alcance), que sigue siendo **una** entrada del historial de
+  deshacer;
+- la app: el botón **Reacomodar** manda el alcance que el lector está
+  viendo (el de las migas), y el lienzo se reencuadra como hasta ahora.
+
+Lo que **no** cambia: la CLI (`genmsi layout`) y el MCP (`save_model`) siguen
+componiendo el modelo entero, con la misma línea base.
+
 ## Log
 
 ### L1 — El pedido del usuario (verbatim)

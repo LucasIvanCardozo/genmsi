@@ -246,6 +246,43 @@ El pedido de recomposición **lleva el alcance**:
 Lo que **no** cambia: la CLI (`genmsi layout`) y el MCP (`save_model`) siguen
 componiendo el modelo entero, con la misma línea base.
 
+### T6 — El contrato (lo que T6 publica)
+
+El lienzo de un ámbito se dibuja **como un lienzo propio**:
+
+1. **El ámbito tiene su origen**: la esquina de los bloques que posee (la
+   misma regla que usa la composición: *"la imagen empieza donde el autor
+   puso las cosas"*). Los nodos del ámbito se dibujan **relativos a ese
+   origen**: la posición en el lienzo es `layout − origen`. El archivo `.gmdl`
+   no cambia: sigue guardando las coordenadas absolutas, como los modelos de
+   referencia (L3).
+2. **Las puertas se dibujan junto al bloque con el que se unen**: la puerta
+   de entrada, justo encima del bloque al que apunta su enlace interno (el
+   enlace del ámbito que va del puerto a ese bloque); la de salida, justo
+   debajo del bloque cuyo enlace termina en el puerto. Una puerta sin
+   enlace interno (el editor lo permite) se dibuja junto al primer bloque
+   del ámbito. Ninguna puerta queda flotando en una posición fija.
+3. **Un bloque nuevo cae dentro de la imagen**: el hueco libre de un ámbito
+   se calcula en el espacio del ámbito (debajo del bloque más bajo) y la
+   posición del modelo es ese hueco más el origen del ámbito.
+4. **Un bloque soltado encima de un contenedor entra en ese contenedor**: la
+   caída mira el contenedor bajo el puntero, como antes.
+5. **La vista sigue al bloque nuevo**: al agregar un bloque, el lienzo se
+   acerca a él (no se reencuadra entero: la imagen no debe saltar de abajo
+   arriba mientras el lector trabaja).
+
+### T7 — Lo que T6 publica en el código
+
+- `src/graph/graph.ts`: el origen de un ámbito y las posiciones de sus
+  nodos (relativas al origen), y las posiciones de las puertas (junto a su
+  bloque).
+- `src/components/GraphView.tsx`: el lienzo dibuja el ámbito desde su
+  origen.
+- `src/state/store.ts`: el hueco libre de un ámbito, en el espacio del
+  ámbito; la caída dentro de un contenedor.
+- `src/components/MonitorView.tsx` / `src/App.tsx`: la vista sigue al
+  bloque nuevo.
+
 ## Log
 
 ### L1 — El pedido del usuario (verbatim)

@@ -440,23 +440,7 @@ Lo que **no** era la causa ✓: la app publica su imagen viva cuando cambia el
 playhead ✓ (`MonitorView.tsx` ✓, el efecto que publica con el reloj ✓) — las
 cifras no están viejas ✓; lo que no hay son los movimientos ✓.
 
-### L13 — T8: el motor compone las puertas que se hablan entre sí (hecho)
-
-**T8 (`ae662ca`)** — el flujo de un ámbito alcanza ahora los enlaces que van
-de una puerta a otra del mismo contenedor ✓, y las puertas que esos enlaces
-unen se componen como cualquier otro bloque ✓: la puerta de entrada queda
-encima de la de salida que alimenta ✓, con el aire del flujo entre ellas ✓.
-
-Los tests del motor (`crates/genmsi-format/tests/layout_scope.rs` ✓):
-la puerta de entrada va **encima** de la de salida ✓, no se pisan ✓, y las
-puertas de un ámbito **no** están en el hueco libre ✓ (las compone la
-composición ✓). El primero falla sin el arreglo ✓ (RED comprobado ✓).
-
-Las puertas que todavía no llevan flujo se apilan **por su clase** ✓ (las de
-entrada bajo las de entrada ✓, las de salida bajo las de salida ✓): antes el
-conteo mezclaba las dos clases ✗.
-
-### L13 — Lo que se arregló y lo que se midió
+### L14 — Lo que se arregló y lo que se midió
 
 **P1 — el reordenamiento** (`ae662ca`) ✓ **arreglado y medido** ✓: con un
 módulo cuyo flujo es sólo sus puertas (el del usuario ✓), después de
@@ -476,7 +460,23 @@ registra el evento *leave* del bloque 13 (el Leave ✓), que es el primer salto
 del movimiento que sale ✗. Eso ya no es de la app ✗: es del motor ✗ (o del
 formato del trace ✓), y es la unidad que sigue ✓.
 
-### L14 — Lo que queda de esta unidad
+### L13 — T8: el motor compone las puertas que se hablan entre sí (hecho)
+
+**T8 (`ae662ca`)** — el flujo de un ámbito alcanza ahora los enlaces que van
+de una puerta a otra del mismo contenedor ✓, y las puertas que esos enlaces
+unen se componen como cualquier otro bloque ✓: la puerta de entrada queda
+encima de la de salida que alimenta ✓, con el aire del flujo entre ellas ✓.
+
+Los tests del motor (`crates/genmsi-format/tests/layout_scope.rs` ✓):
+la puerta de entrada va **encima** de la de salida ✓, no se pisan ✓, y las
+puertas de un ámbito **no** están en el hueco libre ✓ (las compone la
+composición ✓). El primero falla sin el arreglo ✓ (RED comprobado ✓).
+
+Las puertas que todavía no llevan flujo se apilan **por su clase** ✓ (las de
+entrada bajo las de entrada ✓, las de salida bajo las de salida ✓): antes el
+conteo mezclaba las dos clases ✗.
+
+### L15 — Lo que queda de esta unidad
 
 - **S2** (que el contenedor y sus puertas muestren cuántas entidades los
   atravesaron) sigue sin hacer: es otra unidad, con `src/monitor/counts.ts` y

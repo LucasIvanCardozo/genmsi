@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::catalogue::{build_block, class_spec};
 use crate::error::FormatError;
-use crate::model::{Block, GmdlModel, Layout, Link, Port};
+use crate::model::{Block, ContainerHeader, GmdlModel, Layout, Link, Port, SectionKind};
 
 /// Default size of a freshly created block (the original editor's small box).
 ///
@@ -92,6 +92,11 @@ pub enum EditCommand {
         positions: Vec<Position>,
     },
     /// Connect an output port to an input port of a sibling block.
+    ///
+    /// The link may also cross the border of a container: the entry port of
+    /// a container is the source of the link that brings the flow into it,
+    /// and its exit port is the target of the link that takes the flow out
+    /// of it.
     Connect {
         /// Source block id.
         from: u32,
@@ -211,6 +216,15 @@ pub enum UndoStep {
         old: String,
         /// Label after.
         new: String,
+    },
+    /// A port was added to a container.
+    PortAdded {
+        /// Owning container id.
+        container: u32,
+        /// Whether the port is an input port.
+        input: bool,
+        /// The port that was added.
+        port: Port,
     },
 }
 
@@ -404,23 +418,118 @@ impl EditSession {
                 format!("el bloque {container} no es un contenedor"),
             ));
         }
-        // A new block is born with the footprint of its class: the original
-        // editor's class library declares the size of every class, and the
-        // block that is drawn has to fit the shape of that class.
-        let (width, height) = class_spec(class)
-            .map(|spec| (spec.width, spec.height))
-            .unwrap_or((DEFAULT_WIDTH, DEFAULT_HEIGHT));
-        let mut block = build_block(
-            class,
-            container,
-            Some(Layout {
-                width,
-                height,
-                x,
-                y,
-            }),
-        )?;
-        block.id = fresh_id(&self.model);
+        let block = if class == "Container" || class == "Contenedor" {
+            let id = fresh_id(&self.model);
+            Block {
+                id,
+                class: String::new(),
+                kind: 'C',
+                owner: container,
+                name: format!("Modulo{id}"),
+                caption: format!("Modulo {id}"),
+                layout: Some(Layout { width: 160, height: 56, x, y }),
+                header: Some(ContainerHeader::default()),
+                inputs: vec![Port {
+                    ioid: 1,
+                    name: "Entrada1".to_string(),
+                    caption: String::new(),
+                    mylabel: String::new(),
+                    layout: None,
+                }],
+                outputs: vec![Port {
+                    ioid: 2,
+                    name: "Salida1".to_string(),
+                    caption: String::new(),
+                    mylabel: String::new(),
+                    layout: None,
+                }],
+                links: Vec::new(),
+                props: Vec::new(),
+                sections: vec![SectionKind::Inputs, SectionKind::Outputs, SectionKind::Links],
+                source: None,
+            }
+        } else if class == "PortIn" || class == "Entrada" {
+            if container == 0 {
+                return Err(FormatError::structural(
+                    container,
+                    "las entradas de submódulo sólo pueden colocarse dentro de un contenedor",
+                ));
+            }
+            let block = self.model.block_mut(container).ok_or_else(|| {
+                FormatError::structural(container, format!("no existe el contenedor {container}"))
+            })?;
+            // The ports of a container share one numbering: the id of a
+            // port never names two ports of the same container, so the new
+            // port comes after the highest id of any of them.
+            let max_ioid = block
+                .inputs
+                .iter()
+                .chain(&block.outputs)
+                .map(|p| p.ioid)
+                .max()
+                .unwrap_or(0);
+            let ioid = max_ioid + 1;
+            let port = Port {
+                ioid,
+                name: format!("Entrada{ioid}"),
+                caption: String::new(),
+                mylabel: String::new(),
+                layout: None,
+            };
+            block.inputs.push(port.clone());
+            steps.push(UndoStep::PortAdded { container, input: true, port });
+            return Ok(container);
+        } else if class == "PortOut" || class == "Salida" {
+            if container == 0 {
+                return Err(FormatError::structural(
+                    container,
+                    "las salidas de submódulo sólo pueden colocarse dentro de un contenedor",
+                ));
+            }
+            let block = self.model.block_mut(container).ok_or_else(|| {
+                FormatError::structural(container, format!("no existe el contenedor {container}"))
+            })?;
+            // The ports of a container share one numbering: the id of a
+            // port never names two ports of the same container, so the new
+            // port comes after the highest id of any of them.
+            let max_ioid = block
+                .inputs
+                .iter()
+                .chain(&block.outputs)
+                .map(|p| p.ioid)
+                .max()
+                .unwrap_or(0);
+            let ioid = max_ioid + 1;
+            let port = Port {
+                ioid,
+                name: format!("Salida{ioid}"),
+                caption: String::new(),
+                mylabel: String::new(),
+                layout: None,
+            };
+            block.outputs.push(port.clone());
+            steps.push(UndoStep::PortAdded { container, input: false, port });
+            return Ok(container);
+        } else {
+            // A new block is born with the footprint of its class: the original
+            // editor's class library declares the size of every class, and the
+            // block that is drawn has to fit the shape of that class.
+            let (width, height) = class_spec(class)
+                .map(|spec| (spec.width, spec.height))
+                .unwrap_or((DEFAULT_WIDTH, DEFAULT_HEIGHT));
+            let mut b = build_block(
+                class,
+                container,
+                Some(Layout {
+                    width,
+                    height,
+                    x,
+                    y,
+                }),
+            )?;
+            b.id = fresh_id(&self.model);
+            b
+        };
         let index = self.model.blocks.len();
         self.model.blocks.push(block.clone());
         steps.push(UndoStep::BlockAdded { index, block: Box::new(block) });
@@ -562,6 +671,12 @@ impl EditSession {
     /// source port is replaced by the new one. An input port may receive
     /// from several blocks (as the reference models do), so the links that
     /// end at the target port are kept.
+    ///
+    /// The link may cross the border of a container, the way the reference
+    /// models write it: the entry port of a container is the source of the
+    /// link that brings the flow into it, and its exit port is the target
+    /// of the link that takes the flow out of it. The link belongs to the
+    /// container in every case.
     fn connect(
         &mut self,
         from: u32,
@@ -572,40 +687,64 @@ impl EditSession {
     ) -> Result<(), FormatError> {
         self.require_block(from)?;
         self.require_block(to)?;
-        if from == to {
-            return Err(FormatError::structural(
-                from,
-                "no se puede conectar un bloque consigo mismo",
-            ));
-        }
-        if self.model.block(from).expect("checked").owner
-            != self.model.block(to).expect("checked").owner
-        {
+
+        let from_block = self.model.block(from).expect("checked");
+        let to_block = self.model.block(to).expect("checked");
+        let from_is_container = from_block.is_container();
+        let to_is_container = to_block.is_container();
+        let from_owner = from_block.owner;
+        let to_owner = to_block.owner;
+
+        // The container that owns the link, and the side of each of its two
+        // ends: the entry port of a container is an input and its exit port
+        // is an output.
+        let (container, source_is_input, target_is_input) = if from == to {
+            if !from_is_container {
+                return Err(FormatError::structural(
+                    from,
+                    "no se puede conectar un bloque consigo mismo",
+                ));
+            }
+            // The entry port of the container to its own exit port.
+            (from, true, false)
+        } else if from_is_container && to_owner == from {
+            // The entry port of the container to one of the blocks it holds.
+            (from, true, true)
+        } else if to_is_container && from_owner == to {
+            // One of the blocks the container holds to its own exit port.
+            (to, false, false)
+        } else if from_owner == to_owner {
+            // Two blocks that live in the same container.
+            (from_owner, false, true)
+        } else {
             return Err(FormatError::structural(
                 from,
                 "los bloques pertenecen a contenedores distintos",
             ));
-        }
-        let container = self.model.block(from).expect("checked").owner;
-        if self.model.block(from).expect("checked").output(from_ioid).is_none() {
+        };
+
+        if !has_port(self.model.block(from).expect("checked"), from_ioid, source_is_input) {
+            let side = if source_is_input { "entrada" } else { "salida" };
             return Err(FormatError::structural(
                 from,
-                format!("el bloque {from} no tiene el puerto de salida {from_ioid}"),
+                format!("el bloque {from} no tiene el puerto de {side} {from_ioid}"),
             ));
         }
-        if self.model.block(to).expect("checked").input(to_ioid).is_none() {
+        if !has_port(self.model.block(to).expect("checked"), to_ioid, target_is_input) {
+            let side = if target_is_input { "entrada" } else { "salida" };
             return Err(FormatError::structural(
                 to,
-                format!("el bloque {to} no tiene el puerto de entrada {to_ioid}"),
+                format!("el bloque {to} no tiene el puerto de {side} {to_ioid}"),
             ));
         }
+
         // The source port has a single successor: the link that starts
         // there is replaced by the new one. The links that end at the
         // target port stay: an input may receive from several blocks.
         let replaced: Vec<(usize, Link)> = self
             .model
             .block(container)
-            .expect("same owner, so the container exists")
+            .expect("the container exists")
             .links
             .iter()
             .enumerate()
@@ -621,27 +760,32 @@ impl EditSession {
         }
 
         // The two ends share one label: keep one that exists, else mint one.
-        let source_label = self
-            .model
-            .block(from)
-            .and_then(|b| b.output(from_ioid))
-            .and_then(Port::label)
-            .map(str::to_string);
-        let target_label = self
-            .model
-            .block(to)
-            .and_then(|b| b.input(to_ioid))
-            .and_then(Port::label)
-            .map(str::to_string);
+        let source_label = port_label(
+            self.model.block(from).expect("checked"),
+            from_ioid,
+            source_is_input,
+        );
+        let target_label = port_label(
+            self.model.block(to).expect("checked"),
+            to_ioid,
+            target_is_input,
+        );
         let label = match source_label.or(target_label) {
             Some(label) => label,
             None => {
-                let target_class = &self.model.block(to).expect("checked").class;
-                mint_label(&self.model, &format!("A_{target_class}"))
+                let target = self.model.block(to).expect("checked");
+                // A container has no class: its name is what tells one from
+                // another, so the label of the flow that leaves it names it.
+                let base = if target.is_container() {
+                    format!("A_{}", target.name)
+                } else {
+                    format!("A_{}", target.class)
+                };
+                mint_label(&self.model, &base)
             }
         };
-        self.set_port_label(from, from_ioid, false, &label, steps);
-        self.set_port_label(to, to_ioid, true, &label, steps);
+        self.set_port_label(from, from_ioid, source_is_input, &label, steps);
+        self.set_port_label(to, to_ioid, target_is_input, &label, steps);
 
         let link = Link {
             from_module: from,
@@ -969,9 +1113,38 @@ fn apply_steps(model: &mut GmdlModel, steps: &[UndoStep], forward: bool) -> Resu
                     }
                 }
             }
+            UndoStep::PortAdded { container, input, port } => {
+                if let Some(block) = model.block_mut(*container) {
+                    let ports = if *input { &mut block.inputs } else { &mut block.outputs };
+                    if forward {
+                        ports.push(port.clone());
+                    } else {
+                        ports.retain(|p| p.ioid != port.ioid);
+                    }
+                }
+            }
         }
     }
     Ok(())
+}
+
+/// Whether a block has the given port, on the side the link uses.
+fn has_port(block: &Block, ioid: u32, is_input: bool) -> bool {
+    if is_input {
+        block.input(ioid).is_some()
+    } else {
+        block.output(ioid).is_some()
+    }
+}
+
+/// The label of a port of a block, on the side the link uses.
+fn port_label(block: &Block, ioid: u32, is_input: bool) -> Option<String> {
+    let port = if is_input {
+        block.input(ioid)
+    } else {
+        block.output(ioid)
+    };
+    port.and_then(Port::label).map(str::to_string)
 }
 
 /// Remove the given links from a container's link list, by their two ends.
@@ -1398,6 +1571,29 @@ mod tests {
             .apply(EditCommand::Connect { from: 1, from_ioid: 1, to: 2, to_ioid: 7 })
             .expect_err("missing input port");
         assert!(err.to_string().contains("puerto de entrada 7"), "{err}");
+    }
+
+    /// A block is not connected to itself.
+    ///
+    /// The container is the only block that may name both ends of a link:
+    /// its entry port and its exit port.
+    #[test]
+    fn connect_refuses_a_block_connected_to_itself() {
+        let mut session = EditSession::new(model());
+        let before = crate::to_string(session.model());
+        let err = session
+            .apply(EditCommand::Connect { from: 1, from_ioid: 1, to: 1, to_ioid: 1 })
+            .expect_err("a block is not connected to itself");
+        assert!(
+            err.to_string().contains("no se puede conectar un bloque consigo mismo"),
+            "{err}"
+        );
+        assert_eq!(
+            crate::to_string(session.model()),
+            before,
+            "the refused command changed the model"
+        );
+        assert!(!session.can_undo());
     }
 
     #[test]

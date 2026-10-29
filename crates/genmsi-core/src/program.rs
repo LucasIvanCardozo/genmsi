@@ -2839,6 +2839,9 @@ impl Compiler<'_> {
     ///   (`(child, ioid) -> (container, ioid)`), so leaving continues in the
     ///   container's parent, where a link starts at `(container, ioid)`.
     ///
+    /// An entry port with no internal link starts at the container's first
+    /// child (the editor allows it, e.g. TP4's `EleccionProductos`).
+    ///
     /// Nested containers are followed until an activity block is reached.
     fn resolve_target(
         &self,
@@ -2876,25 +2879,43 @@ impl Compiler<'_> {
         else {
             return Ok(None);
         };
-        self.follow(link.to_module, link.to_ioid, entry_index, depth)
+        // The link belongs to the owner's scope, so the flow leaves the module
+        // (or the container) and continues with a sibling of the owner.
+        self.follow(link.to_module, link.to_ioid, owner.id, entry_index, depth)
     }
 
-    /// Continue from `(module, ioid)` after a link already reached it.
+    /// Continue from `(module, ioid)` after a link owned by `scope` reached it.
+    ///
+    /// `scope` is the container that owns the link the flow just travelled.
+    /// It tells an entry from an exit, because the port id cannot: the editor
+    /// gives a container the same id for its entry and its exit port, so a
+    /// container may use one id for both. A link owned by the container itself
+    /// ends at one of the container's output ports (the flow leaves), while a
+    /// link owned by the container's owner ends at one of its input ports (the
+    /// flow enters).
     fn follow(
         &self,
         module_id: u32,
         ioid: u32,
+        scope: u32,
         entry_index: &HashMap<u32, usize>,
         depth: usize,
     ) -> Result<Option<usize>, EngineError> {
+        if depth > 64 {
+            return Err(EngineError::Graph {
+                message: format!(
+                    "container cycle while resolving module {module_id} port {ioid}"
+                ),
+            });
+        }
         let module = self.model.block(module_id).ok_or_else(|| EngineError::Graph {
             message: format!("link points at missing module {module_id}"),
         })?;
         if !module.is_container() {
             return Ok(entry_index.get(&module_id).copied());
         }
-        // Exiting the container: the parent owns the continuation.
-        if module.outputs.iter().any(|port| port.ioid == ioid) {
+        // Exiting the container: the owner owns the continuation.
+        if scope == module_id {
             return self.resolve_in_owner(module_id, ioid, entry_index, depth + 1);
         }
         // Entering the container: an internal link may start at the port.
@@ -2904,10 +2925,11 @@ impl Compiler<'_> {
             .find(|link| link.from_module == module_id && link.from_ioid == ioid)
         {
             let (next_module, next_ioid) = (inner.to_module, inner.to_ioid);
-            return self.follow(next_module, next_ioid, entry_index, depth + 1);
+            return self.follow(next_module, next_ioid, module_id, entry_index, depth + 1);
         }
-        // The editor also allows an entry port without an explicit internal link;
-        // the flow then starts at the container's first child (lowest module id).
+        // The entry port has no internal link: the editor allows it (TP4's
+        // `EleccionProductos`), and the flow then starts at the container's
+        // first child (lowest module id).
         let first_child = self
             .model
             .blocks
@@ -2915,10 +2937,15 @@ impl Compiler<'_> {
             .filter(|block| block.owner == module_id && block.id != module_id)
             .min_by_key(|block| block.id);
         match first_child {
-            Some(child) if !child.is_container() => {
-                Ok(entry_index.get(&child.id).copied())
+            Some(child) if !child.is_container() => Ok(entry_index.get(&child.id).copied()),
+            Some(child) => {
+                // A container child is entered through its first input port.
+                let Some(port) = child.inputs.first() else {
+                    return Ok(None);
+                };
+                let port = port.ioid;
+                self.follow(child.id, port, module_id, entry_index, depth + 1)
             }
-            Some(child) => self.follow(child.id, ioid, entry_index, depth + 1),
             None => Ok(None),
         }
     }

@@ -41,7 +41,7 @@ pub use declaration::{
     UndeclaredEntity, declaration_warnings, undeclared_entities, validate_declarations,
 };
 pub use edit::{EditCommand, EditSession, Position, UndoStep};
-pub use layout::{compose_incomplete, is_composed, relayout};
+pub use layout::{compose_incomplete, is_composed, relayout, relayout_scope};
 pub use measure::{Composition, measure};
 pub use error::{FormatError, Location};
 pub use properties::{UndeclaredProperty, property_warnings, undeclared_properties};

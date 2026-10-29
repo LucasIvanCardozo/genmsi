@@ -10,6 +10,13 @@
 //! the borders of the containers spliced: the flow that enters a container
 //! goes to the block its entry port names, and the flow that leaves it comes
 //! from the block its exit port names.
+//!
+//! A **scope** —the root of the model, or the content of a container— has a
+//! flow of its own: the links it owns, with the borders of the containers
+//! nested in it spliced. A container nested in a scope is an atomic box, so
+//! the splice stops at the container: the flow that enters it ends there, and
+//! the flow that leaves it starts there. The ports of the scope are the ends
+//! of that flow.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -35,6 +42,85 @@ pub fn flow_edges_for(model: &GmdlModel) -> Vec<(u32, u32)> {
         list.sort_unstable();
     }
     without_cycles(&spliced_edges(model, &blocks, &children))
+}
+
+/// The flow of one scope: the links the scope owns.
+///
+/// A scope is the level the reader is looking at: the root of the model, or
+/// the content of a container. Its flow is made of the links it owns, and
+/// the borders of the containers nested in it are spliced: a container nested
+/// in the scope is an atomic box, so the flow that enters it ends at the
+/// container and the flow that leaves it starts there.
+///
+/// The ports of the scope are the ends of the flow. The direction of the link
+/// says which end a port is, not the port id: a link that **starts** at the
+/// scope is its entry port (the flow enters the scope there), and a link that
+/// **ends** at the scope is its exit port (the flow leaves the scope there).
+/// The editor gives a container the same id for its entry and its exit port,
+/// so a container may use one id for both.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ScopeFlow {
+    /// The links between the blocks of the scope.
+    pub edges: Vec<(u32, u32)>,
+    /// The entry ports of the scope: the port, and the block the flow enters.
+    pub entries: Vec<(u32, u32)>,
+    /// The exit ports of the scope: the block the flow leaves from, and the
+    /// port it leaves through.
+    pub exits: Vec<(u32, u32)>,
+}
+
+/// The flow of one scope: the links the scope owns, with the borders of the
+/// containers nested in it spliced.
+///
+/// The links that close a cycle are taken out, as in the flow of the whole
+/// model: the flow of a scope is still a flow, and the block the cycle comes
+/// back to is the start of it.
+pub fn scope_flow(model: &GmdlModel, scope: u32) -> ScopeFlow {
+    let Some(block) = model.block(scope) else {
+        return ScopeFlow::default();
+    };
+    // The blocks the scope owns: the ones it composes.
+    let children: BTreeSet<u32> = model
+        .blocks
+        .iter()
+        .filter(|child| child.owner == scope && child.id != scope)
+        .map(|child| child.id)
+        .collect();
+    let mut flow = ScopeFlow::default();
+    for link in &block.links {
+        let (from, to) = (link.from_module, link.to_module);
+        if from == to {
+            continue;
+        }
+        if from == scope {
+            // The flow enters the scope through its entry port.
+            if children.contains(&to) {
+                flow.entries.push((link.from_ioid, to));
+            }
+            continue;
+        }
+        if to == scope {
+            // The flow leaves the scope through its exit port.
+            if children.contains(&from) {
+                flow.exits.push((from, link.to_ioid));
+            }
+            continue;
+        }
+        // A link between two blocks of the scope. A container nested in the
+        // scope is one of them, and it is an atomic box: the splice stops
+        // there.
+        if children.contains(&from) && children.contains(&to) {
+            flow.edges.push((from, to));
+        }
+    }
+    flow.edges = without_cycles(&flow.edges);
+    flow.edges.sort_unstable();
+    flow.edges.dedup();
+    flow.entries.sort_unstable();
+    flow.entries.dedup();
+    flow.exits.sort_unstable();
+    flow.exits.dedup();
+    flow
 }
 
 /// The links between the blocks that simulate, with the borders of the

@@ -177,6 +177,7 @@ test("a link between two placed blocks becomes an edge", () => {
         to_ioid: 1,
         to_port: "Entrada1",
         label: null,
+        hops: [],
       },
     ],
   );
@@ -204,6 +205,7 @@ test("a link to a block the model does not place is not an edge", () => {
         to_ioid: 1,
         to_port: "Entrada1",
         label: null,
+        hops: [],
       },
     ],
   );
@@ -224,6 +226,7 @@ test("the link of a container leaves by the container's port", () => {
         to_ioid: 1,
         to_port: "Entrada1",
         label: null,
+        hops: [],
       },
     ],
   );
@@ -247,6 +250,7 @@ test("the edge that joins two blocks is found", () => {
         to_ioid: 1,
         to_port: "Entrada1",
         label: null,
+        hops: [],
       },
     ],
   );
@@ -351,6 +355,7 @@ test("graphOf scopes nodes and edges by container", () => {
         to_ioid: 1,
         to_port: "Entrada1",
         label: null,
+        hops: [],
       },
       // Edge inside container 10: 2 -> 3
       {
@@ -363,6 +368,7 @@ test("graphOf scopes nodes and edges by container", () => {
         to_ioid: 1,
         to_port: "Entrada1",
         label: null,
+        hops: [],
       },
     ],
   );

@@ -10,6 +10,7 @@ use serde::Serialize;
 
 use crate::glossary;
 use crate::program::Program;
+use crate::program::borders::{LinkKey, hops_of};
 use crate::sim::{RunResult, TraceEvent};
 use genmsi_format::{GmdlModel, percent_decode};
 
@@ -253,6 +254,21 @@ pub struct ModelEdge {
     pub to_port: String,
     /// Connection label shared by the two ends of the link.
     pub label: Option<String>,
+    /// The pairs of activity blocks this link carries: `(from, to)`, the
+    /// activity block the flow comes from and the one it goes to.
+    ///
+    /// The pairs are resolved **through the borders**: a link that enters a
+    /// container carries the pair (block outside, block inside), and the
+    /// container's own internal link that feeds that entry port carries the
+    /// same pair. A link between two activity blocks carries exactly that
+    /// pair.
+    ///
+    /// A link may carry several pairs: the exit of a container is fed by
+    /// several blocks of its inside, and an entry port may be fed by several
+    /// blocks of the scope above. The pairs are the moves the trace records
+    /// across the link, so a client can draw the entity that crosses it
+    /// without resolving the borders on its own.
+    pub hops: Vec<(u32, u32)>,
 }
 
 /// The ports of a block, in file order, with their decoded captions.
@@ -326,6 +342,10 @@ pub fn model_document(model: &GmdlModel, path: &str) -> ModelDocument {
         .collect();
 
     let mut edges = Vec::new();
+    // The pairs of activity blocks every link carries, resolved through the
+    // borders of the containers by the engine's one resolver (the same one
+    // the compiler uses to wire the program).
+    let hops = hops_of(model);
     for container in model.blocks.iter().filter(|block| block.is_container()) {
         for link in &container.links {
             let source = model.block(link.from_module);
@@ -351,6 +371,10 @@ pub fn model_document(model: &GmdlModel, path: &str) -> ModelDocument {
                 to_ioid: link.to_ioid,
                 to_port: to_port.map(|port| port.name.clone()).unwrap_or_default(),
                 label,
+                hops: hops
+                    .get(&LinkKey::new(container.id, link))
+                    .cloned()
+                    .unwrap_or_default(),
             });
         }
     }

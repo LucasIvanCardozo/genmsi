@@ -39,4 +39,21 @@ to_port: string,
 /**
  * Connection label shared by the two ends of the link.
  */
-label: string | null, };
+label: string | null, 
+/**
+ * The pairs of activity blocks this link carries: `(from, to)`, the
+ * activity block the flow comes from and the one it goes to.
+ *
+ * The pairs are resolved **through the borders**: a link that enters a
+ * container carries the pair (block outside, block inside), and the
+ * container's own internal link that feeds that entry port carries the
+ * same pair. A link between two activity blocks carries exactly that
+ * pair.
+ *
+ * A link may carry several pairs: the exit of a container is fed by
+ * several blocks of its inside, and an entry port may be fed by several
+ * blocks of the scope above. The pairs are the moves the trace records
+ * across the link, so a client can draw the entity that crosses it
+ * without resolving the borders on its own.
+ */
+hops: Array<[number, number]>, };

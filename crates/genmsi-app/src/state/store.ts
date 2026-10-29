@@ -10,6 +10,7 @@ import {
   type ReplayIndex,
   type TransitionIndex,
 } from "../monitor/replay";
+import { freeSpotOf } from "../graph/graph";
 import type {
   CatalogueDocument,
   Diagnostics,
@@ -132,6 +133,14 @@ export interface AppState {
   selectedBlockIds: number[];
   /** The container currently shown in the canvas (0 = model root). */
   activeContainerId: number;
+  /**
+   * The block the canvas has to follow, or `null` when there is none.
+   *
+   * A block that was just added is the one the reader wants to see: the
+   * canvas moves to it without framing the picture again, so the picture
+   * does not jump away from under the reader while he works.
+   */
+  focusBlockId: number | null;
   /** The blocks the user copied. */
   clipboard: number[];
   /** The seed the next run uses. */
@@ -326,23 +335,50 @@ function failureOf(
 }
 
 /**
- * A free spot for a new block: under the model, at its left.
+ * The container a dropped block joins.
  *
- * The spot stays inside the picture the author left, so the graph does not
- * grow every time a block is added and the view stays readable.
+ * A block dropped on the box of a container joins that container: the drop
+ * looks at the container under the pointer, as it did before the canvas
+ * learned to walk into a container. The containers it looks at are the ones
+ * the reader can see —the containers of the scope he is in— and the
+ * smallest one of them wins, because a container inside another one is the
+ * more specific one.
+ *
+ * A drop that lands on no container joins the scope itself.
+ *
+ * @param model the model of the picture
+ * @param scope the scope the reader is in
+ * @param x the horizontal position of the drop, in the pixels of the model
+ * @param y the vertical position of the drop, in the pixels of the model
  */
-function freeSpot(model: ModelBody, containerId = 0): { x: number; y: number } {
-  const placed = model.blocks.filter(
-    (block) => block.layout !== null && block.container === containerId && block.id !== 0,
-  );
-  if (placed.length === 0) {
-    return { x: 80, y: 80 };
-  }
-  const left = Math.min(...placed.map((block) => block.layout?.x ?? 0));
-  const bottom = Math.max(
-    ...placed.map((block) => (block.layout?.y ?? 0) + (block.layout?.height ?? 0)),
-  );
-  return { x: left, y: bottom + 40 };
+export function containerAt(
+  model: ModelBody,
+  scope: number,
+  x: number,
+  y: number,
+): number {
+  const hits = model.blocks
+    .filter((block) => {
+      if (block.kind !== "C" || block.container !== scope) {
+        return false;
+      }
+      const layout = block.layout;
+      if (layout === null) {
+        return false;
+      }
+      return (
+        x >= layout.x &&
+        x <= layout.x + layout.width &&
+        y >= layout.y &&
+        y <= layout.y + layout.height
+      );
+    })
+    .sort(
+      (a, b) =>
+        (a.layout?.width ?? 0) * (a.layout?.height ?? 0) -
+        (b.layout?.width ?? 0) * (b.layout?.height ?? 0),
+    );
+  return hits[0]?.id ?? scope;
 }
 
 /**
@@ -372,6 +408,7 @@ export const useApp = create<AppState>((set, get) => ({
   speed: 1,
   selectedBlockIds: [],
   activeContainerId: 0,
+  focusBlockId: null,
   clipboard: [],
   seed: randomSeed(),
   seedIsAuto: true,
@@ -435,6 +472,7 @@ export const useApp = create<AppState>((set, get) => ({
         playing: false,
         selectedBlockIds: [],
         activeContainerId: 0,
+        focusBlockId: null,
         clipboard: [],
         history: [],
         redoStack: [],
@@ -484,6 +522,7 @@ export const useApp = create<AppState>((set, get) => ({
         playing: false,
         selectedBlockIds: [],
         activeContainerId: 0,
+        focusBlockId: null,
         clipboard: [],
         history: [],
         redoStack: [],
@@ -724,7 +763,10 @@ export const useApp = create<AppState>((set, get) => ({
    * else made. A model that does not compile leaves the app as it was, with
    * the message of the compiler.
    */
-  setActiveContainerId: (id: number) => set({ activeContainerId: id }),
+  setActiveContainerId: (id: number) =>
+    // The scope changed: the block the canvas was following is not on the
+    // screen any more.
+    set({ activeContainerId: id, focusBlockId: null }),
 
   reloadFromDisk: async () => {
     const state = get();
@@ -946,16 +988,36 @@ export const useApp = create<AppState>((set, get) => ({
       });
       return;
     }
-    const spot = freeSpot(model, active);
-    const left = x ?? spot.x;
-    const top = y ?? spot.y;
+    // The blocks the model had before the new one: the block that was
+    // added is the one that was not there.
+    const before = new Set(model.blocks.map((block) => block.id));
+    // The free spot of the scope is computed in the scope's own space, and
+    // the model keeps the absolute coordinates: the position of the model
+    // is that spot plus the origin of the scope.
+    const spot = freeSpotOf(model, active);
+    const left = x ?? spot.position.x;
+    const top = y ?? spot.position.y;
+    // The drop looks at the container under the pointer: a block dropped on
+    // the box of a container joins that container.
+    const container = containerAt(model, active, left, top);
+    // A block that joins another container lands inside the picture of that
+    // container: the place it was dropped at belongs to the scope the
+    // reader was in, and not to the scope the block now belongs to.
+    const position =
+      container === active
+        ? { x: left, y: top }
+        : freeSpotOf(model, container).position;
     await get().apply({
       op: "addBlock",
       class: className,
-      container: active,
-      x: left,
-      y: top,
+      container,
+      x: position.x,
+      y: position.y,
     });
+    // The canvas follows the block that was just added: the picture moves
+    // to it, and it is not framed again.
+    const added = get().model?.blocks.find((block) => !before.has(block.id));
+    set({ focusBlockId: added?.id ?? null });
   },
 
   deleteSelection: async () => {

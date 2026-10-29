@@ -60,6 +60,7 @@ export default function MonitorView({
     selectedBlockIds,
     activeContainerId,
     setActiveContainerId,
+    focusBlockId,
     select,
     catalogue,
     diagnostics,
@@ -463,6 +464,7 @@ export default function MonitorView({
                 fitSignal={fitSignal}
                 containerId={activeContainerId}
                 onOpenContainer={setActiveContainerId}
+                focusBlockId={focusBlockId}
               />
             </div>
           </div>

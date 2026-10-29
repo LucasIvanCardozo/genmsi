@@ -371,6 +371,7 @@ export default memo(function GraphView({
   extraEdges = NO_EXTRA_EDGES,
   containerId = 0,
   onOpenContainer,
+  focusBlockId = null,
 }: {
   model: ModelBody;
   actions: GraphActions;
@@ -385,6 +386,14 @@ export default memo(function GraphView({
   containerId?: number;
   /** Navigate into a child container. */
   onOpenContainer?: (id: number) => void;
+  /**
+   * The block the canvas has to follow, or `null` when there is none.
+   *
+   * The canvas moves to the block that was just added: the picture is not
+   * framed again, because the picture must not jump away from under the
+   * reader while he works.
+   */
+  focusBlockId?: number | null;
 }) {
   const [nodes, setNodes] = useState<Node<BlockData>[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -397,6 +406,9 @@ export default memo(function GraphView({
   // The blocks the user had selected, so a change of the model does not take
   // the selection away.
   const selected = useRef<Set<string>>(new Set());
+  // The block the canvas already followed, so a change of the picture does
+  // not take the reader back to it.
+  const followed = useRef<number | null>(null);
 
   useEffect(() => {
     const graph = graphOf(model, containerId);
@@ -437,6 +449,34 @@ export default memo(function GraphView({
       fitFlow(instance.current, graph.nodes);
     }
   }, [model, extraEdges, fitSignal, containerId]);
+
+  // The canvas follows the block that was just added.
+  //
+  // The picture moves to the block, and it is not framed again: the reader
+  // keeps the zoom he has, and the picture does not jump away from under
+  // him while he works. The block is looked for in the nodes of the
+  // picture, so the effect runs again when the picture is drawn.
+  useEffect(() => {
+    if (focusBlockId === null || followed.current === focusBlockId) {
+      return;
+    }
+    const flow = instance.current;
+    if (flow === null) {
+      return;
+    }
+    const node = nodes.find((candidate) => candidate.id === String(focusBlockId));
+    if (node === undefined) {
+      return;
+    }
+    followed.current = focusBlockId;
+    const width = node.measured?.width ?? widthOf(node);
+    const height = node.measured?.height ?? heightOf(node);
+    flow.setCenter(node.position.x + width / 2, node.position.y + height / 2, {
+      zoom: flow.getZoom(),
+      duration: 300,
+    });
+  }, [focusBlockId, nodes]);
+
   const onNodesChange = useCallback((changes: NodeChange<Node<BlockData>>[]) => {
     setNodes((current) => applyNodeChanges(changes, current));
   }, []);
@@ -498,6 +538,8 @@ export default memo(function GraphView({
           x: event.clientX,
           y: event.clientY,
         });
+        // The place on the canvas is the place in the model: the picture is
+        // not translated, and the model keeps the absolute coordinates.
         actions.onDropBlock(className, Math.round(position.x), Math.round(position.y));
       }
     },
@@ -558,6 +600,9 @@ export default memo(function GraphView({
           if (node.id.startsWith("in-") || node.id.startsWith("out-")) {
             return;
           }
+          // The place on the canvas is the place in the model: the picture
+          // is not translated, so a drag of a block moves that block and
+          // nothing else.
           actions.onMove(Number(node.id), Math.round(node.position.x), Math.round(node.position.y));
         }}
         onConnect={onConnect}
@@ -624,4 +669,22 @@ function fitFlow(instance: ReactFlowInstance<Node<BlockData>, Edge> | null, node
     // model does not become a block the size of the window.
     maxZoom: 1.25,
   });
+}
+
+/**
+ * The width of a node, in pixels.
+ *
+ * The node carries the size the picture gave it in its style, and the
+ * library measures it once it is on the screen. The measured one is the
+ * truth; the style is what the node was drawn at.
+ */
+function widthOf(node: Node<BlockData>): number {
+  return typeof node.style?.width === "number" ? node.style.width : 0;
+}
+
+/**
+ * The height of a node, in pixels.
+ */
+function heightOf(node: Node<BlockData>): number {
+  return typeof node.style?.height === "number" ? node.style.height : 0;
 }

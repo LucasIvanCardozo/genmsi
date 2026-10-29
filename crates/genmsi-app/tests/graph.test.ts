@@ -112,7 +112,7 @@ test("an activity block carries the size the model gives it", () => {
   assert.deepEqual(nodes[0].data.size, { width: 116, height: 31 });
 });
 
-test("the doors of a container keep their id and their place", () => {
+test("the doors of a container keep their id and join their block", () => {
   const model = modelOf([
     block(10, "", {
       kind: "C",
@@ -129,10 +129,11 @@ test("the doors of a container keep their id and their place", () => {
   assert.ok(exit !== undefined, "the exit door is a node");
   assert.equal(entry.data.kind, "PortIn");
   assert.equal(exit.data.kind, "PortOut");
-  // The doors keep the places they had: where they sit is another unit of
-  // work, and this one does not move them.
-  assert.deepEqual(entry.position, { x: 120, y: 30 });
-  assert.deepEqual(exit.position, { x: 120, y: 420 });
+  // The doors are drawn beside the block they join, and not in a fixed
+  // place: this scope has no block of its own, so its doors go to the
+  // corner of the scope, which is the only place the picture has.
+  assert.deepEqual(entry.position, { x: 0, y: 0 });
+  assert.deepEqual(exit.position, { x: 0, y: 0 });
   // The handle of a door is the plain id of its port: React Flow resolves
   // an edge by handle id, and a mismatch makes the edge disappear.
   assert.deepEqual(entry.data.outputs, [{ ioid: 1, name: "Entrada1" }]);

@@ -9,6 +9,10 @@
  *
  * - how a block of the model becomes a **node** of the picture, and how a
  *   link becomes an **edge** (`graphOf`);
+ * - the **origin** of a scope and the **place of its doors**: a scope is a
+ *   canvas of its own, its free spot is measured from its corner, and the
+ *   doors of a container are drawn beside the block they join
+ *   (`scopeOrigin`, `scopeBlocks`, `doorPlacement`, `freeSpotOf`);
  * - which **link** of a scope carries a move of the trace, so the entity
  *   that travels is seen crossing the border of a container (`routesOf`);
  * - where the **ports** of a block sit, so a link leaves the block by the
@@ -117,20 +121,256 @@ function kindOf(block: ModelBlock): BlockKind {
 }
 
 /**
+ * A point in the pixels of the model.
+ *
+ * The model places its blocks in the pixels of its own canvas, and the
+ * canvas of a scope draws them from the corner of that scope: a point of
+ * the model and a point of the canvas are two ways of saying where a
+ * block is.
+ */
+export interface Point {
+  /** The horizontal position, in pixels. */
+  x: number;
+  /** The vertical position, in pixels. */
+  y: number;
+}
+
+/**
+ * The blocks a scope holds, in the order of the model.
+ *
+ * A scope is the level the reader is in: the root of the model (0) or a
+ * container. The blocks it holds are the ones that name it as their
+ * container, and only the ones the model places: a block without a place
+ * is not drawn.
+ */
+export function scopeBlocks(model: ModelBody, scope: number): ModelBlock[] {
+  return model.blocks.filter(
+    (block) => block.container === scope && block.id !== 0 && block.layout !== null,
+  );
+}
+
+/**
+ * The origin of a scope: the corner of the blocks the scope holds.
+ *
+ * A scope is a canvas of its own, and its picture starts where the author
+ * put its blocks: the rule is the one the composition of the engine uses
+ * (`scope_origin` in `crates/genmsi-format/src/layout.rs`).
+ *
+ * The origin is the frame the free spot of the scope is measured in
+ * (`freeSpotOf`): the spot is under the lowest block of the scope, and the
+ * position of the model is that spot plus this corner. The drawing of the
+ * picture is **not** translated by it: the blocks are drawn where the model
+ * places them, so a drag of a block moves that block and nothing else.
+ *
+ * A scope with no block of its own has no corner: its origin is the
+ * origin of the canvas, (0, 0).
+ */
+export function scopeOrigin(model: ModelBody, scope: number): Point {
+  let x = Number.POSITIVE_INFINITY;
+  let y = Number.POSITIVE_INFINITY;
+  for (const block of scopeBlocks(model, scope)) {
+    const layout = block.layout;
+    if (layout === null) {
+      continue;
+    }
+    x = Math.min(x, layout.x);
+    y = Math.min(y, layout.y);
+  }
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    return { x: 0, y: 0 };
+  }
+  return { x, y };
+}
+
+/**
+ * The air between a door and the block it joins, in pixels.
+ *
+ * The door and the block are neighbours, not one thing on top of the
+ * other: the link that joins them is drawn between the two, and it needs
+ * the room to be seen.
+ */
+export const DOOR_GAP = 8;
+
+/**
+ * The place of a door of a container, and the block it joins.
+ */
+export interface DoorPlacement {
+  /** Where the door goes, in the pixels of the model. */
+  position: Point;
+  /**
+   * The block the door joins, or `null` when the scope has no block to
+   * join it to.
+   */
+  joins: number | null;
+}
+
+/**
+ * The block a door of a container joins.
+ *
+ * The entry door joins the block its internal link points at: the link of
+ * the scope that goes from the port to that block. The exit door joins the
+ * block whose link ends at the port. When several links end at the port,
+ * the first one of the model is the one the door joins: the door is one
+ * door, and the picture cannot show it twice.
+ */
+function joinedBlock(
+  model: ModelBody,
+  scope: number,
+  kind: "PortIn" | "PortOut",
+  ioid: number,
+): ModelBlock | null {
+  for (const edge of model.edges) {
+    if (edge.container !== scope) {
+      continue;
+    }
+    if (kind === "PortIn") {
+      if (edge.from_module !== scope || edge.from_ioid !== ioid) {
+        continue;
+      }
+      const block = model.blocks.find((candidate) => candidate.id === edge.to_module);
+      if (block !== undefined && block.layout !== null) {
+        return block;
+      }
+    } else {
+      if (edge.to_module !== scope || edge.to_ioid !== ioid) {
+        continue;
+      }
+      const block = model.blocks.find((candidate) => candidate.id === edge.from_module);
+      if (block !== undefined && block.layout !== null) {
+        return block;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * The first block of a scope, in the order of the model.
+ *
+ * It is the block a door with no internal link is drawn beside: the editor
+ * lets a port of a container stay without a link, and the door of that port
+ * has no block of its own to join.
+ */
+function firstBlockOfScope(model: ModelBody, scope: number): ModelBlock | null {
+  return scopeBlocks(model, scope)[0] ?? null;
+}
+
+/**
+ * The door of a port of a container: where it goes and the block it joins.
+ *
+ * The entry door is drawn just **above** the block its internal link points
+ * at, and the exit door just **below** the block whose link ends at the
+ * port. A port with no internal link is drawn beside the first block of
+ * the scope.
+ *
+ * The door has no place of its own in the model: the place it is drawn at
+ * is the place of the block it joins, and nothing else. No door floats in a
+ * fixed position, and none of them moves when another door is added.
+ *
+ * @param model the model of the picture
+ * @param scope the container the doors belong to
+ * @param kind whether the door is the entry one or the exit one
+ * @param ioid the port the door opens or closes
+ */
+export function doorPlacement(
+  model: ModelBody,
+  scope: number,
+  kind: "PortIn" | "PortOut",
+  ioid: number,
+): DoorPlacement {
+  const joined = joinedBlock(model, scope, kind, ioid);
+  const anchor = joined ?? firstBlockOfScope(model, scope);
+  if (anchor === null || anchor.layout === null) {
+    // The scope has no block to draw the door beside: the door goes to the
+    // corner of the scope, which is the only place the picture has.
+    return { position: { x: 0, y: 0 }, joins: null };
+  }
+  const layout = anchor.layout;
+  // The door is centred on the block it joins, so the link between the two
+  // is a straight line and the reader sees which block the door feeds.
+  const x = layout.x + (layout.width - DOOR_BOX.width) / 2;
+  const y =
+    kind === "PortIn"
+      ? layout.y - DOOR_BOX.height - DOOR_GAP
+      : layout.y + layout.height + DOOR_GAP;
+  return { position: { x, y }, joins: anchor.id };
+}
+
+/**
+ * The free spot of a scope: where a new block goes.
+ */
+export interface FreeSpot {
+  /**
+   * The spot in the scope's own space: under the lowest block the scope
+   * holds, at the left of its picture.
+   */
+  spot: Point;
+  /**
+   * The position of the block in the model: the spot plus the origin of the
+   * scope, because the model keeps the absolute coordinates.
+   */
+  position: Point;
+}
+
+/**
+ * The free spot of a scope, in the scope's own space and in the model.
+ *
+ * The spot is computed in the space of the scope —under the lowest block
+ * the scope holds— and the position of the model is that spot plus the
+ * origin of the scope. A block added inside a container therefore lands
+ * inside the picture the reader is looking at, and not far away from it.
+ *
+ * A scope with no block of its own has its spot at (80, 80): the picture
+ * starts there.
+ */
+export function freeSpotOf(model: ModelBody, scope: number): FreeSpot {
+  const origin = scopeOrigin(model, scope);
+  const blocks = scopeBlocks(model, scope);
+  if (blocks.length === 0) {
+    const spot = { x: 80, y: 80 };
+    return { spot, position: { x: spot.x + origin.x, y: spot.y + origin.y } };
+  }
+  let left = Number.POSITIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  for (const block of blocks) {
+    const layout = block.layout;
+    if (layout === null) {
+      continue;
+    }
+    left = Math.min(left, layout.x - origin.x);
+    bottom = Math.max(bottom, layout.y - origin.y + layout.height);
+  }
+  const spot = { x: left, y: bottom + 40 };
+  return {
+    spot,
+    position: { x: spot.x + origin.x, y: spot.y + origin.y },
+  };
+}
+
+/**
  * The nodes and the edges of the model's graph.
  *
  * The blocks are placed with the geometry the `.gmdl` carries, so the picture
  * is the one the original editor drew. When containerId is provided, only
  * the blocks and edges belonging to that container scope are returned.
+ *
+ * A scope is a canvas of its own: the picture shows the blocks of the scope
+ * and the doors of the container, and the doors are drawn beside the block
+ * they join. The blocks are drawn **where the model places them**: the
+ * picture is not translated, so the place of a block on the canvas is the
+ * place the model gives it, and a drag of a block moves that block and
+ * nothing else.
  */
 export function graphOf(
   model: ModelBody,
   containerId?: number | null,
 ): { nodes: Node<BlockData>[]; edges: Edge[] } {
   const isScoped = containerId !== undefined && containerId !== null;
+  // The scope of the picture: the root of the model when there is none.
+  const scope = containerId ?? 0;
   const parentContainer =
-    isScoped && containerId !== 0
-      ? model.blocks.find((b) => b.id === containerId) ?? null
+    isScoped && scope !== 0
+      ? model.blocks.find((b) => b.id === scope) ?? null
       : null;
 
   const placed = new Map<number, ModelBlock>();
@@ -139,7 +379,7 @@ export function graphOf(
   for (const block of model.blocks) {
     if (block.layout === null) continue;
     if (isScoped) {
-      if (block.container === containerId && block.id !== 0) {
+      if (block.container === scope && block.id !== 0) {
         placed.set(block.id, block);
         scopedBlocks.push(block);
       }
@@ -152,7 +392,12 @@ export function graphOf(
   const nodes: Node<BlockData>[] = scopedBlocks.map((block) => ({
     id: String(block.id),
     type: "bloque",
-    position: { x: block.layout?.x ?? 0, y: block.layout?.y ?? 0 },
+    // The node is drawn where the model places it: the picture is not
+    // translated, and the canvas of a scope is the canvas of the model.
+    position: {
+      x: block.layout?.x ?? 0,
+      y: block.layout?.y ?? 0,
+    },
     data: {
       title: titleOf(block),
       subtitle: subtitleOf(block),
@@ -184,12 +429,17 @@ export function graphOf(
 
   // When inside a container, project its declared inputs and outputs as boundary port nodes
   if (parentContainer !== null) {
-    for (let index = 0; index < parentContainer.inputs.length; index += 1) {
-      const port = parentContainer.inputs[index];
+    for (const port of parentContainer.inputs) {
+      // The door is drawn beside the block it joins: the entry door goes
+      // just above the block its internal link points at.
+      const door = doorPlacement(model, scope, "PortIn", port.ioid);
       nodes.push({
         id: `in-${port.ioid}`,
         type: "bloque",
-        position: { x: 120 + index * 180, y: 30 },
+        position: {
+          x: door.position.x,
+          y: door.position.y,
+        },
         data: {
           title: port.name || `Entrada ${port.ioid}`,
           subtitle: "Entrada de submódulo",
@@ -206,12 +456,17 @@ export function graphOf(
       });
     }
 
-    for (let index = 0; index < parentContainer.outputs.length; index += 1) {
-      const port = parentContainer.outputs[index];
+    for (const port of parentContainer.outputs) {
+      // The exit door goes just below the block whose link ends at the
+      // port.
+      const door = doorPlacement(model, scope, "PortOut", port.ioid);
       nodes.push({
         id: `out-${port.ioid}`,
         type: "bloque",
-        position: { x: 120 + index * 180, y: 420 },
+        position: {
+          x: door.position.x,
+          y: door.position.y,
+        },
         data: {
           title: port.name || `Salida ${port.ioid}`,
           subtitle: "Salida de submódulo",

@@ -460,6 +460,26 @@ registra el evento *leave* del bloque 13 (el Leave ✓), que es el primer salto
 del movimiento que sale ✗. Eso ya no es de la app ✗: es del motor ✗ (o del
 formato del trace ✓), y es la unidad que sigue ✓.
 
+### L14 — Lo que se arregló y lo que se midió
+
+**P1 — el reordenamiento** (`ae662ca`) ✓ **arreglado y medido** ✓: con un
+módulo cuyo flujo es sólo sus puertas (el del usuario ✓), después de
+reacomodar las puertas quedan **una cadena al lado de la otra** ✓ (la entrada
+encima de la salida que alimenta ✓, 74 px de aire ✓), no apiladas en una
+columna ✓.
+
+**P2 — las cifras del contenedor** (`069f10a`) ✓ **arreglado y medido** ✓: el
+Organizador del concurso de pesca muestra **39/39** ✓ (39 entidades dentro ✓,
+39 que entraron ✓) — antes 0/0 ✓.
+
+**P3 — el círculo al salir** (`069f10a`) ✓ **a medio camino** ✓: el movimiento
+que cruza una frontera **ya no se pierde** ✓ (los movimientos que entran al
+contenedor existen ✓: 287 → 308 ✓). Falta la última pieza ✓: el círculo
+sigue sin verse en el camino de salida ✗ — el trace del concurso de pesca no
+registra el evento *leave* del bloque 13 (el Leave ✓), que es el primer salto
+del movimiento que sale ✗. Eso ya no es de la app ✗: es del motor ✗ (o del
+formato del trace ✓), y es la unidad que sigue ✓.
+
 ### L13 — T8: el motor compone las puertas que se hablan entre sí (hecho)
 
 **T8 (`ae662ca`)** — el flujo de un ámbito alcanza ahora los enlaces que van

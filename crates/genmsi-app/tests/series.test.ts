@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { countAt, cumulative, histogram, segmentsOf, seriesFrom } from "../src/monitor/series.ts";
+import { countAt, cumulative, histogram, histogramRows, segmentsOf, seriesFrom } from "../src/monitor/series.ts";
 
 /** The points of one entity. */
 function points(...rows: [number, number][]): Map<string, { time: number; value: number }[]> {
@@ -130,4 +130,16 @@ test("the segments of a facility stop at the instant the reader is at", () => {
     { start: 3, end: 4, busy: true },
     { start: 4, end: 5, busy: false },
   ]);
+});
+
+test("the intervals of a table histogram are correctly stepped", () => {
+  const rows = histogramRows({ first: 10, width: 5, intervals: 4 }, [2, 5, 3, 1]);
+  assert.equal(rows.length, 4);
+  assert.equal(rows[0].label, "0 - 10");
+  assert.equal(rows[1].label, "10 - 15");
+  assert.equal(rows[2].label, "15 - 20");
+  assert.equal(rows[3].label, "> 20");
+  assert.equal(rows[3].overflowClass, true);
+  assert.equal(rows[1].x, 12.5);
+  assert.equal(rows[2].x, 17.5);
 });

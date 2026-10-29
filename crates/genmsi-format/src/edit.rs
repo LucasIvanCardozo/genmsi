@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::catalogue::{build_block, class_spec};
 use crate::error::FormatError;
-use crate::model::{Block, GmdlModel, Layout, Link, Port};
-
+use crate::layout::{DOOR_HEIGHT, DOOR_WIDTH};
+use crate::model::{Block, ContainerHeader, GmdlModel, Layout, Link, Port, PortLayout, SectionKind};
 /// Default size of a freshly created block (the original editor's small box).
 ///
 /// The size of a block comes from its class (the original's class library
@@ -43,6 +43,33 @@ pub struct Position {
     #[serde(default)]
     pub width: Option<i32>,
     /// The new height, when the block changes its size.
+    #[serde(default)]
+    pub height: Option<i32>,
+}
+
+/// One requested door position (the payload of [`EditCommand::SetLayouts`]).
+///
+/// A door is a port of a container, and it is a block of the picture in its
+/// own right: the composition of a scope places it like it places any other
+/// block, and its place travels in the model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct PortPosition {
+    /// The container that owns the door.
+    pub block: u32,
+    /// The id of the door inside the container.
+    pub ioid: u32,
+    /// Whether the door is an entry one.
+    pub input: bool,
+    /// Horizontal position.
+    pub x: i32,
+    /// Vertical position.
+    pub y: i32,
+    /// The new width, when the door changes its size.
+    #[serde(default)]
+    pub width: Option<i32>,
+    /// The new height, when the door changes its size.
     #[serde(default)]
     pub height: Option<i32>,
 }
@@ -90,8 +117,44 @@ pub enum EditCommand {
     SetLayouts {
         /// One position per block.
         positions: Vec<Position>,
+        /// One position per door of the scope that was composed.
+        #[serde(default)]
+        ports: Vec<PortPosition>,
+    },
+    /// Move a door of a container.
+    ///
+    /// A door is a block of the picture in its own right: the reader drags it
+    /// where he wants it, and its place is kept.
+    MovePort {
+        /// The container that owns the door.
+        block: u32,
+        /// The id of the door inside the container.
+        ioid: u32,
+        /// Whether the door is an entry one.
+        input: bool,
+        /// Horizontal position.
+        x: i32,
+        /// Vertical position.
+        y: i32,
+    },
+    /// Remove a door of a container.
+    ///
+    /// The links that touch the door go with it: a link that starts at a
+    /// door that is gone, or that ends at it, is a link that cannot be.
+    RemovePort {
+        /// The container that owns the door.
+        block: u32,
+        /// The id of the door inside the container.
+        ioid: u32,
+        /// Whether the door is an entry one.
+        input: bool,
     },
     /// Connect an output port to an input port of a sibling block.
+    ///
+    /// The link may also cross the border of a container: the entry port of
+    /// a container is the source of the link that brings the flow into it,
+    /// and its exit port is the target of the link that takes the flow out
+    /// of it.
     Connect {
         /// Source block id.
         from: u32,
@@ -179,6 +242,30 @@ pub enum UndoStep {
         /// Layout after.
         new: Option<Layout>,
     },
+    /// A door's place changed.
+    PortLayoutSet {
+        /// The container that owns the door.
+        block: u32,
+        /// The id of the door inside the container.
+        ioid: u32,
+        /// Whether the door is an entry one.
+        input: bool,
+        /// The place before.
+        old: Option<PortLayout>,
+        /// The place after.
+        new: Option<PortLayout>,
+    },
+    /// A door of a container was removed.
+    PortRemoved {
+        /// The container that owns the door.
+        block: u32,
+        /// Whether the door was an entry one.
+        input: bool,
+        /// The index the door had in the list of the doors of its kind.
+        index: usize,
+        /// The door as it was.
+        port: Box<Port>,
+    },
     /// A property's raw value changed.
     PropertyChanged {
         /// Block id.
@@ -211,6 +298,15 @@ pub enum UndoStep {
         old: String,
         /// Label after.
         new: String,
+    },
+    /// A port was added to a container.
+    PortAdded {
+        /// Owning container id.
+        container: u32,
+        /// Whether the port is an input port.
+        input: bool,
+        /// The port that was added.
+        port: Port,
     },
 }
 
@@ -327,8 +423,22 @@ impl EditSession {
                 self.move_block(id, x, y, &mut *steps)?;
                 Vec::new()
             }
-            EditCommand::SetLayouts { positions } => {
-                self.set_layouts(&positions, &mut *steps)?;
+            EditCommand::SetLayouts { positions, ports } => {
+                self.set_layouts(&positions, &ports, &mut *steps)?;
+                Vec::new()
+            }
+            EditCommand::MovePort {
+                block,
+                ioid,
+                input,
+                x,
+                y,
+            } => {
+                self.move_port(block, ioid, input, x, y, &mut *steps)?;
+                Vec::new()
+            }
+            EditCommand::RemovePort { block, ioid, input } => {
+                self.remove_port(block, ioid, input, &mut *steps)?;
                 Vec::new()
             }
             EditCommand::Connect {
@@ -404,23 +514,125 @@ impl EditSession {
                 format!("el bloque {container} no es un contenedor"),
             ));
         }
-        // A new block is born with the footprint of its class: the original
-        // editor's class library declares the size of every class, and the
-        // block that is drawn has to fit the shape of that class.
-        let (width, height) = class_spec(class)
-            .map(|spec| (spec.width, spec.height))
-            .unwrap_or((DEFAULT_WIDTH, DEFAULT_HEIGHT));
-        let mut block = build_block(
-            class,
-            container,
-            Some(Layout {
-                width,
-                height,
-                x,
-                y,
-            }),
-        )?;
-        block.id = fresh_id(&self.model);
+        let block = if class == "Container" || class == "Contenedor" {
+            let id = fresh_id(&self.model);
+            Block {
+                id,
+                class: String::new(),
+                kind: 'C',
+                owner: container,
+                name: format!("Modulo{id}"),
+                caption: format!("Modulo {id}"),
+                layout: Some(Layout { width: 160, height: 56, x, y }),
+                header: Some(ContainerHeader::default()),
+                // The container is born empty: it has no doors of its own.
+                // The reader adds the entry and the exit he needs, and they
+                // are the same doors any other door is.
+                inputs: Vec::new(),
+                outputs: Vec::new(),
+                links: Vec::new(),
+                props: Vec::new(),
+                sections: vec![SectionKind::Inputs, SectionKind::Outputs, SectionKind::Links],
+                source: None,
+            }
+        } else if class == "PortIn" || class == "Entrada" {
+            if container == 0 {
+                return Err(FormatError::structural(
+                    container,
+                    "las entradas de submódulo sólo pueden colocarse dentro de un contenedor",
+                ));
+            }
+            let block = self.model.block_mut(container).ok_or_else(|| {
+                FormatError::structural(container, format!("no existe el contenedor {container}"))
+            })?;
+            // The ports of a container share one numbering: the id of a
+            // port never names two ports of the same container, so the new
+            // port comes after the highest id of any of them.
+            let max_ioid = block
+                .inputs
+                .iter()
+                .chain(&block.outputs)
+                .map(|p| p.ioid)
+                .max()
+                .unwrap_or(0);
+            let ioid = max_ioid + 1;
+            // The door is a block of the picture from the first moment: it
+            // is born where the reader dropped it, and its place lives in
+            // the model like the place of any other block.
+            let port = Port {
+                ioid,
+                name: format!("Entrada{ioid}"),
+                caption: String::new(),
+                mylabel: String::new(),
+                layout: Some(PortLayout {
+                    width: DOOR_WIDTH,
+                    height: DOOR_HEIGHT,
+                    x,
+                    y,
+                }),
+            };
+            block.inputs.push(port.clone());
+            steps.push(UndoStep::PortAdded { container, input: true, port });
+            return Ok(container);
+        } else if class == "PortOut" || class == "Salida" {
+            if container == 0 {
+                return Err(FormatError::structural(
+                    container,
+                    "las salidas de submódulo sólo pueden colocarse dentro de un contenedor",
+                ));
+            }
+            let block = self.model.block_mut(container).ok_or_else(|| {
+                FormatError::structural(container, format!("no existe el contenedor {container}"))
+            })?;
+            // The ports of a container share one numbering: the id of a
+            // port never names two ports of the same container, so the new
+            // port comes after the highest id of any of them.
+            let max_ioid = block
+                .inputs
+                .iter()
+                .chain(&block.outputs)
+                .map(|p| p.ioid)
+                .max()
+                .unwrap_or(0);
+            let ioid = max_ioid + 1;
+            // The door is a block of the picture from the first moment: it
+            // is born where the reader dropped it, and its place lives in
+            // the model like the place of any other block.
+            let port = Port {
+                ioid,
+                name: format!("Salida{ioid}"),
+                caption: String::new(),
+                mylabel: String::new(),
+                layout: Some(PortLayout {
+                    width: DOOR_WIDTH,
+                    height: DOOR_HEIGHT,
+                    x,
+                    y,
+                }),
+            };
+            block.outputs.push(port.clone());
+            steps.push(UndoStep::PortAdded { container, input: false, port });
+            return Ok(container);
+        } else {
+            // A new block is born with the footprint of its class: the original
+            // editor's class library declares the size of every class, and the
+            // block that is drawn has to fit the shape of that class.
+            let (width, height) = class_spec(class)
+                .map(|spec| (spec.width, spec.height))
+                .unwrap_or((DEFAULT_WIDTH, DEFAULT_HEIGHT));
+            let mut b = build_block(
+                class,
+                container,
+                Some(Layout {
+                    width,
+                    height,
+                    x,
+                    y,
+                }),
+            )?;
+            b.id = fresh_id(&self.model);
+            b
+        };
         let index = self.model.blocks.len();
         self.model.blocks.push(block.clone());
         steps.push(UndoStep::BlockAdded { index, block: Box::new(block) });
@@ -514,7 +726,12 @@ impl EditSession {
         Ok(())
     }
 
-    fn set_layouts(&mut self, positions: &[Position], steps: &mut Vec<UndoStep>) -> Result<(), FormatError> {
+    fn set_layouts(
+        &mut self,
+        positions: &[Position],
+        ports: &[PortPosition],
+        steps: &mut Vec<UndoStep>,
+    ) -> Result<(), FormatError> {
         for position in positions {
             self.require_block(position.id)?;
             let old = self.model.block(position.id).expect("checked").layout;
@@ -536,6 +753,110 @@ impl EditSession {
                 new: Some(new),
             });
         }
+        for port in ports {
+            self.set_port_layout(port, steps)?;
+        }
+        Ok(())
+    }
+
+    /// The place of a door of a container.
+    ///
+    /// The place of a door of a container is in the canvas of the scope the
+    /// container holds: it is where the door is drawn, next to the block it
+    /// joins. It is **not** relative to the box of the container: the
+    /// container is a box of its own, and the door is not part of it.
+    fn set_port_layout(
+        &mut self,
+        port: &PortPosition,
+        steps: &mut Vec<UndoStep>,
+    ) -> Result<(), FormatError> {
+        self.require_block(port.block)?;
+        let old = self
+            .model
+            .block(port.block)
+            .expect("checked")
+            .port_of(port.ioid, port.input)
+            .and_then(|found| found.layout);
+        let new = PortLayout {
+            width: port.width.unwrap_or(old.map(|old| old.width).unwrap_or(0)),
+            height: port.height.unwrap_or(old.map(|old| old.height).unwrap_or(0)),
+            x: port.x,
+            y: port.y,
+        };
+        let mut placed = false;
+        if let Some(block) = self.model.block_mut(port.block) {
+            let ports = if port.input {
+                &mut block.inputs
+            } else {
+                &mut block.outputs
+            };
+            if let Some(found) = ports.iter_mut().find(|p| p.ioid == port.ioid) {
+                found.layout = Some(new);
+                placed = true;
+            }
+        }
+        if !placed {
+            return Err(FormatError::structural(
+                port.block,
+                format!("el puerto {} no existe", port.ioid),
+            ));
+        }
+        steps.push(UndoStep::PortLayoutSet {
+            block: port.block,
+            ioid: port.ioid,
+            input: port.input,
+            old,
+            new: Some(new),
+        });
+        Ok(())
+    }
+
+    /// Move a door of a container to a new place.
+    fn move_port(
+        &mut self,
+        block: u32,
+        ioid: u32,
+        input: bool,
+        x: i32,
+        y: i32,
+        steps: &mut Vec<UndoStep>,
+    ) -> Result<(), FormatError> {
+        let old = self
+            .model
+            .block(block)
+            .and_then(|found| found.port_of(ioid, input))
+            .and_then(|found| found.layout);
+        let new = PortLayout {
+            width: old.map(|old| old.width).unwrap_or(0),
+            height: old.map(|old| old.height).unwrap_or(0),
+            x,
+            y,
+        };
+        let mut placed = false;
+        if let Some(block) = self.model.block_mut(block) {
+            let ports = if input {
+                &mut block.inputs
+            } else {
+                &mut block.outputs
+            };
+            if let Some(found) = ports.iter_mut().find(|p| p.ioid == ioid) {
+                found.layout = Some(new);
+                placed = true;
+            }
+        }
+        if !placed {
+            return Err(FormatError::structural(
+                block,
+                format!("el puerto {ioid} no existe"),
+            ));
+        }
+        steps.push(UndoStep::PortLayoutSet {
+            block,
+            ioid,
+            input,
+            old,
+            new: Some(new),
+        });
         Ok(())
     }
 
@@ -556,12 +877,83 @@ impl EditSession {
         }
     }
 
+    /// Remove a door of a container, and the links that touch it.
+    ///
+    /// A link that starts at a door that is gone, or that ends at it, is a
+    /// link that cannot be: it goes with the door.
+    fn remove_port(
+        &mut self,
+        block: u32,
+        ioid: u32,
+        input: bool,
+        steps: &mut Vec<UndoStep>,
+    ) -> Result<(), FormatError> {
+        self.require_block(block)?;
+        // The links that touch the door: the ones that bring the flow into
+        // it, for an entry door; the ones that take the flow out of it, for
+        // an exit door.
+        let removed_links: Vec<(usize, Link)> = self
+            .model
+            .block(block)
+            .expect("checked")
+            .links
+            .iter()
+            .enumerate()
+            .filter(|(_, link)| {
+                if input {
+                    link.from_module == block && link.from_ioid == ioid
+                } else {
+                    link.to_module == block && link.to_ioid == ioid
+                }
+            })
+            .map(|(index, link)| (index, link.clone()))
+            .collect();
+        if !removed_links.is_empty() {
+            remove_links(&mut self.model, block, &removed_links);
+            steps.push(UndoStep::LinksRemoved {
+                container: block,
+                links: removed_links,
+            });
+        }
+        // And the door itself.
+        let mut removed = None;
+        if let Some(owner) = self.model.block_mut(block) {
+            let ports = if input {
+                &mut owner.inputs
+            } else {
+                &mut owner.outputs
+            };
+            if let Some(index) = ports.iter().position(|port| port.ioid == ioid) {
+                removed = Some((index, ports.remove(index)));
+            }
+        }
+        let Some((index, port)) = removed else {
+            return Err(FormatError::structural(
+                block,
+                format!("el puerto {ioid} no existe"),
+            ));
+        };
+        steps.push(UndoStep::PortRemoved {
+            block,
+            input,
+            index,
+            port: Box::new(port),
+        });
+        Ok(())
+    }
+
     /// Connect an output port to an input port of a sibling block.
     ///
     /// A port has a single successor, so the link that starts at the
     /// source port is replaced by the new one. An input port may receive
     /// from several blocks (as the reference models do), so the links that
     /// end at the target port are kept.
+    ///
+    /// The link may cross the border of a container, the way the reference
+    /// models write it: the entry port of a container is the source of the
+    /// link that brings the flow into it, and its exit port is the target
+    /// of the link that takes the flow out of it. The link belongs to the
+    /// container in every case.
     fn connect(
         &mut self,
         from: u32,
@@ -572,40 +964,64 @@ impl EditSession {
     ) -> Result<(), FormatError> {
         self.require_block(from)?;
         self.require_block(to)?;
-        if from == to {
-            return Err(FormatError::structural(
-                from,
-                "no se puede conectar un bloque consigo mismo",
-            ));
-        }
-        if self.model.block(from).expect("checked").owner
-            != self.model.block(to).expect("checked").owner
-        {
+
+        let from_block = self.model.block(from).expect("checked");
+        let to_block = self.model.block(to).expect("checked");
+        let from_is_container = from_block.is_container();
+        let to_is_container = to_block.is_container();
+        let from_owner = from_block.owner;
+        let to_owner = to_block.owner;
+
+        // The container that owns the link, and the side of each of its two
+        // ends: the entry port of a container is an input and its exit port
+        // is an output.
+        let (container, source_is_input, target_is_input) = if from == to {
+            if !from_is_container {
+                return Err(FormatError::structural(
+                    from,
+                    "no se puede conectar un bloque consigo mismo",
+                ));
+            }
+            // The entry port of the container to its own exit port.
+            (from, true, false)
+        } else if from_is_container && to_owner == from {
+            // The entry port of the container to one of the blocks it holds.
+            (from, true, true)
+        } else if to_is_container && from_owner == to {
+            // One of the blocks the container holds to its own exit port.
+            (to, false, false)
+        } else if from_owner == to_owner {
+            // Two blocks that live in the same container.
+            (from_owner, false, true)
+        } else {
             return Err(FormatError::structural(
                 from,
                 "los bloques pertenecen a contenedores distintos",
             ));
-        }
-        let container = self.model.block(from).expect("checked").owner;
-        if self.model.block(from).expect("checked").output(from_ioid).is_none() {
+        };
+
+        if !has_port(self.model.block(from).expect("checked"), from_ioid, source_is_input) {
+            let side = if source_is_input { "entrada" } else { "salida" };
             return Err(FormatError::structural(
                 from,
-                format!("el bloque {from} no tiene el puerto de salida {from_ioid}"),
+                format!("el bloque {from} no tiene el puerto de {side} {from_ioid}"),
             ));
         }
-        if self.model.block(to).expect("checked").input(to_ioid).is_none() {
+        if !has_port(self.model.block(to).expect("checked"), to_ioid, target_is_input) {
+            let side = if target_is_input { "entrada" } else { "salida" };
             return Err(FormatError::structural(
                 to,
-                format!("el bloque {to} no tiene el puerto de entrada {to_ioid}"),
+                format!("el bloque {to} no tiene el puerto de {side} {to_ioid}"),
             ));
         }
+
         // The source port has a single successor: the link that starts
         // there is replaced by the new one. The links that end at the
         // target port stay: an input may receive from several blocks.
         let replaced: Vec<(usize, Link)> = self
             .model
             .block(container)
-            .expect("same owner, so the container exists")
+            .expect("the container exists")
             .links
             .iter()
             .enumerate()
@@ -621,27 +1037,32 @@ impl EditSession {
         }
 
         // The two ends share one label: keep one that exists, else mint one.
-        let source_label = self
-            .model
-            .block(from)
-            .and_then(|b| b.output(from_ioid))
-            .and_then(Port::label)
-            .map(str::to_string);
-        let target_label = self
-            .model
-            .block(to)
-            .and_then(|b| b.input(to_ioid))
-            .and_then(Port::label)
-            .map(str::to_string);
+        let source_label = port_label(
+            self.model.block(from).expect("checked"),
+            from_ioid,
+            source_is_input,
+        );
+        let target_label = port_label(
+            self.model.block(to).expect("checked"),
+            to_ioid,
+            target_is_input,
+        );
         let label = match source_label.or(target_label) {
             Some(label) => label,
             None => {
-                let target_class = &self.model.block(to).expect("checked").class;
-                mint_label(&self.model, &format!("A_{target_class}"))
+                let target = self.model.block(to).expect("checked");
+                // A container has no class: its name is what tells one from
+                // another, so the label of the flow that leaves it names it.
+                let base = if target.is_container() {
+                    format!("A_{}", target.name)
+                } else {
+                    format!("A_{}", target.class)
+                };
+                mint_label(&self.model, &base)
             }
         };
-        self.set_port_label(from, from_ioid, false, &label, steps);
-        self.set_port_label(to, to_ioid, true, &label, steps);
+        self.set_port_label(from, from_ioid, source_is_input, &label, steps);
+        self.set_port_label(to, to_ioid, target_is_input, &label, steps);
 
         let link = Link {
             from_module: from,
@@ -933,6 +1354,25 @@ fn apply_steps(model: &mut GmdlModel, steps: &[UndoStep], forward: bool) -> Resu
                     block.layout = layout;
                 }
             }
+            UndoStep::PortLayoutSet {
+                block,
+                ioid,
+                input,
+                old,
+                new,
+            } => {
+                let layout = if forward { *new } else { *old };
+                if let Some(b) = model.block_mut(*block) {
+                    let ports = if *input {
+                        &mut b.inputs
+                    } else {
+                        &mut b.outputs
+                    };
+                    if let Some(port) = ports.iter_mut().find(|p| p.ioid == *ioid) {
+                        port.layout = layout;
+                    }
+                }
+            }
             UndoStep::PropertyChanged {
                 id,
                 property,
@@ -969,9 +1409,57 @@ fn apply_steps(model: &mut GmdlModel, steps: &[UndoStep], forward: bool) -> Resu
                     }
                 }
             }
+            UndoStep::PortAdded { container, input, port } => {
+                if let Some(block) = model.block_mut(*container) {
+                    let ports = if *input { &mut block.inputs } else { &mut block.outputs };
+                    if forward {
+                        ports.push(port.clone());
+                    } else {
+                        ports.retain(|p| p.ioid != port.ioid);
+                    }
+                }
+            }
+            UndoStep::PortRemoved {
+                block,
+                input,
+                index,
+                port,
+            } => {
+                if forward {
+                    return Ok(());
+                }
+                if let Some(owner) = model.block_mut(*block) {
+                    let ports = if *input {
+                        &mut owner.inputs
+                    } else {
+                        &mut owner.outputs
+                    };
+                    let index = (*index).min(ports.len());
+                    ports.insert(index, port.as_ref().clone());
+                }
+            }
         }
     }
     Ok(())
+}
+
+/// Whether a block has the given port, on the side the link uses.
+fn has_port(block: &Block, ioid: u32, is_input: bool) -> bool {
+    if is_input {
+        block.input(ioid).is_some()
+    } else {
+        block.output(ioid).is_some()
+    }
+}
+
+/// The label of a port of a block, on the side the link uses.
+fn port_label(block: &Block, ioid: u32, is_input: bool) -> Option<String> {
+    let port = if is_input {
+        block.input(ioid)
+    } else {
+        block.output(ioid)
+    };
+    port.and_then(Port::label).map(str::to_string)
 }
 
 /// Remove the given links from a container's link list, by their two ends.
@@ -1031,6 +1519,18 @@ mod tests {
 <module moduleid="0" moduleclass="main" owner="0" caption="m" name="m" kind="C" genprefer="" exehead="" nonexehead="" exefoot="" nonexefoot=""><links><link frommoduleid="1" fromioid="1" tomoduleid="2" toioid="1"/></links><inputs/><outputs/></module>\
 <module moduleid="1" moduleclass="Generate" owner="0" caption="g" name="Generate" kind="A" width="120" height="63" x="10" y="20"><outputs><output ioid="1" name="Salida1" caption="" mylabel="A_Queue"/></outputs><props><property name="Media" hint="Tiempo%20Medio" value="60" type="TSNA" subType="SNA" visible="1" unique="0"/></props></module>\
 <module moduleid="2" moduleclass="Terminate" owner="0" caption="t" name="Terminate" kind="A" width="84" height="64" x="100" y="200"><inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Queue"/></inputs><props><property name="Unidades" hint="" value="1" type="TSNA" subType="SNA" visible="1" unique="0"/></props></module>\
+</modules></gmodel>"#,
+        )
+        .expect("parses")
+    }
+
+    /// A model with a container that has a door.
+    fn model_with_door() -> GmdlModel {
+        parse_str(
+            r#"<gmodel versioncode="1"><gclasses/><modules>\
+<module moduleid="0" moduleclass="main" owner="0" caption="m" name="m" kind="C" genprefer="" exehead="" nonexehead="" exefoot="" nonexefoot=""><links><link frommoduleid="1" fromioid="1" tomoduleid="2" toioid="1"/><link frommoduleid="0" fromioid="1" tomoduleid="2" toioid="1"/></links><inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Queue"/></inputs><outputs/></module>\
+<module moduleid="1" moduleclass="Generate" owner="0" caption="g" name="Generate" kind="A" width="120" height="63" x="10" y="20"><outputs><output ioid="1" name="Salida1" caption="" mylabel="A_Queue"/></outputs></module>\
+<module moduleid="2" moduleclass="Terminate" owner="0" caption="t" name="Terminate" kind="A" width="84" height="64" x="100" y="200"><inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Queue"/></inputs></module>\
 </modules></gmodel>"#,
         )
         .expect("parses")
@@ -1261,6 +1761,7 @@ mod tests {
                     Position { id: 1, x: 1, y: 1, width: None, height: None },
                     Position { id: 2, x: 2, y: 2, width: None, height: None },
                 ],
+                ports: Vec::new(),
             })
             .expect("sets");
         assert_eq!(session.model().block(1).expect("b").layout.unwrap().x, 1);
@@ -1270,6 +1771,182 @@ mod tests {
         assert_eq!(session.model().block(1).expect("b").layout.unwrap().x, 10);
         assert_eq!(session.model().block(2).expect("b").layout.unwrap().x, 100);
         assert!(!session.can_undo());
+    }
+
+    #[test]
+    fn a_door_keeps_the_place_the_composition_gave_it() {
+        // A door is a block of the picture: the composition writes its
+        // place, and the undo brings the old one back.
+        let mut session = EditSession::new(model_with_door());
+        let container = 0u32;
+        let ioid = 1u32;
+        session
+            .apply(EditCommand::SetLayouts {
+                positions: Vec::new(),
+                ports: vec![PortPosition {
+                    block: container,
+                    ioid,
+                    input: true,
+                    x: 320,
+                    y: 78,
+                    width: Some(140),
+                    height: Some(44),
+                }],
+            })
+            .expect("sets the place of the door");
+        let door = session
+            .model()
+            .block(container)
+            .expect("container")
+            .input(ioid)
+            .expect("door")
+            .layout
+            .expect("the door has a place");
+        assert_eq!((door.x, door.y), (320, 78), "the door did not take the place");
+        assert_eq!(door.width, 140, "the door did not take the size");
+
+        // And the undo brings the old place back.
+        session.undo().expect("undoes");
+        assert!(
+            session
+                .model()
+                .block(container)
+                .expect("container")
+                .input(ioid)
+                .expect("door")
+                .layout
+                .is_none(),
+            "the door kept the place after the undo"
+        );
+    }
+
+    #[test]
+    fn a_container_is_born_empty() {
+        // The container is a box of its own: it has no doors until the reader
+        // puts the ones he needs.
+        let mut session = EditSession::new(model());
+        session
+            .apply(EditCommand::AddBlock {
+                class: "Container".into(),
+                container: 0,
+                x: 10,
+                y: 20,
+            })
+            .expect("adds the container");
+        let container = session.model().block(3).expect("the container");
+        assert!(container.inputs.is_empty(), "the container came with an entry");
+        assert!(container.outputs.is_empty(), "the container came with an exit");
+    }
+
+    #[test]
+    fn a_door_can_be_removed_and_comes_back_with_the_undo() {
+        // A door the reader regrets is a door the reader takes away: the
+        // links that touch it go with it, and the undo brings everything
+        // back.
+        let mut session = EditSession::new(model_with_door());
+        session
+            .apply(EditCommand::RemovePort {
+                block: 0,
+                ioid: 1,
+                input: true,
+            })
+            .expect("removes the door");
+        let container = session.model().block(0).expect("the container");
+        assert!(container.input(1).is_none(), "the door is still there");
+        // The link that started at the door went with it.
+        assert_eq!(
+            container.links.len(),
+            1,
+            "the link of the door is still there"
+        );
+        // And the undo brings the door and its link back.
+        session.undo().expect("undoes");
+        let container = session.model().block(0).expect("the container");
+        assert!(container.input(1).is_some(), "the door did not come back");
+        assert_eq!(container.links.len(), 2, "the link did not come back");
+    }
+
+    #[test]
+    fn removing_a_door_that_does_not_exist_is_an_error() {
+        let mut session = EditSession::new(model_with_door());
+        let error = session
+            .apply(EditCommand::RemovePort {
+                block: 0,
+                ioid: 9,
+                input: true,
+            })
+            .expect_err("the door does not exist");
+        assert!(
+            error.to_string().contains("9"),
+            "the error does not name the door: {error}"
+        );
+    }
+
+    #[test]
+    fn a_door_is_born_where_the_reader_drops_it() {
+        // The door is a block of the picture from the first moment: it is
+        // born with the place the reader dropped it, and that place lives
+        // in the model.
+        let mut session = EditSession::new(model());
+        let container = session
+            .apply(EditCommand::AddBlock {
+                class: "Container".into(),
+                container: 0,
+                x: 0,
+                y: 0,
+            })
+            .expect("adds the container")[0];
+        session
+            .apply(EditCommand::AddBlock {
+                class: "PortIn".into(),
+                container,
+                x: 320,
+                y: 78,
+            })
+            .expect("adds the door");
+        let container = session.model().block(container).expect("the container");
+        let door = container.inputs.last().expect("the door is there");
+        let layout = door.layout.expect("the door has a place");
+        assert_eq!((layout.x, layout.y), (320, 78), "the door is not where it was dropped");
+        assert_eq!(layout.width, DOOR_WIDTH, "the door is not the size of a door");
+        assert_eq!(layout.height, DOOR_HEIGHT, "the door is not the size of a door");
+    }
+
+    #[test]
+    fn a_door_moves_where_the_reader_drops_it() {
+        let mut session = EditSession::new(model_with_door());
+        let container = 0u32;
+        let ioid = 1u32;
+        session
+            .apply(EditCommand::MovePort {
+                block: container,
+                ioid,
+                input: true,
+                x: 11,
+                y: 22,
+            })
+            .expect("moves the door");
+        let door = session
+            .model()
+            .block(container)
+            .expect("container")
+            .input(ioid)
+            .expect("door")
+            .layout
+            .expect("the door has a place");
+        assert_eq!((door.x, door.y), (11, 22), "the door did not move");
+        session.undo().expect("undoes");
+        assert!(
+            session
+                .model()
+                .block(container)
+                .expect("container")
+                .input(ioid)
+                .expect("door")
+                .layout
+                .is_none(),
+            "the door kept the place after the undo"
+        );
     }
 
     #[test]
@@ -1398,6 +2075,29 @@ mod tests {
             .apply(EditCommand::Connect { from: 1, from_ioid: 1, to: 2, to_ioid: 7 })
             .expect_err("missing input port");
         assert!(err.to_string().contains("puerto de entrada 7"), "{err}");
+    }
+
+    /// A block is not connected to itself.
+    ///
+    /// The container is the only block that may name both ends of a link:
+    /// its entry port and its exit port.
+    #[test]
+    fn connect_refuses_a_block_connected_to_itself() {
+        let mut session = EditSession::new(model());
+        let before = crate::to_string(session.model());
+        let err = session
+            .apply(EditCommand::Connect { from: 1, from_ioid: 1, to: 1, to_ioid: 1 })
+            .expect_err("a block is not connected to itself");
+        assert!(
+            err.to_string().contains("no se puede conectar un bloque consigo mismo"),
+            "{err}"
+        );
+        assert_eq!(
+            crate::to_string(session.model()),
+            before,
+            "the refused command changed the model"
+        );
+        assert!(!session.can_undo());
     }
 
     #[test]
@@ -1640,6 +2340,7 @@ mod tests {
                     Position { id: 1, x: 1, y: 1, width: None, height: None },
                     Position { id: 999, x: 2, y: 2, width: None, height: None },
                 ],
+                ports: Vec::new(),
             })
             .expect_err("the unknown block is refused");
         assert!(error.to_string().contains("999"), "{error}");
@@ -1685,6 +2386,7 @@ mod tests {
                     Position { id: 1, x: 1, y: 1, width: None, height: None },
                     Position { id: 2, x: 2, y: 2, width: None, height: None },
                 ],
+                ports: Vec::new(),
             })
             .expect("sets");
         assert!(session.can_undo());

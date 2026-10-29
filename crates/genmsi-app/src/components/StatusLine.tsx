@@ -23,6 +23,7 @@ export default function StatusLine({
   pendingSave,
   onConfirmSave,
   onDismissSave,
+  onClearFailure,
 }: {
   /** What the model in memory compiles to. */
   diagnostics: Diagnostics | null;
@@ -36,6 +37,8 @@ export default function StatusLine({
   onConfirmSave: () => void;
   /** Answer the confirmation of a save with no. */
   onDismissSave: () => void;
+  /** Clear the failure or notice banner. */
+  onClearFailure?: () => void;
 }) {
   // The light: it starts again when a new thing that needs the eye
   // arrives, and when the same thing comes back.
@@ -99,8 +102,25 @@ export default function StatusLine({
             : "border-sky-200 bg-sky-50 text-sky-900"
         }`}
       >
-        {failed && <p className="font-semibold">La corrida falló</p>}
-        <p className={failed ? "mt-0.5" : undefined}>{failure.message}</p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            {failed && <p className="font-semibold">La corrida falló</p>}
+            <p className={failed ? "mt-0.5" : undefined}>{failure.message}</p>
+          </div>
+          {onClearFailure && (
+            <button
+              type="button"
+              onClick={onClearFailure}
+              className={`rounded px-1 text-xs font-semibold hover:opacity-75 ${
+                failed ? "text-rose-700" : "text-sky-700"
+              }`}
+              title="Cerrar aviso"
+              aria-label="Cerrar aviso"
+            >
+              ×
+            </button>
+          )}
+        </div>
       </div>
     );
   }

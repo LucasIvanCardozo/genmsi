@@ -63,15 +63,10 @@ export function blockRows(
   model: ModelBody | null,
   state: ReplayState | null,
 ): BlockRow[] {
-  const generators = new Set(
-    (model?.blocks ?? [])
-      .filter((block) => block.class === "Generate")
-      .map((block) => block.id),
-  );
   const counts: Map<number, LiveCounts> =
     state === null
       ? new Map()
-      : countsOf(report.blocks, state, generators);
+      : countsOf(report.blocks, state);
 
   // The retries of every program row, and the rows that count their block.
   const retries = new Map<number, number>();

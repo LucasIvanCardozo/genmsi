@@ -39,12 +39,20 @@ export default function PropertiesPanel({
   catalogue,
   onSetProperty,
   onSetCaption,
+  onOpenContainer,
 }: {
   block: ModelBlock | null;
   catalogue: CatalogueDocument | null;
   onSetProperty: (id: number, property: string, value: string) => void;
   onSetCaption: (id: number, caption: string) => void;
+  onOpenContainer?: (id: number) => void;
 }) {
+  const [draftCaption, setDraftCaption] = useState(block?.caption ?? "");
+
+  useEffect(() => {
+    setDraftCaption(block?.caption ?? "");
+  }, [block?.id, block?.caption]);
+
   if (block === null) {
     return (
       <p className="px-1 py-6 text-sm text-slate-500">
@@ -52,6 +60,13 @@ export default function PropertiesPanel({
       </p>
     );
   }
+
+  const commitCaption = () => {
+    const trimmed = draftCaption.trim();
+    if (trimmed !== block.caption) {
+      onSetCaption(block.id, trimmed);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -76,13 +91,24 @@ export default function PropertiesPanel({
           id="caption"
           aria-label="Título del bloque"
           className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-          defaultValue={block.caption}
-          onBlur={(event) => {
-            if (event.target.value !== block.caption) {
-              onSetCaption(block.id, event.target.value);
+          value={draftCaption}
+          onChange={(event) => setDraftCaption(event.target.value)}
+          onBlur={commitCaption}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              commitCaption();
             }
           }}
         />
+        {block.kind === "C" && onOpenContainer && (
+          <button
+            type="button"
+            onClick={() => onOpenContainer(block.id)}
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-indigo-700 transition"
+          >
+            <span>↗ Entrar al submódulo</span>
+          </button>
+        )}
       </div>
 
       <div>
@@ -93,18 +119,20 @@ export default function PropertiesPanel({
           <p className="mt-2 text-xs text-slate-500">Este bloque no declara propiedades.</p>
         ) : (
           <div className="mt-2 flex flex-col gap-2">
-            {block.properties.map((property) => (
-              <PropertyEditor
-                key={property.name}
-                blockId={block.id}
-                name={property.name}
-                value={property.value}
-                ty={property.ty}
-                subtype={property.subtype}
-                options={optionsOf(catalogue, block.class, property.name)}
-                onCommit={(value) => onSetProperty(block.id, property.name, value)}
-              />
-            ))}
+            {block.properties
+              .filter((property) => property.visible)
+              .map((property) => (
+                <PropertyEditor
+                  key={property.name}
+                  blockId={block.id}
+                  name={property.name}
+                  value={property.value}
+                  ty={property.ty}
+                  subtype={property.subtype}
+                  options={optionsOf(catalogue, block.class, property.name)}
+                  onCommit={(value) => onSetProperty(block.id, property.name, value)}
+                />
+              ))}
           </div>
         )}
       </div>
@@ -173,13 +201,15 @@ function PropertyEditor({
 
   useEffect(() => {
     setDraft(value);
+    setProblem(null);
   }, [value]);
 
   const commit = () => {
-    const failure = validateProperty(spec, draft);
+    const trimmed = draft.trim();
+    const failure = validateProperty(spec, trimmed);
     setProblem(failure);
-    if (failure === null && draft !== value) {
-      onCommit(draft);
+    if (failure === null && trimmed !== value) {
+      onCommit(trimmed);
     }
   };
 
@@ -224,8 +254,8 @@ function PropertyEditor({
         <input
           id={`property-${blockId}-${name}`}
           aria-label={name}
-          type={editor === "integer" || editor === "number" || editor === "percent" ? "number" : "text"}
-          min={editor === "integer" ? 1 : undefined}
+          type="text"
+          inputMode={editor === "integer" || editor === "number" || editor === "percent" ? "decimal" : "text"}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onBlur={commit}

@@ -12,6 +12,7 @@ import {
   pointOnBezier,
   portSpread,
 } from "../src/graph/graph.ts";
+import { DOOR_BOX } from "../src/graph/frames.ts";
 import type { ModelBody } from "../src/types/index.ts";
 
 /** A block of the model, as the engine publishes it. */
@@ -54,8 +55,8 @@ test("a block of the model becomes a node of the picture", () => {
     block(1, "Queue", {
       caption: "Cola de espera",
       label: "cola",
-      inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null }],
-      outputs: [{ ioid: 2, name: "Salida1", caption: "", label: null }],
+      inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null, layout: null }],
+      outputs: [{ ioid: 2, name: "Salida1", caption: "", label: null, layout: null }],
     }),
   ]);
   const { nodes } = graphOf(model);
@@ -83,6 +84,64 @@ test("a container is a node of its own", () => {
   assert.equal(nodes[0].data.title, "Contenedor");
   assert.equal(nodes[0].data.kind, "C");
   assert.equal(nodes[0].zIndex, 0);
+});
+
+test("the container is drawn at the size the model gives it", () => {
+  // The container is a block with a box of its own, and that box is the
+  // one the model carries: the canvas does not invent a size for it.
+  const model = modelOf([
+    block(1, "", {
+      kind: "C",
+      class: "",
+      layout: { x: 327, y: 215, width: 153, height: 39 },
+    }),
+  ]);
+  const { nodes } = graphOf(model);
+  assert.equal(nodes[0].style?.width, 153);
+  assert.equal(nodes[0].style?.height, 39);
+  // And the size travels with the node, so the drawing can use it.
+  assert.deepEqual(nodes[0].data.size, { width: 153, height: 39 });
+});
+
+test("an activity block carries the size the model gives it", () => {
+  // The class of the block decides how big it is drawn, but the size of
+  // the model travels with the node all the same.
+  const model = modelOf([
+    block(1, "Queue", { layout: { x: 10, y: 20, width: 116, height: 31 } }),
+  ]);
+  const { nodes } = graphOf(model);
+  assert.deepEqual(nodes[0].data.size, { width: 116, height: 31 });
+});
+
+test("the doors of a container keep their id and join their block", () => {
+  const model = modelOf([
+    block(10, "", {
+      kind: "C",
+      class: "",
+      container: 0,
+      inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null, layout: null }],
+      outputs: [{ ioid: 1, name: "Salida1", caption: "", label: null, layout: null }],
+    }),
+  ]);
+  const { nodes } = graphOf(model, 10);
+  const entry = nodes.find((node) => node.id === "in-1");
+  const exit = nodes.find((node) => node.id === "out-1");
+  assert.ok(entry !== undefined, "the entry door is a node");
+  assert.ok(exit !== undefined, "the exit door is a node");
+  assert.equal(entry.data.kind, "PortIn");
+  assert.equal(exit.data.kind, "PortOut");
+  // The doors have no place of their own yet, so they go to the free spot
+  // of the scope, one under the other: two doors never share a place.
+  assert.deepEqual(entry.position, { x: 80, y: 80 });
+  assert.deepEqual(exit.position, { x: 80, y: 80 + DOOR_BOX.height + 8 });
+  // The handle of a door is the plain id of its port: React Flow resolves
+  // an edge by handle id, and a mismatch makes the edge disappear.
+  assert.deepEqual(entry.data.outputs, [{ ioid: 1, name: "Entrada1" }]);
+  assert.deepEqual(exit.data.inputs, [{ ioid: 1, name: "Salida1" }]);
+  // And the door has no size in the model: it is drawn at the size of its
+  // own silhouette.
+  assert.equal(entry.data.size, null);
+  assert.equal(exit.data.size, null);
 });
 
 test("a container is the frame around what it holds, and it does not move", () => {
@@ -119,6 +178,7 @@ test("a link between two placed blocks becomes an edge", () => {
         to_ioid: 1,
         to_port: "Entrada1",
         label: null,
+        hops: [],
       },
     ],
   );
@@ -146,6 +206,7 @@ test("a link to a block the model does not place is not an edge", () => {
         to_ioid: 1,
         to_port: "Entrada1",
         label: null,
+        hops: [],
       },
     ],
   );
@@ -166,6 +227,7 @@ test("the link of a container leaves by the container's port", () => {
         to_ioid: 1,
         to_port: "Entrada1",
         label: null,
+        hops: [],
       },
     ],
   );
@@ -189,6 +251,7 @@ test("the edge that joins two blocks is found", () => {
         to_ioid: 1,
         to_port: "Entrada1",
         label: null,
+        hops: [],
       },
     ],
   );
@@ -263,4 +326,69 @@ test("a ball travels the curve at the same speed all along", () => {
   // jump.
   assert.ok(Math.abs(first - second) < first * 0.2, `${first} against ${second}`);
   assert.ok(quarter.x < half.x && half.x < threeQuarters.x);
+});
+
+test("graphOf scopes nodes and edges by container", () => {
+  const model = modelOf(
+    [
+      // Root level: container 10 and block 1
+      block(10, "", {
+        kind: "C",
+        class: "",
+        container: 0,
+        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null, layout: null }],
+        outputs: [{ ioid: 1, name: "Salida1", caption: "", label: null, layout: null }],
+      }),
+      block(1, "Queue", { container: 0 }),
+      // Inside container 10: blocks 2 and 3
+      block(2, "Generate", { container: 10 }),
+      block(3, "Advance", { container: 10 }),
+    ],
+    [
+      // Edge in root: 1 -> 10
+      {
+        id: "0:1:1->10:1",
+        container: 0,
+        from_module: 1,
+        from_ioid: 1,
+        from_port: "Salida1",
+        to_module: 10,
+        to_ioid: 1,
+        to_port: "Entrada1",
+        label: null,
+        hops: [],
+      },
+      // Edge inside container 10: 2 -> 3
+      {
+        id: "10:2:1->3:1",
+        container: 10,
+        from_module: 2,
+        from_ioid: 1,
+        from_port: "Salida1",
+        to_module: 3,
+        to_ioid: 1,
+        to_port: "Entrada1",
+        label: null,
+        hops: [],
+      },
+    ],
+  );
+
+  // Root view: containerId = 0
+  const root = graphOf(model, 0);
+  assert.equal(root.nodes.length, 2, "root shows 2 nodes (container 10 and block 1)");
+  assert.ok(root.nodes.some((n) => n.id === "10"));
+  assert.ok(root.nodes.some((n) => n.id === "1"));
+  assert.equal(root.edges.length, 1);
+  assert.equal(root.edges[0].id, "0:1:1->10:1");
+
+  // Sub-container view: containerId = 10
+  const sub = graphOf(model, 10);
+  assert.equal(sub.nodes.length, 4, "sub-container shows blocks 2, 3 and boundary ports in-1, out-1");
+  assert.ok(sub.nodes.some((n) => n.id === "2"));
+  assert.ok(sub.nodes.some((n) => n.id === "3"));
+  assert.ok(sub.nodes.some((n) => n.id === "in-1"));
+  assert.ok(sub.nodes.some((n) => n.id === "out-1"));
+  assert.equal(sub.edges.length, 1);
+  assert.equal(sub.edges[0].id, "10:2:1->3:1");
 });

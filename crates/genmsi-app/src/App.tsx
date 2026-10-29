@@ -137,6 +137,13 @@ export default function App() {
     () => ({
       onSelect: select,
       onMove: (id: number, x: number, y: number) => void apply({ op: "moveBlock", id, x, y }),
+      onMovePort: (
+        container: number,
+        ioid: number,
+        input: boolean,
+        x: number,
+        y: number,
+      ) => void apply({ op: "movePort", block: container, ioid, input, x, y }),
       onConnect: (from: number, fromIoid: number, to: number, toIoid: number) =>
         void apply({ op: "connect", from, fromIoid, to, toIoid }),
       onRemove: (ids: number[]) => {
@@ -146,6 +153,8 @@ export default function App() {
           void apply({ op: "removeBlocks", ids });
         }
       },
+      onRemovePort: (container: number, ioid: number, input: boolean) =>
+        void apply({ op: "removePort", block: container, ioid, input }),
       onDisconnect: (container: number, from: number, fromIoid: number) =>
         void apply({ op: "disconnect", container, from, fromIoid }),
       onDropBlock: (className: string, x: number, y: number) =>

@@ -14,6 +14,8 @@
  * zero, with the value the entity had when the run started.
  */
 
+import { number } from "../format.ts";
+
 /** One point of an entity's series: its value at one instant. */
 export interface SeriesPoint {
   /** The simulated time. */
@@ -194,4 +196,34 @@ export function countAt(times: number[], until: number): number {
     }
   }
   return found + 1;
+}
+
+export interface HistogramRow {
+  x: number;
+  label: string;
+  frequency: number;
+  accumulated: number;
+  overflowClass: boolean;
+}
+
+/** Compute the histogram rows and labels for table intervals. */
+export function histogramRows(
+  table: { first: number; width: number; intervals: number },
+  frequencies: readonly number[],
+): HistogramRow[] {
+  const total = frequencies.reduce((sum, count) => sum + count, 0);
+  let running = 0;
+  return frequencies.map((count, index) => {
+    running += count;
+    const low = index === 0 ? 0 : table.first + (index - 1) * table.width;
+    const high = table.first + index * table.width;
+    const isOverflow = index === frequencies.length - 1 && table.intervals > 1;
+    return {
+      x: isOverflow ? low + table.width / 2 : (low + high) / 2,
+      label: isOverflow ? `> ${number(low)}` : `${number(low)} - ${number(high)}`,
+      frequency: count,
+      accumulated: total > 0 ? (running / total) * 100 : 0,
+      overflowClass: isOverflow,
+    };
+  });
 }

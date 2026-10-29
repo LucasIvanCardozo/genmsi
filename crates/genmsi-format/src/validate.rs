@@ -186,7 +186,12 @@ fn check_links(model: &GmdlModel) -> Result<(), FormatError> {
                 ));
             }
             if from.id != container.id {
-                if from.output(link.from_ioid).is_none() {
+                // A link that starts at a **container** may start at one of
+                // its doors: the flow enters the container there. A link
+                // that starts at a block starts at one of its outputs.
+                let starts_at_a_port = from.input(link.from_ioid).is_some()
+                    || from.output(link.from_ioid).is_some();
+                if !starts_at_a_port {
                     return Err(FormatError::structural(
                         from.id,
                         format!("link starts at missing output port {}", link.from_ioid),
@@ -203,7 +208,12 @@ fn check_links(model: &GmdlModel) -> Result<(), FormatError> {
                 }
             }
             if to.id != container.id {
-                if to.input(link.to_ioid).is_none() {
+                // A link that ends at a **container** may end at one of its
+                // doors: the flow leaves the container there. A link that
+                // ends at a block ends at one of its inputs.
+                let ends_at_a_port = to.input(link.to_ioid).is_some()
+                    || to.output(link.to_ioid).is_some();
+                if !ends_at_a_port {
                     return Err(FormatError::structural(
                         to.id,
                         format!("link ends at missing input port {}", link.to_ioid),

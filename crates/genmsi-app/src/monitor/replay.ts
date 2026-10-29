@@ -34,6 +34,7 @@
 import { applyChange, closeFigures, emptyFigures, type FigureChange, type Figures } from "./stats.ts";
 import { FLIGHT_SECONDS, firstMoveAfter } from "./balls.ts";
 import type { SeriesPoint } from "./series.ts";
+import type { ModelEdge } from "../types";
 
 /** One event of the trace, as the replay reads it. */
 export interface TraceEventLike {
@@ -1050,6 +1051,28 @@ export interface TransitionIndex {
 }
 
 /**
+ * The block the flow reaches when it leaves a block of the model.
+ *
+ * The destination of the flow may be a port of a container, and a port is
+ * not a block of the model. The link that leaves the block carries the pair
+ * of blocks the flow travels through, and the block the flow reaches is the
+ * other end of that pair.
+ */
+function reachedBy(links: readonly ModelEdge[], from: number): number | null {
+  for (const link of links) {
+    if (link.from_module !== from) {
+      continue;
+    }
+    for (const [start, end] of link.hops) {
+      if (start === from) {
+        return end;
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * The moves of the run, read from the trace.
  *
  * `nodeOf` maps a program block to the block of the model it belongs to.
@@ -1057,6 +1080,7 @@ export interface TransitionIndex {
 export function buildTransitions(
   trace: TraceDocumentLike,
   nodeOf: (block: number) => number | null,
+  links: readonly ModelEdge[] = [],
 ): TransitionIndex {
   const moves: Transition[] = [];
   // The block of the model every transaction is in, and the instant it
@@ -1070,7 +1094,12 @@ export function buildTransitions(
       const target = targetOf(event.detail);
       const from = nodeOf(event.block);
       if (target !== null && from !== null) {
-        const to = nodeOf(target);
+        // The destination of the move may be a **port** of a container, and
+        // a port is not a block of the model: the flow that crosses the
+        // border has no block to name there. The engine published, for every
+        // link, the pairs of blocks that link carries, and the pair that
+        // starts at the block says which block the flow reaches.
+        const to = nodeOf(target) ?? reachedBy(links, from);
         // A move that stays inside the same block of the model is invisible.
         if (to !== null && to !== from) {
           const entered = enteredAt.get(event.xact);
@@ -1190,7 +1219,7 @@ export function clockWithCrossings(
  */
 export function frameAt(index: ReplayIndex, time: number): number {
   const frames = index.frames;
-  if (frames.length === 0) {
+  if (frames.length === 0 || time < frames[0].time) {
     return -1;
   }
   let low = 0;

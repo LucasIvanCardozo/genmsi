@@ -249,6 +249,18 @@ impl Block {
         self.outputs.iter().find(|p| p.ioid == ioid)
     }
 
+    /// One port by id, of either kind.
+    ///
+    /// The entry ports and the exit ports of a block share one numbering, so
+    /// the kind is needed to tell them apart.
+    pub fn port_of(&self, ioid: u32, input: bool) -> Option<&Port> {
+        if input {
+            self.input(ioid)
+        } else {
+            self.output(ioid)
+        }
+    }
+
     /// Label of the block: the connection label of its first labelled input
     /// port. Blocks without inputs (generators, definitions) have none.
     pub fn label(&self) -> Option<&str> {

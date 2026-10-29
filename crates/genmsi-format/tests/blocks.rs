@@ -939,3 +939,346 @@ fn the_editor_offers_the_six_operators_of_a_storage() {
         );
     }
 }
+
+#[test]
+fn adding_a_container_creates_a_submodule() {
+    let mut session = EditSession::new(small_model());
+    let ids = session
+        .apply(EditCommand::AddBlock {
+            class: "Container".into(),
+            container: 0,
+            x: 100,
+            y: 200,
+        })
+        .expect("adds a container");
+    let container_id = ids[0];
+    let container = session.model().block(container_id).expect("exists");
+    assert!(container.is_container());
+    // The container is born empty: it has no doors of its own.
+    assert_eq!(container.inputs.len(), 0);
+    assert_eq!(container.outputs.len(), 0);
+    assert_eq!(container.layout.unwrap().x, 100);
+    assert_eq!(container.layout.unwrap().y, 200);
+
+    // Can add a child block inside this new container
+    let child_ids = session
+        .apply(EditCommand::AddBlock {
+            class: "Generate".into(),
+            container: container_id,
+            x: 50,
+            y: 50,
+        })
+        .expect("adds block inside container");
+    let child = session.model().block(child_ids[0]).expect("child exists");
+    assert_eq!(child.owner, container_id);
+
+    // Can add a PortIn and PortOut inside this container.
+    //
+    // The ports of a container share one numbering, and the container is
+    // born empty: the first door the reader adds is the 1, the next one the
+    // 2. An id never names two doors of the same container.
+    session
+        .apply(EditCommand::AddBlock {
+            class: "PortIn".into(),
+            container: container_id,
+            x: 0,
+            y: 0,
+        })
+        .expect("adds port in");
+    assert_eq!(session.model().block(container_id).unwrap().inputs.len(), 1);
+    assert_eq!(session.model().block(container_id).unwrap().inputs[0].ioid, 1);
+    assert_eq!(session.model().block(container_id).unwrap().inputs[0].name, "Entrada1");
+
+    session
+        .apply(EditCommand::AddBlock {
+            class: "PortOut".into(),
+            container: container_id,
+            x: 0,
+            y: 0,
+        })
+        .expect("adds port out");
+    assert_eq!(session.model().block(container_id).unwrap().outputs.len(), 1);
+    assert_eq!(session.model().block(container_id).unwrap().outputs[0].ioid, 2);
+    assert_eq!(session.model().block(container_id).unwrap().outputs[0].name, "Salida2");
+
+    // Cannot add PortIn at root (container 0)
+    assert!(
+        session
+            .apply(EditCommand::AddBlock {
+                class: "PortIn".into(),
+                container: 0,
+                x: 0,
+                y: 0,
+            })
+            .is_err()
+    );
+
+    // Undo port out
+    session.undo().expect("undo port out");
+    assert_eq!(session.model().block(container_id).unwrap().outputs.len(), 0);
+
+    // Undo port in
+    session.undo().expect("undo port in");
+    assert_eq!(session.model().block(container_id).unwrap().inputs.len(), 0);
+
+    // Undo removes child, then container
+    session.undo().expect("undo child");
+    assert!(session.model().block(child_ids[0]).is_none());
+    session.undo().expect("undo container");
+    assert!(session.model().block(container_id).is_none());
+}
+
+// The ports of a container, and the links that cross its border.
+//
+// A container is a frame: the flow enters it through its own entry port and
+// leaves it through its own exit port. The two ports carry different ids
+// (the file parser refuses a block that has two ports with the same id) and
+// a fresh port carries no label: the label of a port is the label of the
+// flow that crosses it, and the flow is what the links decide.
+
+/// A container with a block of the given class inside it: the session, the
+/// container and the block.
+fn container_with_a_child(class: &str) -> (EditSession, u32, u32) {
+    let mut session = EditSession::new(small_model());
+    let container = session
+        .apply(EditCommand::AddBlock {
+            class: "Container".into(),
+            container: 0,
+            x: 100,
+            y: 200,
+        })
+        .expect("adds a container")[0];
+    // The container is born empty: the reader puts the doors he needs.
+    session
+        .apply(EditCommand::AddBlock {
+            class: "PortIn".into(),
+            container,
+            x: 0,
+            y: 0,
+        })
+        .expect("adds the entry door");
+    session
+        .apply(EditCommand::AddBlock {
+            class: "PortOut".into(),
+            container,
+            x: 0,
+            y: 0,
+        })
+        .expect("adds the exit door");
+    let child = session
+        .apply(EditCommand::AddBlock {
+            class: class.into(),
+            container,
+            x: 10,
+            y: 10,
+        })
+        .expect("adds a block inside the container")[0];
+    (session, container, child)
+}
+
+#[test]
+fn a_new_container_is_empty_and_its_doors_get_their_own_ids() {
+    // The container is born empty: the reader puts the doors he needs, and
+    // they are the doors any other door is.
+    let mut session = EditSession::new(small_model());
+    let ids = session
+        .apply(EditCommand::AddBlock {
+            class: "Container".into(),
+            container: 0,
+            x: 0,
+            y: 0,
+        })
+        .expect("adds a container");
+    let container = session.model().block(ids[0]).expect("exists");
+    assert_eq!(container.inputs.len(), 0, "the container came with an entry");
+    assert_eq!(container.outputs.len(), 0, "the container came with an exit");
+
+    // The entry door the reader adds, and the exit door after it.
+    session
+        .apply(EditCommand::AddBlock {
+            class: "PortIn".into(),
+            container: ids[0],
+            x: 0,
+            y: 0,
+        })
+        .expect("adds the entry door");
+    session
+        .apply(EditCommand::AddBlock {
+            class: "PortOut".into(),
+            container: ids[0],
+            x: 0,
+            y: 0,
+        })
+        .expect("adds the exit door");
+    let container = session.model().block(ids[0]).expect("exists");
+    assert_eq!(container.inputs.len(), 1, "the container has no entry door");
+    assert_eq!(container.outputs.len(), 1, "the container has no exit door");
+    assert_eq!(container.inputs[0].ioid, 1, "the entry door is the door 1");
+    assert_eq!(container.outputs[0].ioid, 2, "the exit door is the door 2");
+    assert_eq!(container.inputs[0].mylabel, "", "a fresh door carries no label");
+    assert_eq!(container.outputs[0].mylabel, "", "a fresh door carries no label");
+    // The two ids do not collide: the file the editor writes reads again.
+    let written = to_string(session.model());
+    let reparsed = parse_str(&written).expect("the written model parses again");
+    let container = reparsed.block(ids[0]).expect("the container is there");
+    assert_eq!(container.inputs[0].ioid, 1);
+    assert_eq!(container.outputs[0].ioid, 2);
+}
+
+#[test]
+fn connecting_the_entry_port_of_a_container_to_a_block_inside_it_mints_the_label() {
+    let (mut session, container, child) = container_with_a_child("Terminate");
+    session
+        .apply(EditCommand::Connect {
+            from: container,
+            from_ioid: 1,
+            to: child,
+            to_ioid: 1,
+        })
+        .expect("connects the entry port to the block inside");
+    // The link that brings the flow into the container belongs to the
+    // container.
+    let links = &session.model().block(container).expect("container").links;
+    assert_eq!(links.len(), 1, "the container holds the link that enters it");
+    assert_eq!(
+        (
+            links[0].from_module,
+            links[0].from_ioid,
+            links[0].to_module,
+            links[0].to_ioid
+        ),
+        (container, 1, child, 1),
+        "the link starts at the entry port of the container"
+    );
+    // The two ends share the label the original editor mints for the block
+    // that receives the flow.
+    assert_eq!(
+        session.model().block(container).unwrap().input(1).unwrap().mylabel,
+        "A_Terminate"
+    );
+    assert_eq!(
+        session.model().block(child).unwrap().input(1).unwrap().mylabel,
+        "A_Terminate"
+    );
+}
+
+#[test]
+fn connecting_a_block_inside_a_container_to_its_exit_port_succeeds() {
+    let (mut session, container, child) = container_with_a_child("Queue");
+    session
+        .apply(EditCommand::Connect {
+            from: child,
+            from_ioid: 2,
+            to: container,
+            to_ioid: 2,
+        })
+        .expect("connects the block to the exit port of the container");
+    // The link that takes the flow out of the container belongs to the
+    // container.
+    let links = &session.model().block(container).expect("container").links;
+    assert_eq!(links.len(), 1, "the container holds the link that leaves it");
+    assert_eq!(
+        (
+            links[0].from_module,
+            links[0].from_ioid,
+            links[0].to_module,
+            links[0].to_ioid
+        ),
+        (child, 2, container, 2),
+        "the link ends at the exit port of the container"
+    );
+    // The label names the container the flow leaves: a container has no
+    // class, so its name is what tells one from another.
+    let name = session
+        .model()
+        .block(container)
+        .expect("container")
+        .name
+        .clone();
+    assert_eq!(
+        session.model().block(container).unwrap().output(2).unwrap().mylabel,
+        format!("A_{name}")
+    );
+    assert_eq!(
+        session.model().block(child).unwrap().output(2).unwrap().mylabel,
+        format!("A_{name}")
+    );
+}
+
+#[test]
+fn a_link_between_the_blocks_of_two_containers_is_refused() {
+    let (mut session, container, _) = container_with_a_child("Queue");
+    let other = session
+        .apply(EditCommand::AddBlock {
+            class: "Container".into(),
+            container: 0,
+            x: 300,
+            y: 200,
+        })
+        .expect("adds another container")[0];
+    session
+        .apply(EditCommand::AddBlock {
+            class: "Queue".into(),
+            container: other,
+            x: 10,
+            y: 10,
+        })
+        .expect("adds a block inside the other container");
+    // A block of one container and a block of another one do not share a
+    // container: the editor refuses the link.
+    let err = session
+        .apply(EditCommand::Connect {
+            from: child_of(&session, container),
+            from_ioid: 2,
+            to: child_of(&session, other),
+            to_ioid: 1,
+        })
+        .expect_err("the blocks live in different containers");
+    assert!(
+        err.to_string()
+            .contains("los bloques pertenecen a contenedores distintos"),
+        "{err}"
+    );
+}
+
+/// The block a container holds.
+fn child_of(session: &EditSession, container: u32) -> u32 {
+    session
+        .model()
+        .children_of(container)
+        .next()
+        .expect("the container holds a block")
+        .id
+}
+
+#[test]
+fn the_entry_port_of_a_container_can_be_connected_to_its_own_exit_port() {
+    // The container passes the flow straight through: the entry port is the
+    // source of the link and the exit port is its target.
+    //
+    // The model validator refuses a container that is connected to itself
+    // (`crates/genmsi-format/src/validate.rs`), so the model this command
+    // builds does not pass `validate` yet: the check belongs to the
+    // validator, not to the editing API.
+    let (mut session, container, _) = container_with_a_child("Queue");
+    session
+        .apply(EditCommand::Connect {
+            from: container,
+            from_ioid: 1,
+            to: container,
+            to_ioid: 2,
+        })
+        .expect("connects the entry port to the exit port");
+    let links = &session.model().block(container).expect("container").links;
+    assert_eq!(links.len(), 1, "the container holds the link that crosses it");
+    assert_eq!(
+        (
+            links[0].from_module,
+            links[0].from_ioid,
+            links[0].to_module,
+            links[0].to_ioid
+        ),
+        (container, 1, container, 2),
+        "the link goes from the entry port to the exit port"
+    );
+}

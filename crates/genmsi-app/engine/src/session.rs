@@ -207,18 +207,31 @@ impl Session {
         Ok(self.state())
     }
 
-    /// Compose the model on the canvas.
+    /// Compose one scope of the model on the canvas.
     ///
-    /// The positions come from the engine's composition, the same one the MCP
-    /// applies before it writes a model: there is one algorithm, so the app
-    /// and the agent put the model on the canvas the same way. The
-    /// composition is one undo entry, like every other edit.
-    pub fn relayout(&mut self) -> Result<SessionState, AppError> {
-        let positions = genmsi_format::relayout(self.editor.model());
-        if positions.is_empty() {
+    /// The reader sees one level of the model at a time —the root, or the
+    /// content of a container— so the composition is the one of that scope:
+    /// the blocks the scope owns and nothing else. The scope is the id of
+    /// the container the reader is in; `0` is the root of the model.
+    ///
+    /// The positions come from the engine's composition of the scope
+    /// (`genmsi_format::layout::relayout_scope`), the same algorithm the
+    /// CLI applies to the whole model: there is one composition in the
+    /// engine, and the app asks it for the scope the reader is looking at.
+    ///
+    /// The composition is applied as **one** command of positions, so it is
+    /// one entry of the undo history, like every other edit. A scope with
+    /// nothing to compose changes nothing: the model stays as it was and
+    /// the undo stack does not grow.
+    pub fn relayout(&mut self, scope: u32) -> Result<SessionState, AppError> {
+        let composition = genmsi_format::layout::relayout_scope(self.editor.model(), scope);
+        if composition.positions.is_empty() && composition.ports.is_empty() {
             return Ok(self.state());
         }
-        self.apply(EditCommand::SetLayouts { positions })
+        self.apply(EditCommand::SetLayouts {
+            positions: composition.positions,
+            ports: composition.ports,
+        })
     }
 
     /// Undo the last operation.

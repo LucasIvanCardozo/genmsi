@@ -114,7 +114,7 @@ export default function RunConsole() {
     }
     setPlaying(false);
     setClock(monitor.startTime);
-    setPlayhead(0);
+    setPlayhead(frameAt(monitor, monitor.startTime));
   };
 
   return (

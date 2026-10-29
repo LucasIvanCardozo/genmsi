@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useId,
@@ -33,6 +34,7 @@ import {
   captionBaseline,
   captionFits,
   captionLayout,
+  containerPair,
   drawingOf,
   figureLayout,
   figureText,
@@ -42,6 +44,8 @@ import {
   labelLines,
   nodeSizeOf,
   portPlacements,
+  textsOf,
+  wrapperClass,
   type PortSide,
 } from "../graph/node";
 import { useBlockCounts, useBlockFigure, useRunHasPublished } from "../monitor/live";
@@ -76,129 +80,54 @@ const NOTE_LABEL_COLOR = "#475569";
 /**
  * One block of the model, drawn as a node of the graph.
  *
- * The block is drawn with the silhouette of its class: the shape module
- * holds it, with the zones where the rótulo and the figure go, and with the
- * anchor of each of its ports (S2, S8, S9). A class the shape module does
- * not know keeps the plain rounded rectangle, so the canvas never breaks.
+ * Every block of the canvas is drawn the same way: the 66 classes of the
+ * catalogue, the container and the doors of a container (S3). The shape
+ * module holds the zones where the rótulo and the figure go, and the
+ * anchor of each of its ports (S2, S8, S9); the shape of a block the
+ * catalogue does not know comes from the frames module. The ring of the
+ * selection goes on the wrapper that holds the silhouette.
  *
- * The silhouette is the truth: it is drawn at the size of its own class, one
+ * The silhouette is the truth: it is drawn at the size of its own shape, one
  * to one, without being scaled and without being cropped. The node of the
  * graph has that very size, so the drawing, the selection and the MiniMap
  * all agree on where the block is.
  */
 function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
-  const container = data.kind === "C";
-  const note = data.title === "Note";
-  const spread = (count: number, index: number): string =>
-    `${((index + 1) / (count + 1)) * 100}%`;
-  // How the block is drawn: its silhouette, its zones and its ports.
-  const drawing = drawingOf(data.title, container);
+  const note = data.kind === "A" && data.title === "Note";
+  // How the block is drawn: its silhouette, its zones and its ports. The
+  // class decides the shape of the 66 classes of the catalogue, and the
+  // kind decides the shape of the container and of the doors.
+  const drawing = drawingOf({
+    className: data.kind === "A" ? data.title : "",
+    kind: data.kind,
+    title: data.title,
+    subtitle: data.subtitle,
+    size: data.size,
+    inputs: data.inputs,
+    outputs: data.outputs,
+  });
+  // The name the block shows and the caption under it: the container shows
+  // the caption of the model as its name and the word "Contenedor" under
+  // it, and the doors show the name of the port.
+  const texts = textsOf(data.kind, data.title, data.subtitle);
   // How many transactions the block holds now, and how many have gone
   // through it: the live layer answers for this block alone.
   const counts = useBlockCounts(Number(id));
   // The figure of the block: the number of the entity it operates on, or the
   // pair of always.
   const figure = useBlockFigure(Number(id));
+  // A container is not a block of the listing: its figures are computed, and
+  // it shows the pair of its own —the entities inside it and the ones that
+  // went through it— even when it is empty.
+  const shown =
+    data.kind === "C" ? containerPair(counts) : figureText(figure, counts);
   // The dash of an empty figure only says something while the run plays.
   const running = useRunHasPublished();
   const clip = useId().replace(/[^a-zA-Z0-9_-]/g, "");
 
-  if (
-    drawing.fallback ||
-    drawing.shape === undefined ||
-    drawing.colors === undefined ||
-    drawing.label === null
-  ) {
-    // The plain block of always: the rounded rectangle the canvas drew
-    // before the redesign, with its ports spread along the edges.
-    return (
-      <div
-        className={[
-          "relative flex h-full w-full flex-col justify-center rounded-md border px-2 text-left shadow-sm",
-          container
-            ? "border-slate-300 border-dashed bg-transparent"
-            : "border-slate-400 bg-white",
-          note ? "opacity-70" : "",
-          selected ? "ring-2 ring-indigo-500" : "",
-        ].join(" ")}
-      >
-        {data.inputs.map((port, index) => (
-          <Handle
-            key={`in-${port.ioid}`}
-            type="target"
-            position={Position.Top}
-            id={String(port.ioid)}
-            title={port.name}
-            style={{ left: spread(data.inputs.length, index), top: -6 }}
-            className="!size-3 !rounded-full !border-2 !border-white !bg-slate-400"
-          />
-        ))}
-        {/* A container is entered through one of its input ports and left
-            through one of its output ports: those links start and end at the
-            container itself, so the container needs a source and a target
-            handle for them. */}
-        {container &&
-          data.inputs.map((port, index) => (
-            <Handle
-              key={`entry-${port.ioid}`}
-              type="source"
-              position={Position.Top}
-              id={`in-${port.ioid}`}
-              title={port.name}
-              style={{ left: spread(data.inputs.length, index), top: -6 }}
-              className="!size-3 !rounded-full !border-2 !border-transparent !bg-transparent"
-            />
-          ))}
-        <span
-          className={[
-            "truncate text-xs font-semibold tracking-tight",
-            container ? "text-slate-500" : "text-slate-800",
-            note ? "italic" : "",
-          ].join(" ")}
-        >
-          {data.title}
-        </span>
-        {data.subtitle !== "" && (
-          <span className="truncate text-[10px] text-slate-500">{data.subtitle}</span>
-        )}
-        {data.outputs.map((port, index) => (
-          <Handle
-            key={`out-${port.ioid}`}
-            type="source"
-            position={Position.Bottom}
-            id={String(port.ioid)}
-            title={port.name}
-            style={{ left: spread(data.outputs.length, index), bottom: -6 }}
-            className="!size-3 !rounded-full !border-2 !border-white !bg-slate-400"
-          />
-        ))}
-        {container &&
-          data.outputs.map((port, index) => (
-            <Handle
-              key={`exit-${port.ioid}`}
-              type="target"
-              position={Position.Bottom}
-              id={`out-${port.ioid}`}
-              title={port.name}
-              style={{ left: spread(data.outputs.length, index), bottom: -6 }}
-              className="!size-3 !rounded-full !border-2 !border-transparent !bg-transparent"
-            />
-          ))}
-        {/* The two numbers of the block: how many transactions are inside it
-            now, and how many have gone through it since the run started. */}
-        {counts !== undefined && counts.ever > 0 && (
-          <span className="pointer-events-none absolute right-1.5 top-1 font-mono text-[10px] leading-none text-indigo-600">
-            {counts.now}
-            <span className="text-slate-400">/{counts.ever}</span>
-          </span>
-        )}
-      </div>
-    );
-  }
-
   const shape = drawing.shape;
   const colors = drawing.colors;
-  // The size of the block: the footprint of its class, one to one. The
+  // The size of the block: the footprint of its shape, one to one. The
   // silhouette is never scaled and never cropped.
   const width = shape.footprint.width;
   const height = shape.footprint.height;
@@ -210,7 +139,7 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
   // The rótulo of the block: the name of the class, in one line when it
   // fits its zone and in two lines when it does not. No character of it is
   // ever cut.
-  const lines = labelLines(data.title, labelZone);
+  const lines = labelLines(texts.label, labelZone);
   const baselines = labelBaselines(labelZone, lines.length);
   // The caption keeps its own place, the second line of the zone, and it is
   // drawn at the size of the design when it fits: a caption that does not
@@ -219,8 +148,8 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
   const caption =
     drawing.subtitle &&
     captionFits(labelZone, lines.length) &&
-    data.subtitle !== ""
-      ? captionLayout(data.subtitle, labelZone)
+    texts.caption !== ""
+      ? captionLayout(texts.caption, labelZone)
       : { text: "", size: CAPTION_SIZE };
   // The figure of the block, centred in the zone the shape declares. A
   // block the run publishes no figure for shows the dash of an empty
@@ -233,32 +162,25 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
       ? null
       : figureLayout(
           figureZone,
-          running ? figureZoneText(figureText(figure, counts), figureZone) : "",
+          running ? figureZoneText(shown, figureZone) : "",
         );
 
   return (
-    <div
-      className={[
-        "relative h-full w-full",
-        note ? "opacity-70" : "",
-        selected ? "ring-2 ring-indigo-500" : "",
-      ].join(" ")}
-    >
-      {/* The silhouette of the class and the text of its zones, drawn in the
-          footprint of the class: the path is the one the shape module
+    <div className={wrapperClass(selected, note)}>
+      {/* The silhouette of the block and the text of its zones, drawn in the
+          footprint of the shape: the path is the one the shape module
           declares, the details are the strokes inside it, and the text goes
           in the zones the shape declares, which are inside the silhouette.
-          Nothing is scaled: the viewBox is the footprint of the class, so a
-          circle stays a circle and every figure keeps the width of its
-          stroke. */}
+          Nothing is scaled: the viewBox is the box of the node, so a circle
+          stays a circle and every figure keeps the width of its stroke. */}
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full"
-        viewBox={`0 0 ${width + 2 * STROKE_MARGIN} ${height + 2 * STROKE_MARGIN}`}
+        viewBox={`0 0 ${drawing.size.width} ${drawing.size.height}`}
         preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label={data.subtitle !== "" ? `${data.title} ${data.subtitle}` : data.title}
       >
-        {/* The whole drawing lives in the footprint of the class, and the
+        {/* The whole drawing lives in the footprint of the shape, and the
             group carries it the room the border needs: the outline is
             drawn centred on the line of the shape, so without that margin
             its outer half is cut by the box. */}
@@ -409,6 +331,16 @@ const nodeTypes = { bloque: BlockNode };
 /** The links are drawn by the component that knows the balls that travel. */
 const edgeTypes = { bloque: GraphEdge };
 
+/**
+ * The links the model does not draw: none, by default.
+ *
+ * The list is a constant of the module and not a fresh array on every
+ * render: the effect that draws the graph depends on it, and a list that
+ * changes its identity on every render makes that effect run again and
+ * again, for ever.
+ */
+const NO_EXTRA_EDGES: Edge[] = [];
+
 /** The nodes and the edges of the model's graph. */
 function graphOfUnused(): void {
   void graphOf;
@@ -421,10 +353,20 @@ export interface GraphActions {
   onSelect: (ids: number[]) => void;
   /** The user moved a block. */
   onMove: (id: number, x: number, y: number) => void;
+  /** The user moved a door of a container. */
+  onMovePort: (
+    container: number,
+    ioid: number,
+    input: boolean,
+    x: number,
+    y: number,
+  ) => void;
   /** The user connected two ports. */
   onConnect: (from: number, fromIoid: number, to: number, toIoid: number) => void;
   /** The user removed a block. */
   onRemove: (ids: number[]) => void;
+  /** The user removed a door of a container. */
+  onRemovePort: (container: number, ioid: number, input: boolean) => void;
   /** The user removed a link. */
   onDisconnect: (container: number, from: number, fromIoid: number) => void;
   /** The user dropped a new block of a class. */
@@ -438,11 +380,15 @@ export interface GraphActions {
  * is the one the original editor drew. Every change leaves the graph as a
  * command for the facade: the app never rewrites the file itself.
  */
-export default function GraphView({
+export default memo(function GraphView({
   model,
   actions,
   fitSignal,
-  extraEdges = [],
+  extraEdges = NO_EXTRA_EDGES,
+  containerId = 0,
+  onOpenContainer,
+  focusBlockId = null,
+  focusToken = 0,
 }: {
   model: ModelBody;
   actions: GraphActions;
@@ -453,6 +399,25 @@ export default function GraphView({
    * way between two blocks that the model joins through a container.
    */
   extraEdges?: Edge[];
+  /** The container currently scoped in the canvas (0 = root). */
+  containerId?: number;
+  /** Navigate into a child container. */
+  onOpenContainer?: (id: number) => void;
+  /**
+   * The block the canvas has to follow, or `null` when there is none.
+   *
+   * The canvas moves to the block the reader picked in the tree: the
+   * picture is not framed again, because the picture must not jump away
+   * from under the reader while he works.
+   */
+  focusBlockId?: number | null;
+  /**
+   * Which time the canvas was told to follow a block.
+   *
+   * The token grows with every request, so the canvas follows the block
+   * again when the reader asks for the same one twice.
+   */
+  focusToken?: number;
 }) {
   const [nodes, setNodes] = useState<Node<BlockData>[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -465,20 +430,28 @@ export default function GraphView({
   // The blocks the user had selected, so a change of the model does not take
   // the selection away.
   const selected = useRef<Set<string>>(new Set());
+  // The block the canvas already followed, so a change of the picture does
+  // not take the reader back to it.
+  const followed = useRef<number | null>(null);
 
   useEffect(() => {
-    const graph = graphOf(model);
+    const graph = graphOf(model, containerId);
     setNodes(
       graph.nodes.map((node) => {
         const drawn = { ...node, selected: selected.current.has(node.id) };
-        // The block is drawn at the size of its class: the shape is the
+        // The block is drawn at the size of its shape: the shape is the
         // truth, and the box the model carries is not rewritten. A class
-        // the shape module does not know, and every container, keep the
-        // box of the model.
-        const size = nodeSizeOf(node.data.title, node.data.kind === "C");
-        if (size === null) {
-          return drawn;
-        }
+        // the shape module does not know, the container and the doors are
+        // drawn at the box the model gives them.
+        const size = nodeSizeOf({
+          className: node.data.kind === "A" ? node.data.title : "",
+          kind: node.data.kind,
+          title: node.data.title,
+          subtitle: node.data.subtitle,
+          size: node.data.size,
+          inputs: node.data.inputs,
+          outputs: node.data.outputs,
+        });
         return { ...drawn, style: { ...drawn.style, width: size.width, height: size.height } };
       }),
     );
@@ -492,14 +465,44 @@ export default function GraphView({
     // shrink the picture until nothing could be read.
     const decision = decideFrame(
       frame.current,
-      `${model.path}|${model.title}`,
+      `${model.path}|${model.title}|${containerId}`,
       fitSignal,
     );
     frame.current = decision.state;
     if (decision.fit) {
       fitFlow(instance.current, graph.nodes);
     }
-  }, [model, extraEdges, fitSignal]);
+  }, [model, extraEdges, fitSignal, containerId]);
+
+  // The canvas follows the block the reader picked in the tree.
+  //
+  // The picture moves to the block, and it is not framed again: the reader
+  // keeps the zoom he has, and the picture does not jump away from under
+  // him while he works. The block is looked for in the nodes of the
+  // picture, so the effect runs again when the picture is drawn. The
+  // token says *which time* the reader asked for it, so the canvas
+  // follows the block again when he asks for the same one twice.
+  useEffect(() => {
+    if (focusBlockId === null || followed.current === focusToken) {
+      return;
+    }
+    const flow = instance.current;
+    if (flow === null) {
+      return;
+    }
+    const node = nodes.find((candidate) => candidate.id === String(focusBlockId));
+    if (node === undefined) {
+      return;
+    }
+    followed.current = focusToken;
+    const width = node.measured?.width ?? widthOf(node);
+    const height = node.measured?.height ?? heightOf(node);
+    flow.setCenter(node.position.x + width / 2, node.position.y + height / 2, {
+      zoom: flow.getZoom(),
+      duration: 300,
+    });
+  }, [focusBlockId, focusToken, nodes]);
+
   const onNodesChange = useCallback((changes: NodeChange<Node<BlockData>>[]) => {
     setNodes((current) => applyNodeChanges(changes, current));
   }, []);
@@ -521,14 +524,32 @@ export default function GraphView({
       if (connection.sourceHandle === null || connection.targetHandle === null) {
         return;
       }
-      actions.onConnect(
-        Number(connection.source),
-        Number(connection.sourceHandle),
-        Number(connection.target),
-        Number(connection.targetHandle),
-      );
+      let from = Number(connection.source);
+      let fromIoid = Number(connection.sourceHandle);
+      if (connection.source.startsWith("in-")) {
+        from = containerId;
+        fromIoid = Number(connection.source.slice(3));
+      }
+
+      let to = Number(connection.target);
+      let toIoid = Number(connection.targetHandle);
+      if (connection.target.startsWith("out-")) {
+        to = containerId;
+        toIoid = Number(connection.target.slice(4));
+      }
+
+      if (
+        Number.isNaN(from) ||
+        Number.isNaN(fromIoid) ||
+        Number.isNaN(to) ||
+        Number.isNaN(toIoid)
+      ) {
+        return;
+      }
+
+      actions.onConnect(from, fromIoid, to, toIoid);
     },
-    [actions],
+    [actions, containerId],
   );
 
   const onDrop = useCallback(
@@ -538,9 +559,14 @@ export default function GraphView({
       if (className === "") {
         return;
       }
-      const position = projectPosition(event);
-      if (position !== null) {
-        actions.onDropBlock(className, position.x, position.y);
+      if (instance.current) {
+        const position = instance.current.screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+        // The place on the canvas is the place in the model: the picture is
+        // not translated, and the model keeps the absolute coordinates.
+        actions.onDropBlock(className, Math.round(position.x), Math.round(position.y));
       }
     },
     [actions],
@@ -549,6 +575,18 @@ export default function GraphView({
   const projected = useMemo(
     () => ({ nodes, edges }),
     [nodes, edges],
+  );
+
+  const onNodeDoubleClick = useCallback(
+    (_event: React.MouseEvent, node: Node<BlockData>) => {
+      if (node.data.kind === "C") {
+        const id = Number(node.id);
+        if (id !== containerId) {
+          onOpenContainer?.(id);
+        }
+      }
+    },
+    [containerId, onOpenContainer],
   );
 
   return (
@@ -570,17 +608,59 @@ export default function GraphView({
         }}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onNodeClick={(_event, node) => actions.onSelect([Number(node.id)])}
+        onNodeDoubleClick={onNodeDoubleClick}
+        onNodeClick={(_event, node) => {
+          if (!node.id.startsWith("in-") && !node.id.startsWith("out-")) {
+            actions.onSelect([Number(node.id)]);
+          }
+        }}
         onPaneClick={() => actions.onSelect([])}
         onSelectionChange={({ nodes: picked }) => {
           selected.current = new Set(picked.map((node) => node.id));
-          actions.onSelect(picked.map((node) => Number(node.id)));
+          const validIds = picked
+            .filter((node) => !node.id.startsWith("in-") && !node.id.startsWith("out-"))
+            .map((node) => Number(node.id));
+          actions.onSelect(validIds);
         }}
-        onNodeDragStop={(_event, node) =>
-          actions.onMove(Number(node.id), Math.round(node.position.x), Math.round(node.position.y))
-        }
+        onNodeDragStop={(_event, node) => {
+          if (node.id.startsWith("in-") || node.id.startsWith("out-")) {
+            // A door is a block of the picture in its own right: it moves
+            // like one, and its place is kept.
+            const door = /^(in|out)-(\d+)$/.exec(node.id);
+            if (door !== null) {
+              const input = door[1] === "in";
+              actions.onMovePort(
+                containerId,
+                Number(door[2]),
+                input,
+                Math.round(node.position.x),
+                Math.round(node.position.y),
+              );
+            }
+            return;
+          }
+          // The place on the canvas is the place in the model: the picture
+          // is not translated, so a drag of a block moves that block and
+          // nothing else.
+          actions.onMove(Number(node.id), Math.round(node.position.x), Math.round(node.position.y));
+        }}
         onConnect={onConnect}
-        onNodesDelete={(deleted) => actions.onRemove(deleted.map((node) => Number(node.id)))}
+        onNodesDelete={(deleted) => {
+          // A door is a block of the picture in its own right: removing it
+          // removes the door, and the links that touch it.
+          for (const node of deleted) {
+            const door = /^(in|out)-(\d+)$/.exec(node.id);
+            if (door !== null) {
+              actions.onRemovePort(containerId, Number(door[2]), door[1] === "in");
+            }
+          }
+          const blockIds = deleted
+            .filter((node) => !node.id.startsWith("in-") && !node.id.startsWith("out-"))
+            .map((node) => Number(node.id));
+          if (blockIds.length > 0) {
+            actions.onRemove(blockIds);
+          }
+        }}
         onEdgesDelete={(deleted) => {
           for (const edge of deleted) {
             const data = edge.data as
@@ -616,7 +696,7 @@ export default function GraphView({
       </ReactFlow>
     </div>
   );
-}
+});
 
 /**
  * Frame the flow of the model: the blocks that simulate.
@@ -639,16 +719,19 @@ function fitFlow(instance: ReactFlowInstance<Node<BlockData>, Edge> | null, node
 }
 
 /**
- * The canvas position of a drop.
+ * The width of a node, in pixels.
  *
- * The graph knows where the pointer is in the canvas, so a block dropped on
- * the picture lands there.
+ * The node carries the size the picture gave it in its style, and the
+ * library measures it once it is on the screen. The measured one is the
+ * truth; the style is what the node was drawn at.
  */
-function projectPosition(event: React.DragEvent): { x: number; y: number } | null {
-  const target = event.currentTarget as HTMLElement;
-  const bounds = target.getBoundingClientRect();
-  return {
-    x: Math.round(event.clientX - bounds.left),
-    y: Math.round(event.clientY - bounds.top),
-  };
+function widthOf(node: Node<BlockData>): number {
+  return typeof node.style?.width === "number" ? node.style.width : 0;
+}
+
+/**
+ * The height of a node, in pixels.
+ */
+function heightOf(node: Node<BlockData>): number {
+  return typeof node.style?.height === "number" ? node.style.height : 0;
 }

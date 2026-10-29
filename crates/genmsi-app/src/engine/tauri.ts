@@ -100,7 +100,7 @@ export const tauri: EngineAdapter = {
   reload: async (path: string) => stateOf(await session({ op: "reload", path })),
   newModel: async () => stateOf(await session({ op: "new" })),
   apply: async (command: EditCommand) => stateOf(await session({ op: "apply", command })),
-  relayout: async () => stateOf(await session({ op: "relayout" })),
+  relayout: async (scope: number) => stateOf(await session({ op: "relayout", scope })),
   undo: async () => stateOf(await session({ op: "undo" })),
   redo: async () => stateOf(await session({ op: "redo" })),
   save: async (path?: string): Promise<SaveResult> => {
@@ -148,11 +148,10 @@ export const tauri: EngineAdapter = {
   },
   catalogue: async () => documentOf<CatalogueDocument>(await session({ op: "catalogue" })),
   /**
-   * Ask the shell to stop waiting for the run in flight.
+   * Ask the shell to stop the run in flight.
    *
-   * The engine cannot be interrupted yet: the shell stops waiting for the
-   * run and throws its answer away. The answer says whether there was a run
-   * to stop.
+   * The shell raises the cancellation flag in the engine, stopping the run
+   * at the next event. The answer says whether there was a run to stop.
    */
   cancelRun: () => invoke<boolean>("cancel_run"),
 };

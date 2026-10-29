@@ -10,9 +10,18 @@ use std::collections::{HashMap, HashSet};
 
 use genmsi_format::{Block, GmdlModel};
 
+use self::borders::Borders;
 use crate::error::EngineError;
 use crate::expr::{BinOp, Expr, NameSource, ProgramExpr, RefKind};
 use crate::rng::BLOCK_STREAM_BASE;
+
+// The resolver of the borders of the containers lives in its own file
+// (`borders.rs`) and is declared here, next to the compiler that uses it, so
+// it is reachable as `genmsi_core::program::borders` without the crate root
+// having to know about it. The model document uses it as well: the compiler
+// and the document resolve the borders with the same rules.
+#[path = "borders.rs"]
+pub mod borders;
 
 /// The table of the standard normal distribution the `VariableN` class uses.
 ///
@@ -1108,13 +1117,19 @@ impl Compiler<'_> {
         }
 
         // Resolve module outputs through the container hierarchy.
+        //
+        // The borders are resolved by the engine's one resolver
+        // (`crate::program::borders`): the compiler and the model document
+        // share it, so the program and the pairs the document publishes
+        // cannot disagree about where the flow goes.
+        let borders = Borders::new(self.model);
         for (module_id, ports) in &pending_links {
             let Some(&last) = module_last.get(module_id) else {
                 continue;
             };
             let mut targets = Vec::new();
             for (name, ioid) in ports {
-                let target = self.resolve_target(*module_id, *ioid as u32, &entry_index)?;
+                let target = self.resolve_target(&borders, *module_id, *ioid as u32, &entry_index)?;
                 targets.push((name.clone(), target));
             }
             let block = &mut blocks[last];
@@ -2839,88 +2854,29 @@ impl Compiler<'_> {
     ///   (`(child, ioid) -> (container, ioid)`), so leaving continues in the
     ///   container's parent, where a link starts at `(container, ioid)`.
     ///
+    /// An entry port with no internal link starts at the container's first
+    /// child (the editor allows it, e.g. TP4's `EleccionProductos`).
+    ///
     /// Nested containers are followed until an activity block is reached.
+    ///
+    /// The rules themselves live in [`borders`](crate::program::borders), the
+    /// resolver the model document uses as well: the compiler wires the
+    /// program with them and the document publishes the pairs of activity
+    /// blocks every link carries, so both say the same thing about where the
+    /// flow goes.
     fn resolve_target(
         &self,
+        borders: &Borders<'_>,
         module_id: u32,
         ioid: u32,
         entry_index: &HashMap<u32, usize>,
     ) -> Result<Option<usize>, EngineError> {
-        self.resolve_in_owner(module_id, ioid, entry_index, 0)
-    }
-
-    fn resolve_in_owner(
-        &self,
-        module_id: u32,
-        ioid: u32,
-        entry_index: &HashMap<u32, usize>,
-        depth: usize,
-    ) -> Result<Option<usize>, EngineError> {
-        if depth > 64 {
-            return Err(EngineError::Graph {
-                message: format!(
-                    "container cycle while resolving module {module_id} port {ioid}"
-                ),
-            });
-        }
-        let module = self.model.block(module_id).ok_or_else(|| EngineError::Graph {
-            message: format!("link points at missing module {module_id}"),
-        })?;
-        let owner = self.model.block(module.owner).ok_or_else(|| EngineError::Graph {
-            message: format!("module {module_id} has missing owner {}", module.owner),
-        })?;
-        let Some(link) = owner
-            .links
-            .iter()
-            .find(|link| link.from_module == module_id && link.from_ioid == ioid)
-        else {
+        let Some(target) = borders.target_from(module_id, ioid)? else {
             return Ok(None);
         };
-        self.follow(link.to_module, link.to_ioid, entry_index, depth)
-    }
-
-    /// Continue from `(module, ioid)` after a link already reached it.
-    fn follow(
-        &self,
-        module_id: u32,
-        ioid: u32,
-        entry_index: &HashMap<u32, usize>,
-        depth: usize,
-    ) -> Result<Option<usize>, EngineError> {
-        let module = self.model.block(module_id).ok_or_else(|| EngineError::Graph {
-            message: format!("link points at missing module {module_id}"),
-        })?;
-        if !module.is_container() {
-            return Ok(entry_index.get(&module_id).copied());
-        }
-        // Exiting the container: the parent owns the continuation.
-        if module.outputs.iter().any(|port| port.ioid == ioid) {
-            return self.resolve_in_owner(module_id, ioid, entry_index, depth + 1);
-        }
-        // Entering the container: an internal link may start at the port.
-        if let Some(inner) = module
-            .links
-            .iter()
-            .find(|link| link.from_module == module_id && link.from_ioid == ioid)
-        {
-            let (next_module, next_ioid) = (inner.to_module, inner.to_ioid);
-            return self.follow(next_module, next_ioid, entry_index, depth + 1);
-        }
-        // The editor also allows an entry port without an explicit internal link;
-        // the flow then starts at the container's first child (lowest module id).
-        let first_child = self
-            .model
-            .blocks
-            .iter()
-            .filter(|block| block.owner == module_id && block.id != module_id)
-            .min_by_key(|block| block.id);
-        match first_child {
-            Some(child) if !child.is_container() => {
-                Ok(entry_index.get(&child.id).copied())
-            }
-            Some(child) => self.follow(child.id, ioid, entry_index, depth + 1),
-            None => Ok(None),
-        }
+        // The resolver names the activity block the flow reaches; the
+        // program needs the statement it starts at.
+        Ok(entry_index.get(&target).copied())
     }
 
     fn number_expr(&self, value: f64) -> ProgramExpr {

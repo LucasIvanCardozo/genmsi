@@ -5,6 +5,7 @@ import {
   thumbnailOf,
   THUMBNAIL_BOX,
   type CatalogueEntry,
+  type CatalogueGroup,
 } from "../graph/catalogue";
 import type { CatalogueDocument } from "../types";
 
@@ -41,7 +42,35 @@ export default function ClassList({
     );
   }
 
-  const groups = groupByFamily(classes);
+  const structureGroup: CatalogueGroup = {
+    family: "Estructura" as any,
+    colors: { acento: "#4338ca", borde: "#b8b7e4", relleno: "#f4f4fa" },
+    entries: [
+      {
+        className: "Container",
+        title: "Submódulo",
+        family: "Estructura" as any,
+        shape: null,
+        colors: { acento: "#4338ca", borde: "#b8b7e4", relleno: "#f4f4fa" },
+      },
+      {
+        className: "PortIn",
+        title: "Entrada",
+        family: "Fuente" as const,
+        shape: null,
+        colors: { acento: "#047857", borde: "#b3c4bc", relleno: "#f3f6f5" },
+      },
+      {
+        className: "PortOut",
+        title: "Salida",
+        family: "Destino" as const,
+        shape: null,
+        colors: { acento: "#be123c", borde: "#deb3b7", relleno: "#f9f4f4" },
+      },
+    ],
+  };
+
+  const groups = [structureGroup, ...groupByFamily(classes)];
 
   return (
     <div className="flex flex-col gap-2">
@@ -110,7 +139,7 @@ function ClassCard({
       onClick={() => onAdd(entry.className)}
       className="flex w-full cursor-grab items-center gap-1.5 rounded-md border border-transparent px-1 py-[5px] text-left transition hover:border-indigo-200 hover:bg-indigo-50/50 active:cursor-grabbing"
     >
-      {thumbnail !== null && (
+      {thumbnail !== null ? (
         <svg
           width={THUMBNAIL_BOX.width}
           height={THUMBNAIL_BOX.height}
@@ -142,6 +171,26 @@ function ClassCard({
               />
             ))}
           </g>
+        </svg>
+      ) : (
+        <svg
+          width={THUMBNAIL_BOX.width}
+          height={THUMBNAIL_BOX.height}
+          viewBox={`0 0 ${THUMBNAIL_BOX.width} ${THUMBNAIL_BOX.height}`}
+          aria-hidden="true"
+          focusable="false"
+          className="shrink-0"
+        >
+          <rect
+            x={5}
+            y={4}
+            width={46}
+            height={20}
+            rx={3}
+            fill="none"
+            stroke={entry.colors?.borde ?? "#94a3b8"}
+            strokeWidth={1.6}
+          />
         </svg>
       )}
       <span className="min-w-0 flex-1">

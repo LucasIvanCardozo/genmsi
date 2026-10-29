@@ -19,6 +19,14 @@
 //! container's border is spliced before the layout (`layout::flow`), so a link
 //! that goes from a block of one container to a block of another says where
 //! the flow goes.
+//!
+//! There are **two** compositions, and both are of the engine. `relayout`
+//! composes the whole tree (the one the CLI and the MCP ask for, with its
+//! committed baseline), and `relayout_scope` composes **one scope**: the level
+//! the reader is looking at, the root of the model or the content of a
+//! container. A scope is a canvas of its own: the blocks of a container are
+//! composed among themselves, a container nested in them is an atomic box, and
+//! nothing outside the scope moves.
 
 pub mod flow;
 
@@ -27,7 +35,7 @@ use dagre::{EdgeLabel, LayoutOptions, NodeLabel, RankDir, Ranker};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use crate::edit::Position;
+use crate::edit::{PortPosition, Position};
 use crate::model::{GmdlModel, Layout};
 
 /// Width of a block that has no geometry of its own.
@@ -89,6 +97,101 @@ pub fn relayout(model: &GmdlModel) -> Vec<Position> {
         second
     } else {
         first
+    }
+}
+
+/// The width of a door of a container.
+///
+/// It is the box the app draws a door in (`DOOR_BOX` in
+/// `crates/genmsi-app/src/graph/frames.ts`): the composition reserves the
+/// room the reader is going to see.
+pub const DOOR_WIDTH: i32 = 140;
+/// The height of a door of a container.
+///
+/// It is the box the app draws a door in: see [`DOOR_WIDTH`].
+pub const DOOR_HEIGHT: i32 = 44;
+/// Where a scope with no blocks of its own starts its picture.
+const EMPTY_SPOT: i32 = 80;
+/// The air between the lowest block of a scope and the free spot below it.
+///
+/// It is the same air the app leaves: the door that the engine places and
+/// the door the app draws in the meantime are in the same place.
+const FREE_SPOT_AIR: i32 = 40;
+
+/// The composition of one scope: the place of its blocks and of its doors.
+///
+/// A scope is a canvas of its own, and everything it holds is placed in it:
+/// the blocks it owns and the doors that open and close its flow.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ScopeComposition {
+    /// The place of every block the scope owns.
+    pub positions: Vec<Position>,
+    /// The place of every door of the scope.
+    pub ports: Vec<PortPosition>,
+}
+
+/// The positions that compose **one scope** of the model.
+///
+/// A scope is the level the reader is looking at: the root of the model, or
+/// the content of a container. The reader sees one level at a time, so the
+/// composition of a scope moves the blocks of that scope and nothing else: a
+/// "rearrange" inside a container does not move the blocks of the root.
+///
+/// The rules of the composition:
+///
+/// - the blocks the scope composes are the ones it owns (`block.owner ==
+///   scope`);
+/// - a container **nested** in the scope is an *atomic box*: a node of the
+///   scope's graph with the size the model gives it (the one the composition
+///   of its own scope gave it), whose content is neither looked at nor moved;
+/// - the links the scope composes are the ones it **owns**, with the borders
+///   of the nested containers spliced: a link that enters a nested container
+///   ends at the container (which is an atomic box) and a link that leaves it
+///   starts there;
+/// - the **ports of the scope** are the ends of the flow: they take part in
+///   the composition as the ends of the flow, so the block the flow enters
+///   through is placed first and the block it leaves through is placed last;
+/// - what is written back is the scope's own: the positions of its children.
+///   **Not** its frame: the container is a box of its own, and what it holds
+///   does not change it — its size and its place are the ones the model
+///   gives it, and nothing here touches them.
+///
+/// A scope is a canvas of its own: the positions of its children live in the
+/// canvas of the scope, which is where the author put them. The composition
+/// starts there, and never before it.
+///
+/// Nothing outside the scope is touched: a block that is not a child of the
+/// scope, and is not the scope itself, keeps the position it has.
+///
+/// The composition is deterministic: the same model and the same scope always
+/// produce the same positions, in the same order (sorted by block id).
+pub fn relayout_scope(model: &GmdlModel, scope: u32) -> ScopeComposition {
+    // A scope that is not in the model has no blocks to compose.
+    if model.block(scope).is_none() {
+        return ScopeComposition { positions: Vec::new(), ports: Vec::new() };
+    }
+    // The blocks the scope owns: the ones it composes.
+    let mut children: Vec<u32> = model
+        .blocks
+        .iter()
+        .filter(|block| block.owner == scope && block.id != scope)
+        .map(|block| block.id)
+        .collect();
+    children.sort_unstable();
+    // A scope with no blocks of its own has no picture of blocks, but it
+    // can still have doors: the composition places them.
+    if children.is_empty() && model.block(scope).is_some_and(|block| block.inputs.is_empty() && block.outputs.is_empty()) {
+        return ScopeComposition { positions: Vec::new(), ports: Vec::new() };
+    }
+    // The same ranker as the whole model, with the same fallback: the
+    // composition must never panic.
+    let ranker = Ranker::NetworkSimplex;
+    match guarded(|| compose_scope(model, scope, &children, ranker, GAP_X, RANK_SEP)) {
+        Some(positions) => positions,
+        None => {
+            guarded(|| compose_scope(model, scope, &children, Ranker::TightTree, GAP_X, RANK_SEP))
+                .unwrap_or_default()
+        }
     }
 }
 
@@ -159,13 +262,24 @@ fn compose(
     nodesep: i32,
     ranksep: i32,
 ) -> Option<Vec<Position>> {
+    guarded(|| compose_with(model, root, ranker, nodesep, ranksep))
+}
+
+/// The composition, when the ranker does not panic.
+///
+/// The port's network simplex panics on some compound graphs (the cycles of
+/// the container borders): the composition must never panic, so the answer
+/// comes from the tight tree when the simplex fails. Both answers are the
+/// same every time, so the composition stays deterministic.
+fn guarded<F, T>(compose: F) -> Option<T>
+where
+    F: FnOnce() -> T,
+{
     let hook = std::panic::take_hook();
     if std::env::var("DAGRE_VERBOSE").is_err() {
         std::panic::set_hook(Box::new(|_| {}));
     }
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        compose_with(model, root, ranker, nodesep, ranksep)
-    }));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(compose));
     std::panic::set_hook(hook);
     result.ok()
 }
@@ -384,6 +498,422 @@ fn compose_with(
     positions
 }
 
+/// The composition of **one scope**: the blocks the scope owns, and nothing
+/// else.
+///
+/// The graph dagre composes is the scope's own: its blocks and the flow
+/// between them. A container nested in the scope is an *atomic box*: a node
+/// of the graph with the size the model gives it, whose content is neither
+/// looked at nor moved. The ports of the scope are the ends of the flow:
+/// they take part in the composition as the nodes the flow starts at and ends
+/// at, so the block the flow enters through is placed first and the block it
+/// leaves through is placed last.
+///
+/// The gaps are the ones of the whole model, so a scope and the whole model
+/// agree on how far apart two blocks of a layer are. The tuning that leaves
+/// the whole picture square is not applied here: a scope is a canvas of its
+/// own, and its picture is not the picture of the model.
+fn compose_scope(
+    model: &GmdlModel,
+    scope: u32,
+    children: &[u32],
+    ranker: Ranker,
+    nodesep: i32,
+    ranksep: i32,
+) -> ScopeComposition {
+    // The margin of the frames: it is never wider than the gap between two
+    // layers.
+    let margin = PAD.min(ranksep / 2);
+    // The flow of the scope: the links it owns, with the borders of the
+    // nested containers spliced, and the ports of the scope at its ends.
+    let flow = flow::scope_flow(model, scope);
+    // The blocks of the scope that no link of the scope reaches: they are
+    // drawn in a grid beside the flow.
+    let grid = grid_of_scope(&flow, children);
+    let in_grid: HashSet<u32> = grid.iter().copied().collect();
+    let mut graph = Graph::with_options(GraphOptions {
+        directed: true,
+        multigraph: true,
+        compound: false,
+    });
+    for id in children {
+        // The blocks that are drawn in the grid take no room in the flow:
+        // they are not drawn there. They stay in the graph all the same: the
+        // order the crate gives the flow depends on them, and the flow
+        // crosses fewer links when they are there.
+        let (width, height) = if in_grid.contains(id) {
+            (0, 0)
+        } else {
+            size_of(model, *id)
+        };
+        let label = NodeLabel {
+            width: f64::from(width),
+            height: f64::from(height),
+            ..NodeLabel::default()
+        };
+        graph.set_node(id.to_string(), Some(label));
+    }
+    // The ports of the scope: the ends of the flow. They are blocks of the
+    // picture in their own right: the composition places them like it
+    // places any other block, and their place is written back.
+    for (ioid, _) in &flow.entries {
+        graph.set_node(entry_node(*ioid), Some(door_label()));
+    }
+    for (_, ioid) in &flow.exits {
+        graph.set_node(exit_node(*ioid), Some(door_label()));
+    }
+    // The doors that talk to each other: the flow of a submodule whose only
+    // content is its doors. They are nodes of the composition like the
+    // others, and the link between them says which goes first.
+    for (from_ioid, to_ioid) in &flow.port_links {
+        graph.set_node(door_node(model, scope, *from_ioid).0, Some(door_label()));
+        graph.set_node(door_node(model, scope, *to_ioid).0, Some(door_label()));
+    }
+    for (from_ioid, to_ioid) in &flow.port_links {
+        graph.set_edge(
+            door_node(model, scope, *from_ioid).0,
+            door_node(model, scope, *to_ioid).0,
+            Some(EdgeLabel::default()),
+            None,
+        );
+    }
+    // The flow of the scope: the links between the blocks it owns, with the
+    // borders of the nested containers spliced, and the links that carry the
+    // flow into the scope and out of it.
+    for (from, to) in &flow.edges {
+        graph.set_edge(
+            from.to_string(),
+            to.to_string(),
+            Some(EdgeLabel::default()),
+            None,
+        );
+    }
+    for (ioid, to) in &flow.entries {
+        graph.set_edge(
+            entry_node(*ioid),
+            to.to_string(),
+            Some(EdgeLabel::default()),
+            None,
+        );
+    }
+    for (from, ioid) in &flow.exits {
+        graph.set_edge(
+            from.to_string(),
+            exit_node(*ioid),
+            Some(EdgeLabel::default()),
+            None,
+        );
+    }
+    let options = LayoutOptions {
+        // The flow goes down: the input of a block is at its top and its
+        // output at its bottom.
+        rankdir: RankDir::TB,
+        ranker,
+        // The gap between two blocks of the same layer, and the gap between
+        // two layers of the flow.
+        nodesep: f64::from(nodesep),
+        ranksep: f64::from(ranksep),
+        edgesep: 20.0,
+        ..LayoutOptions::default()
+    };
+    dagre::layout(&mut graph, Some(options));
+
+    // dagre places a block by its middle; the file carries its corner.
+    let mut positions: Vec<Position> = Vec::new();
+    for id in children {
+        if in_grid.contains(id) {
+            // The blocks that are drawn in the grid are placed in the grid,
+            // not where dagre puts them.
+            continue;
+        }
+        let Some(node) = graph.node(&id.to_string()) else {
+            continue;
+        };
+        let (Some(x), Some(y)) = (node.x, node.y) else {
+            continue;
+        };
+        let width = node.width.round() as i32;
+        let height = node.height.round() as i32;
+        positions.push(Position {
+            id: *id,
+            x: (x - f64::from(width) / 2.0).round() as i32,
+            y: (y - f64::from(height) / 2.0).round() as i32,
+            width: Some(width),
+            height: Some(height),
+        });
+    }
+    // The chains of the flow start together: the reader sees every start of
+    // the flow in the first row.
+    align_components(model, scope, &mut positions, &flow.edges);
+    // The chains that share the canvas move apart: the picture grows only
+    // where two chains of the flow meet nowhere and overlap.
+    separate_components(model, scope, &mut positions, &flow.edges, margin);
+    // The blocks that are drawn in the grid get a place in it: the grid is
+    // laid out once the picture of the flow is known.
+    for id in &grid {
+        let (width, height) = size_of(model, *id);
+        positions.push(Position {
+            id: *id,
+            x: 0,
+            y: 0,
+            width: Some(width),
+            height: Some(height),
+        });
+    }
+    // The blocks that are drawn in the grid go in a grid beside the flow, in
+    // the shape that leaves the picture as square as possible.
+    place_free(&mut positions, model, &grid, nodesep);
+    // The frame of the scope is **not** composed: the container is a box of
+    // its own, and what it holds does not change it. Its size and its place
+    // are the ones the model gives it, and nothing here touches them.
+    // The doors of the scope: the place the composition gave them. A door
+    // is a block of the picture, and its place travels in the model. A door
+    // that carries the flow to several blocks is still one door: it has one
+    // place, not one per link.
+    let mut ports: Vec<PortPosition> = Vec::new();
+    let entries: BTreeSet<u32> = flow.entries.iter().map(|(ioid, _)| *ioid).collect();
+    for ioid in &entries {
+        if let Some(port) = door_position(&graph, model, scope, *ioid) {
+            ports.push(port);
+        }
+    }
+    let exits: BTreeSet<u32> = flow.exits.iter().map(|(_, ioid)| *ioid).collect();
+    for ioid in &exits {
+        if let Some(port) = door_position(&graph, model, scope, *ioid) {
+            ports.push(port);
+        }
+    }
+    // The doors that talk to each other: they are placed by the composition
+    // like any other block of the picture.
+    for (from_ioid, to_ioid) in &flow.port_links {
+        for ioid in [from_ioid, to_ioid] {
+            if ports.iter().any(|port| port.ioid == *ioid) {
+                continue;
+            }
+            if let Some(port) = door_position(&graph, model, scope, *ioid) {
+                ports.push(port);
+            }
+        }
+    }
+    // The doors that carry no flow yet —the reader just added them— go
+    // with the doors of their own kind, one under the other: the picture
+    // shows which door is which.
+    if let Some(container) = model.block(scope) {
+        // The doors that the flow joins to each other are placed by the
+        // composition, not by the free spot.
+        let joined: BTreeSet<u32> = flow
+            .port_links
+            .iter()
+            .flat_map(|(from, to)| [*from, *to])
+            .collect();
+        let mut pending: Vec<(u32, bool)> = Vec::new();
+        for port in &container.inputs {
+            if !entries.contains(&port.ioid) && !joined.contains(&port.ioid) {
+                pending.push((port.ioid, true));
+            }
+        }
+        for port in &container.outputs {
+            if !exits.contains(&port.ioid) && !joined.contains(&port.ioid) {
+                pending.push((port.ioid, false));
+            }
+        }
+        // The doors that go to the free spot are stacked by their kind: the
+        // entry doors under the entry doors, the exit doors under the exit
+        // doors.
+        let mut stacked_inputs = 0;
+        let mut stacked_outputs = 0;
+        for (ioid, input) in pending {
+            let same_kind: Vec<&PortPosition> =
+                ports.iter().filter(|port| port.input == input).collect();
+            let (x, y) = match same_kind
+                .iter()
+                .map(|port| port.y + port.height.unwrap_or(DOOR_HEIGHT))
+                .max()
+            {
+                Some(bottom) => (same_kind[0].x, bottom + RANK_SEP),
+                None => {
+                    // There is no door of its kind to sit under: the door
+                    // goes to the free spot of the scope, under the doors of
+                    // its kind that are already there.
+                    let (left, top) = free_spot_of_scope(model, children);
+                    let placed = if input {
+                        stacked_inputs += 1;
+                        stacked_inputs - 1
+                    } else {
+                        stacked_outputs += 1;
+                        stacked_outputs - 1
+                    };
+                    (left, top + placed * (DOOR_HEIGHT + GAP_Y))
+                }
+            };
+            ports.push(PortPosition {
+                block: scope,
+                ioid,
+                input,
+                x,
+                y,
+                width: Some(DOOR_WIDTH),
+                height: Some(DOOR_HEIGHT),
+            });
+        }
+    }
+    // The composition starts where the author put things, and never before
+    // it: the picture has no negative coordinates.
+    let (origin_x, origin_y) = scope_origin(model, children);
+    let left = positions.iter().map(|position| position.x).min().unwrap_or(0);
+    let top = positions.iter().map(|position| position.y).min().unwrap_or(0);
+    let (shift_x, shift_y) = (origin_x - left.min(origin_x), origin_y - top.min(origin_y));
+    for position in &mut positions {
+        position.x += shift_x;
+        position.y += shift_y;
+    }
+    for port in &mut ports {
+        port.x += shift_x;
+        port.y += shift_y;
+    }
+    positions.sort_by_key(|position| position.id);
+    ports.sort_by_key(|port| (port.ioid, port.input));
+    ScopeComposition { positions, ports }
+}
+
+/// The free spot of a scope: under its lowest block, at its left.
+///
+/// It is where a block that has no place of its own goes, and where a door
+/// that carries no flow yet goes when there is no door of its kind to sit
+/// under.
+pub fn free_spot_of_scope(model: &GmdlModel, children: &[u32]) -> (i32, i32) {
+    let mut left = i32::MAX;
+    let mut bottom = i32::MIN;
+    for id in children {
+        let Some(layout) = model.block(*id).and_then(|block| block.layout) else {
+            continue;
+        };
+        left = left.min(layout.x);
+        bottom = bottom.max(layout.y + layout.height);
+    }
+    if left == i32::MAX {
+        return (EMPTY_SPOT, EMPTY_SPOT);
+    }
+    (left, bottom + FREE_SPOT_AIR)
+}
+
+/// The box of a door of the scope.
+///
+/// It is the box the app draws a door in, and the one the composition
+/// reserves for it: the numbers are the same ones the app uses, so the
+/// picture the composition makes is the picture the reader sees.
+fn door_label() -> NodeLabel {
+    NodeLabel {
+        width: f64::from(DOOR_WIDTH),
+        height: f64::from(DOOR_HEIGHT),
+        ..NodeLabel::default()
+    }
+}
+
+/// The place of a door of the scope, as the composition gave it.
+///
+/// Dagre places a node by its middle and the model carries its corner.
+fn door_position(
+    graph: &Graph<NodeLabel, EdgeLabel>,
+    model: &GmdlModel,
+    scope: u32,
+    ioid: u32,
+) -> Option<PortPosition> {
+    let (name, input) = door_node(model, scope, ioid);
+    let node = graph.node(&name)?;
+    let (Some(x), Some(y)) = (node.x, node.y) else {
+        return None;
+    };
+    let width = node.width.round() as i32;
+    let height = node.height.round() as i32;
+    Some(PortPosition {
+        block: scope,
+        ioid,
+        input,
+        x: (x - f64::from(width) / 2.0).round() as i32,
+        y: (y - f64::from(height) / 2.0).round() as i32,
+        width: Some(width),
+        height: Some(height),
+    })
+}
+
+/// The node of the graph that stands for a port of the scope, and whether the
+/// port is an entry one.
+///
+/// The ports of a scope share one numbering, so the kind of the port is what
+/// tells them apart: a port that is an input of the container is the node the
+/// flow enters the scope by, and a port that is an output is the node it
+/// leaves through.
+fn door_node(model: &GmdlModel, scope: u32, ioid: u32) -> (String, bool) {
+    let is_input = model
+        .block(scope)
+        .is_some_and(|block| block.inputs.iter().any(|port| port.ioid == ioid));
+    if is_input {
+        (entry_node(ioid), true)
+    } else {
+        (exit_node(ioid), false)
+    }
+}
+
+/// The blocks of a scope that no link of the scope reaches: they are drawn in
+/// a grid beside the flow.
+///
+/// A block that the ports of the scope reach is in the flow: the entry port
+/// carries the flow into the scope, and the exit port carries it out.
+fn grid_of_scope(flow: &flow::ScopeFlow, children: &[u32]) -> Vec<u32> {
+    let mut reached: HashSet<u32> = HashSet::new();
+    for (from, to) in &flow.edges {
+        reached.insert(*from);
+        reached.insert(*to);
+    }
+    for (_, to) in &flow.entries {
+        reached.insert(*to);
+    }
+    for (from, _) in &flow.exits {
+        reached.insert(*from);
+    }
+    children
+        .iter()
+        .copied()
+        .filter(|id| !reached.contains(id))
+        .collect()
+}
+
+/// Where the picture of a scope starts: where the author put the blocks the
+/// scope owns.
+///
+/// A scope is a canvas of its own: its origin is the corner of the blocks it
+/// holds, not the origin of the whole model.
+fn scope_origin(model: &GmdlModel, children: &[u32]) -> (i32, i32) {
+    let mut x = i32::MAX;
+    let mut y = i32::MAX;
+    for id in children {
+        let Some(layout) = model.block(*id).and_then(|block| block.layout) else {
+            continue;
+        };
+        x = x.min(layout.x);
+        y = y.min(layout.y);
+    }
+    if x == i32::MAX {
+        (0, 0)
+    } else {
+        (x, y)
+    }
+}
+
+/// The node of the graph that stands for the entry port of a scope.
+///
+/// The name cannot be the id of a block: the ids of the blocks are numbers,
+/// and the ports of a scope are not blocks of the model.
+fn entry_node(ioid: u32) -> String {
+    format!("port-in-{ioid}")
+}
+
+/// The node of the graph that stands for the exit port of a scope.
+fn exit_node(ioid: u32) -> String {
+    format!("port-out-{ioid}")
+}
+
 /// The blocks that are drawn in a grid beside the flow: the ones no link
 /// reaches and that live in the root of the model.
 ///
@@ -577,7 +1107,16 @@ fn component_boxes(
             continue;
         };
         let rect = match model.block(position.id) {
-            Some(block) if block.is_container() => frames.get(&position.id).copied(),
+            // A container that holds blocks has a frame around them. A
+            // container whose content lives in another canvas (a container
+            // nested in the scope being composed) has no frame here: it is
+            // the box it is.
+            Some(block) if block.is_container() => frames.get(&position.id).copied().or(Some((
+                position.x,
+                position.y,
+                position.width.unwrap_or(DEFAULT_WIDTH),
+                position.height.unwrap_or(DEFAULT_HEIGHT),
+            ))),
             _ => Some((
                 position.x,
                 position.y,

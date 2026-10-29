@@ -181,6 +181,7 @@ fn undo_restores_the_reference_model_byte_for_byte() {
                 width: None,
                 height: None,
             }],
+            ports: Vec::new(),
         })
         .expect("moves");
     assert!(session.dirty());

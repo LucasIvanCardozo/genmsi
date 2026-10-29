@@ -23,6 +23,7 @@ import {
 } from "recharts";
 import { decimals, number } from "../../format.ts";
 import { tableDerived } from "../../monitor/derived.ts";
+import { histogramRows } from "../../monitor/series.ts";
 import type { Figures } from "../../monitor/stats.ts";
 import type { ReportDocument, Table } from "../../types";
 
@@ -71,27 +72,7 @@ export default function TableHistogram({
     const sumSquares = figure?.sumSquares ?? 0;
     const overflow = figure?.overflow ?? 0;
     const derived = tableDerived({ samples, sum, sumSquares, overflow });
-    const total = frequencies.reduce((sum2, count) => sum2 + count, 0);
-    let running = 0;
-    const rows = frequencies.map((count, index) => {
-      running += count;
-      const low =
-        index === 0
-          ? 0
-          : entry.table.first + (index - 1) * entry.table.width + entry.table.width;
-      const high = entry.table.first + index * entry.table.width;
-      const isOverflow = index === frequencies.length - 1 && entry.table.intervals > 1;
-      return {
-        x: (low + high) / 2,
-        label: isOverflow ? `> ${number(high)}` : `${number(low)} - ${number(high)}`,
-        frequency: count,
-        accumulated: total > 0 ? (running / total) * 100 : 0,
-        // The name is not `overflow`: Recharts gives every property of a
-        // row to the shape it draws, and `overflow` is an attribute of the
-        // SVG that a boolean would break.
-        overflowClass: isOverflow,
-      };
-    });
+    const rows = histogramRows(entry.table, frequencies);
     const barSize = Math.max(4, Math.round(620 / Math.max(rows.length, 1)) - 8);
     return { rows, derived, samples, overflow, width: entry.table.width, barSize };
   }, [entry, live]);

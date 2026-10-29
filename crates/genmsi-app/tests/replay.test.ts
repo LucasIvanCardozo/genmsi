@@ -616,7 +616,18 @@ test("the slider is a clock: a time selects the last record at or before it", ()
   assert.equal(at(1.5), 1, "the last record at or before 1.5");
   assert.equal(at(2), 2, "the exact instant of a record");
   assert.equal(at(9.9), 4, "the last record of the run");
-  assert.equal(frameAt(index, -5), 0, "before the run, the first record");
+  assert.equal(frameAt(index, -5), -1, "before the run, no record has happened");
+});
+
+test("a time before the first record has no frame", () => {
+  const traceWithDelay: TraceDocumentLike = {
+    ...smallTrace,
+    events: smallTrace.events.map((e) => ({ ...e, time: e.time + 10 })),
+  };
+  const index = buildIndex(traceWithDelay, smallReport, smallModel);
+  assert.equal(frameAt(index, 0), -1, "before the first event at t=10");
+  assert.equal(frameAt(index, 9.9), -1, "just before the first event");
+  assert.equal(frameAt(index, 10), 0, "at the exact instant of the first event");
 });
 
 test("the replay does not skip a crossing", () => {

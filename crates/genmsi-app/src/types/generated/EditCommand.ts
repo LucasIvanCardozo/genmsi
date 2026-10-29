@@ -69,7 +69,19 @@ x: number,
 /**
  * Vertical position.
  */
-y: number, } | { "op": "connect", 
+y: number, } | { "op": "removePort", 
+/**
+ * The container that owns the door.
+ */
+block: number, 
+/**
+ * The id of the door inside the container.
+ */
+ioid: number, 
+/**
+ * Whether the door is an entry one.
+ */
+input: boolean, } | { "op": "connect", 
 /**
  * Source block id.
  */

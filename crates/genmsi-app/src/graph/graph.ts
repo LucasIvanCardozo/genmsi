@@ -213,10 +213,10 @@ export function doorPlace(
   if (port?.layout != null) {
     return { x: port.layout.x, y: port.layout.y };
   }
-  // The door has no place yet: it goes under the doors of its own kind
-  // that have one, or to the free spot of the scope when none of them has.
-  const base =
-    lowestDoorPlace(model, scope, kind) ?? freeSpotOf(model, scope).position;
+  // The door has no place yet: it goes to the free spot of the scope. The
+  // spot does not depend on the other doors, so moving one door never moves
+  // the others.
+  const base = freeSpotOf(model, scope).position;
   // And under the doors that already took that place: two doors never
   // share a place.
   const withoutPlace = [
@@ -228,36 +228,10 @@ export function doorPlace(
   );
   return {
     x: base.x,
-    y: base.y + DOOR_GAP + index * (DOOR_BOX.height + DOOR_GAP),
+    y: base.y + index * (DOOR_BOX.height + DOOR_GAP),
   };
 }
 
-/**
- * The place under the lowest door of the scope that has one.
- *
- * A door that has no place yet goes below the doors of its own kind that
- * have one: the reader sees them apart, and none of them sits on top of
- * another.
- */
-function lowestDoorPlace(
-  model: ModelBody,
-  scope: number,
-  kind: "PortIn" | "PortOut",
-): Point | null {
-  const container = model.blocks.find((block) => block.id === scope);
-  const doors = kind === "PortIn" ? container?.inputs ?? [] : container?.outputs ?? [];
-  let lowest: Point | null = null;
-  for (const door of doors) {
-    const layout = door.layout;
-    if (layout === null) {
-      continue;
-    }
-    if (lowest === null || layout.y + layout.height > lowest.y) {
-      lowest = { x: layout.x, y: layout.y + layout.height };
-    }
-  }
-  return lowest;
-}
 
 /**
  * The free spot of a scope: where a new block goes.

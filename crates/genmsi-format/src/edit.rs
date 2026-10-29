@@ -137,6 +137,18 @@ pub enum EditCommand {
         /// Vertical position.
         y: i32,
     },
+    /// Remove a door of a container.
+    ///
+    /// The links that touch the door go with it: a link that starts at a
+    /// door that is gone, or that ends at it, is a link that cannot be.
+    RemovePort {
+        /// The container that owns the door.
+        block: u32,
+        /// The id of the door inside the container.
+        ioid: u32,
+        /// Whether the door is an entry one.
+        input: bool,
+    },
     /// Connect an output port to an input port of a sibling block.
     ///
     /// The link may also cross the border of a container: the entry port of
@@ -242,6 +254,17 @@ pub enum UndoStep {
         old: Option<PortLayout>,
         /// The place after.
         new: Option<PortLayout>,
+    },
+    /// A door of a container was removed.
+    PortRemoved {
+        /// The container that owns the door.
+        block: u32,
+        /// Whether the door was an entry one.
+        input: bool,
+        /// The index the door had in the list of the doors of its kind.
+        index: usize,
+        /// The door as it was.
+        port: Box<Port>,
     },
     /// A property's raw value changed.
     PropertyChanged {
@@ -414,6 +437,10 @@ impl EditSession {
                 self.move_port(block, ioid, input, x, y, &mut *steps)?;
                 Vec::new()
             }
+            EditCommand::RemovePort { block, ioid, input } => {
+                self.remove_port(block, ioid, input, &mut *steps)?;
+                Vec::new()
+            }
             EditCommand::Connect {
                 from,
                 from_ioid,
@@ -498,20 +525,11 @@ impl EditSession {
                 caption: format!("Modulo {id}"),
                 layout: Some(Layout { width: 160, height: 56, x, y }),
                 header: Some(ContainerHeader::default()),
-                inputs: vec![Port {
-                    ioid: 1,
-                    name: "Entrada1".to_string(),
-                    caption: String::new(),
-                    mylabel: String::new(),
-                    layout: None,
-                }],
-                outputs: vec![Port {
-                    ioid: 2,
-                    name: "Salida1".to_string(),
-                    caption: String::new(),
-                    mylabel: String::new(),
-                    layout: None,
-                }],
+                // The container is born empty: it has no doors of its own.
+                // The reader adds the entry and the exit he needs, and they
+                // are the same doors any other door is.
+                inputs: Vec::new(),
+                outputs: Vec::new(),
                 links: Vec::new(),
                 props: Vec::new(),
                 sections: vec![SectionKind::Inputs, SectionKind::Outputs, SectionKind::Links],
@@ -841,6 +859,71 @@ impl EditSession {
             x,
             y,
         }
+    }
+
+    /// Remove a door of a container, and the links that touch it.
+    ///
+    /// A link that starts at a door that is gone, or that ends at it, is a
+    /// link that cannot be: it goes with the door.
+    fn remove_port(
+        &mut self,
+        block: u32,
+        ioid: u32,
+        input: bool,
+        steps: &mut Vec<UndoStep>,
+    ) -> Result<(), FormatError> {
+        self.require_block(block)?;
+        // The links that touch the door: the ones that bring the flow into
+        // it, for an entry door; the ones that take the flow out of it, for
+        // an exit door.
+        let removed_links: Vec<(usize, Link)> = self
+            .model
+            .block(block)
+            .expect("checked")
+            .links
+            .iter()
+            .enumerate()
+            .filter(|(_, link)| {
+                if input {
+                    link.from_module == block && link.from_ioid == ioid
+                } else {
+                    link.to_module == block && link.to_ioid == ioid
+                }
+            })
+            .map(|(index, link)| (index, link.clone()))
+            .collect();
+        if !removed_links.is_empty() {
+            remove_links(&mut self.model, block, &removed_links);
+            steps.push(UndoStep::LinksRemoved {
+                container: block,
+                links: removed_links,
+            });
+        }
+        // And the door itself.
+        let mut removed = None;
+        if let Some(owner) = self.model.block_mut(block) {
+            let ports = if input {
+                &mut owner.inputs
+            } else {
+                &mut owner.outputs
+            };
+            if let Some(index) = ports.iter().position(|port| port.ioid == ioid) {
+                removed = Some((index, ports.remove(index)));
+            }
+        }
+        let Some((index, port)) = removed else {
+            return Err(FormatError::structural(
+                block,
+                format!("el puerto {ioid} no existe"),
+            ));
+        };
+        steps.push(UndoStep::PortRemoved {
+            block,
+            input,
+            index,
+            port: Box::new(port),
+        });
+        Ok(())
     }
 
     /// Connect an output port to an input port of a sibling block.
@@ -1320,6 +1403,25 @@ fn apply_steps(model: &mut GmdlModel, steps: &[UndoStep], forward: bool) -> Resu
                     }
                 }
             }
+            UndoStep::PortRemoved {
+                block,
+                input,
+                index,
+                port,
+            } => {
+                if forward {
+                    return Ok(());
+                }
+                if let Some(owner) = model.block_mut(*block) {
+                    let ports = if *input {
+                        &mut owner.inputs
+                    } else {
+                        &mut owner.outputs
+                    };
+                    let index = (*index).min(ports.len());
+                    ports.insert(index, port.as_ref().clone());
+                }
+            }
         }
     }
     Ok(())
@@ -1410,7 +1512,7 @@ mod tests {
     fn model_with_door() -> GmdlModel {
         parse_str(
             r#"<gmodel versioncode="1"><gclasses/><modules>\
-<module moduleid="0" moduleclass="main" owner="0" caption="m" name="m" kind="C" genprefer="" exehead="" nonexehead="" exefoot="" nonexefoot=""><links><link frommoduleid="1" fromioid="1" tomoduleid="2" toioid="1"/></links><inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Queue"/></inputs><outputs/></module>\
+<module moduleid="0" moduleclass="main" owner="0" caption="m" name="m" kind="C" genprefer="" exehead="" nonexehead="" exefoot="" nonexefoot=""><links><link frommoduleid="1" fromioid="1" tomoduleid="2" toioid="1"/><link frommoduleid="0" fromioid="1" tomoduleid="2" toioid="1"/></links><inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Queue"/></inputs><outputs/></module>\
 <module moduleid="1" moduleclass="Generate" owner="0" caption="g" name="Generate" kind="A" width="120" height="63" x="10" y="20"><outputs><output ioid="1" name="Salida1" caption="" mylabel="A_Queue"/></outputs></module>\
 <module moduleid="2" moduleclass="Terminate" owner="0" caption="t" name="Terminate" kind="A" width="84" height="64" x="100" y="200"><inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Queue"/></inputs></module>\
 </modules></gmodel>"#,
@@ -1699,6 +1801,68 @@ mod tests {
                 .layout
                 .is_none(),
             "the door kept the place after the undo"
+        );
+    }
+
+    #[test]
+    fn a_container_is_born_empty() {
+        // The container is a box of its own: it has no doors until the reader
+        // puts the ones he needs.
+        let mut session = EditSession::new(model());
+        session
+            .apply(EditCommand::AddBlock {
+                class: "Container".into(),
+                container: 0,
+                x: 10,
+                y: 20,
+            })
+            .expect("adds the container");
+        let container = session.model().block(3).expect("the container");
+        assert!(container.inputs.is_empty(), "the container came with an entry");
+        assert!(container.outputs.is_empty(), "the container came with an exit");
+    }
+
+    #[test]
+    fn a_door_can_be_removed_and_comes_back_with_the_undo() {
+        // A door the reader regrets is a door the reader takes away: the
+        // links that touch it go with it, and the undo brings everything
+        // back.
+        let mut session = EditSession::new(model_with_door());
+        session
+            .apply(EditCommand::RemovePort {
+                block: 0,
+                ioid: 1,
+                input: true,
+            })
+            .expect("removes the door");
+        let container = session.model().block(0).expect("the container");
+        assert!(container.input(1).is_none(), "the door is still there");
+        // The link that started at the door went with it.
+        assert_eq!(
+            container.links.len(),
+            1,
+            "the link of the door is still there"
+        );
+        // And the undo brings the door and its link back.
+        session.undo().expect("undoes");
+        let container = session.model().block(0).expect("the container");
+        assert!(container.input(1).is_some(), "the door did not come back");
+        assert_eq!(container.links.len(), 2, "the link did not come back");
+    }
+
+    #[test]
+    fn removing_a_door_that_does_not_exist_is_an_error() {
+        let mut session = EditSession::new(model_with_door());
+        let error = session
+            .apply(EditCommand::RemovePort {
+                block: 0,
+                ioid: 9,
+                input: true,
+            })
+            .expect_err("the door does not exist");
+        assert!(
+            error.to_string().contains("9"),
+            "the error does not name the door: {error}"
         );
     }
 

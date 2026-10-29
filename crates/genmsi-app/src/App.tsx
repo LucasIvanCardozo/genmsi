@@ -153,6 +153,8 @@ export default function App() {
           void apply({ op: "removeBlocks", ids });
         }
       },
+      onRemovePort: (container: number, ioid: number, input: boolean) =>
+        void apply({ op: "removePort", block: container, ioid, input }),
       onDisconnect: (container: number, from: number, fromIoid: number) =>
         void apply({ op: "disconnect", container, from, fromIoid }),
       onDropBlock: (className: string, x: number, y: number) =>

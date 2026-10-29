@@ -954,8 +954,9 @@ fn adding_a_container_creates_a_submodule() {
     let container_id = ids[0];
     let container = session.model().block(container_id).expect("exists");
     assert!(container.is_container());
-    assert_eq!(container.inputs.len(), 1);
-    assert_eq!(container.outputs.len(), 1);
+    // The container is born empty: it has no doors of its own.
+    assert_eq!(container.inputs.len(), 0);
+    assert_eq!(container.outputs.len(), 0);
     assert_eq!(container.layout.unwrap().x, 100);
     assert_eq!(container.layout.unwrap().y, 200);
 
@@ -973,10 +974,9 @@ fn adding_a_container_creates_a_submodule() {
 
     // Can add a PortIn and PortOut inside this container.
     //
-    // The ports of a container share one numbering: the container is born
-    // with an entry port (1) and an exit port (2), so the port that comes
-    // next is the 3, and the one after it the 4. An id never names two
-    // ports of the same container.
+    // The ports of a container share one numbering, and the container is
+    // born empty: the first door the reader adds is the 1, the next one the
+    // 2. An id never names two doors of the same container.
     session
         .apply(EditCommand::AddBlock {
             class: "PortIn".into(),
@@ -985,9 +985,9 @@ fn adding_a_container_creates_a_submodule() {
             y: 0,
         })
         .expect("adds port in");
-    assert_eq!(session.model().block(container_id).unwrap().inputs.len(), 2);
-    assert_eq!(session.model().block(container_id).unwrap().inputs[1].ioid, 3);
-    assert_eq!(session.model().block(container_id).unwrap().inputs[1].name, "Entrada3");
+    assert_eq!(session.model().block(container_id).unwrap().inputs.len(), 1);
+    assert_eq!(session.model().block(container_id).unwrap().inputs[0].ioid, 1);
+    assert_eq!(session.model().block(container_id).unwrap().inputs[0].name, "Entrada1");
 
     session
         .apply(EditCommand::AddBlock {
@@ -997,9 +997,9 @@ fn adding_a_container_creates_a_submodule() {
             y: 0,
         })
         .expect("adds port out");
-    assert_eq!(session.model().block(container_id).unwrap().outputs.len(), 2);
-    assert_eq!(session.model().block(container_id).unwrap().outputs[1].ioid, 4);
-    assert_eq!(session.model().block(container_id).unwrap().outputs[1].name, "Salida4");
+    assert_eq!(session.model().block(container_id).unwrap().outputs.len(), 1);
+    assert_eq!(session.model().block(container_id).unwrap().outputs[0].ioid, 2);
+    assert_eq!(session.model().block(container_id).unwrap().outputs[0].name, "Salida2");
 
     // Cannot add PortIn at root (container 0)
     assert!(
@@ -1015,11 +1015,11 @@ fn adding_a_container_creates_a_submodule() {
 
     // Undo port out
     session.undo().expect("undo port out");
-    assert_eq!(session.model().block(container_id).unwrap().outputs.len(), 1);
+    assert_eq!(session.model().block(container_id).unwrap().outputs.len(), 0);
 
     // Undo port in
     session.undo().expect("undo port in");
-    assert_eq!(session.model().block(container_id).unwrap().inputs.len(), 1);
+    assert_eq!(session.model().block(container_id).unwrap().inputs.len(), 0);
 
     // Undo removes child, then container
     session.undo().expect("undo child");
@@ -1048,6 +1048,23 @@ fn container_with_a_child(class: &str) -> (EditSession, u32, u32) {
             y: 200,
         })
         .expect("adds a container")[0];
+    // The container is born empty: the reader puts the doors he needs.
+    session
+        .apply(EditCommand::AddBlock {
+            class: "PortIn".into(),
+            container,
+            x: 0,
+            y: 0,
+        })
+        .expect("adds the entry door");
+    session
+        .apply(EditCommand::AddBlock {
+            class: "PortOut".into(),
+            container,
+            x: 0,
+            y: 0,
+        })
+        .expect("adds the exit door");
     let child = session
         .apply(EditCommand::AddBlock {
             class: class.into(),
@@ -1060,7 +1077,9 @@ fn container_with_a_child(class: &str) -> (EditSession, u32, u32) {
 }
 
 #[test]
-fn a_new_container_has_an_entry_port_and_an_exit_port_with_different_ids() {
+fn a_new_container_is_empty_and_its_doors_get_their_own_ids() {
+    // The container is born empty: the reader puts the doors he needs, and
+    // they are the doors any other door is.
     let mut session = EditSession::new(small_model());
     let ids = session
         .apply(EditCommand::AddBlock {
@@ -1071,12 +1090,33 @@ fn a_new_container_has_an_entry_port_and_an_exit_port_with_different_ids() {
         })
         .expect("adds a container");
     let container = session.model().block(ids[0]).expect("exists");
-    assert_eq!(container.inputs.len(), 1, "the container has an entry port");
-    assert_eq!(container.outputs.len(), 1, "the container has an exit port");
-    assert_eq!(container.inputs[0].ioid, 1, "the entry port is the port 1");
-    assert_eq!(container.outputs[0].ioid, 2, "the exit port is the port 2");
-    assert_eq!(container.inputs[0].mylabel, "", "a fresh port carries no label");
-    assert_eq!(container.outputs[0].mylabel, "", "a fresh port carries no label");
+    assert_eq!(container.inputs.len(), 0, "the container came with an entry");
+    assert_eq!(container.outputs.len(), 0, "the container came with an exit");
+
+    // The entry door the reader adds, and the exit door after it.
+    session
+        .apply(EditCommand::AddBlock {
+            class: "PortIn".into(),
+            container: ids[0],
+            x: 0,
+            y: 0,
+        })
+        .expect("adds the entry door");
+    session
+        .apply(EditCommand::AddBlock {
+            class: "PortOut".into(),
+            container: ids[0],
+            x: 0,
+            y: 0,
+        })
+        .expect("adds the exit door");
+    let container = session.model().block(ids[0]).expect("exists");
+    assert_eq!(container.inputs.len(), 1, "the container has no entry door");
+    assert_eq!(container.outputs.len(), 1, "the container has no exit door");
+    assert_eq!(container.inputs[0].ioid, 1, "the entry door is the door 1");
+    assert_eq!(container.outputs[0].ioid, 2, "the exit door is the door 2");
+    assert_eq!(container.inputs[0].mylabel, "", "a fresh door carries no label");
+    assert_eq!(container.outputs[0].mylabel, "", "a fresh door carries no label");
     // The two ids do not collide: the file the editor writes reads again.
     let written = to_string(session.model());
     let reparsed = parse_str(&written).expect("the written model parses again");

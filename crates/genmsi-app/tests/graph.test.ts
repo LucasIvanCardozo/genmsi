@@ -132,8 +132,8 @@ test("the doors of a container keep their id and join their block", () => {
   assert.equal(exit.data.kind, "PortOut");
   // The doors have no place of their own yet, so they go to the free spot
   // of the scope, one under the other: two doors never share a place.
-  assert.deepEqual(entry.position, { x: 80, y: 80 + 8 });
-  assert.deepEqual(exit.position, { x: 80, y: 80 + 8 + DOOR_BOX.height + 8 });
+  assert.deepEqual(entry.position, { x: 80, y: 80 });
+  assert.deepEqual(exit.position, { x: 80, y: 80 + DOOR_BOX.height + 8 });
   // The handle of a door is the plain id of its port: React Flow resolves
   // an edge by handle id, and a mismatch makes the edge disappear.
   assert.deepEqual(entry.data.outputs, [{ ioid: 1, name: "Entrada1" }]);

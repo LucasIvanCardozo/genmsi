@@ -216,7 +216,7 @@ test("a door with no place goes to the free spot of the scope", () => {
   assert.notDeepEqual(entry.position, exit.position);
   // And the place of the door is in the canvas of the scope.
   const spot = freeSpotOf(model, 10).position;
-  assert.deepEqual(entry.position, { x: spot.x, y: spot.y + 8 });
+  assert.deepEqual(entry.position, spot);
   assert.equal(exit.position.x, spot.x);
   assert.ok(exit.position.y > entry.position.y);
 });

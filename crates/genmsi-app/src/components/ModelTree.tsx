@@ -4,7 +4,6 @@ import {
   ChevronRight,
   Folder,
   FolderOpen,
-  FolderPlus,
   Layers,
   Component,
 } from "lucide-react";
@@ -22,14 +21,12 @@ export default function ModelTree({
   selectedBlockIds = [],
   onSelectContainer,
   onSelectBlock,
-  onAddContainer,
 }: {
   model: ModelBody;
   activeContainerId: number;
   selectedBlockIds?: number[];
   onSelectContainer: (id: number) => void;
   onSelectBlock?: (id: number) => void;
-  onAddContainer?: () => void;
 }) {
   // Collect all containers (kind === "C" or id === 0).
   const containers = model.blocks.filter((b) => b.kind === "C" && b.id !== 0);
@@ -76,17 +73,6 @@ export default function ModelTree({
       <div className="mb-2 flex items-center justify-between border-b border-slate-200 pb-2">
         <span className="font-semibold text-slate-700">Modelos y Módulos</span>
         <div className="flex items-center gap-2">
-          {onAddContainer && (
-            <button
-              type="button"
-              onClick={onAddContainer}
-              className="flex items-center gap-1 rounded border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[11px] font-medium text-indigo-700 hover:bg-indigo-100 transition shadow-2xs"
-              title="Crear un nuevo submódulo en el contenedor activo"
-            >
-              <FolderPlus className="size-3" />
-              Nuevo
-            </button>
-          )}
           <button
             type="button"
             onClick={() => {

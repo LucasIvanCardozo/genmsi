@@ -110,6 +110,8 @@ pub const DOOR_WIDTH: i32 = 140;
 ///
 /// It is the box the app draws a door in: see [`DOOR_WIDTH`].
 pub const DOOR_HEIGHT: i32 = 44;
+/// Where a scope with no blocks of its own starts its picture.
+const EMPTY_SPOT: i32 = 80;
 
 /// The composition of one scope: the place of its blocks and of its doors.
 ///
@@ -171,9 +173,9 @@ pub fn relayout_scope(model: &GmdlModel, scope: u32) -> ScopeComposition {
         .map(|block| block.id)
         .collect();
     children.sort_unstable();
-    // A scope with nothing in it has no picture: there is nothing to place
-    // and no frame to draw around it.
-    if children.is_empty() {
+    // A scope with no blocks of its own has no picture of blocks, but it
+    // can still have doors: the composition places them.
+    if children.is_empty() && model.block(scope).is_some_and(|block| block.inputs.is_empty() && block.outputs.is_empty()) {
         return ScopeComposition { positions: Vec::new(), ports: Vec::new() };
     }
     // The same ranker as the whole model, with the same fallback: the
@@ -661,6 +663,50 @@ fn compose_scope(
             ports.push(port);
         }
     }
+    // The doors that carry no flow yet —the reader just added them— go
+    // with the doors of their own kind, one under the other: the picture
+    // shows which door is which.
+    if let Some(container) = model.block(scope) {
+        let mut pending: Vec<(u32, bool)> = Vec::new();
+        for port in &container.inputs {
+            if !entries.contains(&port.ioid) {
+                pending.push((port.ioid, true));
+            }
+        }
+        for port in &container.outputs {
+            if !exits.contains(&port.ioid) {
+                pending.push((port.ioid, false));
+            }
+        }
+        for (ioid, input) in pending {
+            let same_kind: Vec<&PortPosition> =
+                ports.iter().filter(|port| port.input == input).collect();
+            let (x, y) = match same_kind
+                .iter()
+                .map(|port| port.y + port.height.unwrap_or(DOOR_HEIGHT))
+                .max()
+            {
+                Some(bottom) => (same_kind[0].x, bottom + RANK_SEP),
+                None => {
+                    // There is no door of its kind to sit under: the door
+                    // goes to the free spot of the scope, under the doors
+                    // that are already there.
+                    let (left, top) = free_spot_of_scope(model, children);
+                    let placed = ports.len() as i32;
+                    (left, top + placed * (DOOR_HEIGHT + GAP_Y))
+                }
+            };
+            ports.push(PortPosition {
+                block: scope,
+                ioid,
+                input,
+                x,
+                y,
+                width: Some(DOOR_WIDTH),
+                height: Some(DOOR_HEIGHT),
+            });
+        }
+    }
     // The composition starts where the author put things, and never before
     // it: the picture has no negative coordinates.
     let (origin_x, origin_y) = scope_origin(model, children);
@@ -678,6 +724,27 @@ fn compose_scope(
     positions.sort_by_key(|position| position.id);
     ports.sort_by_key(|port| (port.ioid, port.input));
     ScopeComposition { positions, ports }
+}
+
+/// The free spot of a scope: under its lowest block, at its left.
+///
+/// It is where a block that has no place of its own goes, and where a door
+/// that carries no flow yet goes when there is no door of its kind to sit
+/// under.
+fn free_spot_of_scope(model: &GmdlModel, children: &[u32]) -> (i32, i32) {
+    let mut left = i32::MAX;
+    let mut bottom = i32::MIN;
+    for id in children {
+        let Some(layout) = model.block(*id).and_then(|block| block.layout) else {
+            continue;
+        };
+        left = left.min(layout.x);
+        bottom = bottom.max(layout.y + layout.height);
+    }
+    if left == i32::MAX {
+        return (EMPTY_SPOT, EMPTY_SPOT);
+    }
+    (left, bottom + GAP_Y)
 }
 
 /// The box of a door of the scope.

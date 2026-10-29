@@ -530,7 +530,6 @@ export default function MonitorView({
                     focusBlock(id);
                     setAside("bloque");
                   }}
-                  onAddContainer={() => void addBlock("Container")}
                 />
               )}
             </div>

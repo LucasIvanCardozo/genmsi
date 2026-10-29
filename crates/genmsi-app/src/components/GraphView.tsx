@@ -359,6 +359,8 @@ export interface GraphActions {
   onConnect: (from: number, fromIoid: number, to: number, toIoid: number) => void;
   /** The user removed a block. */
   onRemove: (ids: number[]) => void;
+  /** The user removed a door of a container. */
+  onRemovePort: (container: number, ioid: number, input: boolean) => void;
   /** The user removed a link. */
   onDisconnect: (container: number, from: number, fromIoid: number) => void;
   /** The user dropped a new block of a class. */
@@ -638,6 +640,14 @@ export default memo(function GraphView({
         }}
         onConnect={onConnect}
         onNodesDelete={(deleted) => {
+          // A door is a block of the picture in its own right: removing it
+          // removes the door, and the links that touch it.
+          for (const node of deleted) {
+            const door = /^(in|out)-(\d+)$/.exec(node.id);
+            if (door !== null) {
+              actions.onRemovePort(containerId, Number(door[2]), door[1] === "in");
+            }
+          }
           const blockIds = deleted
             .filter((node) => !node.id.startsWith("in-") && !node.id.startsWith("out-"))
             .map((node) => Number(node.id));

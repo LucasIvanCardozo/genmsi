@@ -446,6 +446,54 @@ fn the_doors_of_the_scope_are_the_same_every_time() {
 }
 
 #[test]
+fn every_door_of_the_scope_has_a_place() {
+    // A door that carries no flow yet —the reader just added it— is a
+    // door of the scope all the same: the composition gives it a place,
+    // with the doors of its own kind.
+    let model = model("TP3__aeropuerto.gmdl");
+    let scope = 13;
+    let container = model.block(scope).expect("the scope is a block");
+    let doors = container.inputs.len() + container.outputs.len();
+    let composition = relayout_scope(&model, scope);
+    assert_eq!(
+        composition.ports.len(),
+        doors,
+        "the scope does not have one place per door"
+    );
+    // The doors that carry no flow are with the doors of their kind.
+    let entry = composition
+        .ports
+        .iter()
+        .find(|port| port.input)
+        .expect("the scope has an entry door");
+    let exit = composition
+        .ports
+        .iter()
+        .find(|port| !port.input)
+        .expect("the scope has an exit door");
+    let first_block = composition
+        .positions
+        .iter()
+        .map(|position| position.y)
+        .min()
+        .expect("the scope has blocks");
+    assert!(
+        entry.y < first_block,
+        "the entry door is not above the flow of the scope"
+    );
+    let last_block = composition
+        .positions
+        .iter()
+        .map(|position| position.y)
+        .max()
+        .expect("the scope has blocks");
+    assert!(
+        exit.y > last_block,
+        "the exit door is not below the flow of the scope"
+    );
+}
+
+#[test]
 fn the_composition_of_a_scope_leaves_no_block_on_another() {
     // The measure of the house: two blocks that sit on each other are a
     // picture the reader cannot read. The measure is taken over every scope

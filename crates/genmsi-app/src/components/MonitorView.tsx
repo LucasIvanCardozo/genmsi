@@ -3,7 +3,7 @@ import { ChevronRight, CornerLeftUp, Layers } from "lucide-react";
 import { advance, advanceClock, clockWithCrossings, frameAt, stateAt, type ReplayState } from "../monitor/replay";
 import { useApp } from "../state/store";
 import { FLIGHT_SECONDS, MIN_WALL_FLIGHT, travellersAt, type Move } from "../monitor/balls";
-import { graphOf, visibleLinkId, visibleLinks } from "../graph/graph";
+import { graphOf, routeFor, routesOf } from "../graph/graph";
 import { countsOf } from "../monitor/counts";
 import { figureBlockOf, figuresOf } from "../monitor/figures";
 import { useLive, type LiveBall, type LiveCounts } from "../monitor/live";
@@ -115,30 +115,30 @@ export default function MonitorView({
     return countsOf(report.blocks, state);
   }, [report, state]);
 
-  // The links of the model: a ball travels over the one that joins the two
-  // blocks it goes from and to.
+  // The links of the model: the canvas draws the ones of the scope the
+  // reader is in, and an entity travels over the one that carries its move.
   const edges = useMemo(
     () => (model === null ? [] : graphOf(model, activeContainerId).edges),
     [model, activeContainerId],
   );
 
-  // Precomputed O(1) route lookup map for ball travel.
-  const routes = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const edge of edges) {
-      const key = `${edge.source}->${edge.target}`;
-      if (!map.has(key)) {
-        map.set(key, edge.id);
-      }
+  // The links of the scope, with the pairs of activity blocks they carry:
+  // the engine publishes them with the borders of the containers already
+  // resolved, so the app does not have to resolve them on its own.
+  const scopeLinks = useMemo(() => {
+    if (model === null) {
+      return [];
     }
-    return map;
-  }, [edges]);
+    const drawn = new Set(edges.map((edge) => edge.id));
+    return model.edges.filter((link) => drawn.has(link.id));
+  }, [model, edges]);
 
-  // The links the model does not draw but a ball travels over: the direct
-  // way between two blocks that the model joins through a container.
-  const links = useMemo(
-    () => visibleLinks(transitions?.moves ?? [], edges),
-    [transitions, edges],
+  // The routes of the scope: the link that carries each move of the trace.
+  // The same move is carried by a different link in each scope, so the
+  // routes are the ones of the scope the reader is in.
+  const routes = useMemo(
+    () => routesOf(scopeLinks, model?.edges ?? []),
+    [scopeLinks, model],
   );
 
   // The blocks of the model, as the figures read them: the class of the
@@ -238,8 +238,12 @@ export default function MonitorView({
       // still flies long enough to be seen.
       speed * MIN_WALL_FLIGHT,
     )) {
-      const routeKey = `${traveller.from}->${traveller.to}`;
-      const id = current.routes.get(routeKey) ?? visibleLinkId(traveller.from, traveller.to);
+      const id = routeFor(current.routes, traveller.from, traveller.to);
+      if (id === undefined) {
+        // The scope has no link that carries the move: it happens deeper
+        // inside the model, and there is nothing to draw the entity on.
+        continue;
+      }
       const list = balls.get(id);
       const ball: LiveBall = { xact: traveller.xact, progress: traveller.progress };
       if (list === undefined) {
@@ -457,7 +461,6 @@ export default function MonitorView({
                 model={model}
                 actions={actions}
                 fitSignal={fitSignal}
-                extraEdges={links}
                 containerId={activeContainerId}
                 onOpenContainer={setActiveContainerId}
               />

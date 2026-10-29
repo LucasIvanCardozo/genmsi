@@ -325,6 +325,16 @@ const nodeTypes = { bloque: BlockNode };
 /** The links are drawn by the component that knows the balls that travel. */
 const edgeTypes = { bloque: GraphEdge };
 
+/**
+ * The links the model does not draw: none, by default.
+ *
+ * The list is a constant of the module and not a fresh array on every
+ * render: the effect that draws the graph depends on it, and a list that
+ * changes its identity on every render makes that effect run again and
+ * again, for ever.
+ */
+const NO_EXTRA_EDGES: Edge[] = [];
+
 /** The nodes and the edges of the model's graph. */
 function graphOfUnused(): void {
   void graphOf;
@@ -358,7 +368,7 @@ export default memo(function GraphView({
   model,
   actions,
   fitSignal,
-  extraEdges = [],
+  extraEdges = NO_EXTRA_EDGES,
   containerId = 0,
   onOpenContainer,
 }: {

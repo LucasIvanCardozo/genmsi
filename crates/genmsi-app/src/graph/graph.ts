@@ -9,6 +9,8 @@
  *
  * - how a block of the model becomes a **node** of the picture, and how a
  *   link becomes an **edge** (`graphOf`);
+ * - which **link** of a scope carries a move of the trace, so the entity
+ *   that travels is seen crossing the border of a container (`routesOf`);
  * - where the **ports** of a block sit, so a link leaves the block by the
  *   port it names and not by the middle of the block (`portSpread`);
  * - the **curve** an edge follows, and the point of that curve where a
@@ -21,7 +23,7 @@
  */
 import { getBezierPath, Position, type Edge, type Node } from "@xyflow/react";
 import { DOOR_BOX } from "./frames.ts";
-import type { ModelBody, ModelBlock } from "../types";
+import type { ModelBody, ModelBlock, ModelEdge } from "../types";
 
 /**
  * The kind of a block of the picture.
@@ -295,55 +297,115 @@ export function edgeBetween(edges: Edge[], from: number, to: number): Edge | und
 }
 
 /**
- * The id of the link a ball travels over.
+ * The key of the pair of activity blocks a link carries.
  *
- * When the two blocks are joined by a link, that is the one. When the
- * model's link goes through a container, the container is a frame and not a
- * step the reader sees: the ball crosses the frame, and the link it travels
- * is the direct one between the two blocks.
+ * The pair is the move the trace records: the block the flow comes from and
+ * the block it goes to.
  */
-export function routeOf(edges: Edge[], from: number, to: number): string {
-  const edge = edgeBetween(edges, from, to);
-  return edge === undefined ? visibleLinkId(from, to) : edge.id;
-}
-
-/** The id of the direct link between two blocks that the model does not join. */
-export function visibleLinkId(from: number, to: number): string {
-  return `visible:${from}->${to}`;
+export function pairKey(from: number, to: number): string {
+  return `${from}->${to}`;
 }
 
 /**
- * The links the model does not draw but the reader must see the ball cross.
+ * The routes of a scope: the link that carries each move of the trace.
  *
- * A container gathers the blocks of a part of the model, and the model's
- * links go in and out of it. The transaction does not go through the
- * container: it goes from one block to the next. The ball follows the
- * visible way, which is a link of its own, drawn only where the ball is.
+ * The truth is the model's: every link publishes the pairs of activity
+ * blocks it carries (`ModelEdge.hops`), with the borders of the containers
+ * already resolved by the engine. The routes are that truth seen from one
+ * scope: the link of the scope that carries the pair of a move.
+ *
+ * A move the trace records in the block the transaction was counted in
+ * skips the block it really went through, and no link carries its pair.
+ * For those, the route is the link that carries the **first hop of the
+ * chain** the flow crossed: the chain is already published as the hops of
+ * the links, so the app does not resolve the flow of the engine on its own.
+ *
+ * The chain is only for the pairs that **no link carries**: a pair that
+ * some link carries is a move of the flow, and the scope that does not
+ * carry it simply has no link for it.
  */
-export function visibleLinks(
-  moves: { from: number; to: number }[],
-  edges: Edge[],
-): Edge[] {
-  const links: Edge[] = [];
-  const seen = new Set<string>();
-  for (const move of moves) {
-    const id = routeOf(edges, move.from, move.to);
-    if (seen.has(id) || edgeBetween(edges, move.from, move.to) !== undefined) {
-      continue;
+export interface ScopeRoutes {
+  /** The link of the scope that carries a pair, by the key of the pair. */
+  byPair: Map<string, string>;
+  /**
+   * The link of the scope that carries the first hop of the chain of a pair
+   * that no link carries, by the key of the pair.
+   */
+  byChain: Map<string, string>;
+}
+
+/**
+ * The routes of a scope.
+ *
+ * The scope's links are the ones it owns, and they are the ones the canvas
+ * draws in it: the link that enters a container belongs to the scope
+ * above, and the link that feeds the entry port of the container belongs
+ * to the container.
+ *
+ * @param scope The links the scope draws.
+ * @param model The links of the whole model: the chain of a move is read
+ *   from them, because the flow of a move crosses the borders.
+ */
+export function routesOf(scope: ModelEdge[], model: ModelEdge[]): ScopeRoutes {
+  const byPair = new Map<string, string>();
+  for (const link of scope) {
+    for (const [from, to] of link.hops) {
+      const key = pairKey(from, to);
+      if (!byPair.has(key)) {
+        byPair.set(key, link.id);
+      }
     }
-    seen.add(id);
-    links.push({
-      id,
-      source: String(move.from),
-      target: String(move.to),
-      type: "bloque",
-      // The link is not drawn: the model does not have it, and the ball is
-      // the only thing that travels over it.
-      style: { stroke: "transparent", strokeWidth: 0 },
-      data: { visible: true },
-    });
   }
-  return links;
+  // The block every pair reaches, in every scope: the chain of a move is
+  // the pair of its first hop and the pair that follows it, and the flow of
+  // a move crosses the borders, so the second hop may live in another
+  // scope.
+  const reaches = new Map<number, number[]>();
+  // The pairs the model carries: a pair that some link carries is a move
+  // of the flow of the engine, and the chain is not for it.
+  const carried = new Set<string>();
+  for (const link of model) {
+    for (const [from, to] of link.hops) {
+      carried.add(pairKey(from, to));
+      const list = reaches.get(from);
+      if (list === undefined) {
+        reaches.set(from, [to]);
+      } else if (!list.includes(to)) {
+        list.push(to);
+      }
+    }
+  }
+  // The chain of a move: the first hop is the one the scope carries, and
+  // the second one is the pair that follows it.
+  const byChain = new Map<string, string>();
+  for (const link of scope) {
+    for (const [from, to] of link.hops) {
+      for (const next of reaches.get(to) ?? []) {
+        const key = pairKey(from, next);
+        if (!byPair.has(key) && !carried.has(key) && !byChain.has(key)) {
+          byChain.set(key, link.id);
+        }
+      }
+    }
+  }
+  return { byPair, byChain };
+}
+
+/**
+ * The link a move travels over in a scope.
+ *
+ * The link that carries the pair of the move, or the link that carries the
+ * first hop of the chain of a move that no link carries. `undefined` when
+ * the scope has no link for the move: the move happens deeper inside the
+ * model, and there is nothing to draw the entity on.
+ */
+export function routeFor(
+  routes: ScopeRoutes,
+  from: number,
+  to: number,
+): string | undefined {
+  const key = pairKey(from, to);
+  return routes.byPair.get(key) ?? routes.byChain.get(key);
 }
 
 /**

@@ -423,6 +423,18 @@ mantenimiento puede terminar desde el CLI:
 Y falta encadenar el tramo de T1 (el motor, `39d029d`), que entra por
 debajo del presupuesto igual que los otros dos.
 
+**La cadena quedó completa.** Con una tercera autoridad (T1) el mismo
+`capture` la rechaza igual, con el mismo motivo: el bloqueo no es del
+candidato, ni de los bindings, ni de una autoridad trabada. Las tres
+autoridades de la ronda quedan **vivas** (estado `reviewing`, sin quemar), y
+cada una cubre una unidad de trabajo:
+
+| autoridad | unidad | tramo | líneas | lentes |
+|---|---|---|---|---|
+| `review-0360430e8b8b91f4` | T1 — el motor | `0f56073..39d029d` | 1.228 | risk, resilience, readability |
+| `review-462d8dcc01c99a15` | T5 — el dibujo | `d85c4e1..0f56073` | 1.395 | readability, reliability |
+| `review-07593c1d666d238e` | T4 — el enrutado | `39d029d..HEAD` | 448 | readability, reliability |
+
 Lo que sí está probado, sin la revisión nativa: `cargo test --workspace`
 (578) y el suite de la app (279) en verde, `tsc` limpio, el diferencial del
 DOM de los 66 bloques idéntico, y la medición en el navegador del círculo

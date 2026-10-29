@@ -489,13 +489,47 @@ Lo que sí está probado, sin la revisión nativa: `cargo test --workspace`
 DOM de los 66 bloques idéntico, y la medición en el navegador del círculo
 cruzando la frontera.
 
-### L11 — Lo que queda de esta unidad
+### L11 — La composición por alcance (T2 y T3)
+
+El motor compone ahora un alcance (`genmsi_format::layout::relayout_scope`) y
+el pedido de reacomodar lleva el alcance que el lector está viendo.
+
+**Medido en la app corriendo** (`TP10__tp10.gmdl`, 87 bloques), reacomodando
+en cada nivel:
+
+| ámbito | bloques que cambian | fuera del alcance | hijos dentro del marco |
+|---|---|---|---|
+| raíz (0) | 11 | **0** | — |
+| contenedor 1 | **10** (9 hijos + su marco) | **0** | sí |
+| contenedor 11 | 9 (8 hijos + su marco) | **0** | sí |
+
+Antes (L6): **86 de 86** bloques se movían, y los hijos de un contenedor se
+rankeaban por el flujo global. Ahora, dentro de un contenedor, se mueven
+**sólo sus hijos y su marco**, y los 77 bloques de afuera quedan byte a byte
+donde estaban.
+
+El marco del contenedor se recalcula alrededor de sus hijos (la misma regla de
+`place_frames` que usa la composición del modelo entero) y queda en el mismo
+espacio que ellos: el marco sigue conteniendo a su contenido.
+
+Sobre los 25 modelos de referencia: **120 ámbitos** compuestos, **0** bloques
+fuera del marco de su ámbito y **0** pares de bloques superpuestos.
+
+Lo que no cambia: la composición del modelo entero (`relayout`, la que usan la
+CLI y el MCP) y su línea base commiteada; la geometría no entra en la
+simulación (el programa GPSS y el reporte de los modelos de referencia salen
+byte a byte iguales).
+
+### L12 — Lo que queda de esta unidad
 
 - **S2** (las cifras del contenedor y de sus puertas) queda sin hacer: el
   dato ya está publicado (los pares de cada enlace) pero contarlo y
   publicarlo es otra unidad, con `src/monitor/counts.ts` y un lugar donde
   escribirlo.
-- **T2 + T3** (la recomposición por alcance) quedan para otra ronda: tocan
-  el algoritmo de composición del motor y piden su propia medición.
-- La posición de las puertas (hoy fijas en el código) y el marco del ámbito
-  siguen siendo de otra unidad.
+- **La posición de las puertas** (hoy fijas en el código) y el **marco del
+  ámbito** como marco visible siguen siendo de otra unidad: las puertas
+  todavía son cajas sueltas en posiciones fijas (`120 + i·180, 30` y
+  `120 + i·180, 420`), y el contenido del ámbito se ve en las coordenadas
+  absolutas del modelo, no relativizado a su marco.
+- **El reordenamiento por alcance ya está** (T2 + T3): dentro de un
+  contenedor se reacomoda lo que se está viendo y nada más.

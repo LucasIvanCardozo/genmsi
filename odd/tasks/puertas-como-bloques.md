@@ -402,7 +402,61 @@ entidades que entraron por ella ✓ y la de salida las que salieron ✓ — pero
 falta llevarla a la puerta ✓, que tiene su propia forma ✓ y su propia zona
 de figura ✓.
 
-### L12 — Lo que queda de esta unidad
+### L12 — Los tres problemas que el usuario reportó (análisis)
+
+> "el reordenamiento dentro de un container sigue sin tener en cuenta a los
+> bloques de entrada y salida con sus relaciones como lo hace con cualquier
+> otro bloque"
+
+> "las instancias que entran a un container no cuentan en su suma de
+> instancias (en el bloque de container), es decir, se queda siempore en 0/0"
+
+> "las instancias que salen de un container no se ven animadas con el
+> circulito"
+
+El usuario pasó dos capturas del mismo módulo (un submódulo cuyo flujo es sólo
+sus puertas: Entrada2→Salida3 y Entrada4→Salida1). Antes de la reorganization
+las puertas están donde el autor las puso; después quedan apiladas en una
+columna y los enlaces las atraviesan.
+
+**P1 — el reordenamiento no compone las puertas.** La causa está en el motor:
+el enlace que va de una puerta a otra puerta del mismo contenedor **vive en
+los enlaces del padre** (la convención del formato: un enlace vive en el
+ámbito de su ancestro común más bajo ✓), y el flujo del ámbito leía sólo los
+enlaces del propio ámbito ✓. El motor nunca vio esos enlaces ✓ → las puertas
+no entraron en la composición ✓ → no tenían lugar ✓ → la app las apiló en el
+hueco libre ✓, justo en medio de los enlaces que las unen ✓.
+
+**P2 y P3 — los movimientos hacia las puertas se pierden.** La causa está en
+la app: `buildTransitions` mapea el bloque del programa al bloque del
+modelo ✓, y **un puerto no es un bloque del modelo** ✓ → el destino del
+movimiento no se encuentra ✓ → el movimiento no existe ✓. Medido: 287
+movimientos en el trace y **ninguno** sale del contenedor 11 ✓. De ahí sale
+que la bola no se vea al salir ✓ y que el contenedor cuente 0/0 ✓ (su total de
+"pasadas" son los cruces de su frontera ✓, que se cuentan con esos mismos
+movimientos ✓).
+
+Lo que **no** era la causa ✓: la app publica su imagen viva cuando cambia el
+playhead ✓ (`MonitorView.tsx` ✓, el efecto que publica con el reloj ✓) — las
+cifras no están viejas ✓; lo que no hay son los movimientos ✓.
+
+### L13 — T8: el motor compone las puertas que se hablan entre sí (hecho)
+
+**T8 (`ae662ca`)** — el flujo de un ámbito alcanza ahora los enlaces que van
+de una puerta a otra del mismo contenedor ✓, y las puertas que esos enlaces
+unen se componen como cualquier otro bloque ✓: la puerta de entrada queda
+encima de la de salida que alimenta ✓, con el aire del flujo entre ellas ✓.
+
+Los tests del motor (`crates/genmsi-format/tests/layout_scope.rs` ✓):
+la puerta de entrada va **encima** de la de salida ✓, no se pisan ✓, y las
+puertas de un ámbito **no** están en el hueco libre ✓ (las compone la
+composición ✓). El primero falla sin el arreglo ✓ (RED comprobado ✓).
+
+Las puertas que todavía no llevan flujo se apilan **por su clase** ✓ (las de
+entrada bajo las de entrada ✓, las de salida bajo las de salida ✓): antes el
+conteo mezclaba las dos clases ✗.
+
+### L14 — Lo que queda de esta unidad
 
 - **S2** (que el contenedor y sus puertas muestren cuántas entidades los
   atravesaron) sigue sin hacer: es otra unidad, con `src/monitor/counts.ts` y

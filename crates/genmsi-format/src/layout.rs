@@ -562,6 +562,21 @@ fn compose_scope(
     for (_, ioid) in &flow.exits {
         graph.set_node(exit_node(*ioid), Some(door_label()));
     }
+    // The doors that talk to each other: the flow of a submodule whose only
+    // content is its doors. They are nodes of the composition like the
+    // others, and the link between them says which goes first.
+    for (from_ioid, to_ioid) in &flow.port_links {
+        graph.set_node(door_node(model, scope, *from_ioid).0, Some(door_label()));
+        graph.set_node(door_node(model, scope, *to_ioid).0, Some(door_label()));
+    }
+    for (from_ioid, to_ioid) in &flow.port_links {
+        graph.set_edge(
+            door_node(model, scope, *from_ioid).0,
+            door_node(model, scope, *to_ioid).0,
+            Some(EdgeLabel::default()),
+            None,
+        );
+    }
     // The flow of the scope: the links between the blocks it owns, with the
     // borders of the nested containers spliced, and the links that carry the
     // flow into the scope and out of it.
@@ -658,31 +673,55 @@ fn compose_scope(
     let mut ports: Vec<PortPosition> = Vec::new();
     let entries: BTreeSet<u32> = flow.entries.iter().map(|(ioid, _)| *ioid).collect();
     for ioid in &entries {
-        if let Some(port) = door_position(&graph, scope, *ioid, true) {
+        if let Some(port) = door_position(&graph, model, scope, *ioid) {
             ports.push(port);
         }
     }
     let exits: BTreeSet<u32> = flow.exits.iter().map(|(_, ioid)| *ioid).collect();
     for ioid in &exits {
-        if let Some(port) = door_position(&graph, scope, *ioid, false) {
+        if let Some(port) = door_position(&graph, model, scope, *ioid) {
             ports.push(port);
+        }
+    }
+    // The doors that talk to each other: they are placed by the composition
+    // like any other block of the picture.
+    for (from_ioid, to_ioid) in &flow.port_links {
+        for ioid in [from_ioid, to_ioid] {
+            if ports.iter().any(|port| port.ioid == *ioid) {
+                continue;
+            }
+            if let Some(port) = door_position(&graph, model, scope, *ioid) {
+                ports.push(port);
+            }
         }
     }
     // The doors that carry no flow yet —the reader just added them— go
     // with the doors of their own kind, one under the other: the picture
     // shows which door is which.
     if let Some(container) = model.block(scope) {
+        // The doors that the flow joins to each other are placed by the
+        // composition, not by the free spot.
+        let joined: BTreeSet<u32> = flow
+            .port_links
+            .iter()
+            .flat_map(|(from, to)| [*from, *to])
+            .collect();
         let mut pending: Vec<(u32, bool)> = Vec::new();
         for port in &container.inputs {
-            if !entries.contains(&port.ioid) {
+            if !entries.contains(&port.ioid) && !joined.contains(&port.ioid) {
                 pending.push((port.ioid, true));
             }
         }
         for port in &container.outputs {
-            if !exits.contains(&port.ioid) {
+            if !exits.contains(&port.ioid) && !joined.contains(&port.ioid) {
                 pending.push((port.ioid, false));
             }
         }
+        // The doors that go to the free spot are stacked by their kind: the
+        // entry doors under the entry doors, the exit doors under the exit
+        // doors.
+        let mut stacked_inputs = 0;
+        let mut stacked_outputs = 0;
         for (ioid, input) in pending {
             let same_kind: Vec<&PortPosition> =
                 ports.iter().filter(|port| port.input == input).collect();
@@ -694,10 +733,16 @@ fn compose_scope(
                 Some(bottom) => (same_kind[0].x, bottom + RANK_SEP),
                 None => {
                     // There is no door of its kind to sit under: the door
-                    // goes to the free spot of the scope, under the doors
-                    // that are already there.
+                    // goes to the free spot of the scope, under the doors of
+                    // its kind that are already there.
                     let (left, top) = free_spot_of_scope(model, children);
-                    let placed = ports.len() as i32;
+                    let placed = if input {
+                        stacked_inputs += 1;
+                        stacked_inputs - 1
+                    } else {
+                        stacked_outputs += 1;
+                        stacked_outputs - 1
+                    };
                     (left, top + placed * (DOOR_HEIGHT + GAP_Y))
                 }
             };
@@ -736,7 +781,7 @@ fn compose_scope(
 /// It is where a block that has no place of its own goes, and where a door
 /// that carries no flow yet goes when there is no door of its kind to sit
 /// under.
-fn free_spot_of_scope(model: &GmdlModel, children: &[u32]) -> (i32, i32) {
+pub fn free_spot_of_scope(model: &GmdlModel, children: &[u32]) -> (i32, i32) {
     let mut left = i32::MAX;
     let mut bottom = i32::MIN;
     for id in children {
@@ -770,15 +815,11 @@ fn door_label() -> NodeLabel {
 /// Dagre places a node by its middle and the model carries its corner.
 fn door_position(
     graph: &Graph<NodeLabel, EdgeLabel>,
+    model: &GmdlModel,
     scope: u32,
     ioid: u32,
-    input: bool,
 ) -> Option<PortPosition> {
-    let name = if input {
-        entry_node(ioid)
-    } else {
-        exit_node(ioid)
-    };
+    let (name, input) = door_node(model, scope, ioid);
     let node = graph.node(&name)?;
     let (Some(x), Some(y)) = (node.x, node.y) else {
         return None;
@@ -794,6 +835,24 @@ fn door_position(
         width: Some(width),
         height: Some(height),
     })
+}
+
+/// The node of the graph that stands for a port of the scope, and whether the
+/// port is an entry one.
+///
+/// The ports of a scope share one numbering, so the kind of the port is what
+/// tells them apart: a port that is an input of the container is the node the
+/// flow enters the scope by, and a port that is an output is the node it
+/// leaves through.
+fn door_node(model: &GmdlModel, scope: u32, ioid: u32) -> (String, bool) {
+    let is_input = model
+        .block(scope)
+        .is_some_and(|block| block.inputs.iter().any(|port| port.ioid == ioid));
+    if is_input {
+        (entry_node(ioid), true)
+    } else {
+        (exit_node(ioid), false)
+    }
 }
 
 /// The blocks of a scope that no link of the scope reaches: they are drawn in

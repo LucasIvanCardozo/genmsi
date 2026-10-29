@@ -20,7 +20,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::model::{Block, GmdlModel};
+use crate::model::{Block, GmdlModel, Link};
 
 /// The links of the flow: the blocks that follow each other.
 ///
@@ -67,6 +67,13 @@ pub struct ScopeFlow {
     /// The exit ports of the scope: the block the flow leaves from, and the
     /// port it leaves through.
     pub exits: Vec<(u32, u32)>,
+    /// The links that go from a port of the scope to another port of it.
+    ///
+    /// A submodule whose flow is only its doors has no block in it: the flow
+    /// goes from its entry door to its exit door. Those links are the flow of
+    /// the scope all the same, and the composition places the doors they
+    /// join as it places any other block.
+    pub port_links: Vec<(u32, u32)>,
 }
 
 /// The flow of one scope: the links the scope owns, with the borders of the
@@ -86,9 +93,32 @@ pub fn scope_flow(model: &GmdlModel, scope: u32) -> ScopeFlow {
         .filter(|child| child.owner == scope && child.id != scope)
         .map(|child| child.id)
         .collect();
+    // The links of the scope: the ones between the blocks it owns, and the
+    // ones that go from a port of the scope to another port of it. The
+    // second kind lives in the links of the **owner**: a port belongs to
+    // the scope above the container, and the flow that goes from one port
+    // to another is the flow of the container itself.
+    let mut links: Vec<Link> = block.links.clone();
+    if let Some(owner) = model.block(block.owner) {
+        links.extend(
+            owner
+                .links
+                .iter()
+                .filter(|link| link.from_module == scope && link.to_module == scope)
+                .cloned(),
+        );
+    }
     let mut flow = ScopeFlow::default();
-    for link in &block.links {
+    for link in &links {
         let (from, to) = (link.from_module, link.to_module);
+        if from == scope && to == scope {
+            // The link goes from a port of the scope to another port of it:
+            // the flow of a submodule whose doors talk to each other. The
+            // link is the flow of the scope, and the composition places the
+            // doors it joins.
+            flow.port_links.push((link.from_ioid, link.to_ioid));
+            continue;
+        }
         if from == to {
             continue;
         }

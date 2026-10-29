@@ -18,7 +18,7 @@
 
 use std::path::{Path, PathBuf};
 
-use genmsi_format::layout::relayout_scope;
+use genmsi_format::layout::{free_spot_of_scope, relayout_scope};
 use genmsi_format::{GmdlModel, Layout, Position};
 
 /// The reference model with that name.
@@ -566,4 +566,69 @@ fn corpus() -> Vec<PathBuf> {
         .collect();
     paths.sort();
     paths
+}
+
+#[test]
+fn the_doors_of_a_scope_that_talk_to_each_other_are_placed() {
+    // A submodule whose flow is only its doors: the flow goes from the entry
+    // door to the exit door. The composition places the doors like it places
+    // any other block, and the link between them says which goes first.
+    let model = genmsi_format::parse_str(
+        r#"<gmodel versioncode="1"><gclasses/><modules>\
+<module moduleid="0" moduleclass="main" owner="0" caption="m" name="m" kind="C" genprefer="" exehead="" nonexehead="" exefoot="" nonexefoot=""><links><link frommoduleid="11" fromioid="1" tomoduleid="11" toioid="2"/></links><inputs/><outputs/></module>\
+<module moduleid="11" moduleclass="" owner="0" caption="Modulo 4" name="Modulo4" kind="C" width="130" height="45" x="100" y="100"><inputs><input ioid="1" name="Entrada2" caption="" mylabel="A_Queue"/></inputs><outputs><output ioid="2" name="Salida3" caption="" mylabel="A_Queue"/></outputs></module>\
+</modules></gmodel>"#,
+    )
+    .expect("the model parses");
+    let composition = relayout_scope(&model, 11);
+    assert_eq!(
+        composition.ports.len(),
+        2,
+        "the scope does not have one place per door"
+    );
+    let entry = composition
+        .ports
+        .iter()
+        .find(|port| port.input)
+        .expect("the scope has an entry door");
+    let exit = composition
+        .ports
+        .iter()
+        .find(|port| !port.input)
+        .expect("the scope has an exit door");
+    // The entry door comes before the exit door: the link between them is
+    // part of the flow of the scope.
+    assert!(
+        entry.y < exit.y,
+        "the entry door is not above the exit door it feeds"
+    );
+    // And the two doors do not sit on each other.
+    let bottom = entry.y + entry.height.unwrap_or(0);
+    assert!(
+        bottom <= exit.y,
+        "the entry door and the exit door sit on each other"
+    );
+}
+
+#[test]
+fn the_doors_of_a_scope_are_placed_by_the_composition_and_not_by_the_free_spot() {
+    // The doors of a scope are blocks of the picture: the composition places
+    // them where the flow says. The free spot is the place of a block that
+    // has no place of its own, and a door that the flow reaches does not go
+    // there: the doors of a scope with a block in it are part of the
+    // picture of the scope, not a stack at its free spot.
+    let model = genmsi_format::parse_str(
+        r#"<gmodel versioncode="1"><gclasses/><modules><module moduleid="0" moduleclass="main" owner="0" caption="m" name="m" kind="C" genprefer="" exehead="" nonexehead="" exefoot="" nonexefoot=""><links><link frommoduleid="11" fromioid="1" tomoduleid="11" toioid="2"/></links><inputs/><outputs/></module><module moduleid="11" moduleclass="" owner="0" caption="Modulo 4" name="Modulo4" kind="C" width="130" height="45" x="100" y="100"><inputs><input ioid="1" name="Entrada2" caption="" mylabel="A_Queue"/></inputs><outputs><output ioid="2" name="Salida3" caption="" mylabel="A_Queue"/></outputs></module><module moduleid="12" moduleclass="Queue" owner="11" caption="Cola" name="Cola" kind="A" width="100" height="40" x="100" y="400"><inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Queue"/></inputs><outputs><output ioid="2" name="Salida1" caption="" mylabel="A_Queue"/></outputs></module></modules></gmodel>"#,
+    )
+    .expect("the model parses");
+    let composition = relayout_scope(&model, 11);
+    // The free spot of the scope: under its lowest block, at its left.
+    let free = free_spot_of_scope(&model, &[12]);
+    for port in &composition.ports {
+        assert!(
+            port.y != free.1,
+            "the door {} is at the free spot of the scope: the composition did not place it",
+            port.ioid
+        );
+    }
 }

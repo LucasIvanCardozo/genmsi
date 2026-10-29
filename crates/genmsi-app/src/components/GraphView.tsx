@@ -372,6 +372,7 @@ export default memo(function GraphView({
   containerId = 0,
   onOpenContainer,
   focusBlockId = null,
+  focusToken = 0,
 }: {
   model: ModelBody;
   actions: GraphActions;
@@ -389,11 +390,18 @@ export default memo(function GraphView({
   /**
    * The block the canvas has to follow, or `null` when there is none.
    *
-   * The canvas moves to the block that was just added: the picture is not
-   * framed again, because the picture must not jump away from under the
-   * reader while he works.
+   * The canvas moves to the block the reader picked in the tree: the
+   * picture is not framed again, because the picture must not jump away
+   * from under the reader while he works.
    */
   focusBlockId?: number | null;
+  /**
+   * Which time the canvas was told to follow a block.
+   *
+   * The token grows with every request, so the canvas follows the block
+   * again when the reader asks for the same one twice.
+   */
+  focusToken?: number;
 }) {
   const [nodes, setNodes] = useState<Node<BlockData>[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -450,14 +458,16 @@ export default memo(function GraphView({
     }
   }, [model, extraEdges, fitSignal, containerId]);
 
-  // The canvas follows the block that was just added.
+  // The canvas follows the block the reader picked in the tree.
   //
   // The picture moves to the block, and it is not framed again: the reader
   // keeps the zoom he has, and the picture does not jump away from under
   // him while he works. The block is looked for in the nodes of the
-  // picture, so the effect runs again when the picture is drawn.
+  // picture, so the effect runs again when the picture is drawn. The
+  // token says *which time* the reader asked for it, so the canvas
+  // follows the block again when he asks for the same one twice.
   useEffect(() => {
-    if (focusBlockId === null || followed.current === focusBlockId) {
+    if (focusBlockId === null || followed.current === focusToken) {
       return;
     }
     const flow = instance.current;
@@ -468,14 +478,14 @@ export default memo(function GraphView({
     if (node === undefined) {
       return;
     }
-    followed.current = focusBlockId;
+    followed.current = focusToken;
     const width = node.measured?.width ?? widthOf(node);
     const height = node.measured?.height ?? heightOf(node);
     flow.setCenter(node.position.x + width / 2, node.position.y + height / 2, {
       zoom: flow.getZoom(),
       duration: 300,
     });
-  }, [focusBlockId, nodes]);
+  }, [focusBlockId, focusToken, nodes]);
 
   const onNodesChange = useCallback((changes: NodeChange<Node<BlockData>>[]) => {
     setNodes((current) => applyNodeChanges(changes, current));

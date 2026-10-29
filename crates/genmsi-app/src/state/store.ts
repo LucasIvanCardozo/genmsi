@@ -136,11 +136,19 @@ export interface AppState {
   /**
    * The block the canvas has to follow, or `null` when there is none.
    *
-   * A block that was just added is the one the reader wants to see: the
-   * canvas moves to it without framing the picture again, so the picture
-   * does not jump away from under the reader while he works.
+   * The block is the one the reader picked in the tree: the canvas moves
+   * to it without framing the picture again, so the picture does not jump
+   * away from under the reader while he works. Placing a block does **not**
+   * move the canvas: the reader stays where he is.
    */
   focusBlockId: number | null;
+  /**
+   * Which time the canvas was told to follow a block.
+   *
+   * The number grows with every request to follow a block, so the canvas
+   * follows a block again when the reader asks for the same one twice.
+   */
+  focusToken: number;
   /** The blocks the user copied. */
   clipboard: number[];
   /** The seed the next run uses. */
@@ -223,6 +231,13 @@ export interface AppState {
   setSpeed: (speed: number) => void;
   /** Select the blocks of the graph. */
   select: (ids: number[]) => void;
+  /**
+   * Tell the canvas to follow a block.
+   *
+   * The block is the one the reader picked in the tree: the canvas moves
+   * to it, and the picture is not framed again.
+   */
+  focusBlock: (id: number) => void;
   /** Add a block of a class, at a position or in the first free spot. */
   addBlock: (className: string, x?: number, y?: number) => Promise<void>;
   /** Delete the selected blocks. */
@@ -409,6 +424,7 @@ export const useApp = create<AppState>((set, get) => ({
   selectedBlockIds: [],
   activeContainerId: 0,
   focusBlockId: null,
+  focusToken: 0,
   clipboard: [],
   seed: randomSeed(),
   seedIsAuto: true,
@@ -976,6 +992,13 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
 
+  focusBlock: (id: number) => {
+    // The canvas follows the block the reader picked in the tree. The
+    // token grows with every request, so the canvas follows the block
+    // again when the reader asks for the same one twice.
+    set({ focusBlockId: id, focusToken: get().focusToken + 1 });
+  },
+
   addBlock: async (className: string, x?: number, y?: number) => {
     const model = get().model;
     if (model === null) {
@@ -988,14 +1011,10 @@ export const useApp = create<AppState>((set, get) => ({
       });
       return;
     }
-    // The blocks the model had before the new one: the block that was
-    // added is the one that was not there.
-    const before = new Set(model.blocks.map((block) => block.id));
     // The free spot of the scope is computed in the scope's own space, and
     // the model keeps the absolute coordinates: the position of the model
     // is that spot plus the origin of the scope.
-    const spot = freeSpotOf(model, active);
-    const left = x ?? spot.position.x;
+    const spot = freeSpotOf(model, active);    const left = x ?? spot.position.x;
     const top = y ?? spot.position.y;
     // The drop looks at the container under the pointer: a block dropped on
     // the box of a container joins that container.
@@ -1014,10 +1033,9 @@ export const useApp = create<AppState>((set, get) => ({
       x: position.x,
       y: position.y,
     });
-    // The canvas follows the block that was just added: the picture moves
-    // to it, and it is not framed again.
-    const added = get().model?.blocks.find((block) => !before.has(block.id));
-    set({ focusBlockId: added?.id ?? null });
+    // The canvas does **not** follow the block that was added: the reader
+    // stays where he is. The movement of the picture is the one the
+    // reader asks for in the tree.
   },
 
   deleteSelection: async () => {

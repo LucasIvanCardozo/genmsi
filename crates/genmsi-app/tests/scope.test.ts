@@ -286,8 +286,10 @@ interface AppState {
   error: string | null;
   model: ModelBody | null;
   focusBlockId: number | null;
+  focusToken: number;
   activeContainerId: number;
   addBlock: (className: string, x?: number, y?: number) => Promise<void>;
+  focusBlock: (id: number) => void;
 }
 
 /**
@@ -506,11 +508,46 @@ test("a block added inside a container lands inside the picture of the scope", a
     spot.position,
     "the block did not land in the free spot of the scope",
   );
-  // And the canvas follows the block that was just added.
+  // And the canvas does **not** follow the block that was added: the
+  // reader stays where he is.
   const state = useApp.getState();
   assert.equal(
     state.focusBlockId,
-    13,
-    "the canvas was not told to follow the block that was added",
+    null,
+    "the canvas moved to the block that was added",
   );
+});
+
+test("the canvas follows the block the reader picks in the tree", async () => {
+  const model = scopeModel();
+  const shell = new FakeShell(model);
+  const { useApp } = await module<{
+    useApp: {
+      getState: () => AppState;
+      setState: (state: Partial<AppState>) => void;
+    };
+  }>("/src/state/store.ts");
+
+  useApp.setState({ model, activeContainerId: 0, status: "ready", error: null });
+  const before = useApp.getState().focusToken;
+
+  // The reader picks a block in the tree: the canvas follows it.
+  useApp.getState().focusBlock(4);
+
+  const state = useApp.getState();
+  assert.equal(state.focusBlockId, 4, "the canvas was not told to follow the block");
+  assert.ok(
+    state.focusToken > before,
+    "the request to follow a block did not grow the token",
+  );
+
+  // And the reader picks the same block again: the canvas follows it
+  // again, because the request is a new one.
+  const token = state.focusToken;
+  useApp.getState().focusBlock(4);
+  assert.ok(
+    useApp.getState().focusToken > token,
+    "the same block did not get a new request",
+  );
+  assert.equal(useApp.getState().focusBlockId, 4, "the canvas lost the block");
 });

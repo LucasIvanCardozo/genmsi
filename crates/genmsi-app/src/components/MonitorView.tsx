@@ -61,6 +61,8 @@ export default function MonitorView({
     activeContainerId,
     setActiveContainerId,
     focusBlockId,
+    focusToken,
+    focusBlock,
     select,
     catalogue,
     diagnostics,
@@ -465,6 +467,7 @@ export default function MonitorView({
                 containerId={activeContainerId}
                 onOpenContainer={setActiveContainerId}
                 focusBlockId={focusBlockId}
+                focusToken={focusToken}
               />
             </div>
           </div>
@@ -522,6 +525,9 @@ export default function MonitorView({
                       setActiveContainerId(targetBlock.container);
                     }
                     select([id]);
+                    // The canvas follows the block the reader picked: the
+                    // picture moves to it and is not framed again.
+                    focusBlock(id);
                     setAside("bloque");
                   }}
                   onAddContainer={() => void addBlock("Container")}

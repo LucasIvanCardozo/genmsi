@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::catalogue::{build_block, class_spec};
 use crate::error::FormatError;
-use crate::model::{Block, ContainerHeader, GmdlModel, Layout, Link, Port, SectionKind};
+use crate::model::{Block, ContainerHeader, GmdlModel, Layout, Link, Port, PortLayout, SectionKind};
 
 /// Default size of a freshly created block (the original editor's small box).
 ///
@@ -43,6 +43,33 @@ pub struct Position {
     #[serde(default)]
     pub width: Option<i32>,
     /// The new height, when the block changes its size.
+    #[serde(default)]
+    pub height: Option<i32>,
+}
+
+/// One requested door position (the payload of [`EditCommand::SetLayouts`]).
+///
+/// A door is a port of a container, and it is a block of the picture in its
+/// own right: the composition of a scope places it like it places any other
+/// block, and its place travels in the model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct PortPosition {
+    /// The container that owns the door.
+    pub block: u32,
+    /// The id of the door inside the container.
+    pub ioid: u32,
+    /// Whether the door is an entry one.
+    pub input: bool,
+    /// Horizontal position.
+    pub x: i32,
+    /// Vertical position.
+    pub y: i32,
+    /// The new width, when the door changes its size.
+    #[serde(default)]
+    pub width: Option<i32>,
+    /// The new height, when the door changes its size.
     #[serde(default)]
     pub height: Option<i32>,
 }
@@ -90,6 +117,25 @@ pub enum EditCommand {
     SetLayouts {
         /// One position per block.
         positions: Vec<Position>,
+        /// One position per door of the scope that was composed.
+        #[serde(default)]
+        ports: Vec<PortPosition>,
+    },
+    /// Move a door of a container.
+    ///
+    /// A door is a block of the picture in its own right: the reader drags it
+    /// where he wants it, and its place is kept.
+    MovePort {
+        /// The container that owns the door.
+        block: u32,
+        /// The id of the door inside the container.
+        ioid: u32,
+        /// Whether the door is an entry one.
+        input: bool,
+        /// Horizontal position.
+        x: i32,
+        /// Vertical position.
+        y: i32,
     },
     /// Connect an output port to an input port of a sibling block.
     ///
@@ -183,6 +229,19 @@ pub enum UndoStep {
         old: Option<Layout>,
         /// Layout after.
         new: Option<Layout>,
+    },
+    /// A door's place changed.
+    PortLayoutSet {
+        /// The container that owns the door.
+        block: u32,
+        /// The id of the door inside the container.
+        ioid: u32,
+        /// Whether the door is an entry one.
+        input: bool,
+        /// The place before.
+        old: Option<PortLayout>,
+        /// The place after.
+        new: Option<PortLayout>,
     },
     /// A property's raw value changed.
     PropertyChanged {
@@ -341,8 +400,18 @@ impl EditSession {
                 self.move_block(id, x, y, &mut *steps)?;
                 Vec::new()
             }
-            EditCommand::SetLayouts { positions } => {
-                self.set_layouts(&positions, &mut *steps)?;
+            EditCommand::SetLayouts { positions, ports } => {
+                self.set_layouts(&positions, &ports, &mut *steps)?;
+                Vec::new()
+            }
+            EditCommand::MovePort {
+                block,
+                ioid,
+                input,
+                x,
+                y,
+            } => {
+                self.move_port(block, ioid, input, x, y, &mut *steps)?;
                 Vec::new()
             }
             EditCommand::Connect {
@@ -623,7 +692,12 @@ impl EditSession {
         Ok(())
     }
 
-    fn set_layouts(&mut self, positions: &[Position], steps: &mut Vec<UndoStep>) -> Result<(), FormatError> {
+    fn set_layouts(
+        &mut self,
+        positions: &[Position],
+        ports: &[PortPosition],
+        steps: &mut Vec<UndoStep>,
+    ) -> Result<(), FormatError> {
         for position in positions {
             self.require_block(position.id)?;
             let old = self.model.block(position.id).expect("checked").layout;
@@ -645,6 +719,110 @@ impl EditSession {
                 new: Some(new),
             });
         }
+        for port in ports {
+            self.set_port_layout(port, steps)?;
+        }
+        Ok(())
+    }
+
+    /// The place of a door of a container.
+    ///
+    /// The place of a door of a container is in the canvas of the scope the
+    /// container holds: it is where the door is drawn, next to the block it
+    /// joins. It is **not** relative to the box of the container: the
+    /// container is a box of its own, and the door is not part of it.
+    fn set_port_layout(
+        &mut self,
+        port: &PortPosition,
+        steps: &mut Vec<UndoStep>,
+    ) -> Result<(), FormatError> {
+        self.require_block(port.block)?;
+        let old = self
+            .model
+            .block(port.block)
+            .expect("checked")
+            .port_of(port.ioid, port.input)
+            .and_then(|found| found.layout);
+        let new = PortLayout {
+            width: port.width.unwrap_or(old.map(|old| old.width).unwrap_or(0)),
+            height: port.height.unwrap_or(old.map(|old| old.height).unwrap_or(0)),
+            x: port.x,
+            y: port.y,
+        };
+        let mut placed = false;
+        if let Some(block) = self.model.block_mut(port.block) {
+            let ports = if port.input {
+                &mut block.inputs
+            } else {
+                &mut block.outputs
+            };
+            if let Some(found) = ports.iter_mut().find(|p| p.ioid == port.ioid) {
+                found.layout = Some(new);
+                placed = true;
+            }
+        }
+        if !placed {
+            return Err(FormatError::structural(
+                port.block,
+                format!("el puerto {} no existe", port.ioid),
+            ));
+        }
+        steps.push(UndoStep::PortLayoutSet {
+            block: port.block,
+            ioid: port.ioid,
+            input: port.input,
+            old,
+            new: Some(new),
+        });
+        Ok(())
+    }
+
+    /// Move a door of a container to a new place.
+    fn move_port(
+        &mut self,
+        block: u32,
+        ioid: u32,
+        input: bool,
+        x: i32,
+        y: i32,
+        steps: &mut Vec<UndoStep>,
+    ) -> Result<(), FormatError> {
+        let old = self
+            .model
+            .block(block)
+            .and_then(|found| found.port_of(ioid, input))
+            .and_then(|found| found.layout);
+        let new = PortLayout {
+            width: old.map(|old| old.width).unwrap_or(0),
+            height: old.map(|old| old.height).unwrap_or(0),
+            x,
+            y,
+        };
+        let mut placed = false;
+        if let Some(block) = self.model.block_mut(block) {
+            let ports = if input {
+                &mut block.inputs
+            } else {
+                &mut block.outputs
+            };
+            if let Some(found) = ports.iter_mut().find(|p| p.ioid == ioid) {
+                found.layout = Some(new);
+                placed = true;
+            }
+        }
+        if !placed {
+            return Err(FormatError::structural(
+                block,
+                format!("el puerto {ioid} no existe"),
+            ));
+        }
+        steps.push(UndoStep::PortLayoutSet {
+            block,
+            ioid,
+            input,
+            old,
+            new: Some(new),
+        });
         Ok(())
     }
 
@@ -1077,6 +1255,25 @@ fn apply_steps(model: &mut GmdlModel, steps: &[UndoStep], forward: bool) -> Resu
                     block.layout = layout;
                 }
             }
+            UndoStep::PortLayoutSet {
+                block,
+                ioid,
+                input,
+                old,
+                new,
+            } => {
+                let layout = if forward { *new } else { *old };
+                if let Some(b) = model.block_mut(*block) {
+                    let ports = if *input {
+                        &mut b.inputs
+                    } else {
+                        &mut b.outputs
+                    };
+                    if let Some(port) = ports.iter_mut().find(|p| p.ioid == *ioid) {
+                        port.layout = layout;
+                    }
+                }
+            }
             UndoStep::PropertyChanged {
                 id,
                 property,
@@ -1204,6 +1401,18 @@ mod tests {
 <module moduleid="0" moduleclass="main" owner="0" caption="m" name="m" kind="C" genprefer="" exehead="" nonexehead="" exefoot="" nonexefoot=""><links><link frommoduleid="1" fromioid="1" tomoduleid="2" toioid="1"/></links><inputs/><outputs/></module>\
 <module moduleid="1" moduleclass="Generate" owner="0" caption="g" name="Generate" kind="A" width="120" height="63" x="10" y="20"><outputs><output ioid="1" name="Salida1" caption="" mylabel="A_Queue"/></outputs><props><property name="Media" hint="Tiempo%20Medio" value="60" type="TSNA" subType="SNA" visible="1" unique="0"/></props></module>\
 <module moduleid="2" moduleclass="Terminate" owner="0" caption="t" name="Terminate" kind="A" width="84" height="64" x="100" y="200"><inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Queue"/></inputs><props><property name="Unidades" hint="" value="1" type="TSNA" subType="SNA" visible="1" unique="0"/></props></module>\
+</modules></gmodel>"#,
+        )
+        .expect("parses")
+    }
+
+    /// A model with a container that has a door.
+    fn model_with_door() -> GmdlModel {
+        parse_str(
+            r#"<gmodel versioncode="1"><gclasses/><modules>\
+<module moduleid="0" moduleclass="main" owner="0" caption="m" name="m" kind="C" genprefer="" exehead="" nonexehead="" exefoot="" nonexefoot=""><links><link frommoduleid="1" fromioid="1" tomoduleid="2" toioid="1"/></links><inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Queue"/></inputs><outputs/></module>\
+<module moduleid="1" moduleclass="Generate" owner="0" caption="g" name="Generate" kind="A" width="120" height="63" x="10" y="20"><outputs><output ioid="1" name="Salida1" caption="" mylabel="A_Queue"/></outputs></module>\
+<module moduleid="2" moduleclass="Terminate" owner="0" caption="t" name="Terminate" kind="A" width="84" height="64" x="100" y="200"><inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Queue"/></inputs></module>\
 </modules></gmodel>"#,
         )
         .expect("parses")
@@ -1434,6 +1643,7 @@ mod tests {
                     Position { id: 1, x: 1, y: 1, width: None, height: None },
                     Position { id: 2, x: 2, y: 2, width: None, height: None },
                 ],
+                ports: Vec::new(),
             })
             .expect("sets");
         assert_eq!(session.model().block(1).expect("b").layout.unwrap().x, 1);
@@ -1443,6 +1653,90 @@ mod tests {
         assert_eq!(session.model().block(1).expect("b").layout.unwrap().x, 10);
         assert_eq!(session.model().block(2).expect("b").layout.unwrap().x, 100);
         assert!(!session.can_undo());
+    }
+
+    #[test]
+    fn a_door_keeps_the_place_the_composition_gave_it() {
+        // A door is a block of the picture: the composition writes its
+        // place, and the undo brings the old one back.
+        let mut session = EditSession::new(model_with_door());
+        let container = 0u32;
+        let ioid = 1u32;
+        session
+            .apply(EditCommand::SetLayouts {
+                positions: Vec::new(),
+                ports: vec![PortPosition {
+                    block: container,
+                    ioid,
+                    input: true,
+                    x: 320,
+                    y: 78,
+                    width: Some(140),
+                    height: Some(44),
+                }],
+            })
+            .expect("sets the place of the door");
+        let door = session
+            .model()
+            .block(container)
+            .expect("container")
+            .input(ioid)
+            .expect("door")
+            .layout
+            .expect("the door has a place");
+        assert_eq!((door.x, door.y), (320, 78), "the door did not take the place");
+        assert_eq!(door.width, 140, "the door did not take the size");
+
+        // And the undo brings the old place back.
+        session.undo().expect("undoes");
+        assert!(
+            session
+                .model()
+                .block(container)
+                .expect("container")
+                .input(ioid)
+                .expect("door")
+                .layout
+                .is_none(),
+            "the door kept the place after the undo"
+        );
+    }
+
+    #[test]
+    fn a_door_moves_where_the_reader_drops_it() {
+        let mut session = EditSession::new(model_with_door());
+        let container = 0u32;
+        let ioid = 1u32;
+        session
+            .apply(EditCommand::MovePort {
+                block: container,
+                ioid,
+                input: true,
+                x: 11,
+                y: 22,
+            })
+            .expect("moves the door");
+        let door = session
+            .model()
+            .block(container)
+            .expect("container")
+            .input(ioid)
+            .expect("door")
+            .layout
+            .expect("the door has a place");
+        assert_eq!((door.x, door.y), (11, 22), "the door did not move");
+        session.undo().expect("undoes");
+        assert!(
+            session
+                .model()
+                .block(container)
+                .expect("container")
+                .input(ioid)
+                .expect("door")
+                .layout
+                .is_none(),
+            "the door kept the place after the undo"
+        );
     }
 
     #[test]
@@ -1836,6 +2130,7 @@ mod tests {
                     Position { id: 1, x: 1, y: 1, width: None, height: None },
                     Position { id: 999, x: 2, y: 2, width: None, height: None },
                 ],
+                ports: Vec::new(),
             })
             .expect_err("the unknown block is refused");
         assert!(error.to_string().contains("999"), "{error}");
@@ -1881,6 +2176,7 @@ mod tests {
                     Position { id: 1, x: 1, y: 1, width: None, height: None },
                     Position { id: 2, x: 2, y: 2, width: None, height: None },
                 ],
+                ports: Vec::new(),
             })
             .expect("sets");
         assert!(session.can_undo());

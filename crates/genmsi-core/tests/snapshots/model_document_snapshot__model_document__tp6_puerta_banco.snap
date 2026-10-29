@@ -105,7 +105,8 @@ expression: text
           "ioid": 1,
           "name": "Salida1",
           "caption": "",
-          "label": "A_Queue"
+          "label": "A_Queue",
+          "layout": null
         }
       ]
     },
@@ -176,7 +177,8 @@ expression: text
           "ioid": 1,
           "name": "Salida1",
           "caption": "",
-          "label": "A_Buffer"
+          "label": "A_Buffer",
+          "layout": null
         }
       ]
     },
@@ -219,7 +221,8 @@ expression: text
           "ioid": 1,
           "name": "Entrada1",
           "caption": "Ingreso",
-          "label": "A_Logic"
+          "label": "A_Logic",
+          "layout": null
         }
       ],
       "outputs": [
@@ -227,7 +230,8 @@ expression: text
           "ioid": 2,
           "name": "Salida1",
           "caption": "",
-          "label": "A_Buffer1"
+          "label": "A_Buffer1",
+          "layout": null
         }
       ]
     },
@@ -261,7 +265,8 @@ expression: text
           "ioid": 1,
           "name": "Entrada1",
           "caption": "Ingreso",
-          "label": "A_Terminate"
+          "label": "A_Terminate",
+          "layout": null
         }
       ],
       "outputs": []
@@ -305,7 +310,8 @@ expression: text
           "ioid": 1,
           "name": "Entrada1",
           "caption": "Ingreso",
-          "label": "GateL"
+          "label": "GateL",
+          "layout": null
         }
       ],
       "outputs": [
@@ -313,13 +319,15 @@ expression: text
           "ioid": 2,
           "name": "Salida1",
           "caption": "",
-          "label": "A_Depart"
+          "label": "A_Depart",
+          "layout": null
         },
         {
           "ioid": 3,
           "name": "Salida2",
           "caption": "fallo",
-          "label": null
+          "label": null,
+          "layout": null
         }
       ]
     },
@@ -380,7 +388,8 @@ expression: text
           "ioid": 1,
           "name": "Entrada1",
           "caption": "Ingreso al recurso",
-          "label": "A_FacilityUse"
+          "label": "A_FacilityUse",
+          "layout": null
         }
       ],
       "outputs": [
@@ -388,7 +397,8 @@ expression: text
           "ioid": 2,
           "name": "Salida1",
           "caption": "",
-          "label": "A_Advance"
+          "label": "A_Advance",
+          "layout": null
         }
       ]
     },
@@ -412,7 +422,13 @@ expression: text
           "ioid": 1,
           "name": "Entrada 1",
           "caption": "",
-          "label": "A_Advance"
+          "label": "A_Advance",
+          "layout": {
+            "x": 74,
+            "y": 25,
+            "width": 35,
+            "height": 35
+          }
         }
       ],
       "outputs": [
@@ -420,7 +436,13 @@ expression: text
           "ioid": 2,
           "name": "Salida 1",
           "caption": "",
-          "label": "A_Terminate1"
+          "label": "A_Terminate1",
+          "layout": {
+            "x": 74,
+            "y": 191,
+            "width": 35,
+            "height": 35
+          }
         }
       ]
     },
@@ -463,7 +485,8 @@ expression: text
           "ioid": 1,
           "name": "Entrada1",
           "caption": "Ingresa",
-          "label": "A_Advance"
+          "label": "A_Advance",
+          "layout": null
         }
       ],
       "outputs": [
@@ -471,7 +494,8 @@ expression: text
           "ioid": 2,
           "name": "Salida1",
           "caption": "",
-          "label": "A_Terminate1"
+          "label": "A_Terminate1",
+          "layout": null
         }
       ]
     },
@@ -560,7 +584,8 @@ expression: text
           "ioid": 1,
           "name": "Entrada1",
           "caption": "Ingreso",
-          "label": "A_Queue"
+          "label": "A_Queue",
+          "layout": null
         }
       ],
       "outputs": [
@@ -568,7 +593,8 @@ expression: text
           "ioid": 2,
           "name": "Salida1",
           "caption": "",
-          "label": "GateL"
+          "label": "GateL",
+          "layout": null
         }
       ]
     },
@@ -611,7 +637,8 @@ expression: text
           "ioid": 1,
           "name": "Entrada1",
           "caption": "Ingreso",
-          "label": "A_Depart"
+          "label": "A_Depart",
+          "layout": null
         }
       ],
       "outputs": [
@@ -619,7 +646,8 @@ expression: text
           "ioid": 2,
           "name": "Salida1",
           "caption": "",
-          "label": "A_FacilityUse"
+          "label": "A_FacilityUse",
+          "layout": null
         }
       ]
     },
@@ -643,7 +671,8 @@ expression: text
           "ioid": 1,
           "name": "Entrada1",
           "caption": "Ingreso",
-          "label": "A_Buffer"
+          "label": "A_Buffer",
+          "layout": null
         }
       ],
       "outputs": [
@@ -651,7 +680,8 @@ expression: text
           "ioid": 2,
           "name": "Salida1",
           "caption": "",
-          "label": "A_Logic"
+          "label": "A_Logic",
+          "layout": null
         }
       ]
     },
@@ -675,7 +705,8 @@ expression: text
           "ioid": 1,
           "name": "Entrada1",
           "caption": "Ingreso",
-          "label": "A_Buffer1"
+          "label": "A_Buffer1",
+          "layout": null
         }
       ],
       "outputs": [
@@ -683,7 +714,8 @@ expression: text
           "ioid": 2,
           "name": "Salida1",
           "caption": "",
-          "label": "A_Terminate"
+          "label": "A_Terminate",
+          "layout": null
         }
       ]
     },
@@ -735,7 +767,8 @@ expression: text
           "ioid": 1,
           "name": "Entrada1",
           "caption": "Ingreso",
-          "label": "A_Terminate1"
+          "label": "A_Terminate1",
+          "layout": null
         }
       ],
       "outputs": []

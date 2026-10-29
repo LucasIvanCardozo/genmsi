@@ -89,7 +89,7 @@ fn composing_a_scope_moves_only_the_blocks_of_the_scope() {
     // airport: both hold blocks, and both have blocks of their own.
     for (name, scope) in [("TP10__tp10.gmdl", 1u32), ("TP3__aeropuerto.gmdl", 13)] {
         let model = model(name);
-        let positions = relayout_scope(&model, scope);
+        let positions = relayout_scope(&model, scope).positions;
         assert!(
             !positions.is_empty(),
             "{name}: the scope {scope} has nothing to compose"
@@ -128,7 +128,7 @@ fn the_composition_of_a_scope_moves_only_the_children() {
     // blocks; 9 of them are the children of the container 1.
     let model = model("TP10__tp10.gmdl");
     let scope = 1;
-    let positions = relayout_scope(&model, scope);
+    let positions = relayout_scope(&model, scope).positions;
     let mut moved = moved(&model, &positions);
     let mut expected = children_of(&model, scope);
     expected.sort_unstable();
@@ -153,7 +153,7 @@ fn the_box_of_a_container_does_not_change() {
     let scope = 1;
     let before = layout_of(&model, scope).expect("the container has a box");
     // The composition of the container's own content.
-    let inner = composed(&model, &relayout_scope(&model, scope));
+    let inner = composed(&model, &relayout_scope(&model, scope).positions);
     assert_eq!(
         layout_of(&inner, scope),
         Some(before),
@@ -162,7 +162,7 @@ fn the_box_of_a_container_does_not_change() {
 
     // And the composition of the scope of the parent, which places the
     // container like any other block: its size does not change.
-    let outer = composed(&model, &relayout_scope(&model, 0));
+    let outer = composed(&model, &relayout_scope(&model, 0).positions);
     let after = layout_of(&outer, scope).expect("the container has a box");
     assert_eq!(
         (after.2, after.3),
@@ -178,7 +178,7 @@ fn a_nested_container_is_an_atomic_box() {
     let model = model("TP3__aeropuerto.gmdl");
     let scope = 13;
     let nested = 19;
-    let positions = relayout_scope(&model, scope);
+    let positions = relayout_scope(&model, scope).positions;
     let composed = composed(&model, &positions);
     // The nested container keeps the size the model gives it: its frame is
     // not computed around its content, which is in another canvas.
@@ -203,7 +203,7 @@ fn a_nested_container_is_an_atomic_box() {
 #[test]
 fn the_root_scope_composes_the_children_of_the_root() {
     let model = model("TP10__tp10.gmdl");
-    let positions = relayout_scope(&model, 0);
+    let positions = relayout_scope(&model, 0).positions;
     let children = children_of(&model, 0);
     let ids: Vec<u32> = positions.iter().map(|position| position.id).collect();
     assert_eq!(ids, children, "the root scope composes its own children");
@@ -244,8 +244,8 @@ fn the_composition_of_a_scope_is_deterministic() {
         ("TP10__tp10.gmdl", 0),
     ] {
         let model = model(name);
-        let first = relayout_scope(&model, scope);
-        let second = relayout_scope(&model, scope);
+        let first = relayout_scope(&model, scope).positions;
+        let second = relayout_scope(&model, scope).positions;
         assert_eq!(
             first, second,
             "{name}: the composition of the scope {scope} is not deterministic"
@@ -258,12 +258,12 @@ fn a_scope_with_nothing_in_it_composes_nothing() {
     let model = model("TP10__tp10.gmdl");
     // A block that is not a container has no children.
     assert!(
-        relayout_scope(&model, 2).is_empty(),
+        relayout_scope(&model, 2).positions.is_empty(),
         "a block that is not a container composes something"
     );
     // A scope that is not in the model has no children either.
     assert!(
-        relayout_scope(&model, 9999).is_empty(),
+        relayout_scope(&model, 9999).positions.is_empty(),
         "a scope that is not in the model composes something"
     );
     // A container that holds nothing: there is nothing to place, and no
@@ -276,12 +276,12 @@ fn a_scope_with_nothing_in_it_composes_nothing() {
          </modules></gmodel>";
     let empty = genmsi_format::parse_str(text).expect("the model parses");
     assert!(
-        relayout_scope(&empty, 1).is_empty(),
+        relayout_scope(&empty, 1).positions.is_empty(),
         "an empty container composes something"
     );
     // The root of that model holds the empty container, so the root scope
     // composes it: it is a block of the root, like any other.
-    let root = relayout_scope(&empty, 0);
+    let root = relayout_scope(&empty, 0).positions;
     assert_eq!(
         root.iter()
             .map(|position| position.id)
@@ -298,7 +298,7 @@ fn the_ports_of_the_scope_are_the_ends_of_the_flow() {
     // containers it holds (19 and 29).
     let model = model("TP3__aeropuerto.gmdl");
     let scope = 13;
-    let positions = relayout_scope(&model, scope);
+    let positions = relayout_scope(&model, scope).positions;
     let row = |id: u32| -> i32 {
         positions
             .iter()
@@ -337,7 +337,7 @@ fn the_composition_of_a_scope_does_not_depend_on_the_blocks_outside_it() {
     // take part in its composition.
     let model = model("TP10__tp10.gmdl");
     let scope = 1;
-    let first = relayout_scope(&model, scope);
+    let first = relayout_scope(&model, scope).positions;
     // Every block outside the scope is moved somewhere else.
     let mut moved_model = model.clone();
     for block in &mut moved_model.blocks {
@@ -349,11 +349,100 @@ fn the_composition_of_a_scope_does_not_depend_on_the_blocks_outside_it() {
             layout.y += 1000;
         }
     }
-    let second = relayout_scope(&moved_model, scope);
+    let second = relayout_scope(&moved_model, scope).positions;
     assert_eq!(
         first, second,
         "the composition of the scope depends on the blocks outside it"
     );
+}
+
+#[test]
+fn the_doors_of_the_scope_are_placed_like_blocks() {
+    // A door is a block of the picture in its own right: the composition of
+    // the scope places it, gives it a place of its own, and no two doors
+    // share that place.
+    let model = model("TP3__aeropuerto.gmdl");
+    let scope = 13;
+    let composition = relayout_scope(&model, scope);
+    // The scope has a place for each door it has.
+    let container = model.block(scope).expect("the scope is a block");
+    let doors = container.inputs.len() + container.outputs.len();
+    assert_eq!(
+        composition.ports.len(),
+        doors,
+        "the scope does not have one place per door"
+    );
+    // Every door has a place, and it is the size of a door.
+    for port in &composition.ports {
+        assert_eq!(port.block, scope, "the door belongs to another block");
+        assert!(port.width.unwrap_or(0) > 0, "the door has no width");
+        assert!(port.height.unwrap_or(0) > 0, "the door has no height");
+    }
+    // And no two doors sit on each other.
+    for (index, port) in composition.ports.iter().enumerate() {
+        for other in composition.ports.iter().skip(index + 1) {
+            let (x, y) = (port.x, port.y);
+            let (other_x, other_y) = (other.x, other.y);
+            let (width, height) = (port.width.unwrap_or(0), port.height.unwrap_or(0));
+            let (other_width, other_height) = (other.width.unwrap_or(0), other.height.unwrap_or(0));
+            assert!(
+                !(x < other_x + other_width
+                    && other_x < x + width
+                    && y < other_y + other_height
+                    && other_y < y + height),
+                "the doors {ioid} and {other_ioid} sit on each other",
+                ioid = port.ioid,
+                other_ioid = other.ioid
+            );
+        }
+    }
+}
+
+#[test]
+fn the_entry_door_comes_before_the_flow_and_the_exit_door_after_it() {
+    // The entry door opens the flow of the scope: it is above the block the
+    // flow enters through. The exit door closes it: it is below the blocks
+    // the flow leaves through.
+    let model = model("TP3__aeropuerto.gmdl");
+    let scope = 13;
+    let composition = relayout_scope(&model, scope);
+    let row = |id: u32| -> i32 {
+        composition
+            .positions
+            .iter()
+            .find(|position| position.id == id)
+            .map(|position| position.y)
+            .expect("the block is placed")
+    };
+    let entry = composition
+        .ports
+        .iter()
+        .find(|port| port.input)
+        .expect("the scope has an entry door");
+    let exit = composition
+        .ports
+        .iter()
+        .find(|port| !port.input)
+        .expect("the scope has an exit door");
+    assert!(
+        entry.y < row(14),
+        "the entry door is not above the block the flow enters through"
+    );
+    assert!(
+        exit.y > row(19).max(row(29)),
+        "the exit door is not below the blocks the flow leaves through"
+    );
+}
+
+#[test]
+fn the_doors_of_the_scope_are_the_same_every_time() {
+    // The composition is deterministic: the doors are placed like any other
+    // block, and the same scope always gives the same picture.
+    let model = model("TP3__aeropuerto.gmdl");
+    let scope = 13;
+    let first = relayout_scope(&model, scope).ports;
+    let second = relayout_scope(&model, scope).ports;
+    assert_eq!(first, second, "the doors of the scope are not placed the same way twice");
 }
 
 #[test]
@@ -383,7 +472,7 @@ fn the_composition_of_a_scope_leaves_no_block_on_another() {
             .filter(|block| block.is_container())
             .map(|block| block.id)
         {
-            let positions = relayout_scope(&model, scope);
+            let positions = relayout_scope(&model, scope).positions;
             if positions.is_empty() {
                 continue;
             }

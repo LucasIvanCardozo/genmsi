@@ -202,6 +202,12 @@ pub struct ModelPort {
     pub caption: String,
     /// Connection label shared by the two ends of a link.
     pub label: Option<String>,
+    /// The place of the port, when the model gives it one.
+    ///
+    /// A door of a container is a block of the picture in its own right, and
+    /// its place is the one the composition of the scope gave it: in the
+    /// canvas of the model, like the blocks are.
+    pub layout: Option<ModelRect>,
 }
 
 /// One block of the model: an activity block or a container.
@@ -280,6 +286,12 @@ fn ports_of(ports: &[genmsi_format::Port]) -> Vec<ModelPort> {
             name: port.name.clone(),
             caption: percent_decode(&port.caption),
             label: port.label().map(percent_decode),
+            layout: port.layout.as_ref().map(|layout| ModelRect {
+                x: layout.x,
+                y: layout.y,
+                width: layout.width,
+                height: layout.height,
+            }),
         })
         .collect()
 }

@@ -224,11 +224,14 @@ impl Session {
     /// nothing to compose changes nothing: the model stays as it was and
     /// the undo stack does not grow.
     pub fn relayout(&mut self, scope: u32) -> Result<SessionState, AppError> {
-        let positions = genmsi_format::layout::relayout_scope(self.editor.model(), scope);
-        if positions.is_empty() {
+        let composition = genmsi_format::layout::relayout_scope(self.editor.model(), scope);
+        if composition.positions.is_empty() && composition.ports.is_empty() {
             return Ok(self.state());
         }
-        self.apply(EditCommand::SetLayouts { positions })
+        self.apply(EditCommand::SetLayouts {
+            positions: composition.positions,
+            ports: composition.ports,
+        })
     }
 
     /// Undo the last operation.

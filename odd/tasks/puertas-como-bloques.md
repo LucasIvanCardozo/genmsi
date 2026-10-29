@@ -440,7 +440,7 @@ Lo que **no** era la causa ✓: la app publica su imagen viva cuando cambia el
 playhead ✓ (`MonitorView.tsx` ✓, el efecto que publica con el reloj ✓) — las
 cifras no están viejas ✓; lo que no hay son los movimientos ✓.
 
-### L14 — Lo que se arregló y lo que se midió
+### L13 — Lo que se arregló y lo que se midió
 
 **P1 — el reordenamiento** (`ae662ca`) ✓ **arreglado y medido** ✓: con un
 módulo cuyo flujo es sólo sus puertas (el del usuario ✓), después de
@@ -460,7 +460,7 @@ registra el evento *leave* del bloque 13 (el Leave ✓), que es el primer salto
 del movimiento que sale ✗. Eso ya no es de la app ✗: es del motor ✗ (o del
 formato del trace ✓), y es la unidad que sigue ✓.
 
-### L13 — T8: el motor compone las puertas que se hablan entre sí (hecho)
+### L14 — T8: el motor compone las puertas que se hablan entre sí (hecho)
 
 **T8 (`ae662ca`)** — el flujo de un ámbito alcanza ahora los enlaces que van
 de una puerta a otra del mismo contenedor ✓, y las puertas que esos enlaces

@@ -3,12 +3,17 @@
  *
  * The shapes module holds the truth of every class: its silhouette, the
  * zones where its text and its figure go, and the anchor of each of its
- * ports (S2, S8, S9). This module turns that truth into what the node of
- * the canvas needs:
+ * ports (S2, S8, S9). The frames module holds the truth of the blocks that
+ * are not classes of the catalogue: the container and the doors of a
+ * container. This module turns that truth into what the node of the canvas
+ * needs:
  *
- * - the **size of the node**, which is the footprint of the class: the
- *   shape is the truth, and it is drawn one to one, never scaled and never
- *   cropped;
+ * - the **silhouette**, which the class decides for the 66 classes and the
+ *   kind decides for the other three: the container, the entry door and
+ *   the exit door;
+ * - the **size of the node**, which is the footprint of the shape and the
+ *   room the outline needs: the shape is the truth, and it is drawn one to
+ *   one, never scaled and never cropped;
  * - the **zones**, in the pixels of the shape's own footprint, so the text
  *   lands inside the silhouette;
  * - the **lines of the rótulo**: a name that does not fit its zone is
@@ -27,8 +32,16 @@
  * about a block without a browser. The node of the canvas only draws what
  * this module says.
  */
-import { portSpread } from "./graph.ts";
+import { portSpread, type BlockKind } from "./graph.ts";
 import { monospaceWidth, textWidth, truncate } from "./catalogue.ts";
+import {
+  containerShape,
+  plainShape,
+  portInShape,
+  portOutShape,
+  STROKE_MARGIN,
+  type FrameSize,
+} from "./frames.ts";
 import {
   familyColors,
   shapeOf,
@@ -89,23 +102,126 @@ export interface NodeSize {
  * The outline is drawn centred on the line of the shape, so the half that
  * falls outside is cut by the box of the drawing. Two pixels on each side
  * leave the whole border visible.
+ *
+ * The margin lives with the shapes, in the frames module, and it is
+ * re-exported here because the node of the canvas draws with it.
  */
-export const STROKE_MARGIN = 2;
+export { STROKE_MARGIN };
 
-/** How a class of block is drawn. */
+/** How a block of the canvas is drawn. */
 export interface BlockDrawing {
-  /** The shape of the class, or `undefined` when the class is unknown. */
-  shape: BlockShape | undefined;
-  /** The colours of the family, or `undefined` when the class is unknown. */
-  colors: FamilyColors | undefined;
+  /** The silhouette of the block. */
+  shape: BlockShape;
+  /** The colours of the family of the silhouette. */
+  colors: FamilyColors;
   /** Whether the block falls back to the plain rounded rectangle. */
   fallback: boolean;
-  /** The zone of the label, in the pixels of the footprint of the class. */
-  label: FootprintZone | null;
-  /** The zone of the figure, in the pixels of the footprint of the class. */
+  /** The zone of the label, in the pixels of the footprint of the shape. */
+  label: FootprintZone;
+  /** The zone of the figure, in the pixels of the footprint of the shape. */
   figure: FootprintZone | null;
   /** Whether the zone of the label has room for the caption. */
   subtitle: boolean;
+  /** The box the block is drawn in: the footprint and the room of the outline. */
+  size: NodeSize;
+}
+
+/**
+ * What the canvas knows about a block to draw it.
+ *
+ * The class decides the silhouette of the 66 classes of the catalogue, and
+ * the kind decides the silhouette of the other three blocks of the canvas:
+ * the container, the entry door and the exit door. The size is the one the
+ * model gives the block, which is the truth for the container and for a
+ * block of a class the catalogue does not know.
+ */
+export interface BlockToDraw {
+  /** The class of the block; a container and a door have none. */
+  className: string;
+  /** The kind of the block; an activity block when the kind is not given. */
+  kind?: BlockKind;
+  /** The name the block shows as its rótulo; its class when it is not given. */
+  title?: string;
+  /** The caption the block shows under its rótulo. */
+  subtitle?: string;
+  /** The size the model gives the block, or `null` when the model gives none. */
+  size?: NodeSize | null;
+  /** The input ports of the block, in the order of the model. */
+  inputs?: readonly PortOfBlock[];
+  /** The output ports of the block, in the order of the model. */
+  outputs?: readonly PortOfBlock[];
+}
+
+/**
+ * The size a block is drawn at when the model gives it none.
+ *
+ * A block the model does not place is not drawn at all, but the drawing
+ * module cannot know that: it needs a box to draw in, and this is the
+ * box it uses when the model carries none.
+ */
+export const DEFAULT_SIZE: NodeSize = { width: 100, height: 40 };
+
+/**
+ * The name a block shows and the caption under it.
+ */
+export interface BlockTexts {
+  /** The rótulo: the name of the block. */
+  label: string;
+  /** The caption: what the block says under its name. */
+  caption: string;
+}
+
+/**
+ * The text a block shows: its name and the caption under it.
+ *
+ * The 66 classes show the name of their class and, under it, the caption of
+ * the model. The container shows the caption of the model as its name —
+ * that is how the reader knows which container it is — and the word
+ * "Contenedor" under it, because that is what it is. The doors show the
+ * name of the port and, under it, the word that says which side of the
+ * container they are.
+ */
+export function textsOf(kind: BlockKind, title: string, subtitle: string): BlockTexts {
+  switch (kind) {
+    case "C":
+      return { label: subtitle !== "" ? subtitle : title, caption: "Contenedor" };
+    case "PortIn":
+      return { label: title, caption: "Entrada" };
+    case "PortOut":
+      return { label: title, caption: "Salida" };
+    default:
+      return { label: title, caption: subtitle };
+  }
+}
+
+/**
+ * The ring of the selection of a block.
+ *
+ * The ring goes on the wrapper of the block, the box that holds the
+ * silhouette, and not on the silhouette itself: the border of the shape is
+ * drawn inside its own box, so a ring on the inner box would only make the
+ * border look thicker. On the wrapper it is a clean square around the
+ * silhouette, the same square for the 66 classes, for the container and
+ * for the doors (S3).
+ */
+export const SELECTION_RING = "ring-2 ring-indigo-500";
+
+/**
+ * The class of the wrapper of a block: the box that holds the silhouette.
+ *
+ * The wrapper is the outer box of the node of the canvas, and it is the
+ * one that carries the ring of the selection: every block of the canvas is
+ * selected the same way, because every block is drawn the same way.
+ *
+ * @param selected whether the block is selected
+ * @param note whether the block is a note, which is drawn dimmed
+ */
+export function wrapperClass(selected: boolean, note = false): string {
+  return [
+    "relative h-full w-full",
+    note ? "opacity-70" : "",
+    selected ? SELECTION_RING : "",
+  ].join(" ");
 }
 
 /** The counts a block shows when it has no other figure. */
@@ -178,31 +294,103 @@ export const LINE_AIR = 2;
 export const PORT_SIZE = 12;
 
 /**
- * How a class of block is drawn.
+ * How a block of the canvas is drawn.
  *
- * A class the shapes module does not know falls back to the plain rounded
- * rectangle, so that the canvas never breaks. A container falls back too:
- * it is the frame around the blocks, not a step of the flow.
+ * The class of the block decides its silhouette when the class is one of
+ * the 66 of the catalogue. The kind decides it when the class is not: the
+ * container, the entry door and the exit door have the shapes of the
+ * frames module, and a class the catalogue does not know falls back to the
+ * plain plate, so that the canvas never breaks.
+ *
+ * The box of the node is the footprint of the silhouette and the room the
+ * outline needs: the shape is drawn one to one, never scaled and never
+ * cropped, and the box of the node and the viewBox of its silhouette
+ * agree.
  */
-export function drawingOf(className: string, container = false): BlockDrawing {
-  const shape = container ? undefined : shapeOf(className);
-  if (shape === undefined) {
-    return {
-      shape: undefined,
-      colors: undefined,
-      fallback: true,
-      label: null,
-      figure: null,
-      subtitle: false,
-    };
-  }
+export function drawingOf(block: BlockToDraw): BlockDrawing {
+  const kind = block.kind ?? "A";
+  const inputs = block.inputs ?? [];
+  const outputs = block.outputs ?? [];
+  // The class decides the shape of the 66 classes, and only of them.
+  const classShape = kind === "A" ? shapeOf(block.className) : undefined;
+  const shape = classShape ?? shapeOfKind(kind, block, inputs, outputs);
   return {
     shape,
     colors: familyColors(shape.family),
-    fallback: false,
+    fallback: kind === "A" && classShape === undefined,
     label: zoneOf(shape.label),
     figure: shape.figure === null ? null : zoneOf(shape.figure),
     subtitle: shape.label.height >= SUBTITLE_HEIGHT,
+    size: {
+      width: shape.footprint.width + 2 * STROKE_MARGIN,
+      height: shape.footprint.height + 2 * STROKE_MARGIN,
+    },
+  };
+}
+
+/**
+ * The silhouette of a block the catalogue of classes does not draw.
+ *
+ * The container is a block with the box the model gives it, and its ports
+ * sit on the edges of its own silhouette: the inputs on the top edge and
+ * the outputs on the bottom one, spread along it. The doors have the
+ * silhouette of the plate the flow crosses, and the one port they open or
+ * close sits on the edge the flow crosses. A class the catalogue does not
+ * know is drawn as the plain plate.
+ */
+function shapeOfKind(
+  kind: BlockKind,
+  block: BlockToDraw,
+  inputs: readonly PortOfBlock[],
+  outputs: readonly PortOfBlock[],
+): BlockShape {
+  switch (kind) {
+    case "C":
+      return containerShape(footprintOf(block.size), {
+        inputs: inputs.map((port, index) => ({
+          name: port.name,
+          x: portSpread(inputs.length, index),
+          y: 0,
+        })),
+        outputs: outputs.map((port, index) => ({
+          name: port.name,
+          x: portSpread(outputs.length, index),
+          y: 1,
+        })),
+      });
+    case "PortIn":
+      return portInShape(doorName(inputs, outputs));
+    case "PortOut":
+      return portOutShape(doorName(inputs, outputs));
+    default:
+      return plainShape(footprintOf(block.size));
+  }
+}
+
+/**
+ * The name of the port a door carries: it is the one port the door has.
+ */
+function doorName(
+  inputs: readonly PortOfBlock[],
+  outputs: readonly PortOfBlock[],
+): string {
+  const port = outputs[0] ?? inputs[0];
+  return port === undefined ? "" : port.name;
+}
+
+/**
+ * The footprint of a block the model sizes.
+ *
+ * The box the model gives the block is the box of the node, and the
+ * silhouette is drawn inside it with the room the outline needs: the
+ * outline is drawn centred on the line of the shape, so half of it falls
+ * outside, and without that room the border is cut flat on the four sides.
+ */
+function footprintOf(size: NodeSize | null | undefined): FrameSize {
+  const box = size ?? DEFAULT_SIZE;
+  return {
+    width: Math.max(1, Math.round(box.width) - 2 * STROKE_MARGIN),
+    height: Math.max(1, Math.round(box.height) - 2 * STROKE_MARGIN),
   };
 }
 
@@ -224,7 +412,7 @@ export function zoneOf(zone: Zone): FootprintZone {
 }
 
 /**
- * The size of the node of a class: the footprint of the class, one to one.
+ * The size of the node of a block: the footprint of its shape, one to one.
  *
  * The shape is the truth: a block is drawn at the size of its class, with
  * its own proportion, and never scaled to the box the model happens to
@@ -232,24 +420,12 @@ export function zoneOf(zone: Zone): FootprintZone {
  * size of its class: the model is not rewritten, and the reader can lay
  * the canvas out again with the relayout command of the toolbar.
  *
- * A class the shapes module does not know, and every container, keep the
- * box of the model: they are drawn as the plain rectangle.
+ * The container, the doors and a class the shapes module does not know
+ * have no class to say how big they are: they are drawn at the box the
+ * model gives them, and their silhouette is the plate that fits in it.
  */
-export function nodeSizeOf(className: string, container = false): NodeSize | null {
-  if (container) {
-    return null;
-  }
-  const shape = shapeOf(className);
-  if (shape === undefined) {
-    return null;
-  }
-  // The border of the silhouette is drawn centred on its own line, so half
-  // of it falls outside the shape: the box of the block leaves that room,
-  // or the outline is cut flat on the four sides.
-  return {
-    width: shape.footprint.width + 2 * STROKE_MARGIN,
-    height: shape.footprint.height + 2 * STROKE_MARGIN,
-  };
+export function nodeSizeOf(block: BlockToDraw): NodeSize {
+  return drawingOf(block).size;
 }
 
 /**
@@ -289,25 +465,24 @@ export function sideOf(anchor: PortAnchor): PortSide {
 /**
  * Where the ports of a block sit.
  *
- * The anchor comes from the shape of the class: a `Test` leaves by the right
- * vertex of its diamond, and a `Multifurcacion` spreads its five exits
- * along its bottom edge (S8). The anchor is a fraction of the footprint of
- * the class, so the port sits in the shape's own frame, and the block is
- * drawn at the size of that footprint: the port falls on the very point of
- * the silhouette it belongs to.
+ * The anchor comes from the shape of the block: a `Test` leaves by the
+ * right vertex of its diamond, and a `Multifurcacion` spreads its five
+ * exits along its bottom edge (S8). The anchor is a fraction of the
+ * footprint of the shape, so the port sits in the shape's own frame, and
+ * the block is drawn at the size of that footprint: the port falls on the
+ * very point of the silhouette it belongs to.
  *
- * A port the shape does not know keeps the place the ports used to have,
+ * A port the shape does not declare keeps the place the ports used to have,
  * spread along the side: a link that loses its handle is a link the reader
  * cannot follow.
  */
 export function portPlacements(
-  shape: BlockShape | undefined,
+  shape: BlockShape,
   ports: readonly PortOfBlock[],
   fallbackSide: PortSide,
 ): PortPlacement[] {
   return ports.map((port, index) => {
-    const anchor =
-      shape === undefined ? undefined : shape.ports.find((one) => one.name === port.name);
+    const anchor = shape.ports.find((one) => one.name === port.name);
     if (anchor === undefined) {
       return {
         ioid: port.ioid,

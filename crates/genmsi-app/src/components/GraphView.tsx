@@ -43,6 +43,8 @@ import {
   labelLines,
   nodeSizeOf,
   portPlacements,
+  textsOf,
+  wrapperClass,
   type PortSide,
 } from "../graph/node";
 import { useBlockCounts, useBlockFigure, useRunHasPublished } from "../monitor/live";
@@ -77,23 +79,36 @@ const NOTE_LABEL_COLOR = "#475569";
 /**
  * One block of the model, drawn as a node of the graph.
  *
- * The block is drawn with the silhouette of its class: the shape module
- * holds it, with the zones where the rótulo and the figure go, and with the
- * anchor of each of its ports (S2, S8, S9). A class the shape module does
- * not know keeps the plain rounded rectangle, so the canvas never breaks.
+ * Every block of the canvas is drawn the same way: the 66 classes of the
+ * catalogue, the container and the doors of a container (S3). The shape
+ * module holds the zones where the rótulo and the figure go, and the
+ * anchor of each of its ports (S2, S8, S9); the shape of a block the
+ * catalogue does not know comes from the frames module. The ring of the
+ * selection goes on the wrapper that holds the silhouette.
  *
- * The silhouette is the truth: it is drawn at the size of its own class, one
+ * The silhouette is the truth: it is drawn at the size of its own shape, one
  * to one, without being scaled and without being cropped. The node of the
  * graph has that very size, so the drawing, the selection and the MiniMap
  * all agree on where the block is.
  */
 function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
-  const container = data.kind === "C";
-  const note = data.title === "Note";
-  const spread = (count: number, index: number): string =>
-    `${((index + 1) / (count + 1)) * 100}%`;
-  // How the block is drawn: its silhouette, its zones and its ports.
-  const drawing = drawingOf(data.title, container);
+  const note = data.kind === "A" && data.title === "Note";
+  // How the block is drawn: its silhouette, its zones and its ports. The
+  // class decides the shape of the 66 classes of the catalogue, and the
+  // kind decides the shape of the container and of the doors.
+  const drawing = drawingOf({
+    className: data.kind === "A" ? data.title : "",
+    kind: data.kind,
+    title: data.title,
+    subtitle: data.subtitle,
+    size: data.size,
+    inputs: data.inputs,
+    outputs: data.outputs,
+  });
+  // The name the block shows and the caption under it: the container shows
+  // the caption of the model as its name and the word "Contenedor" under
+  // it, and the doors show the name of the port.
+  const texts = textsOf(data.kind, data.title, data.subtitle);
   // How many transactions the block holds now, and how many have gone
   // through it: the live layer answers for this block alone.
   const counts = useBlockCounts(Number(id));
@@ -104,181 +119,9 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
   const running = useRunHasPublished();
   const clip = useId().replace(/[^a-zA-Z0-9_-]/g, "");
 
-  if (data.kind === "PortIn" || data.kind === "PortOut") {
-    const isEntry = data.kind === "PortIn";
-    return (
-      <div
-        className={[
-          "relative flex h-full w-full flex-col justify-center rounded-md border px-3 text-left shadow-2xs transition",
-          isEntry
-            ? "border-[#b3c4bc] bg-[#f3f6f5] text-slate-800"
-            : "border-[#deb3b7] bg-[#f9f4f4] text-slate-800",
-          selected ? "ring-2 ring-indigo-500" : "",
-        ].join(" ")}
-      >
-        <span className="truncate text-xs font-semibold text-slate-800">{data.title}</span>
-        <span className="text-[10px] text-slate-500">{isEntry ? "Entrada" : "Salida"}</span>
-        {isEntry
-          ? data.outputs.map((port) => (
-              <Handle
-                key={`out-${port.ioid}`}
-                type="source"
-                position={Position.Bottom}
-                id={String(port.ioid)}
-                title={port.name}
-                className="!size-3 !rounded-full !border-2 !border-white !bg-[#047857]"
-              />
-            ))
-          : data.inputs.map((port) => (
-              <Handle
-                key={`in-${port.ioid}`}
-                type="target"
-                position={Position.Top}
-                id={String(port.ioid)}
-                title={port.name}
-                className="!size-3 !rounded-full !border-2 !border-white !bg-[#be123c]"
-              />
-            ))}
-      </div>
-    );
-  }
-
-  if (container) {
-    return (
-      <div
-        className={[
-          "relative flex h-full w-full flex-col justify-between rounded-md border border-[#b8b7e4] bg-[#f4f4fa] px-3 py-2 text-left shadow-2xs transition cursor-pointer",
-          selected ? "ring-2 ring-indigo-500" : "",
-        ].join(" ")}
-      >
-        {data.inputs.map((port, index) => (
-          <Handle
-            key={`in-${port.ioid}`}
-            type="target"
-            position={Position.Top}
-            id={String(port.ioid)}
-            title={port.name}
-            style={{ left: spread(data.inputs.length, index), top: -6 }}
-            className="!size-3 !rounded-full !border-2 !border-white !bg-[#4338ca]"
-          />
-        ))}
-        <div className="flex flex-col min-w-0">
-          <span className="truncate text-xs font-semibold text-slate-800">
-            {data.subtitle || data.title}
-          </span>
-          <span className="text-[10px] text-slate-500">Contenedor</span>
-        </div>
-        {data.outputs.map((port, index) => (
-          <Handle
-            key={`out-${port.ioid}`}
-            type="source"
-            position={Position.Bottom}
-            id={String(port.ioid)}
-            title={port.name}
-            style={{ left: spread(data.outputs.length, index), bottom: -6 }}
-            className="!size-3 !rounded-full !border-2 !border-white !bg-[#4338ca]"
-          />
-        ))}
-      </div>
-    );
-  }
-
-  if (
-    drawing.fallback ||
-    drawing.shape === undefined ||
-    drawing.colors === undefined ||
-    drawing.label === null
-  ) {
-    // The plain block of always: the rounded rectangle the canvas drew
-    // before the redesign, with its ports spread along the edges.
-    return (
-      <div
-        className={[
-          "relative flex h-full w-full flex-col justify-center rounded-md border px-2 text-left shadow-sm",
-          container
-            ? "border-slate-300 border-dashed bg-transparent"
-            : "border-slate-400 bg-white",
-          note ? "opacity-70" : "",
-          selected ? "ring-2 ring-indigo-500" : "",
-        ].join(" ")}
-      >
-        {data.inputs.map((port, index) => (
-          <Handle
-            key={`in-${port.ioid}`}
-            type="target"
-            position={Position.Top}
-            id={String(port.ioid)}
-            title={port.name}
-            style={{ left: spread(data.inputs.length, index), top: -6 }}
-            className="!size-3 !rounded-full !border-2 !border-white !bg-slate-400"
-          />
-        ))}
-        {/* A container is entered through one of its input ports and left
-            through one of its output ports: those links start and end at the
-            container itself, so the container needs a source and a target
-            handle for them. */}
-        {container &&
-          data.inputs.map((port, index) => (
-            <Handle
-              key={`entry-${port.ioid}`}
-              type="source"
-              position={Position.Top}
-              id={`in-${port.ioid}`}
-              title={port.name}
-              style={{ left: spread(data.inputs.length, index), top: -6 }}
-              className="!size-3 !rounded-full !border-2 !border-transparent !bg-transparent"
-            />
-          ))}
-        <span
-          className={[
-            "truncate text-xs font-semibold tracking-tight",
-            container ? "text-slate-500" : "text-slate-800",
-            note ? "italic" : "",
-          ].join(" ")}
-        >
-          {data.title}
-        </span>
-        {data.subtitle !== "" && (
-          <span className="truncate text-[10px] text-slate-500">{data.subtitle}</span>
-        )}
-        {data.outputs.map((port, index) => (
-          <Handle
-            key={`out-${port.ioid}`}
-            type="source"
-            position={Position.Bottom}
-            id={String(port.ioid)}
-            title={port.name}
-            style={{ left: spread(data.outputs.length, index), bottom: -6 }}
-            className="!size-3 !rounded-full !border-2 !border-white !bg-slate-400"
-          />
-        ))}
-        {container &&
-          data.outputs.map((port, index) => (
-            <Handle
-              key={`exit-${port.ioid}`}
-              type="target"
-              position={Position.Bottom}
-              id={`out-${port.ioid}`}
-              title={port.name}
-              style={{ left: spread(data.outputs.length, index), bottom: -6 }}
-              className="!size-3 !rounded-full !border-2 !border-transparent !bg-transparent"
-            />
-          ))}
-        {/* The two numbers of the block: how many transactions are inside it
-            now, and how many have gone through it since the run started. */}
-        {counts !== undefined && counts.ever > 0 && (
-          <span className="pointer-events-none absolute right-1.5 top-1 font-mono text-[10px] leading-none text-indigo-600">
-            {counts.now}
-            <span className="text-slate-400">/{counts.ever}</span>
-          </span>
-        )}
-      </div>
-    );
-  }
-
   const shape = drawing.shape;
   const colors = drawing.colors;
-  // The size of the block: the footprint of its class, one to one. The
+  // The size of the block: the footprint of its shape, one to one. The
   // silhouette is never scaled and never cropped.
   const width = shape.footprint.width;
   const height = shape.footprint.height;
@@ -290,7 +133,7 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
   // The rótulo of the block: the name of the class, in one line when it
   // fits its zone and in two lines when it does not. No character of it is
   // ever cut.
-  const lines = labelLines(data.title, labelZone);
+  const lines = labelLines(texts.label, labelZone);
   const baselines = labelBaselines(labelZone, lines.length);
   // The caption keeps its own place, the second line of the zone, and it is
   // drawn at the size of the design when it fits: a caption that does not
@@ -299,8 +142,8 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
   const caption =
     drawing.subtitle &&
     captionFits(labelZone, lines.length) &&
-    data.subtitle !== ""
-      ? captionLayout(data.subtitle, labelZone)
+    texts.caption !== ""
+      ? captionLayout(texts.caption, labelZone)
       : { text: "", size: CAPTION_SIZE };
   // The figure of the block, centred in the zone the shape declares. A
   // block the run publishes no figure for shows the dash of an empty
@@ -317,28 +160,21 @@ function BlockNode({ id, data, selected }: NodeProps<Node<BlockData>>) {
         );
 
   return (
-    <div
-      className={[
-        "relative h-full w-full",
-        note ? "opacity-70" : "",
-        selected ? "ring-2 ring-indigo-500" : "",
-      ].join(" ")}
-    >
-      {/* The silhouette of the class and the text of its zones, drawn in the
-          footprint of the class: the path is the one the shape module
+    <div className={wrapperClass(selected, note)}>
+      {/* The silhouette of the block and the text of its zones, drawn in the
+          footprint of the shape: the path is the one the shape module
           declares, the details are the strokes inside it, and the text goes
           in the zones the shape declares, which are inside the silhouette.
-          Nothing is scaled: the viewBox is the footprint of the class, so a
-          circle stays a circle and every figure keeps the width of its
-          stroke. */}
+          Nothing is scaled: the viewBox is the box of the node, so a circle
+          stays a circle and every figure keeps the width of its stroke. */}
       <svg
         className="pointer-events-none absolute inset-0 h-full w-full"
-        viewBox={`0 0 ${width + 2 * STROKE_MARGIN} ${height + 2 * STROKE_MARGIN}`}
+        viewBox={`0 0 ${drawing.size.width} ${drawing.size.height}`}
         preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label={data.subtitle !== "" ? `${data.title} ${data.subtitle}` : data.title}
       >
-        {/* The whole drawing lives in the footprint of the class, and the
+        {/* The whole drawing lives in the footprint of the shape, and the
             group carries it the room the border needs: the outline is
             drawn centred on the line of the shape, so without that margin
             its outer half is cut by the box. */}
@@ -557,14 +393,19 @@ export default memo(function GraphView({
     setNodes(
       graph.nodes.map((node) => {
         const drawn = { ...node, selected: selected.current.has(node.id) };
-        // The block is drawn at the size of its class: the shape is the
+        // The block is drawn at the size of its shape: the shape is the
         // truth, and the box the model carries is not rewritten. A class
-        // the shape module does not know, and every container, keep the
-        // box of the model.
-        const size = nodeSizeOf(node.data.title, node.data.kind === "C");
-        if (size === null) {
-          return drawn;
-        }
+        // the shape module does not know, the container and the doors are
+        // drawn at the box the model gives them.
+        const size = nodeSizeOf({
+          className: node.data.kind === "A" ? node.data.title : "",
+          kind: node.data.kind,
+          title: node.data.title,
+          subtitle: node.data.subtitle,
+          size: node.data.size,
+          inputs: node.data.inputs,
+          outputs: node.data.outputs,
+        });
         return { ...drawn, style: { ...drawn.style, width: size.width, height: size.height } };
       }),
     );

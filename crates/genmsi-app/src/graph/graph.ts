@@ -20,7 +20,25 @@
  * very same string `getBezierPath` returns.
  */
 import { getBezierPath, Position, type Edge, type Node } from "@xyflow/react";
+import { DOOR_BOX } from "./frames.ts";
 import type { ModelBody, ModelBlock } from "../types";
+
+/**
+ * The kind of a block of the picture.
+ *
+ * `A` is an activity block, `C` a container, and `PortIn` and `PortOut`
+ * the two doors of a container: the kinds the model does not have, which
+ * the canvas draws as blocks of their own.
+ */
+export type BlockKind = "A" | "C" | "PortIn" | "PortOut";
+
+/** The size the model gives a block, in the pixels of the model. */
+export interface BlockSize {
+  /** The width of the block. */
+  width: number;
+  /** The height of the block. */
+  height: number;
+}
 
 /** One port of a block, as the node draws it. */
 export interface PortData {
@@ -36,12 +54,22 @@ export interface BlockData extends Record<string, unknown> {
   title: string;
   /** The block's caption, or its label when it has no caption. */
   subtitle: string;
-  /** `A` for an activity block, `C` for a container. */
-  kind: string;
+  /** The kind of the block: `A`, `C`, `PortIn` or `PortOut`. */
+  kind: BlockKind;
   /** The block's input ports. */
   inputs: PortData[];
   /** The block's output ports. */
   outputs: PortData[];
+  /**
+   * The size the model gives the block, or `null` when the model gives
+   * none.
+   *
+   * The size is the truth for the container and for a block of a class the
+   * catalogue does not know: the canvas draws them at the size the model
+   * carries. The doors have no size in the model: they are drawn at the
+   * size of their own silhouette.
+   */
+  size: BlockSize | null;
 }
 
 /** The four points of a cubic curve: the two ends and the two controls. */
@@ -74,6 +102,16 @@ function subtitleOf(block: ModelBlock): string {
     return block.caption;
   }
   return block.label ?? "";
+}
+
+/**
+ * The kind of a block of the model: an activity block or a container.
+ *
+ * The model knows two kinds, and the canvas draws two more: the doors of
+ * a container are not blocks of the model.
+ */
+function kindOf(block: ModelBlock): BlockKind {
+  return block.kind === "C" ? "C" : "A";
 }
 
 /**
@@ -116,13 +154,26 @@ export function graphOf(
     data: {
       title: titleOf(block),
       subtitle: subtitleOf(block),
-      kind: block.kind,
+      kind: kindOf(block),
       inputs: block.inputs.map((port) => ({ ioid: port.ioid, name: port.name })),
       outputs: block.outputs.map((port) => ({ ioid: port.ioid, name: port.name })),
+      size:
+        block.layout === null
+          ? null
+          : { width: block.layout.width, height: block.layout.height },
     },
     style: {
-      width: block.kind === "C" ? 160 : Math.max(block.layout?.width ?? 100, 72),
-      height: block.kind === "C" ? 56 : Math.max(block.layout?.height ?? 40, 32),
+      // The container is a block with a box of its own, and that box is the
+      // one the model gives it: the model is the truth for a block that has
+      // no class to say how big it is (L2, L3).
+      width:
+        block.kind === "C"
+          ? (block.layout?.width ?? 160)
+          : Math.max(block.layout?.width ?? 100, 72),
+      height:
+        block.kind === "C"
+          ? (block.layout?.height ?? 56)
+          : Math.max(block.layout?.height ?? 40, 32),
     },
     zIndex: block.kind === "C" ? 0 : 2,
     // Blocks and containers at the current level are draggable
@@ -143,8 +194,11 @@ export function graphOf(
           kind: "PortIn",
           inputs: [],
           outputs: [{ ioid: port.ioid, name: port.name }],
+          // The door has no size in the model: it is drawn at the size of
+          // its own silhouette.
+          size: null,
         },
-        style: { width: 140, height: 44 },
+        style: { width: DOOR_BOX.width, height: DOOR_BOX.height },
         zIndex: 2,
         draggable: true,
       });
@@ -162,8 +216,11 @@ export function graphOf(
           kind: "PortOut",
           inputs: [{ ioid: port.ioid, name: port.name }],
           outputs: [],
+          // The door has no size in the model: it is drawn at the size of
+          // its own silhouette.
+          size: null,
         },
-        style: { width: 140, height: 44 },
+        style: { width: DOOR_BOX.width, height: DOOR_BOX.height },
         zIndex: 2,
         draggable: true,
       });

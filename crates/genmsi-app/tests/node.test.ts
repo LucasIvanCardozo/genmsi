@@ -1,6 +1,7 @@
 //! The drawing of a block of the canvas.
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   CAPTION_MIN_SIZE,
@@ -10,6 +11,7 @@ import {
   LINE_AIR,
   LINE_HEIGHT,
   NO_FIGURE,
+  SELECTION_RING,
   SUBTITLE_HEIGHT,
   ZONE_AIR,
   captionBaseline,
@@ -30,11 +32,21 @@ import {
   STROKE_MARGIN,
   portPlacements,
   sideOf,
+  textsOf,
+  wrapperClass,
+  type BlockDrawing,
   type FootprintZone,
+  type NodeSize,
   type PortOfBlock,
 } from "../src/graph/node.ts";
 import { monospaceWidth, textWidth, truncate } from "../src/graph/catalogue.ts";
-import { SHAPE_CLASSES, shapeOf, type PortAnchor } from "../src/graph/shapes.ts";
+import {
+  FAMILY_COLORS,
+  SHAPE_CLASSES,
+  shapeOf,
+  type BlockShape,
+  type PortAnchor,
+} from "../src/graph/shapes.ts";
 
 /** The ports of a block, as the model declares them. */
 function ports(...names: string[]): PortOfBlock[] {
@@ -49,6 +61,33 @@ function ports(...names: string[]): PortOfBlock[] {
  */
 function zone(width: number, height = 24): FootprintZone {
   return { left: 0, top: 0, width, height };
+}
+
+/**
+ * The drawing of a class of the catalogue, as the canvas asks for it.
+ *
+ * The 66 classes decide their own shape: the canvas asks for the drawing
+ * of a class by its name, and the class is the truth of its silhouette.
+ */
+function classDrawing(className: string): BlockDrawing {
+  return drawingOf({ className });
+}
+
+/**
+ * The size of the node of a class of the catalogue.
+ *
+ * The node of a class is the footprint of the class and the room the
+ * outline needs, and never the box the model happens to carry.
+ */
+function classSize(className: string): NodeSize {
+  return nodeSizeOf({ className });
+}
+
+/** The shape of a class of the catalogue, which always has one. */
+function shapeOfClass(className: string): BlockShape {
+  const shape = shapeOf(className);
+  assert.ok(shape !== undefined, `the class ${className} has a shape`);
+  return shape;
 }
 
 test("the handle of a port sits at the anchor the shape declares", () => {
@@ -88,10 +127,10 @@ test("the ports keep their anchors in the footprint of the class", () => {
 });
 
 test("a port the shape does not know keeps the spread of the ports", () => {
-  // A class without a shape keeps the places the ports used to have,
+  // A shape that declares no port keeps the places the ports used to have,
   // spread along the side: a link that loses its handle is a link the
   // reader cannot follow.
-  const placed = portPlacements(undefined, ports("Entrada1", "Salida1"), "top");
+  const placed = portPlacements(shapeOfClass("Note"), ports("Entrada1", "Salida1"), "top");
   assert.deepEqual(
     placed.map((one) => one.x),
     [1 / 3, 2 / 3],
@@ -140,16 +179,19 @@ test("the side of a port is the side of the silhouette it belongs to", () => {
 });
 
 test("a class the shapes module does not know still gets a node", () => {
-  const unknown = drawingOf("ClaseQueNoExiste");
+  const unknown = classDrawing("ClaseQueNoExiste");
   assert.equal(unknown.fallback, true);
-  assert.equal(unknown.shape, undefined);
+  // It is drawn as the plain plate, and it is drawn the same way every
+  // other block is drawn: one silhouette, one wrapper, one ring.
+  assert.equal(unknown.shape.family, "Operación");
+  assert.ok(unknown.shape.footprint.width > 0);
   // And its figure is the pair of always: how many are inside it and how
   // many have gone through it.
   assert.equal(figureText(undefined, { now: 2, ever: 15 }), "2/15");
   // A class the shapes module knows is drawn with its silhouette.
-  const known = drawingOf("Queue");
+  const known = classDrawing("Queue");
   assert.equal(known.fallback, false);
-  assert.ok(known.shape !== undefined);
+  assert.ok(known.shape.footprint.width > 0);
   assert.ok(known.colors !== undefined);
 });
 
@@ -169,7 +211,7 @@ test("the zones of the label and of the figure stay inside the block", () => {
   for (const className of SHAPE_CLASSES) {
     const shape = shapeOf(className);
     assert.ok(shape !== undefined, `the class ${className} has a shape`);
-    const drawing = drawingOf(className);
+    const drawing = classDrawing(className);
     assert.equal(drawing.fallback, false, `the class ${className} is drawn`);
     for (const zoneOfBlock of [drawing.label, drawing.figure]) {
       if (zoneOfBlock === null) {
@@ -208,7 +250,7 @@ test("the node of a block is the footprint of its class, one to one", () => {
   for (const className of SHAPE_CLASSES) {
     const shape = shapeOf(className);
     assert.ok(shape !== undefined, `the class ${className} has a shape`);
-    const size = nodeSizeOf(className);
+    const size = classSize(className);
     assert.ok(size !== null, `the class ${className} has a size`);
     // The shape is the truth: the block is drawn at the size of its class,
     // with its own proportion, and never scaled.
@@ -227,7 +269,7 @@ test("the node of a block is the footprint of its class, one to one", () => {
     );
     // And the drawing of the block is that very silhouette, drawn inside
     // the box with the room of the border around it.
-    const drawing = drawingOf(className);
+    const drawing = classDrawing(className);
     assert.ok(drawing.shape !== undefined);
     assert.equal(
       drawing.shape.footprint.width + 2 * STROKE_MARGIN,
@@ -246,33 +288,148 @@ test("the size of the block does not depend on the box the model carries", () =>
   // not rewritten.
   const shape = shapeOf("Note");
   assert.ok(shape !== undefined, "the class Note has a shape");
-  const size = nodeSizeOf("Note");
+  const size = classSize("Note");
   assert.ok(size !== null);
   assert.equal(size.width, shape.footprint.width + 2 * STROKE_MARGIN);
   assert.equal(size.height, shape.footprint.height + 2 * STROKE_MARGIN);
   // A class that is not square keeps its own proportion: nothing is
   // stretched to the box of the model.
-  const wide = nodeSizeOf("Variable");
+  const wide = classSize("Variable");
   assert.ok(wide !== null);
   assert.ok(wide.width > wide.height, "the class keeps its own proportion");
 });
 
-test("a container and an unknown class keep the plain rectangle of the model", () => {
-  const container = drawingOf("Contenedor", true);
-  assert.equal(container.fallback, true);
-  assert.equal(container.shape, undefined);
-  assert.equal(container.label, null);
-  assert.equal(container.figure, null);
-  assert.equal(container.subtitle, false);
-  // They keep the box of the model: the canvas draws no silhouette for them.
-  assert.equal(nodeSizeOf("Contenedor", true), null);
-  const unknown = drawingOf("ClaseQueNoExiste");
+test("the container is a block, and it is drawn at the size the model gives it", () => {
+  // The container is not a frame around the blocks it holds: it has a box
+  // of its own, the one the model carries (L2, L3).
+  const drawing = drawingOf({
+    className: "",
+    kind: "C",
+    title: "Contenedor",
+    subtitle: "Modulo 4",
+    size: { width: 153, height: 39 },
+    inputs: ports("Entrada1"),
+    outputs: ports("Salida1"),
+  });
+  assert.equal(drawing.fallback, false);
+  // Its colour is the one of the family it was drawn by hand with.
+  assert.equal(drawing.shape.family, "Decisión");
+  assert.equal(drawing.colors, FAMILY_COLORS["Decisión"]);
+  // The box of the node is the box of the model, and the silhouette is
+  // drawn one to one inside it: nothing is scaled and nothing is cropped.
+  assert.equal(drawing.size.width, 153);
+  assert.equal(drawing.size.height, 39);
+  assert.equal(drawing.shape.footprint.width, 153 - 2 * STROKE_MARGIN);
+  assert.equal(drawing.shape.footprint.height, 39 - 2 * STROKE_MARGIN);
+  // And the ports of the container sit on the anchors its shape declares.
+  const inputs = portPlacements(drawing.shape, ports("Entrada1"), "top");
+  const outputs = portPlacements(drawing.shape, ports("Salida1"), "bottom");
+  assert.deepEqual(inputs.map((one) => [one.x, one.y]), [[0.5, 0]]);
+  assert.deepEqual(outputs.map((one) => [one.x, one.y]), [[0.5, 1]]);
+  assert.equal(inputs[0].side, "top");
+  assert.equal(outputs[0].side, "bottom");
+});
+
+test("the doors have a shape and a size of their own", () => {
+  // The entry door and the exit door are blocks of the canvas, with the
+  // silhouette of the plate the flow crosses.
+  const entry = drawingOf({
+    className: "",
+    kind: "PortIn",
+    title: "Entrada1",
+    outputs: ports("Entrada1"),
+  });
+  const exit = drawingOf({
+    className: "",
+    kind: "PortOut",
+    title: "Salida1",
+    inputs: ports("Salida1"),
+  });
+  assert.equal(entry.fallback, false);
+  assert.equal(exit.fallback, false);
+  assert.equal(entry.shape.family, "Fuente");
+  assert.equal(exit.shape.family, "Destino");
+  // The door has no size in the model: it is drawn at the size of its own
+  // silhouette.
+  assert.equal(entry.size.width, entry.shape.footprint.width + 2 * STROKE_MARGIN);
+  assert.equal(entry.size.height, entry.shape.footprint.height + 2 * STROKE_MARGIN);
+  // The flow comes in through the bottom of the entry door and leaves
+  // through the top of the exit door.
+  const entryPorts = portPlacements(entry.shape, ports("Entrada1"), "bottom");
+  const exitPorts = portPlacements(exit.shape, ports("Salida1"), "top");
+  assert.deepEqual(entryPorts.map((one) => [one.x, one.y]), [[0.5, 1]]);
+  assert.deepEqual(exitPorts.map((one) => [one.x, one.y]), [[0.5, 0]]);
+});
+
+test("a class the catalogue does not know is drawn at the box of the model", () => {
+  const unknown = drawingOf({
+    className: "ClaseQueNoExiste",
+    title: "ClaseQueNoExiste",
+    size: { width: 120, height: 60 },
+  });
   assert.equal(unknown.fallback, true);
-  assert.equal(unknown.shape, undefined);
-  assert.equal(unknown.label, null);
-  assert.equal(unknown.figure, null);
-  assert.equal(unknown.subtitle, false);
-  assert.equal(nodeSizeOf("ClaseQueNoExiste"), null);
+  // The plate is drawn inside the box of the model, with the room the
+  // outline needs.
+  assert.equal(unknown.size.width, 120);
+  assert.equal(unknown.size.height, 60);
+  assert.equal(unknown.shape.footprint.width, 120 - 2 * STROKE_MARGIN);
+  assert.equal(unknown.shape.footprint.height, 60 - 2 * STROKE_MARGIN);
+  // And its name goes on a zone inside the plate.
+  assert.ok(unknown.label.width > 0);
+  assert.ok(
+    unknown.label.left + unknown.label.width <= unknown.shape.footprint.width,
+    "the zone of the name is inside the plate",
+  );
+});
+
+test("the container shows its caption as its name, and the doors their own", () => {
+  // The container shows the caption of the model as its name, and the word
+  // that says what it is under it.
+  const container = textsOf("C", "Contenedor", "Modulo 4");
+  assert.equal(container.label, "Modulo 4");
+  assert.equal(container.caption, "Contenedor");
+  // A container with no caption shows the word that names it.
+  const bare = textsOf("C", "Contenedor", "");
+  assert.equal(bare.label, "Contenedor");
+  // The doors show the name of the port and the side they are on.
+  assert.deepEqual(textsOf("PortIn", "Entrada1", ""), {
+    label: "Entrada1",
+    caption: "Entrada",
+  });
+  assert.deepEqual(textsOf("PortOut", "Salida1", ""), {
+    label: "Salida1",
+    caption: "Salida",
+  });
+  // And a block of the catalogue shows its class and the caption of the
+  // model, as it always did.
+  assert.deepEqual(textsOf("A", "Queue", "Cola de espera"), {
+    label: "Queue",
+    caption: "Cola de espera",
+  });
+});
+
+test("the ring of the selection is on the wrapper of the block", () => {
+  // The ring goes on the wrapper, the box that holds the silhouette, and
+  // not on the silhouette itself: a ring on the inner box would only make
+  // the border of the shape look thicker (S3).
+  assert.ok(wrapperClass(true).includes(SELECTION_RING));
+  assert.equal(wrapperClass(false).includes(SELECTION_RING), false);
+  // The wrapper is the same for every kind of block: the 66 classes, the
+  // container and the doors are selected the same way.
+  assert.equal(wrapperClass(true, false), wrapperClass(true, false));
+  assert.ok(wrapperClass(true, true).includes("opacity-70"));
+  // And the canvas writes the ring in one place only: the wrapper of the
+  // node, which every block of the canvas shares.
+  const source = readFileSync(
+    new URL("../src/components/GraphView.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.equal(
+    source.includes("ring-2 ring-indigo-500"),
+    false,
+    "the ring is not written by hand in the canvas",
+  );
+  assert.ok(source.includes("wrapperClass(selected, note)"));
 });
 
 test("a name that fits its zone goes on one line", () => {
@@ -303,7 +460,7 @@ test("a name that does not fit its zone goes on two lines and loses no character
 
 test("the name of a class is never cut, and it goes on two lines when it does not fit", () => {
   for (const className of SHAPE_CLASSES) {
-    const drawing = drawingOf(className);
+    const drawing = classDrawing(className);
     assert.ok(drawing.label !== null, `${className}: the class has a zone of the label`);
     const label = drawing.label;
     const lines = labelLines(className, label);
@@ -370,7 +527,7 @@ test("the lines of the rótulo are one line and an air apart", () => {
 });
 
 test("the caption is cut to the width of its zone", () => {
-  const drawing = drawingOf("Generate");
+  const drawing = classDrawing("Generate");
   assert.ok(drawing.label !== null);
   const label = drawing.label;
   // A caption that fits the zone is never cut.
@@ -386,7 +543,7 @@ test("the caption is cut to the width of its zone", () => {
 });
 
 test("a caption that fits its zone is whole, at the size of the design", () => {
-  const drawing = drawingOf("Generate");
+  const drawing = classDrawing("Generate");
   assert.ok(drawing.label !== null);
   const label = drawing.label;
   const caption = "Clientes";
@@ -402,7 +559,7 @@ test("a caption that fits its zone is whole, at the size of the design", () => {
 });
 
 test("a caption that does not fit is drawn smaller, and keeps more of its text than before", () => {
-  const drawing = drawingOf("Generate");
+  const drawing = classDrawing("Generate");
   assert.ok(drawing.label !== null);
   const label = drawing.label;
   const caption = "ProbClientes";
@@ -428,7 +585,7 @@ test("a caption that does not fit is drawn smaller, and keeps more of its text t
 });
 
 test("a caption that does not fit even at the smallest size is cut with an ellipsis", () => {
-  const drawing = drawingOf("Alter");
+  const drawing = classDrawing("Alter");
   assert.ok(drawing.label !== null);
   const label = drawing.label;
   const caption = "ProbClientes";
@@ -453,7 +610,7 @@ test("a caption that does not fit even at the smallest size is cut with an ellip
 });
 
 test("the figure is centred in its zone", () => {
-  const drawing = drawingOf("Terminate");
+  const drawing = classDrawing("Terminate");
   assert.ok(drawing.figure !== null);
   const zoneOfFigure = drawing.figure;
   const layout = figureLayout(zoneOfFigure, "3");
@@ -467,7 +624,7 @@ test("the figure is centred in its zone", () => {
   assert.equal(layout.size, FIGURE_SIZE, "the figure keeps the size of the design");
   // And every class with a zone of the figure centres its figure there.
   for (const className of SHAPE_CLASSES) {
-    const drawn = drawingOf(className);
+    const drawn = classDrawing(className);
     if (drawn.figure === null) {
       continue;
     }
@@ -480,7 +637,7 @@ test("the figure is centred in its zone", () => {
 });
 
 test("a reserved zone with no figure shows the dash, and not nothing", () => {
-  const drawing = drawingOf("Variable");
+  const drawing = classDrawing("Variable");
   assert.ok(drawing.figure !== null, "the class reserves a zone of the figure");
   const zoneOfFigure = drawing.figure;
   // The run publishes no figure for the block: the zone shows the dash,
@@ -494,12 +651,12 @@ test("a reserved zone with no figure shows the dash, and not nothing", () => {
   assert.equal(shown.text, "7", "the figure is the number the run published");
   assert.equal(shown.empty, false, "the zone holds a figure");
   // A class that reserves no zone of the figure has no dash to draw.
-  const without = drawingOf("Note");
+  const without = classDrawing("Note");
   assert.equal(without.figure, null, "the class Note reserves no zone of the figure");
 });
 
 test("the live figure is cut to the width of its zone", () => {
-  const drawing = drawingOf("Terminate");
+  const drawing = classDrawing("Terminate");
   assert.ok(drawing.figure !== null);
   // The zone of the figure holds the pair of always.
   const text = figureZoneText("2/15", drawing.figure);
@@ -511,7 +668,7 @@ test("the live figure is cut to the width of its zone", () => {
 });
 
 test("the rótulo is on the first line of its zone and the caption on the second", () => {
-  const drawing = drawingOf("Generate");
+  const drawing = classDrawing("Generate");
   assert.ok(drawing.label !== null);
   const label = drawing.label;
   // The rótulo is written at the top of the zone, and the caption below
@@ -527,7 +684,7 @@ test("the rótulo is on the first line of its zone and the caption on the second
 });
 
 test("a name that takes two lines leaves no place for the caption", () => {
-  const drawing = drawingOf("Generate");
+  const drawing = classDrawing("Generate");
   assert.ok(drawing.label !== null);
   // With one line of the rótulo, the caption has its place under it.
   assert.equal(captionFits(drawing.label, 1), true);
@@ -538,7 +695,7 @@ test("a name that takes two lines leaves no place for the caption", () => {
 
 test("the subtitle only fits when the zone of the label has room for it", () => {
   for (const className of SHAPE_CLASSES) {
-    const drawing = drawingOf(className);
+    const drawing = classDrawing(className);
     assert.ok(drawing.label !== null, `${className}: the class has a zone of the label`);
     // The caption needs a line of its own under the rótulo.
     assert.equal(

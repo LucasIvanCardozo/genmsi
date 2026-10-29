@@ -85,6 +85,64 @@ test("a container is a node of its own", () => {
   assert.equal(nodes[0].zIndex, 0);
 });
 
+test("the container is drawn at the size the model gives it", () => {
+  // The container is a block with a box of its own, and that box is the
+  // one the model carries: the canvas does not invent a size for it.
+  const model = modelOf([
+    block(1, "", {
+      kind: "C",
+      class: "",
+      layout: { x: 327, y: 215, width: 153, height: 39 },
+    }),
+  ]);
+  const { nodes } = graphOf(model);
+  assert.equal(nodes[0].style?.width, 153);
+  assert.equal(nodes[0].style?.height, 39);
+  // And the size travels with the node, so the drawing can use it.
+  assert.deepEqual(nodes[0].data.size, { width: 153, height: 39 });
+});
+
+test("an activity block carries the size the model gives it", () => {
+  // The class of the block decides how big it is drawn, but the size of
+  // the model travels with the node all the same.
+  const model = modelOf([
+    block(1, "Queue", { layout: { x: 10, y: 20, width: 116, height: 31 } }),
+  ]);
+  const { nodes } = graphOf(model);
+  assert.deepEqual(nodes[0].data.size, { width: 116, height: 31 });
+});
+
+test("the doors of a container keep their id and their place", () => {
+  const model = modelOf([
+    block(10, "", {
+      kind: "C",
+      class: "",
+      container: 0,
+      inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null }],
+      outputs: [{ ioid: 1, name: "Salida1", caption: "", label: null }],
+    }),
+  ]);
+  const { nodes } = graphOf(model, 10);
+  const entry = nodes.find((node) => node.id === "in-1");
+  const exit = nodes.find((node) => node.id === "out-1");
+  assert.ok(entry !== undefined, "the entry door is a node");
+  assert.ok(exit !== undefined, "the exit door is a node");
+  assert.equal(entry.data.kind, "PortIn");
+  assert.equal(exit.data.kind, "PortOut");
+  // The doors keep the places they had: where they sit is another unit of
+  // work, and this one does not move them.
+  assert.deepEqual(entry.position, { x: 120, y: 30 });
+  assert.deepEqual(exit.position, { x: 120, y: 420 });
+  // The handle of a door is the plain id of its port: React Flow resolves
+  // an edge by handle id, and a mismatch makes the edge disappear.
+  assert.deepEqual(entry.data.outputs, [{ ioid: 1, name: "Entrada1" }]);
+  assert.deepEqual(exit.data.inputs, [{ ioid: 1, name: "Salida1" }]);
+  // And the door has no size in the model: it is drawn at the size of its
+  // own silhouette.
+  assert.equal(entry.data.size, null);
+  assert.equal(exit.data.size, null);
+});
+
 test("a container is the frame around what it holds, and it does not move", () => {
   const model = modelOf([
     block(1, "", { kind: "C", class: "" }),

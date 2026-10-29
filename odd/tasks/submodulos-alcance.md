@@ -250,12 +250,20 @@ componiendo el modelo entero, con la misma línea base.
 
 El lienzo de un ámbito se dibuja **como un lienzo propio**:
 
-1. **El ámbito tiene su origen**: la esquina de los bloques que posee (la
+1. **El alcance tiene su origen**: la esquina de los bloques que posee (la
    misma regla que usa la composición: *"la imagen empieza donde el autor
-   puso las cosas"*). Los nodos del ámbito se dibujan **relativos a ese
-   origen**: la posición en el lienzo es `layout − origen`. El archivo `.gmdl`
-   no cambia: sigue guardando las coordenadas absolutas, como los modelos de
-   referencia (L3).
+   puso las cosas"*). El origen sirve para **medir** el ámbito (dónde está
+   su hueco libre), **no para desplazar el dibujo**: los nodos se dibujan
+   en las coordenadas que el modelo tiene. El `.gmdl` no cambia: sigue
+   guardando las coordenadas absolutas, como los modelos de referencia
+   (L3).
+
+   Por qué el dibujo no se desplaza: el encuadre de la imagen absorbe el
+   desplazamiento (la geometría relativa del ámbito es la misma con y sin
+   él), y en cambio **desplazar el dibujo hace que arrastrar el bloque de
+   la esquina mueva toda la imagen del ámbito** — justo lo que el lector
+   reportó. El alcance es un lienzo propio en el sentido de lo que se
+   **lee** (su contenido, enquadrado), no en el de las coordenadas.
 2. **Las puertas se dibujan junto al bloque con el que se unen**: la puerta
    de entrada, justo encima del bloque al que apunta su enlace interno (el
    enlace del ámbito que va del puerto a ese bloque); la de salida, justo

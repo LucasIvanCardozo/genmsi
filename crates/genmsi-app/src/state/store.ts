@@ -925,7 +925,7 @@ export const useApp = create<AppState>((set, get) => ({
       // mapped to the blocks of the model, because a ball travels between the
       // rectangles the reader sees.
       const nodeOf = (block: number) => report.blocks[block]?.node ?? null;
-      const transitions = buildTransitions(trace, nodeOf);
+      const transitions = buildTransitions(trace, nodeOf, currentModel.edges);
       set({
         report,
         trace,

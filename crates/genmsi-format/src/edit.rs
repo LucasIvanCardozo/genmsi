@@ -18,8 +18,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::catalogue::{build_block, class_spec};
 use crate::error::FormatError;
+use crate::layout::{DOOR_HEIGHT, DOOR_WIDTH};
 use crate::model::{Block, ContainerHeader, GmdlModel, Layout, Link, Port, PortLayout, SectionKind};
-
 /// Default size of a freshly created block (the original editor's small box).
 ///
 /// The size of a block comes from its class (the original's class library
@@ -556,12 +556,20 @@ impl EditSession {
                 .max()
                 .unwrap_or(0);
             let ioid = max_ioid + 1;
+            // The door is a block of the picture from the first moment: it
+            // is born where the reader dropped it, and its place lives in
+            // the model like the place of any other block.
             let port = Port {
                 ioid,
                 name: format!("Entrada{ioid}"),
                 caption: String::new(),
                 mylabel: String::new(),
-                layout: None,
+                layout: Some(PortLayout {
+                    width: DOOR_WIDTH,
+                    height: DOOR_HEIGHT,
+                    x,
+                    y,
+                }),
             };
             block.inputs.push(port.clone());
             steps.push(UndoStep::PortAdded { container, input: true, port });
@@ -587,12 +595,20 @@ impl EditSession {
                 .max()
                 .unwrap_or(0);
             let ioid = max_ioid + 1;
+            // The door is a block of the picture from the first moment: it
+            // is born where the reader dropped it, and its place lives in
+            // the model like the place of any other block.
             let port = Port {
                 ioid,
                 name: format!("Salida{ioid}"),
                 caption: String::new(),
                 mylabel: String::new(),
-                layout: None,
+                layout: Some(PortLayout {
+                    width: DOOR_WIDTH,
+                    height: DOOR_HEIGHT,
+                    x,
+                    y,
+                }),
             };
             block.outputs.push(port.clone());
             steps.push(UndoStep::PortAdded { container, input: false, port });
@@ -1864,6 +1880,36 @@ mod tests {
             error.to_string().contains("9"),
             "the error does not name the door: {error}"
         );
+    }
+
+    #[test]
+    fn a_door_is_born_where_the_reader_drops_it() {
+        // The door is a block of the picture from the first moment: it is
+        // born with the place the reader dropped it, and that place lives
+        // in the model.
+        let mut session = EditSession::new(model());
+        let container = session
+            .apply(EditCommand::AddBlock {
+                class: "Container".into(),
+                container: 0,
+                x: 0,
+                y: 0,
+            })
+            .expect("adds the container")[0];
+        session
+            .apply(EditCommand::AddBlock {
+                class: "PortIn".into(),
+                container,
+                x: 320,
+                y: 78,
+            })
+            .expect("adds the door");
+        let container = session.model().block(container).expect("the container");
+        let door = container.inputs.last().expect("the door is there");
+        let layout = door.layout.expect("the door has a place");
+        assert_eq!((layout.x, layout.y), (320, 78), "the door is not where it was dropped");
+        assert_eq!(layout.width, DOOR_WIDTH, "the door is not the size of a door");
+        assert_eq!(layout.height, DOOR_HEIGHT, "the door is not the size of a door");
     }
 
     #[test]

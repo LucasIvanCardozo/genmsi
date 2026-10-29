@@ -318,7 +318,55 @@ Lo que cuesta ✓: crear un contenedor son **dos pasos más** (agregar la
 entrada y la salida ✓). A cambio, el lector sabe exactamente qué puertas
 tiene ✓.
 
-### L10 — Lo que queda de esta unidad
+### L10 — T6: la puerta nace donde se la suelta (hecho)
+
+El usuario lo dijo así:
+
+> "los bloques de entrada o salida no utilizan el mismo sistema o codigo que los
+> otros bloques, porque? porque cuando los coloco 'spawnean' en cualquier lado y
+> no donde suelto el mouse. Ademas hay veces (no se como reproducir este bug)
+> que cuando muevo otro bloque diferente, por ejemplo un advance) algun bloque
+> de entrada o salida se mueve junto a el"
+
+**El análisis a fondo** (la causa raíz es una sola):
+
+1. **La puerta era el único bloque de la imagen cuyo lugar no vivía en el
+   modelo** ✓. El motor la creaba sin lugar (`layout: None` ✓), así que la
+   app tenía que inventarle uno ✓ — el "hueco libre" ✓ — y ese hueco depende
+   de los bloques del ámbito ✓. Por eso **mover un bloque movía la puerta** ✓
+   (medido: la puerta estaba en (344, 462) ✓ y al mover el bloque más bajo
+   quedó en (281, 656) ✓).
+2. **El motor descartaba la posición del mouse** ✓: la rama de las puertas
+   del `add_block` ignoraba `x` e `y` ✓, así que la puerta aparecía donde
+   fuera ✗.
+3. **La app se diferenciaba de los bloques en tres caminos más** ✓: el
+   identificador del nodo ("in-1" ✗, una cadena ✗, contra el número de un
+   bloque ✓), el lugar ✗ (el de un puerto ✗, contra el de un bloque ✓) y las
+   rutas de la app que trabajan con identificadores de bloque ✓ (la
+   selección ✓, las propiedades ✓, el portapapeles ✓) ✗.
+
+**El arreglo** ✓: la puerta nace **con el lugar donde el lector la suelta** ✓,
+y ese lugar vive en el modelo como el de cualquier otro bloque ✓ (el motor
+escribe el `layout` del puerto al crearlo ✓, con la caja de la puerta ✓).
+Con eso, la app **deja de inventar lugares** ✓ y la puerta deja de moverse
+cuando se mueve otro bloque ✓.
+
+Medido en la app corriendo:
+
+| regla | medida |
+|---|---|
+| la puerta nace donde se la suelta | el modelo dice `(420, 300, 140 x 44)` ✓, la pantalla `(389, 326)` ✓ |
+| mover otros bloques no mueve la puerta | la puerta siguió en `(389, 326)` ✓ al mover dos bloques ✓ |
+
+**Lo que queda de la reutilización** ✓: el identificador del nodo de la
+puerta sigue siendo una cadena ✗ ("in-1" ✓), y por eso las rutas de la app
+que trabajan con bloques ✗ (la selección ✗, el panel de propiedades ✗, el
+portapapeles ✗) la tratan aparte ✓. Cambiar eso es otra unidad ✓: es
+cambiar el tipo de la selección ✗ y el del portapapeles ✗ — y el `.gmdl` no
+admite que las puertas sean módulos ✗ (son `<input>` y `<output>` ✓, no
+módulos ✓), así que la identidad de la puerta tiene que ser de la app ✓.
+
+### L11 — Lo que queda de esta unidad
 
 - **S2** (que el contenedor y sus puertas muestren cuántas entidades los
   atravesaron) sigue sin hacer: es otra unidad, con `src/monitor/counts.ts` y

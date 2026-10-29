@@ -112,6 +112,11 @@ pub const DOOR_WIDTH: i32 = 140;
 pub const DOOR_HEIGHT: i32 = 44;
 /// Where a scope with no blocks of its own starts its picture.
 const EMPTY_SPOT: i32 = 80;
+/// The air between the lowest block of a scope and the free spot below it.
+///
+/// It is the same air the app leaves: the door that the engine places and
+/// the door the app draws in the meantime are in the same place.
+const FREE_SPOT_AIR: i32 = 40;
 
 /// The composition of one scope: the place of its blocks and of its doors.
 ///
@@ -744,7 +749,7 @@ fn free_spot_of_scope(model: &GmdlModel, children: &[u32]) -> (i32, i32) {
     if left == i32::MAX {
         return (EMPTY_SPOT, EMPTY_SPOT);
     }
-    (left, bottom + GAP_Y)
+    (left, bottom + FREE_SPOT_AIR)
 }
 
 /// The box of a door of the scope.

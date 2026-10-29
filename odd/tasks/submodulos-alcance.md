@@ -405,6 +405,24 @@ La rama completa se reintentó después del último commit y volvió a dar
 nativa de esta rama **tiene que ir encadenada por unidad** (T4 → T5 → T1),
 como está previsto en el diseño de commits de trabajo.
 
+**El bloqueo es del camino de captura, no del candidato.** Se probó con una
+autoridad **nueva** sobre el tramo de T5 (`review-462d8dcc01c99a15`, 7
+archivos, 1.395 líneas, otra lineage, otro target, otros hashes de sujeto):
+el `STATUS` devuelve sus bindings y la captura los rechaza igual. Con eso
+queda descartado que sea un binding rancio o una autoridad trabada: la
+validación de `capture` no admite ningún binding del proveedor.
+
+Quedan dos autoridades **vivas** (estado `reviewing`, sin quemar), que el
+mantenimiento puede terminar desde el CLI:
+
+| autoridad | tramo | líneas | lentes |
+|---|---|---|---|
+| `review-07593c1d666d238e` | T4 (`39d029d..HEAD`) | 448 | readability, reliability |
+| `review-462d8dcc01c99a15` | T5 (`d85c4e1..0f56073`) | 1.395 | readability, reliability |
+
+Y falta encadenar el tramo de T1 (el motor, `39d029d`), que entra por
+debajo del presupuesto igual que los otros dos.
+
 Lo que sí está probado, sin la revisión nativa: `cargo test --workspace`
 (578) y el suite de la app (279) en verde, `tsc` limpio, el diferencial del
 DOM de los 66 bloques idéntico, y la medición en el navegador del círculo

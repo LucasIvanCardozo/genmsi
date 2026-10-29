@@ -102,11 +102,17 @@ ningún alcance: `SessionRequest::Relayout` es una variante sin carga
 
 | T | Specs | Qué | Ruta | Estado | Commit |
 |---|---|---|---|---|---|
-| T1 | S1, S2 | La verdad del flujo: cada enlace declara los pares de bloques de actividad que lo cruzan, y el documento del modelo lo publica | inline | — | — |
-| T2 | S4 | El motor compone un alcance: `relayout_scope(model, scope)` con los contenedores anidados como cajas atómicas | inline | — | — |
-| T3 | S4 | El pedido lleva el alcance: protocolo, sesión, facade y el botón de la app | inline | — | — |
-| T4 | S1, S2 | La app enruta la entidad por el enlace del alcance y cuenta lo que cruza cada frontera | inline | — | — |
-| T5 | S3 | Un solo camino de dibujo: contenedor y bordes con la misma silueta, selección, hover y cifra | inline | — | — |
+| T0 | — | La navegación por contenedores (el árbol, las migas, el alcance del lienzo) y los bordes que el motor puede editar | inline | **hecho** | `5eeeb6d`, `563db27` |
+| T1 | S1, S2 | La verdad del flujo: cada enlace declara los pares de bloques de actividad que lo cruzan, y el documento del modelo lo publica | `gentle-ai-worker` | en curso | — |
+| T2 | S4 | El motor compone un alcance: `relayout_scope(model, scope)` con los contenedores anidados como cajas atómicas | inline | **aplazado** (otra ronda) | — |
+| T3 | S4 | El pedido lleva el alcance: protocolo, sesión, facade y el botón de la app | inline | **aplazado** (otra ronda) | — |
+| T4 | S1, S2 | La app enruta la entidad por el enlace del alcance y cuenta lo que cruza cada frontera | `gentle-ai-worker` | en curso | — |
+| T5 | S3 | Un solo camino de dibujo: contenedor y bordes con la misma silueta, selección, hover y cifra | `gentle-ai-worker` | en curso | — |
+
+Esta ronda toma **T1 + T4 + T5** (la unidad 1 y la unidad 2 del plan de la
+sesión de investigación): la silueta única con su selección única, y la
+animación del círculo de vuelta. **T2 + T3 quedan para otra ronda**: tocan
+el algoritmo de composición del motor y piden su propia medición (L6).
 
 ### T1 — El contrato (lo que T1 publica)
 
@@ -161,6 +167,35 @@ La composición de modelo entero (`relayout(model)`, la que piden la CLI y el
 MCP) **no cambia**: sigue componiendo el árbol completo y su línea base
 commiteada (`crates/genmsi-format/tests/layout-baseline.json`) sigue siendo
 la de la medida.
+
+### T5 — El contrato (lo que T5 publica)
+
+El dibujo de los 69 bloques del lienzo pasa por **un solo camino**: la
+silueta SVG con sus zonas, los puertos en los anclajes que la forma declara,
+y el anillo de selección **siempre en el wrapper externo**.
+
+- `src/graph/frames.ts` (nuevo): las formas **estructurales** —la del
+  contenedor y la de las puertas—, que no son clases del catálogo y por eso
+  no viven en `src/graph/shapes.ts` (que es generado por
+  `odd/tasks/forma-bloques-diseno/generar_shapes.py` y no se toca a mano).
+  - El **contenedor** es un bloque más: su caja es la que el modelo le da
+    (L2, L3), no un marco que envuelve a sus hijos. Se dibuja como el bloque
+    redondeado que dibuja el resto, con el rótulo del contenedor (su
+    caption) y la palabra "Contenedor" debajo.
+  - Las **puertas** (`Entrada`/`Salida`) tienen su silueta propia, con el
+    nombre del puerto dentro.
+  - Los colores son los que ya usan hoy, que son los de una familia del
+    catálogo: el contenedor, el de `Decisión`; la puerta de entrada, el de
+    `Fuente`; la de salida, el de `Destino`.
+- `src/graph/node.ts`: `drawingOf` y `nodeSizeOf` dejan de preguntar por la
+  **clase** y preguntan por el **tipo de bloque** (`"A"`, `"C"`,
+  `"PortIn"`, `"PortOut"`) y por el tamaño que el modelo le da. La clase
+  sigue mandando en los 66 bloques; el tipo manda en los otros tres.
+- `src/components/GraphView.tsx`: `BlockNode` tiene **una** rama: la
+  silueta, el texto, los puertos y el anillo. Las tres ramas que había
+  (`:107` las puertas, `:146` el contenedor, la de los 66) se van.
+- El **anillo** va en el wrapper externo de los 69: el contenedor y las
+  puertas se seleccionan como cualquier otro bloque (S3).
 
 ## Log
 
@@ -243,3 +278,63 @@ etiqueta que ya está: el "T" se propagaba a todos los enlaces nuevos. Con los
 puertos naciendo vacíos (L5 de la fase anterior) el motor acuña la etiqueta
 canónica `A_<Clase>` sola, y el enlace que entra a un contenedor lleva la
 del contenedor (`A_Modulo4`).
+
+### L6 — La sesión de investigación (lo que se midió con la app corriendo)
+
+La pregunta del usuario ("vamos con la unidad 1 + 2") se responde después de
+investigar el problema **corriendo la app real** (dev server + navegador,
+`agent-browser`) sobre `fixtures/models/TP3__aeropuerto.gmdl` y
+`fixtures/models/TP10__tp10.gmdl`, midiendo el DOM, las bolas publicadas y
+el efecto de cada comando. Lo medido:
+
+- **Las bolas que cruzan una frontera no existen.** En el alcance raíz del
+  aeropuerto se publican 10 bolas, **todas** con id `visible:*`, y en el DOM
+  hay **0 círculos**; las aristas reales del contenedor (`0:68:1->1:1`,
+  `0:51:1->3:1`, `0:74:1->2:1`…) están dibujadas pero **sin bola**. En 20 s
+  de polling: ids `visible:*` y `0:*`, con máximo 2 círculos. **1293 de 3583
+  movimientos (36%)** del aeropuerto pierden su bola. La causa es la que
+  anticipa S1: el trace registra el salto entre los bloques de actividad
+  (`73→1`) y ningún enlace del alcance empareja con ese par.
+- **El contenedor se dibuja con un tamaño inventado.** `src/graph/graph.ts`
+  lo fuerza a `160×56` y tira el tamaño que el modelo le da. Medido: tras un
+  *Reacomodar*, el contenedor 1 de `TP10` tiene **694×596** en el modelo y
+  la app lo dibuja **160×56**.
+- **El reordenamiento mueve el modelo entero.** Entrando al contenedor 1 y
+  apretando *Reacomodar*, cambiaron **86 de 86** bloques: los que están
+  afuera, incluidos. La composición es un único grafo dagre global
+  (`crates/genmsi-format/src/layout.rs`, `compose_with`) con las fronteras
+  cosidas (`layout/flow.rs`, `flow_edges_for`): los hijos de un contenedor se
+  rankean por el flujo **global**, así que su orden interno depende de lo
+  que hay afuera.
+- **Dentro de un contenedor pasan cosas raras.** Al agregar un bloque, cae
+  **fuera de la pantalla** (canvas de 742 px, bloque nuevo en `y=899`): el
+  hueco libre se calcula abajo del hijo más bajo, en coordenadas absolutas,
+  y la vista no se reencuadra. Las puertas están en posiciones fijas
+  (`120 + i·180, 30` y `120 + i·180, 420`): la `Entrada2` apareció en la
+  esquina superior izquierda y la `Salida1` en el medio del diagrama, y se
+  mueven cada vez que se agrega otra puerta.
+
+### L7 — La decisión de esta sesión
+
+> "vamos con la unidad 1 + 2"
+
+Se toman **T1 + T4 + T5**: la verdad del flujo en el motor (T1), el
+enrutado de la entidad por el enlace del alcance (T4) y el camino de dibujo
+único (T5). **T2 + T3 quedan para otra ronda** (L6): tocan el algoritmo de
+composición, que es del motor y tiene su línea base commiteada
+(`crates/genmsi-format/tests/layout-baseline.json`).
+
+Una corrección al plan de la sesión de investigación: la ruta visible **no**
+se resuelve en la app con una regla estructural propia (el representante del
+bloque en el alcance). La verdad del flujo vive en el motor (D1, S5) y se
+publica; la app la proyecta. La razón es concreta: un puerto de entrada sin
+enlace interno (que el editor permite, p.ej. `EleccionProductos` de TP4) no
+tiene arista en el alcance, y la regla de la app perdería la bola ahí.
+
+### L8 — El borde de la unidad
+
+Riesgo: **item 3** (cambian las firmas de `drawingOf`/`nodeSizeOf`, que son
+helpers compartidos por el nodo y sus pruebas) y **item 6** parcial (el
+círculo se ve en la pantalla: la prueba es visual). Mitigación: la prueba
+diferencial de los 66 bloques (se dibujan igual que antes) y la verificación
+visual en el navegador sobre los dos modelos de referencia.

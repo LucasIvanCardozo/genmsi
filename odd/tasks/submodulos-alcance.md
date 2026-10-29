@@ -371,7 +371,38 @@ Medido en el navegador, con la app corriendo:
 - El contenedor y las puertas se seleccionan igual que cualquier otro
   bloque: el anillo es el mismo objeto.
 
-### L10 — Lo que queda de esta unidad
+### L10 — La revisión nativa del tramo de T4
+
+Con el RDD activo, `assess` sobre el tramo `d85c4e1..HEAD` dio riesgo medio y
+`reviewDue: false` (bajo presupuesto). La revisión nativa se pidió igual, a
+pedido del proveedor, y **el candidato completo no entra en el presupuesto de
+contexto**: `lens_context_budget_exceeded`, sin autoridad creada. Como los
+commits ya están partidos por unidad, la revisión se encadenó por tramo: el de
+T4 (`39d029d..HEAD`, 5 archivos, 448 líneas) sí entró y creó la autoridad
+`review-07593c1d666d238e` (riesgo medio, lentes `review-readability` y
+`review-reliability`, presupuesto de correcciones 200).
+
+**La captura de los resultados quedó bloqueada**: el `STATUS` devuelve los dos
+bindings de captura textualmente y `gentle_review_capture` (y el de grupo) los
+rechazan con `capture-binding-rejected` ("collectBinding is missing or stale
+for current STATUS"), en las dos formas que la fachada admite (objeto y
+cadena) y con y sin `reviewerRunAcknowledged`. El contenido del binding
+coincide campo por campo con el del proveedor. Los veredictos no se escriben
+a mano: los admite el motor, y acá no hay veredicto.
+
+La autoridad queda **viva** (estado `reviewing`, generación 1), sin quemar: el
+mantenimiento la puede terminar desde el CLI, que es donde vive la validación
+del binding:
+
+    gentle-ai review status --cwd <repo> --contract gentle-ai.review-integration/v2 --next-transition
+    gentle-ai review capture-result --help
+
+Lo que sí está probado, sin la revisión nativa: `cargo test --workspace`
+(578) y el suite de la app (279) en verde, `tsc` limpio, el diferencial del
+DOM de los 66 bloques idéntico, y la medición en el navegador del círculo
+cruzando la frontera.
+
+### L11 — Lo que queda de esta unidad
 
 - **S2** (las cifras del contenedor y de sus puertas) queda sin hacer: el
   dato ya está publicado (los pares de cada enlace) pero contarlo y

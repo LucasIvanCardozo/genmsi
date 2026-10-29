@@ -80,6 +80,7 @@ export interface CountedModel {
  * @param blocks the rows of the report
  * @param state the counters of the replay
  * @param model the model the containers belong to
+ * @param crossings the entities that entered each container
  * @param generators the blocks that have no figure of their own
  */
 export function countsWithContainers(
@@ -119,20 +120,17 @@ export function countsWithContainers(
  *   expands into several, so the sum is made over the figures and not
  *   over the rows.
  * - The entities that **passed** through the container are the ones that
- *   came in by its entry door: the block the internal link of that door
- *   points to is where the flow enters the container, and its total of
- *   entries is the total that went through the container. A container
- *   without an entry door —or with a door that carries no link— has
+ *   crossed its border, and they come from the trace of the run
+ *   (`crossingsUntil`): a container has as many entry doors as the reader
+ *   gave it, and every one of them counts. A container nobody entered has
  *   passed nothing, and its total is zero.
  */
 export function containerCountsOf(
   model: CountedModel,
   counts: ReadonlyMap<number, LiveCounts>,
 ): Map<number, LiveCounts> {
-  const byId = new Map<number, ModelBlock>();
   const children = new Map<number, ModelBlock[]>();
   for (const block of model.blocks) {
-    byId.set(block.id, block);
     if (block.id === 0) {
       continue;
     }
@@ -151,7 +149,7 @@ export function containerCountsOf(
     }
     figures.set(
       block.id,
-      figureOfContainer(block, model, counts, byId, children, memo, new Set()),
+      figureOfContainer(block, counts, children, memo, new Set()),
     );
   }
   return figures;
@@ -165,36 +163,88 @@ export function containerCountsOf(
  * container. The moves of the run are the ones the trace records, and the
  * app has them already.
  *
- * The count is the one of the moves that happened **up to** `until`, so it
- * grows with the replay and says what happened so far.
+ * The crossings are **events**, not counts: they are told once, when the run
+ * is known, and counted later, up to the time the replay has reached. The
+ * count grows with the replay and says what happened so far, and the count
+ * of a run of a hundred thousand moves does not cost a hundred thousand
+ * walks every frame.
  *
  * @param model the model the containers belong to
  * @param transitions the moves of the run, in the order they happened
- * @param until the time of the run the count stops at
  */
-export function crossingsOf(
+export interface Crossings {
+  /** The time of each crossing, in the order they happened. */
+  readonly times: readonly number[];
+  /** The container each crossing entered, parallel to `times`. */
+  readonly containers: readonly number[];
+}
+
+/**
+ * The crossings of the borders of the model, as the events that made them.
+ *
+ * A move that comes from outside a container and goes in crosses its
+ * border: that is an entity that went through it. A move that leaves is
+ * not a crossing: the container counts the entities that entered it, and an
+ * entity that goes in and out went through it once.
+ *
+ * @param model the model the containers belong to
+ * @param transitions the moves of the run, in the order they happened
+ */
+export function crossingsEvents(
   model: CountedModel,
   transitions: readonly { from: number; to: number; time: number }[],
-  until: number,
-): Map<number, number> {
+): Crossings {
   const owner = new Map<number, number>();
   for (const block of model.blocks) {
     owner.set(block.id, block.container);
   }
-  const crossings = new Map<number, number>();
+  const times: number[] = [];
+  const containers: number[] = [];
   for (const move of transitions) {
-    if (move.time > until) {
-      continue;
-    }
     const from = chainOf(owner, move.from);
     const to = chainOf(owner, move.to);
     // The move enters the containers the destination is inside of and the
     // origin is not: those are the borders it crosses coming in.
     for (const container of to) {
       if (!from.has(container)) {
-        crossings.set(container, (crossings.get(container) ?? 0) + 1);
+        times.push(move.time);
+        containers.push(container);
       }
     }
+  }
+  return { times, containers };
+}
+
+/**
+ * The entities that entered each container, up to a time of the run.
+ *
+ * The count is the one of the crossings that happened **up to** `until`, so
+ * it grows with the replay and says what happened so far.
+ *
+ * @param events the crossings of the model
+ * @param until the time of the run the count stops at
+ */
+export function crossingsUntil(
+  events: Crossings,
+  until: number,
+): Map<number, number> {
+  const crossings = new Map<number, number>();
+  // The crossings happen in the order of the moves, so the ones that are
+  // already made are the first ones: a binary search finds where the count
+  // stops.
+  let low = 0;
+  let high = events.times.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if (events.times[middle] <= until) {
+      low = middle + 1;
+    } else {
+      high = middle;
+    }
+  }
+  for (let index = 0; index < low; index += 1) {
+    const container = events.containers[index];
+    crossings.set(container, (crossings.get(container) ?? 0) + 1);
   }
   return crossings;
 }
@@ -224,12 +274,15 @@ function chainOf(owner: ReadonlyMap<number, number>, block: number): Set<number>
  * The walk of the containers can go deep —a container inside a container—,
  * so the figures already computed are kept and the containers that reach
  * themselves (a cycle of doors) stop the walk instead of looping for ever.
+ *
+ * Only the entities **inside** are computed here: the entities that passed
+ * through the container are the ones that crossed its border, and they come
+ * from the trace of the run (`crossingsUntil`). A container has as many
+ * entry doors as the reader gave it, and every one of them counts.
  */
 function figureOfContainer(
   container: ModelBlock,
-  model: CountedModel,
   counts: ReadonlyMap<number, LiveCounts>,
-  byId: ReadonlyMap<number, ModelBlock>,
   children: ReadonlyMap<number, ModelBlock[]>,
   memo: Map<number, LiveCounts>,
   visiting: Set<number>,
@@ -248,49 +301,11 @@ function figureOfContainer(
   for (const child of children.get(container.id) ?? []) {
     now +=
       child.kind === "C"
-        ? figureOfContainer(child, model, counts, byId, children, memo, visiting).now
+        ? figureOfContainer(child, counts, children, memo, visiting).now
         : counts.get(child.id)?.now ?? 0;
   }
-  // The entities that passed: the total of the block the entry door leads
-  // to.
-  let ever = 0;
-  const entry = entryTargetOf(container, model, byId);
-  if (entry !== undefined) {
-    ever =
-      entry.kind === "C"
-        ? figureOfContainer(entry, model, counts, byId, children, memo, visiting).ever
-        : counts.get(entry.id)?.ever ?? 0;
-  }
   visiting.delete(container.id);
-  const figure: LiveCounts = { now, ever };
+  const figure: LiveCounts = { now, ever: 0 };
   memo.set(container.id, figure);
   return figure;
-}
-
-/**
- * The block the flow enters the container by.
- *
- * The entry door of a container is one of its input ports, and the link
- * that leaves that port inside the container is the one that says which
- * block the flow enters by. A container with several entry doors takes
- * the first one that carries a link.
- */
-function entryTargetOf(
-  container: ModelBlock,
-  model: CountedModel,
-  byId: ReadonlyMap<number, ModelBlock>,
-): ModelBlock | undefined {
-  for (const port of container.inputs) {
-    const link = model.edges.find(
-      (edge) => edge.from_module === container.id && edge.from_ioid === port.ioid,
-    );
-    if (link === undefined) {
-      continue;
-    }
-    const target = byId.get(link.to_module);
-    if (target !== undefined) {
-      return target;
-    }
-  }
-  return undefined;
 }

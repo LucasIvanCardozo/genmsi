@@ -5,7 +5,8 @@ import {
   containerCountsOf,
   countsOf,
   countsWithContainers,
-  crossingsOf,
+  crossingsEvents,
+  crossingsUntil,
   type CountState,
 } from "../src/monitor/counts.ts";
 import { containerPair } from "../src/graph/node.ts";
@@ -176,7 +177,10 @@ test("a container shows the sum of the figures of the blocks it holds", () => {
   assert.equal(figure?.now, 5);
 });
 
-test("the total of a container is the figure of the block its entry door leads to", () => {
+test("the total of a container is the count of the entities that entered it", () => {
+  // The total of a container is NOT the total of the block its entry door
+  // leads to: a container has as many entry doors as the reader gave it,
+  // and every entity that entered by any of them went through it.
   const rows = [row(1, 11, "Queue", true), row(2, 12, "Depart", true)];
   const model = {
     blocks: [
@@ -195,9 +199,42 @@ test("the total of a container is the figure of the block its entry door leads t
       { now: 2, ever: 15 },
     ]),
     model,
+    crossingsUntil(crossingsEvents(model, [{ from: 0, to: 12, time: 10 }]), 100),
   );
-  assert.equal(counts.get(10)?.ever, 15);
+  assert.equal(counts.get(10)?.ever, 1);
   assert.equal(counts.get(10)?.now, 5);
+});
+
+test("a container with several entry doors counts every entity that entered it", () => {
+  // The bug: the total of the container was the total of the block the
+  // FIRST entry door leads to, so the entities that entered by the other
+  // doors were not counted, and the container stayed in 0/0.
+  const model = {
+    blocks: [
+      container(10, [port(2, "Entrada 1"), port(3, "Entrada 2")]),
+      block(11, { container: 10 }),
+      block(12, { container: 10 }),
+      block(13, { container: 0 }),
+    ],
+    edges: [],
+  };
+  const moves = [
+    { from: 13, to: 11, time: 10 },
+    { from: 13, to: 12, time: 20 },
+  ];
+  const crossings = crossingsUntil(crossingsEvents(model, moves), 100);
+  assert.equal(crossings.get(10), 2);
+  const counts = countsWithContainers(
+    [row(1, 11, "Queue", true), row(2, 12, "Queue", true)],
+    counters([
+      { now: 0, ever: 4 },
+      { now: 0, ever: 6 },
+    ]),
+    model,
+    crossings,
+  );
+  assert.equal(counts.get(10)?.ever, 2);
+  assert.equal(containerPair(counts.get(10)), "0/2");
 });
 
 test("a container without an entry door has passed nothing", () => {
@@ -274,10 +311,11 @@ test("the total of a container is the count of the moves that entered it", () =>
     { from: 12, to: 11, time: 10 },
     { from: 11, to: 12, time: 20 },
   ];
-  assert.equal(crossingsOf(model, moves, 100).get(10), 1);
+  const events = crossingsEvents(model, moves);
+  assert.equal(crossingsUntil(events, 100).get(10), 1);
   // And the count stops at the time the replay has reached.
-  assert.equal(crossingsOf(model, moves, 15).get(10), 1);
-  assert.equal(crossingsOf(model, moves, 5).get(10), undefined);
+  assert.equal(crossingsUntil(events, 15).get(10), 1);
+  assert.equal(crossingsUntil(events, 5).get(10), undefined);
 });
 
 test("the container shows the entities that crossed its border", () => {
@@ -291,9 +329,8 @@ test("the container shows the entities that crossed its border", () => {
     edges: [],
   };
   const rows = [row(1, 11, "Queue", true)];
-  const crossings = crossingsOf(
-    model,
-    [{ from: 0, to: 11, time: 10 }],
+  const crossings = crossingsUntil(
+    crossingsEvents(model, [{ from: 0, to: 11, time: 10 }]),
     100,
   );
   const counts = countsWithContainers(

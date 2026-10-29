@@ -4,7 +4,7 @@ import { advance, advanceClock, clockWithCrossings, frameAt, stateAt, type Repla
 import { useApp } from "../state/store";
 import { FLIGHT_SECONDS, MIN_WALL_FLIGHT, travellersAt, type Move } from "../monitor/balls";
 import { graphOf, routeFor, routesOf } from "../graph/graph";
-import { countsOf, countsWithContainers, crossingsOf } from "../monitor/counts";
+import { countsOf, countsWithContainers, crossingsEvents, crossingsUntil } from "../monitor/counts";
 import { figureBlockOf, figuresOf } from "../monitor/figures";
 import { useLive, type LiveBall, type LiveCounts } from "../monitor/live";
 import ClassList from "./ClassList";
@@ -106,6 +106,17 @@ export default function MonitorView({
     return next;
   }, [monitor, playhead]);
 
+  // The crossings of the borders of the model: the entities that entered
+  // each container. They are told once, when the run is known, and counted
+  // up to the time the replay has reached.
+  const crossings = useMemo(
+    () =>
+      model === null
+        ? { times: [] as number[], containers: [] as number[] }
+        : crossingsEvents(model, transitions?.moves ?? []),
+    [model, transitions],
+  );
+
   // The counts of every block of the model: how many transactions are inside
   // it now, and how many have gone through it. The program blocks of a block
   // (a facility use expands into several) are added up.
@@ -113,20 +124,18 @@ export default function MonitorView({
   // sum of the rows of the block (see `src/monitor/counts.ts`).
   // The containers have no row of the report —the engine compiles them
   // inline—, so their figures are computed from the blocks they hold and
-  // from the link their entry door carries.
+  // from the crossings of their border.
   const counts = useMemo(() => {
     if (report === null || state === null || model === null) {
       return new Map<number, LiveCounts>();
     }
-    // The entities that entered each container: the count of the moves
-    // that crossed its border, up to the time the replay has reached.
-    const crossings = crossingsOf(
+    return countsWithContainers(
+      report.blocks,
+      state,
       model,
-      transitions?.moves ?? [],
-      state.time,
+      crossingsUntil(crossings, state.time),
     );
-    return countsWithContainers(report.blocks, state, model, crossings);
-  }, [report, state, model, transitions]);
+  }, [report, state, model, crossings]);
 
   // The links of the model: the canvas draws the ones of the scope the
   // reader is in, and an entity travels over the one that carries its move.
@@ -196,6 +205,7 @@ export default function MonitorView({
     counts,
     edges,
     routes,
+    crossings,
     moves: [] as Move[],
     times: [] as number[],
     figures: state?.figures ?? null,
@@ -207,6 +217,7 @@ export default function MonitorView({
     counts,
     edges,
     routes,
+    crossings,
     moves: (transitions?.moves ?? []) as Move[],
     times: transitions?.times ?? [],
     figures: state?.figures ?? null,
@@ -344,7 +355,12 @@ export default function MonitorView({
         live.current.counts =
           currentModel === null
             ? countsOf(report.blocks, nextState)
-            : countsWithContainers(report.blocks, nextState, currentModel);
+            : countsWithContainers(
+                report.blocks,
+                nextState,
+                currentModel,
+                crossingsUntil(live.current.crossings, nextState.time),
+              );
         live.current.figures = nextState.figures;
       }
 

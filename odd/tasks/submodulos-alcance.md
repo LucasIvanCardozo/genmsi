@@ -103,11 +103,11 @@ ningún alcance: `SessionRequest::Relayout` es una variante sin carga
 | T | Specs | Qué | Ruta | Estado | Commit |
 |---|---|---|---|---|---|
 | T0 | — | La navegación por contenedores (el árbol, las migas, el alcance del lienzo) y los bordes que el motor puede editar | inline | **hecho** | `5eeeb6d`, `563db27` |
-| T1 | S1, S2 | La verdad del flujo: cada enlace declara los pares de bloques de actividad que lo cruzan, y el documento del modelo lo publica | `gentle-ai-worker` | en curso | — |
+| T1 | S1, S2 | La verdad del flujo: cada enlace declara los pares de bloques de actividad que lo cruzan, y el documento del modelo lo publica | `gentle-ai-worker` | **hecho** | `39d029d` |
 | T2 | S4 | El motor compone un alcance: `relayout_scope(model, scope)` con los contenedores anidados como cajas atómicas | inline | **aplazado** (otra ronda) | — |
 | T3 | S4 | El pedido lleva el alcance: protocolo, sesión, facade y el botón de la app | inline | **aplazado** (otra ronda) | — |
-| T4 | S1, S2 | La app enruta la entidad por el enlace del alcance y cuenta lo que cruza cada frontera | `gentle-ai-worker` | en curso | — |
-| T5 | S3 | Un solo camino de dibujo: contenedor y bordes con la misma silueta, selección, hover y cifra | `gentle-ai-worker` | en curso | — |
+| T4 | S1, S2 | La app enruta la entidad por el enlace del alcance y cuenta lo que cruza cada frontera | `gentle-ai-worker` | **hecho** (el enrutado; las cifras quedan para otra ronda) | `8b92324` |
+| T5 | S3 | Un solo camino de dibujo: contenedor y bordes con la misma silueta, selección, hover y cifra | `gentle-ai-worker` | **hecho** | `0f56073` |
 
 Esta ronda toma **T1 + T4 + T5** (la unidad 1 y la unidad 2 del plan de la
 sesión de investigación): la silueta única con su selección única, y la
@@ -338,3 +338,46 @@ helpers compartidos por el nodo y sus pruebas) y **item 6** parcial (el
 círculo se ve en la pantalla: la prueba es visual). Mitigación: la prueba
 diferencial de los 66 bloques (se dibujan igual que antes) y la verificación
 visual en el navegador sobre los dos modelos de referencia.
+
+### L9 — Lo que se entregó y lo que se midió
+
+- **T5** (`0f56073`): un solo camino de dibujo para los 69 bloques. El
+  contenedor y las puertas tienen su silueta (`src/graph/frames.ts`), el
+  anillo de la selección está en el wrapper externo de los 69, y el
+  contenedor se dibuja al tamaño que el modelo le da (medido: 694×596 en el
+  modelo, 160×56 antes).
+- **T1** (`39d029d`): la resolución de las fronteras tiene **una**
+  implementación, compartida con el compilador
+  (`genmsi_core::program::borders`), y el documento publica por enlace los
+  pares de bloques de actividad que cruza (`ModelEdge.hops`). El programa,
+  la traza y el reporte de los 24 modelos de referencia salen byte a byte
+  iguales. Costo: 52 µs en release para el modelo más grande del corpus (el
+  documento entero, 286 µs; compilarlo, 342 µs).
+- **T4** (`8b92324`): las rutas de un ámbito salen de los pares publicados; el
+  círculo cruza el borde del contenedor en la raíz y el puerto dentro del
+  contenedor.
+
+Medido en el navegador, con la app corriendo:
+
+- **El círculo cruza la frontera.** En la raíz del aeropuerto las entidades
+  se publican sobre `0:68:1->1:1` (la salida del contenedor 68) y sobre
+  `0:74:1->2:1`, y el DOM tiene círculos (máximo 3 simultáneos). Antes: 10
+  bolas publicadas **todas** con id `visible:*` y **0** círculos en el DOM.
+- **Dentro del contenedor**, el círculo cruza el puerto: sobre
+  `68:73:2->68:1` (el bloque 73 hacia la `Salida1` del contenedor 68).
+- **Los 66 bloques no cambiaron**: el diferencial del DOM (silueta, texto,
+  puertos, caja y anillo de cada nodo, antes y después) da 66/66 nodos
+  idénticos.
+- El contenedor y las puertas se seleccionan igual que cualquier otro
+  bloque: el anillo es el mismo objeto.
+
+### L10 — Lo que queda de esta unidad
+
+- **S2** (las cifras del contenedor y de sus puertas) queda sin hacer: el
+  dato ya está publicado (los pares de cada enlace) pero contarlo y
+  publicarlo es otra unidad, con `src/monitor/counts.ts` y un lugar donde
+  escribirlo.
+- **T2 + T3** (la recomposición por alcance) quedan para otra ronda: tocan
+  el algoritmo de composición del motor y piden su propia medición.
+- La posición de las puertas (hoy fijas en el código) y el marco del ámbito
+  siguen siendo de otra unidad.

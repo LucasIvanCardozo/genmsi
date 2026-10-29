@@ -385,17 +385,25 @@ T4 (`39d029d..HEAD`, 5 archivos, 448 líneas) sí entró y creó la autoridad
 **La captura de los resultados quedó bloqueada**: el `STATUS` devuelve los dos
 bindings de captura textualmente y `gentle_review_capture` (y el de grupo) los
 rechazan con `capture-binding-rejected` ("collectBinding is missing or stale
-for current STATUS"), en las dos formas que la fachada admite (objeto y
-cadena) y con y sin `reviewerRunAcknowledged`. El contenido del binding
-coincide campo por campo con el del proveedor. Los veredictos no se escriben
-a mano: los admite el motor, y acá no hay veredicto.
+for current STATUS"). Se probaron **ocho** formas: slot por slot y grupo
+completo, el binding como objeto y como cadena, con y sin
+`reviewerRunAcknowledged`. Un `STATUS` fresco, tomado después del último
+commit, devuelve los mismos bindings **byte a byte** (mismo target, mismo
+árbol candidato): no es que estén rancios, es que la validación del
+`capture` no admite el binding del propio proveedor.
 
-La autoridad queda **viva** (estado `reviewing`, generación 1), sin quemar: el
-mantenimiento la puede terminar desde el CLI, que es donde vive la validación
-del binding:
+Los veredictos no se escriben a mano: los admite el motor, y acá no hay
+veredicto. La autoridad queda **viva** (estado `reviewing`, generación 1), sin
+quemar: el mantenimiento la puede terminar desde el CLI, que es donde vive la
+validación del binding:
 
     gentle-ai review status --cwd <repo> --contract gentle-ai.review-integration/v2 --next-transition
     gentle-ai review capture-result --help
+
+La rama completa se reintentó después del último commit y volvió a dar
+`lens_context_budget_exceeded` (terminal para ese candidato): la revisión
+nativa de esta rama **tiene que ir encadenada por unidad** (T4 → T5 → T1),
+como está previsto en el diseño de commits de trabajo.
 
 Lo que sí está probado, sin la revisión nativa: `cargo test --workspace`
 (578) y el suite de la app (279) en verde, `tsc` limpio, el diferencial del

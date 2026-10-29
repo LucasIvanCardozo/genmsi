@@ -89,8 +89,8 @@ que se ve desde afuera**, que no tiene por qué rodear a ese interior.
 |---|---|---|---|---|---|
 | T1 | S1 | El lienzo sigue al bloque que se elige en el árbol; al agregar un bloque no se mueve | app | **hecho** | `7baed15` |
 | T2 | S4, S5 | El motor no recalcula el recuadro del ámbito | format | **hecho** | `bf58e30` |
-| T3 | S2, S3 | Las puertas son nodos del modelo con posición propia, y el modelo la publica | format, engine, core | en curso | — |
-| T4 | S2, S3 | La app dibuja cada puerta en su lugar, y su arrastre se guarda | app | pendiente | — |
+| T3 | S2, S3 | Las puertas son nodos del modelo con posición propia, y el modelo la publica | format, engine, core | **hecho** | `4d53c82` |
+| T4 | S2, S3 | La app dibuja cada puerta en su lugar, y su arrastre se guarda | app | **hecho** | `9215021` |
 
 ## Log
 
@@ -220,3 +220,54 @@ Las coordenadas de una puerta son absolutas: en el canvas del modelo, como
 las de los bloques. El `layout` de un puerto de un bloque normal sí es
 relativo a ese bloque (es lo que dice el `.gmdl`), pero las puertas de un
 contenedor se guardan en absoluto en los modelos de referencia.
+
+### L7 — T3 y T4 (hechos), y lo que se midió
+
+**T3 (`4d53c82`)** — La puerta es un nodo del modelo con posición propia:
+
+- el motor la compone **con tamaño** (la caja con la que la app dibuja una
+  puerta, 140 x 44), así que dagre la coloca como coloca a cualquier bloque:
+  la de entrada abre el flujo y la de salida lo cierra;
+- su lugar se escribe en el modelo con el de los bloques, en el **mismo
+  comando** (una sola entrada del historial de deshacer);
+- el documento del modelo publica el lugar de cada puerto (`ModelPort.layout`);
+- una puerta se **arrastra** como cualquier otro bloque (`movePort`).
+
+Una puerta que lleva el flujo a varios bloques es **una** puerta: tiene un
+lugar, no uno por enlace.
+
+**T4 (`9215021`)** — La app dibuja cada puerta donde el modelo dice, y una
+puerta que todavía no tiene lugar (una nueva) va **debajo de las puertas de su
+misma clase** que ya tienen uno: dos puertas nunca comparten lugar.
+
+Medido en la app corriendo (concurso de pesca, 87 bloques):
+
+| regla | medida |
+|---|---|
+| colocar un bloque no mueve el lienzo | `translate(179.371px, -237.003px)` antes y después |
+| elegir un bloque del árbol sí lo mueve | `translate(104.228px, -183.743px)` |
+| el recuadro del contenedor no cambia al reacomodar su contenido | `(118, 192, 116 x 34)` antes y después |
+| mover un bloque no mueve las puertas | los dos `layout` de las puertas idénticos antes y después |
+| arrastrar una puerta la deja donde se suelta | la entrada pasó de `(330, 78)` a `(400, 100)` |
+| las puertas no se superponen | 4 puertas (2 de entrada, 2 de salida) en pantalla, 0 solapadas |
+| una puerta nueva va bajo las de su clase | `in-1` y `in-3` una debajo de la otra; `out-2` y `out-4` ídem |
+
+El dibujo de los 66 bloques de actividad queda **idéntico**: el diferencial del
+DOM (silueta, texto, puertos, caja y anillo de cada nodo) da 66/66 nodos
+iguales.
+
+`cargo test --workspace` en verde; la app, 296/296; `bunx tsc --noEmit`
+limpio.
+
+### L8 — Lo que queda de esta unidad
+
+- **S2** (que el contenedor y sus puertas muestren cuántas entidades los
+  atravesaron) sigue sin hacer: es otra unidad, con `src/monitor/counts.ts` y
+  un lugar donde escribirlo.
+- **El interior de un contenedor no tiene por qué caber en la caja del
+  contenedor**: la caja es la que se ve desde afuera (S5) y el interior es un
+  lienzo propio. Cuando el contenido crece, la caja no crece con él: el
+  lector ve el contenido fuera de la caja, y es lo que pidió.
+- **La puerta que el lector arrastra** se guarda en el modelo, pero una
+  puerta nueva (la que el lector acaba de agregar) empieza sin lugar y la
+  composición se lo da en el próximo *Reacomodar*.

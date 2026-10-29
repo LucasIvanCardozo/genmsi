@@ -42,11 +42,20 @@ pub enum SessionRequest {
         /// The command to apply.
         command: EditCommand,
     },
-    /// Compose the model on the canvas.
+    /// Compose one scope of the model on the canvas.
     ///
-    /// The positions come from the engine's composition, so the app and the
-    /// MCP put the model on the canvas the same way.
-    Relayout,
+    /// The request carries the **scope**: the container the reader is
+    /// looking at, `0` for the root of the model. The reader sees one
+    /// level at a time, so the request composes that level and nothing
+    /// else: the blocks of the scope move and no block of any other scope
+    /// does.
+    ///
+    /// The positions come from the engine's composition of that scope, so
+    /// the app and the engine agree on what the scope looks like.
+    Relayout {
+        /// The scope to compose: the container the reader is in.
+        scope: u32,
+    },
     /// Undo the last operation.
     Undo,
     /// Redo the last undone operation.
@@ -257,7 +266,9 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
             with_session(session, |session| session.reload(Path::new(&path)))
         }
         SessionRequest::Apply { command } => with_session(session, |session| session.apply(command)),
-        SessionRequest::Relayout => with_session(session, |session| session.relayout()),
+        SessionRequest::Relayout { scope } => {
+            with_session(session, |session| session.relayout(scope))
+        }
         SessionRequest::Undo => with_session(session, |session| session.undo()),
         SessionRequest::Redo => with_session(session, |session| session.redo()),
         SessionRequest::State => with_session(session, |session| Ok(session.state())),

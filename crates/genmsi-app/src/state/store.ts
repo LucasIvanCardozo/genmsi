@@ -222,7 +222,13 @@ export interface AppState {
   copy: () => void;
   /** Paste the copied blocks. */
   paste: () => Promise<void>;
-  /** Reorder the graph in layers. */
+  /**
+   * Compose the scope the reader is in on the canvas.
+   *
+   * The scope is the container of the breadcrumbs: the root of the model
+   * when the reader is at the top, the container it is in when the reader
+   * went into one. The engine composes that scope and nothing else.
+   */
   relayout: () => Promise<void>;
   /** Set the seed of the next run. */
   setSeed: (seed: number) => void;
@@ -983,8 +989,12 @@ export const useApp = create<AppState>((set, get) => ({
   relayout: async () => {
     try {
       // The positions come from the engine: the app and the MCP put the
-      // model on the canvas the same way.
-      const state = await engine().relayout();
+      // model on the canvas the same way. The engine composes the scope the
+      // reader is looking at —the container of the breadcrumbs, the root of
+      // the model when the reader is at the top— and nothing else: the
+      // blocks of any other scope stay where they are.
+      const scope = get().activeContainerId;
+      const state = await engine().relayout(scope);
       // The model moved, but the program did not change: the run the reader
       // was watching stays.
       set({

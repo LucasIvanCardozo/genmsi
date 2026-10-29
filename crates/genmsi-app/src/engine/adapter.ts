@@ -113,12 +113,14 @@ export interface EngineAdapter {
   /** Apply one editing command. */
   apply(command: EditCommand): Promise<SessionState>;
   /**
-   * Compose the model on the canvas.
+   * Compose one scope of the model on the canvas.
    *
-   * The positions come from the engine, the same composition the MCP applies
-   * before it writes a model: there is one algorithm.
+   * The scope is the container the reader is looking at: `0` is the root of
+   * the model. The positions come from the engine, the same composition the
+   * CLI applies to the whole model: there is one algorithm, and the app
+   * asks it for the scope the reader is in.
    */
-  relayout(): Promise<SessionState>;
+  relayout(scope: number): Promise<SessionState>;
   /** Undo the last operation. */
   undo(): Promise<SessionState>;
   /** Redo the last undone operation. */

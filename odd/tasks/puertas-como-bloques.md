@@ -178,6 +178,13 @@ no se mueve al colocar un bloque. El pedido de seguimiento lleva un token, así
 que el lienzo sigue al bloque otra vez cuando el lector lo pide dos veces.
 Los tests de la app: 297 en verde.
 
+Medido en la app corriendo (concurso de pesca, 87 bloques):
+
+| acción | el lienzo se movió |
+|---|---|
+| colocar un bloque | **no** (`translate(179.371px, -237.003px)` antes y después) |
+| elegir un bloque del árbol (80 filas) | **sí** (`translate(104.228px, -183.743px)`) |
+
 **T2 (`bf58e30`)** — El motor no recalcula el recuadro del ámbito: la
 composición de un ámbito escribe las posiciones de sus bloques y nada más.
 Medido sobre los modelos de referencia (25 modelos, 120 ámbitos): la caja del

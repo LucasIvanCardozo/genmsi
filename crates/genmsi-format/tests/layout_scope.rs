@@ -83,6 +83,25 @@ fn moved(model: &GmdlModel, positions: &[Position]) -> Vec<u32> {
         .collect()
 }
 
+/// The blocks the flow of the scope reaches.
+///
+/// The composition puts the blocks the flow does not reach in a grid beside
+/// the picture, and the grid is at the level of the doors: the flow of the
+/// scope and the blocks that are in it are two different things.
+fn flow_blocks(model: &GmdlModel, scope: u32) -> Vec<u32> {
+    let flow = genmsi_format::layout::flow::scope_flow(model, scope);
+    let mut blocks: Vec<u32> = flow
+        .edges
+        .iter()
+        .flat_map(|(from, to)| [*from, *to])
+        .collect();
+    blocks.extend(flow.entries.iter().map(|(_, to)| *to));
+    blocks.extend(flow.exits.iter().map(|(from, _)| *from));
+    blocks.sort_unstable();
+    blocks.dedup();
+    blocks
+}
+
 #[test]
 fn composing_a_scope_moves_only_the_blocks_of_the_scope() {
     // The container 1 of the fishing contest and the container 13 of the
@@ -307,9 +326,10 @@ fn the_ports_of_the_scope_are_the_ends_of_the_flow() {
             .expect("the block is placed")
     };
     let children = children_of(&model, scope);
+    let flow = flow_blocks(&model, scope);
     // The block the flow enters through comes first.
     let first = row(14);
-    for id in &children {
+    for id in &flow {
         if *id == 14 {
             continue;
         }
@@ -320,13 +340,24 @@ fn the_ports_of_the_scope_are_the_ends_of_the_flow() {
     }
     // And the blocks the flow leaves through come last.
     let last = row(19).max(row(29));
-    for id in &children {
+    for id in &flow {
         if *id == 19 || *id == 29 {
             continue;
         }
         assert!(
             row(*id) <= last,
             "the block {id} comes after the block the flow leaves through"
+        );
+    }
+    // The blocks the flow does not reach are in the grid beside the picture:
+    // they are not part of the flow, and their place says nothing about it.
+    for id in &children {
+        if flow.contains(id) {
+            continue;
+        }
+        assert!(
+            row(*id) <= last || row(*id) >= first,
+            "the block {id} is between the blocks the flow enters and leaves through"
         );
     }
 }
@@ -471,25 +502,22 @@ fn every_door_of_the_scope_has_a_place() {
         .iter()
         .find(|port| !port.input)
         .expect("the scope has an exit door");
-    let first_block = composition
-        .positions
-        .iter()
-        .map(|position| position.y)
-        .min()
-        .expect("the scope has blocks");
+    let row = |id: u32| -> i32 {
+        composition
+            .positions
+            .iter()
+            .find(|position| position.id == id)
+            .map(|position| position.y)
+            .expect("the block is placed")
+    };
     assert!(
-        entry.y < first_block,
-        "the entry door is not above the flow of the scope"
+        entry.y < row(14),
+        "the entry door is not above the block the flow enters through"
     );
-    let last_block = composition
-        .positions
-        .iter()
-        .map(|position| position.y)
-        .max()
-        .expect("the scope has blocks");
+    let last = row(19).max(row(29));
     assert!(
-        exit.y > last_block,
-        "the exit door is not below the flow of the scope"
+        exit.y > last,
+        "the exit door is not below the blocks the flow leaves through"
     );
 }
 
@@ -628,6 +656,137 @@ fn the_doors_of_a_scope_are_placed_by_the_composition_and_not_by_the_free_spot()
         assert!(
             port.y != free.1,
             "the door {} is at the free spot of the scope: the composition did not place it",
+            port.ioid
+        );
+    }
+}
+
+/// A container whose doors carry no flow: the reader just made it and
+/// added the doors, and nothing is connected to them yet.
+const CONTAINER_WITHOUT_FLOW: &str = r#"<gmodel versioncode="1"><gclasses/><modules>
+<module moduleid="0" moduleclass="main" owner="0" caption="m" name="m" kind="C">
+<links><link frommoduleid="1" fromioid="1" tomoduleid="2" toioid="1"/></links>
+<inputs/><outputs/></module>
+<module moduleid="1" moduleclass="Generate" owner="0" caption="g" name="Generate" kind="A">
+<outputs><output ioid="1" name="Salida1" caption="" mylabel="A_Contenedor"/></outputs>
+</module>
+<module moduleid="2" moduleclass="" owner="0" caption="c" name="Contenedor" kind="C">
+<inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Contenedor"/></inputs>
+<outputs><output ioid="2" name="Salida2" caption="" mylabel="A_SalidaContenedor"/></outputs>
+<links/>
+</module>
+<module moduleid="3" moduleclass="Advance" owner="2" caption="a" name="Advance" kind="A" width="100" height="40" x="300" y="400">
+<inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Interior"/></inputs>
+<outputs><output ioid="2" name="Salida1" caption="" mylabel="A_SalidaInterior"/></outputs>
+</module>
+</modules></gmodel>"#;
+
+#[test]
+fn the_doors_that_carry_no_flow_do_not_share_a_place() {
+    // The doors that the flow does not reach are blocks of the picture all
+    // the same: the composition places them like it places any other block,
+    // and two of them never share a place.
+    //
+    // The doors used to go to the free spot of the scope with one counter
+    // per kind, and both kinds counted from the same place: the entry door
+    // and the exit door landed on the same pixel.
+    let model = genmsi_format::parse_str(CONTAINER_WITHOUT_FLOW).expect("the model parses");
+    let composition = relayout_scope(&model, 2);
+    assert_eq!(
+        composition.ports.len(),
+        2,
+        "the scope does not have one place per door"
+    );
+    for (index, port) in composition.ports.iter().enumerate() {
+        for other in composition.ports.iter().skip(index + 1) {
+            assert!(
+                port.x != other.x || port.y != other.y,
+                "the doors {} and {} sit on each other",
+                port.ioid,
+                other.ioid
+            );
+        }
+    }
+}
+
+#[test]
+fn the_composition_of_a_scope_translates_with_the_model() {
+    // The blocks of a scope and its doors are in the same picture: move the
+    // model and the picture moves the same way.
+    //
+    // The doors used to be placed in the absolute coordinates of the model
+    // while the composition worked in the coordinates of the scope, and the
+    // scope's shift was applied to them a second time: the doors ended up
+    // twice as far from the blocks as they should be.
+    let model = model("TP3__aeropuerto.gmdl");
+    let mut moved = model.clone();
+    for block in &mut moved.blocks {
+        if let Some(layout) = block.layout.as_mut() {
+            layout.x += 137;
+            layout.y += 61;
+        }
+        for port in block.inputs.iter_mut().chain(block.outputs.iter_mut()) {
+            if let Some(layout) = port.layout.as_mut() {
+                layout.x += 137;
+                layout.y += 61;
+            }
+        }
+    }
+    let scope = 13;
+    let first = relayout_scope(&model, scope);
+    let second = relayout_scope(&moved, scope);
+    assert_eq!(first.positions.len(), second.positions.len());
+    for position in &first.positions {
+        let other = second
+            .positions
+            .iter()
+            .find(|candidate| candidate.id == position.id)
+            .expect("the block is placed in both pictures");
+        assert_eq!(
+            (other.x, other.y),
+            (position.x + 137, position.y + 61),
+            "the block {} did not move with the model",
+            position.id
+        );
+    }
+    assert_eq!(first.ports.len(), second.ports.len());
+    for port in &first.ports {
+        let other = second
+            .ports
+            .iter()
+            .find(|candidate| candidate.ioid == port.ioid && candidate.input == port.input)
+            .expect("the door is placed in both pictures");
+        assert_eq!(
+            (other.x, other.y),
+            (port.x + 137, port.y + 61),
+            "the door {} did not move with the model",
+            port.ioid
+        );
+    }
+    // And the same for the doors that the flow does not reach: they are the
+    // ones the composition had to place by itself, and the ones that used
+    // to be shifted twice.
+    let model = genmsi_format::parse_str(CONTAINER_WITHOUT_FLOW).expect("the model parses");
+    let mut moved = model.clone();
+    for block in &mut moved.blocks {
+        if let Some(layout) = block.layout.as_mut() {
+            layout.x += 137;
+            layout.y += 61;
+        }
+    }
+    let first = relayout_scope(&model, 2);
+    let second = relayout_scope(&moved, 2);
+    assert_eq!(first.ports.len(), second.ports.len());
+    for port in &first.ports {
+        let other = second
+            .ports
+            .iter()
+            .find(|candidate| candidate.ioid == port.ioid && candidate.input == port.input)
+            .expect("the door is placed in both pictures");
+        assert_eq!(
+            (other.x, other.y),
+            (port.x + 137, port.y + 61),
+            "the door {} did not move with the model",
             port.ioid
         );
     }

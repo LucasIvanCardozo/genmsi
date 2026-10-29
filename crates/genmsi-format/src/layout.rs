@@ -429,21 +429,33 @@ fn compose_with(
     // The components that share the canvas move apart: the picture grows
     // only where two chains of the flow meet nowhere and overlap.
     separate_components(model, root, &mut positions, &edges, margin);
-    // The blocks that are drawn in the grid get a place in it: the grid is
-    // laid out once the picture of the flow is known.
-    for id in &grid {
-        let (width, height) = size_of(model, *id);
-        positions.push(Position {
-            id: *id,
-            x: 0,
-            y: 0,
-            width: Some(width),
-            height: Some(height),
-        });
-    }
     // The blocks that are drawn in the grid go in a grid beside the flow, in
-    // the shape that leaves the picture as square as possible.
-    place_free(&mut positions, model, &grid, nodesep);
+    // the shape that leaves the picture as square as possible. The grid is
+    // laid out once the picture of the flow is known.
+    let things: Vec<FreeThing> = grid
+        .iter()
+        .map(|id| {
+            let (width, height) = size_of(model, *id);
+            FreeThing {
+                key: FreeKey::Block(*id),
+                width,
+                height,
+            }
+        })
+        .collect();
+    let flow = box_of(positions.iter());
+    for (key, x, y) in place_free(&things, flow, nodesep) {
+        if let FreeKey::Block(id) = key {
+            let (width, height) = size_of(model, id);
+            positions.push(Position {
+                id,
+                x,
+                y,
+                width: Some(width),
+                height: Some(height),
+            });
+        }
+    }
     // The containers: the frame of each one is the box of the blocks it
     // holds, with the margin that separates them. The frames are computed
     // from the innermost out, and they follow the blocks they hold.
@@ -648,21 +660,9 @@ fn compose_scope(
     // The chains that share the canvas move apart: the picture grows only
     // where two chains of the flow meet nowhere and overlap.
     separate_components(model, scope, &mut positions, &flow.edges, margin);
-    // The blocks that are drawn in the grid get a place in it: the grid is
-    // laid out once the picture of the flow is known.
-    for id in &grid {
-        let (width, height) = size_of(model, *id);
-        positions.push(Position {
-            id: *id,
-            x: 0,
-            y: 0,
-            width: Some(width),
-            height: Some(height),
-        });
-    }
-    // The blocks that are drawn in the grid go in a grid beside the flow, in
-    // the shape that leaves the picture as square as possible.
-    place_free(&mut positions, model, &grid, nodesep);
+    // The blocks that the flow does not reach, and the doors that carry no
+    // flow, go to the grid: it is laid out once the picture of the flow is
+    // known, which is why it waits for the doors below.
     // The frame of the scope is **not** composed: the container is a box of
     // its own, and what it holds does not change it. Its size and its place
     // are the ones the model gives it, and nothing here touches them.
@@ -695,66 +695,103 @@ fn compose_scope(
             }
         }
     }
-    // The doors that carry no flow yet —the reader just added them— go
-    // with the doors of their own kind, one under the other: the picture
-    // shows which door is which.
+    // The doors that carry no flow yet —the reader just added them— are
+    // blocks of the picture all the same, and they go to the grid with the
+    // blocks that the flow does not reach: two things of the grid never
+    // share a place, and the grid goes beside the flow, never over it.
+    let mut things: Vec<FreeThing> = grid
+        .iter()
+        .map(|id| {
+            let (width, height) = size_of(model, *id);
+            FreeThing {
+                key: FreeKey::Block(*id),
+                width,
+                height,
+            }
+        })
+        .collect();
     if let Some(container) = model.block(scope) {
         // The doors that the flow joins to each other are placed by the
-        // composition, not by the free spot.
+        // composition, not by the grid.
         let joined: BTreeSet<u32> = flow
             .port_links
             .iter()
             .flat_map(|(from, to)| [*from, *to])
             .collect();
-        let mut pending: Vec<(u32, bool)> = Vec::new();
         for port in &container.inputs {
             if !entries.contains(&port.ioid) && !joined.contains(&port.ioid) {
-                pending.push((port.ioid, true));
+                things.push(FreeThing {
+                    key: FreeKey::Door {
+                        container: scope,
+                        ioid: port.ioid,
+                        input: true,
+                    },
+                    width: DOOR_WIDTH,
+                    height: DOOR_HEIGHT,
+                });
             }
         }
         for port in &container.outputs {
             if !exits.contains(&port.ioid) && !joined.contains(&port.ioid) {
-                pending.push((port.ioid, false));
+                things.push(FreeThing {
+                    key: FreeKey::Door {
+                        container: scope,
+                        ioid: port.ioid,
+                        input: false,
+                    },
+                    width: DOOR_WIDTH,
+                    height: DOOR_HEIGHT,
+                });
             }
         }
-        // The doors that go to the free spot are stacked by their kind: the
-        // entry doors under the entry doors, the exit doors under the exit
-        // doors.
-        let mut stacked_inputs = 0;
-        let mut stacked_outputs = 0;
-        for (ioid, input) in pending {
-            let same_kind: Vec<&PortPosition> =
-                ports.iter().filter(|port| port.input == input).collect();
-            let (x, y) = match same_kind
-                .iter()
-                .map(|port| port.y + port.height.unwrap_or(DOOR_HEIGHT))
-                .max()
-            {
-                Some(bottom) => (same_kind[0].x, bottom + RANK_SEP),
-                None => {
-                    // There is no door of its kind to sit under: the door
-                    // goes to the free spot of the scope, under the doors of
-                    // its kind that are already there.
-                    let (left, top) = free_spot_of_scope(model, children);
-                    let placed = if input {
-                        stacked_inputs += 1;
-                        stacked_inputs - 1
-                    } else {
-                        stacked_outputs += 1;
-                        stacked_outputs - 1
-                    };
-                    (left, top + placed * (DOOR_HEIGHT + GAP_Y))
-                }
-            };
-            ports.push(PortPosition {
-                block: scope,
+    }
+    // The box of the flow: the blocks it reaches and the doors that open
+    // and close it. The grid goes beside that box, never over it.
+    let flow_box = box_of_rects(
+        positions
+            .iter()
+            .map(|position| {
+                (
+                    position.x,
+                    position.y,
+                    position.x + position.width.unwrap_or(DEFAULT_WIDTH),
+                    position.y + position.height.unwrap_or(DEFAULT_HEIGHT),
+                )
+            })
+            .chain(ports.iter().map(|port| {
+                (
+                    port.x,
+                    port.y,
+                    port.x + port.width.unwrap_or(DOOR_WIDTH),
+                    port.y + port.height.unwrap_or(DOOR_HEIGHT),
+                )
+            })),
+    );
+    for (key, x, y) in place_free(&things, flow_box, nodesep) {
+        match key {
+            FreeKey::Block(id) => {
+                let (width, height) = size_of(model, id);
+                positions.push(Position {
+                    id,
+                    x,
+                    y,
+                    width: Some(width),
+                    height: Some(height),
+                });
+            }
+            FreeKey::Door {
+                container,
+                ioid,
+                input,
+            } => ports.push(PortPosition {
+                block: container,
                 ioid,
                 input,
                 x,
                 y,
                 width: Some(DOOR_WIDTH),
                 height: Some(DOOR_HEIGHT),
-            });
+            }),
         }
     }
     // The composition starts where the author put things, and never before
@@ -1290,27 +1327,54 @@ impl FreeGrid {
 /// Every column of the grid is as wide as the widest block of it, and every
 /// row as tall as the tallest block of it: a block that is small does not
 /// make the grid bigger.
-fn place_free(positions: &mut [Position], model: &GmdlModel, free: &[u32], nodesep: i32) {
-    if free.is_empty() {
-        return;
+/// What a thing of the free grid is.
+///
+/// The free grid holds the things of a scope that the flow does not reach:
+/// the blocks nobody linked and the doors that carry no flow. Both are
+/// blocks of the picture, and both are drawn in the grid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FreeKey {
+    /// A block of the model.
+    Block(u32),
+    /// A door of a container: the container, the port, and whether the door
+    /// is an entry one.
+    Door {
+        /// The container that owns the door.
+        container: u32,
+        /// The id of the door inside the container.
+        ioid: u32,
+        /// Whether the door is an entry one.
+        input: bool,
+    },
+}
+
+/// One thing of the free grid, with the size it is drawn at.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FreeThing {
+    /// What the thing is.
+    key: FreeKey,
+    /// The width of the thing.
+    width: i32,
+    /// The height of the thing.
+    height: i32,
+}
+
+/// The places of the free grid, one per thing of the grid.
+fn place_free(
+    things: &[FreeThing],
+    flow: Option<(i32, i32, i32, i32)>,
+    nodesep: i32,
+) -> Vec<(FreeKey, i32, i32)> {
+    if things.is_empty() {
+        return Vec::new();
     }
-    // The size of every block of the grid.
-    let order: Vec<(u32, i32, i32)> = free
-        .iter()
-        .map(|id| (*id, size_of(model, *id).0, size_of(model, *id).1))
-        .collect();
-    let sizes: Vec<(i32, i32)> = order.iter().map(|(_, width, height)| (*width, *height)).collect();
-    // The box of everything else: the flow and the frames around it.
-    let flow = box_of(
-        positions
-            .iter()
-            .filter(|position| !free.contains(&position.id)),
-    );
+    // The size of every thing of the grid.
+    let sizes: Vec<(i32, i32)> = things.iter().map(|thing| (thing.width, thing.height)).collect();
     // The candidates: the grid beside the flow or above it, with as many
     // columns as it takes.
     let mut best: Option<FreeGrid> = None;
-    for columns in 1..=free.len() {
-        let rows = free.len().div_ceil(columns);
+    for columns in 1..=things.len() {
+        let rows = things.len().div_ceil(columns);
         let (width, height, _) = grid_of(&sizes, columns, rows, nodesep);
         for side in [Side::Left, Side::Above] {
             let (total_width, total_height) = match (&flow, side) {
@@ -1338,7 +1402,7 @@ fn place_free(positions: &mut [Position], model: &GmdlModel, free: &[u32], nodes
         }
     }
     let Some(grid) = best else {
-        return;
+        return Vec::new();
     };
     // The place of the grid: beside the flow or above it, at the top.
     let (origin_x, origin_y) = match (&flow, grid.side) {
@@ -1346,17 +1410,21 @@ fn place_free(positions: &mut [Position], model: &GmdlModel, free: &[u32], nodes
         (Some((left, top, _, _)), Side::Above) => (*left, *top - GAP_Y - grid.height),
         (None, _) => (0, 0),
     };
-    let rows = free.len().div_ceil(grid.columns);
+    let rows = things.len().div_ceil(grid.columns);
     let (_, _, offsets) = grid_of(&sizes, grid.columns, rows, nodesep);
-    for (index, (id, _, _)) in order.iter().enumerate() {
-        let column = index % grid.columns;
-        let row = index / grid.columns;
-        let Some(position) = positions.iter_mut().find(|position| position.id == *id) else {
-            continue;
-        };
-        position.x = origin_x + offsets.0[column];
-        position.y = origin_y + offsets.1[row];
-    }
+    things
+        .iter()
+        .enumerate()
+        .map(|(index, thing)| {
+            let column = index % grid.columns;
+            let row = index / grid.columns;
+            (
+                thing.key,
+                origin_x + offsets.0[column],
+                origin_y + offsets.1[row],
+            )
+        })
+        .collect()
 }
 
 /// The shape of a grid of blocks: its width, its height, and the place of
@@ -1413,6 +1481,21 @@ fn box_of<'a>(
                 top.min(y),
                 right.max(x + width),
                 bottom.max(y + height),
+            ),
+        })
+    })
+}
+
+/// The box that holds a set of rectangles: its corners.
+fn box_of_rects(rects: impl Iterator<Item = (i32, i32, i32, i32)>) -> Option<(i32, i32, i32, i32)> {
+    rects.fold(None, |corners, (x, y, right, bottom)| {
+        Some(match corners {
+            None => (x, y, right, bottom),
+            Some((left, top, right_max, bottom_max)) => (
+                left.min(x),
+                top.min(y),
+                right_max.max(right),
+                bottom_max.max(bottom),
             ),
         })
     })

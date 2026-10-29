@@ -475,7 +475,6 @@ composición ✓). El primero falla sin el arreglo ✓ (RED comprobado ✓).
 Las puertas que todavía no llevan flujo se apilan **por su clase** ✓ (las de
 entrada bajo las de entrada ✓, las de salida bajo las de salida ✓): antes el
 conteo mezclaba las dos clases ✗.
-
 ### L15 — Lo que queda de esta unidad
 
 - **S2** (que el contenedor y sus puertas muestren cuántas entidades los

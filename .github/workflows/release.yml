@@ -213,6 +213,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: genmsi-pacman
+          # The .SRCINFO starts with a dot, and the glob of the action
+          # does not see the files that hide.
+          include-hidden-files: true
           path: |
             # The package of the symbols (genmsi-debug-...) stays out: it
             # is a convention of the repositories of Arch, not an

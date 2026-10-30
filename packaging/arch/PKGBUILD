@@ -1,4 +1,4 @@
-# Maintainer: Lucas Cardozo
+# Maintainer: Lucas Cardozo <lucasivancardozo27@gmail.com>
 #
 # El paquete de CachyOS y de la familia Arch (pacman).
 #
@@ -13,8 +13,9 @@
 #
 # Para publicarlo en la AUR: el `source` apunta a la etiqueta del
 # repositorio y el `sha256sums` tiene que ser el de esa etiqueta (la AUR no
-# acepta SKIP).
-
+# acepta SKIP). El script de la CI escribe el PKGBUILD relleno y su .SRCINFO
+# en `target/arch-package`, y la CI los publica como assets del release: esos
+# son los archivos que hay que subir a la AUR.
 pkgname=genmsi
 pkgver=0.3.0
 pkgrel=1
@@ -25,6 +26,9 @@ license=('MIT')
 depends=('gtk3' 'webkit2gtk-4.1')
 makedepends=('rust' 'cargo' 'bun' 'patchelf' 'make' 'pkgconf')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/LucasIvanCardozo/genmsi/archive/refs/tags/v$pkgver.tar.gz")
+# La suma real del tarball de la fuente: la CI rellena esta línea (el
+# script packaging/arch/build-package.sh escribe el PKGBUILD relleno en
+# target/arch-package), porque la AUR no acepta SKIP.
 sha256sums=('SKIP')
 
 build() {
@@ -43,6 +47,8 @@ package() {
     "$pkgdir/usr/bin/genmsi-app-desktop"
   install -Dm644 packaging/linux/GenMSI.desktop \
     "$pkgdir/usr/share/applications/GenMSI.desktop"
+  # El icono se instala con el nombre que pide el lanzador (Icon=GenMSI),
+  # para que el menú del sistema lo muestre.
   install -Dm644 crates/genmsi-app/src-tauri/icons/128x128.png \
     "$pkgdir/usr/share/icons/hicolor/128x128/apps/GenMSI.png"
   install -Dm644 crates/genmsi-app/LEEME.txt \

@@ -3,6 +3,6 @@ Type=Application
 Name=GenMSI
 Comment=Simulador GPSS
 Exec=genmsi-app-desktop
-Icon=genmsi-app-desktop
+Icon=GenMSI
 Terminal=false
 Categories=Education;

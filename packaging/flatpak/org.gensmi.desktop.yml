@@ -1,0 +1,59 @@
+# The Flatpak of the GenMSI desktop application.
+#
+# The id of the app is the identifier of the Tauri app: org.gensmi.desktop.
+#
+# The Flatpak ships the binary already built: the CI builds it in the Linux
+# job and hands it over. The binary of Tauri carries the frontend inside it,
+# so the manifest needs nothing more than the binary, the launcher, the icon
+# and the system dependencies (GTK 3 and WebKitGTK 4.1, the same ones the
+# .deb declares).
+#
+# The build expects three files next to this manifest:
+#
+#   genmsi-app-desktop   the binary, already built
+#   GenMSI.desktop       the launcher of the repository
+#   GenMSI.png           the icon of the repository
+#
+# The runtime is the one of GNOME: it brings gtk3 and webkit2gtk. The
+# version is 47 because GNOME 45 and later ship WebKitGTK 4.1 (the 4.0
+# series was dropped after GNOME 44), and the shell of Tauri links against
+# 4.1, the same version the .deb depends on.
+#
+# The box of the sandbox: the app opens and saves the models wherever the
+# user points, so it needs the home directory of the user.
+app-id: org.gensmi.desktop
+runtime: org.gnome.Platform
+runtime-version: '47'
+sdk: org.gnome.Sdk
+command: genmsi-app-desktop
+finish-args:
+  # The models live wherever the user points: the app opens them there and
+  # saves them there.
+  - --filesystem=home
+  # The window: Wayland when the session has it, X11 when it does not.
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  # The GPU of the machine, for the canvas of the graphs.
+  - --device=dri
+modules:
+  - name: genmsi
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 genmsi-app-desktop /app/bin/genmsi-app-desktop
+      - install -Dm644 GenMSI.desktop /app/share/applications/org.gensmi.desktop.desktop
+      - install -Dm644 GenMSI.png /app/share/icons/hicolor/128x128/apps/org.gensmi.desktop.png
+      # The launcher of the repository asks for the icon by the name the
+      # package of pacman installs it with; inside the Flatpak the icon is
+      # exported with the name of the app.
+      - sed -i 's|^Icon=.*|Icon=org.gensmi.desktop|' /app/share/applications/org.gensmi.desktop.desktop
+      # The window of the app answers to this name, so the taskbar shows the
+      # icon of the app and not a generic one.
+      - echo 'StartupWMClass=genmsi-app-desktop' >> /app/share/applications/org.gensmi.desktop.desktop
+    sources:
+      - type: file
+        path: genmsi-app-desktop
+      - type: file
+        path: GenMSI.desktop
+      - type: file
+        path: GenMSI.png

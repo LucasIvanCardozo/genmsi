@@ -58,30 +58,16 @@ install -m 644 "${repo}/crates/genmsi-app/src-tauri/icons/128x128.png" "${app_di
 install -m 644 "${repo}/crates/genmsi-app/LEEME.txt" "${app_dir}/LEEME.txt"
 install -m 644 "${repo}/crates/genmsi-app/src-tauri/icons/128x128.png" "${icon}"
 
-cat > "${app_dir}/GenMSI.desktop" <<DESKTOP
-[Desktop Entry]
-Type=Application
-Name=GenMSI
-Comment=Simulador GPSS
-Exec=${app_dir}/genmsi-app-desktop
-Icon=genmsi-app-desktop
-Terminal=false
-Categories=Education;
-DESKTOP
+# El lanzador: el del repositorio, con la ruta del programa cambiada (el
+# programa vive en la carpeta del usuario y no en el PATH).
+sed "s|^Exec=.*|Exec=${app_dir}/genmsi-app-desktop|" \
+  "${repo}/packaging/linux/GenMSI.desktop" > "${app_dir}/GenMSI.desktop"
 chmod 644 "${app_dir}/GenMSI.desktop"
 
 # El lanzador del menú: la ruta es absoluta, así que el escritorio lo
 # encuentra desde cualquier lugar.
-cat > "${launcher}" <<DESKTOP
-[Desktop Entry]
-Type=Application
-Name=GenMSI
-Comment=Simulador GPSS
-Exec=${app_dir}/genmsi-app-desktop
-Icon=genmsi-app-desktop
-Terminal=false
-Categories=Education;
-DESKTOP
+sed "s|^Exec=.*|Exec=${app_dir}/genmsi-app-desktop|" \
+  "${repo}/packaging/linux/GenMSI.desktop" > "${launcher}"
 chmod 644 "${launcher}"
 
 # El escritorio cachea los iconos: sin esto, el icono nuevo no aparece

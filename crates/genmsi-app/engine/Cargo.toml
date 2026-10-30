@@ -1,7 +1,7 @@
 [package]
 name = "genmsi-app-engine"
 description = "Engine facade the app's backends share: loads a model and returns the engine's documents as bytes"
-version = "0.1.0"
+version = "0.3.0"
 edition = "2024"
 license = "MIT"
 authors = ["Lucas Cardozo"]

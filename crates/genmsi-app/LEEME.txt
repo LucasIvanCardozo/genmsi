@@ -1,4 +1,4 @@
-GenMSI 0.1.0 — simulador GPSS
+GenMSI 0.3.0 — simulador GPSS
 ================================
 
 Esta carpeta lleva la aplicación para Linux (x86_64), sin instalar.
@@ -28,8 +28,10 @@ Un escritorio Linux con GTK 3 y WebKitGTK 4.1 (los tiene cualquier
 distribución de escritorio: Debian, Ubuntu, Fedora, openSUSE, Arch, CachyOS...).
 
 Para instalarlo como un programa del sistema, mejor el paquete:
-  - Debian, Ubuntu y derivados:  GenMSI_0.1.0_amd64.deb   (sudo dpkg -i)
-  - Fedora, openSUSE y derivados:  GenMSI-0.1.0-1.x86_64.rpm
+  - Debian, Ubuntu y derivados:  GenMSI_0.3.0_amd64.deb   (sudo dpkg -i)
+  - Fedora, openSUSE y derivados:  GenMSI-0.3.0-1.x86_64.rpm
+  - CachyOS, Arch y derivados:  genmsi-0.3.0-1-x86_64.pkg.tar.zst
+    (sudo pacman -U)
 
 QUÉ HAY DENTRO
 --------------

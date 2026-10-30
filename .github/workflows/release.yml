@@ -1,0 +1,88 @@
+# Los instaladores de los tres sistemas.
+#
+# Tauri arma el instalador del sistema en el que corre: el `.deb` y el
+# `.rpm` en Linux, el `.msi` y el `.exe` en Windows, el `.dmg` en macOS.
+# Por eso el trabajo está en la matriz: un runner por sistema, y los
+# instaladores de la misma versión en todos.
+#
+# El release se abre como borrador: lo publica quien decide que la versión
+# está para publicar.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "La etiqueta del release (v0.3.0)"
+        required: true
+        default: "v0.3.0"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            name: linux
+            args: ""
+          - platform: macos-latest
+            name: macos
+            args: ""
+          - platform: windows-latest
+            name: windows
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "crates/genmsi-app/src-tauri -> target"
+
+      - name: Las dependencias de Linux
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Las dependencias de macOS
+        if: matrix.platform == 'macos-latest'
+        run: brew install create-dmg
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: bun
+
+      - name: Las dependencias del frontend
+        working-directory: crates/genmsi-app
+        run: bun install --frozen-lockfile
+
+      - name: El bundle
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: crates/genmsi-app
+          tagName: ${{ inputs.tag || github.ref_name }}
+          releaseName: "GenMSI ${{ inputs.tag || github.ref_name }}"
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

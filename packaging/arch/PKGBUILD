@@ -1,0 +1,51 @@
+# Maintainer: Lucas Cardozo
+#
+# El paquete de CachyOS y de la familia Arch (pacman).
+#
+# El bundle de Tauri no tiene un formato de pacman: el `.deb` es de la
+# familia Debian y el `.rpm` de la Fedora, y ninguno de los dos sirve acá.
+# Este PKGBUILD arma el paquete de Arch: el mismo programa, con las mismas
+# dependencias del sistema (GTK 3 y WebKitGTK 4.1).
+#
+# Para armarlo desde el repositorio local:
+#
+#     packaging/arch/build-package.sh
+#
+# Para publicarlo en la AUR: el `source` apunta a la etiqueta del
+# repositorio y el `sha256sums` tiene que ser el de esa etiqueta (la AUR no
+# acepta SKIP).
+
+pkgname=genmsi
+pkgver=0.3.0
+pkgrel=1
+pkgdesc="GenMSI: simulador de eventos discretos al estilo GPSS"
+arch=('x86_64')
+url="https://github.com/LucasIvanCardozo/genmsi"
+license=('MIT')
+depends=('gtk3' 'webkit2gtk-4.1')
+makedepends=('rust' 'cargo' 'bun' 'patchelf' 'make' 'pkgconf')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/LucasIvanCardozo/genmsi/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "$srcdir/$pkgname-$pkgver"
+  # El frontend: el mismo que la app de escritorio arma.
+  cd crates/genmsi-app
+  bun install --frozen-lockfile
+  bun run build
+  cd "$srcdir/$pkgname-$pkgver"
+  # El shell: el motor va dentro del programa.
+  cargo build --release --manifest-path crates/genmsi-app/src-tauri/Cargo.toml
+}
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+  install -Dm755 crates/genmsi-app/src-tauri/target/release/genmsi-app-desktop \
+    "$pkgdir/usr/bin/genmsi-app-desktop"
+  install -Dm644 packaging/linux/GenMSI.desktop \
+    "$pkgdir/usr/share/applications/GenMSI.desktop"
+  install -Dm644 crates/genmsi-app/src-tauri/icons/128x128.png \
+    "$pkgdir/usr/share/icons/hicolor/128x128/apps/GenMSI.png"
+  install -Dm644 crates/genmsi-app/LEEME.txt \
+    "$pkgdir/usr/share/doc/$pkgname/LEEME.txt"
+}

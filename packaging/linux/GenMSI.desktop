@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=GenMSI
+Comment=Simulador GPSS
+Exec=genmsi-app-desktop
+Icon=genmsi-app-desktop
+Terminal=false
+Categories=Education;

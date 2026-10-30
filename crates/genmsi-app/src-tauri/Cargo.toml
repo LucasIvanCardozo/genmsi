@@ -1,7 +1,7 @@
 [package]
 name = "genmsi-app-desktop"
 description = "The GenMSI desktop shell: a Tauri window around the same frontend"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 license = "MIT"
 authors = ["Lucas Cardozo"]

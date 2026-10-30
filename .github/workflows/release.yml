@@ -182,8 +182,10 @@ jobs:
     runs-on: ubuntu-latest
     container: archlinux:base-devel
     steps:
-      - uses: actions/checkout@v4
-
+      # The dependencies come BEFORE the checkout: the image of Arch does
+      # not have git, and without git the checkout downloads the repository
+      # as a tarball and leaves no history behind. The package is built
+      # from the tag, and a tag needs the history.
       - name: The dependencies
         run: |
           pacman -Syu --noconfirm
@@ -198,6 +200,8 @@ jobs:
           # Bun: its own release (the crate of crates.io is another
           # program), installed for everybody and not for one user.
           BUN_INSTALL=/usr/local bash -c "curl -fsSL https://bun.sh/install | bash"
+
+      - uses: actions/checkout@v4
 
       - name: The package
         run: |

@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { pairKey, routeFor, routesOf } from "../src/graph/graph.ts";
+import { legsOf, pairKey, routeFor, routesOf } from "../src/graph/graph.ts";
 import type { ModelBody } from "../src/types/index.ts";
 
 /** A block of the model, as the engine publishes it. */
@@ -199,4 +199,125 @@ test("a scope with no links carries no move", () => {
   const model = modelOf();
   const routes = routesOf([], model.edges);
   assert.equal(routeFor(routes, 1, 3), undefined);
+});
+
+/**
+ * A container whose flow is only its doors.
+ *
+ * The block 1 enters the container by the door 2, the door 2 feeds the door
+ * 3, and the door 3 leaves to the block 4. The entity goes in and comes out
+ * without touching a block of activity: the whole passage is ONE move.
+ */
+function onlyDoors(): ModelBody {
+  return {
+    schema: "genmsi.model/1",
+    path: "/tmp/model.gmdl",
+    title: "Modelo",
+    dirty: false,
+    bytes: 0,
+    blocks: [
+      block(1, "Generate", {
+        outputs: [
+          { ioid: 1, name: "Salida1", caption: "", label: null, layout: null },
+        ],
+      }),
+      block(2, "", {
+        kind: "C",
+        class: "",
+        inputs: [{ ioid: 2, name: "Entrada2", caption: "", label: null, layout: null }],
+        outputs: [{ ioid: 3, name: "Salida3", caption: "", label: null, layout: null }],
+      }),
+      block(4, "Terminate", {
+        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null, layout: null }],
+      }),
+    ],
+    edges: [
+      // The link that enters the container.
+      link("0:1:1->2:2", 0, [1, 1], [2, 2], [[1, 4]]),
+      // The link between the two doors of the container.
+      link("2:2:2->2:3", 2, [2, 2], [2, 3], [[1, 4]]),
+      // The link that leaves the container.
+      link("0:2:3->4:1", 0, [2, 3], [4, 1], [[1, 4]]),
+    ],
+  } as unknown as ModelBody;
+}
+
+/**
+ * A container with two entry doors.
+ *
+ * The block 1 enters by the door 1 and the block 2 enters by the door 2, and
+ * both reach the same block 3 inside. The pairs of the moves are different,
+ * and each entity has to travel over the link of ITS door.
+ */
+function twoDoors(): ModelBody {
+  return {
+    schema: "genmsi.model/1",
+    path: "/tmp/model.gmdl",
+    title: "Modelo",
+    dirty: false,
+    bytes: 0,
+    blocks: [
+      block(1, "Generate", {
+        outputs: [
+          { ioid: 1, name: "Salida1", caption: "", label: null, layout: null },
+        ],
+      }),
+      block(2, "Generate", {
+        outputs: [
+          { ioid: 1, name: "Salida1", caption: "", label: null, layout: null },
+        ],
+      }),
+      block(5, "", {
+        kind: "C",
+        class: "",
+        inputs: [
+          { ioid: 1, name: "Entrada1", caption: "", label: null, layout: null },
+          { ioid: 2, name: "Entrada2", caption: "", label: null, layout: null },
+        ],
+        outputs: [{ ioid: 3, name: "Salida3", caption: "", label: null, layout: null }],
+      }),
+      block(3, "Advance", {
+        container: 5,
+        inputs: [{ ioid: 1, name: "Entrada1", caption: "", label: null, layout: null }],
+      }),
+    ],
+    edges: [
+      link("0:1:1->5:1", 0, [1, 1], [5, 1], [[1, 3]]),
+      link("0:2:1->5:2", 0, [2, 1], [5, 2], [[2, 3]]),
+      link("5:5:1->3:1", 5, [5, 1], [3, 1], [[1, 3]]),
+      link("5:5:2->3:1", 5, [5, 2], [3, 1], [[2, 3]]),
+    ],
+  } as unknown as ModelBody;
+}
+
+test("the move that crosses the border travels over the links of the scope", () => {
+  // The chain of the move is the links the flow travels: the one that
+  // enters the container and the one that leaves it. The entity crosses
+  // them one after the other, and the reader sees it go in and come out.
+  const model = onlyDoors();
+  const root = routesOf(linksOf(model, 0), model.edges);
+  assert.deepEqual(legsOf(root, 1, 4), ["0:1:1->2:2", "0:2:3->4:1"]);
+  // Inside the container, the chain is the link between the two doors.
+  const inside = routesOf(linksOf(model, 2), model.edges);
+  assert.deepEqual(legsOf(inside, 1, 4), ["2:2:2->2:3"]);
+});
+
+test("each entity travels over the link of ITS door", () => {
+  // Two doors of the same container reach the same block inside. The
+  // entity that entered by the second door travels over the second door's
+  // link, and not over the first one's.
+  const model = twoDoors();
+  const inside = routesOf(linksOf(model, 5), model.edges);
+  assert.deepEqual(legsOf(inside, 1, 3), ["5:5:1->3:1"]);
+  assert.deepEqual(legsOf(inside, 2, 3), ["5:5:2->3:1"]);
+  // And in the scope above, each one enters by its own door.
+  const root = routesOf(linksOf(model, 0), model.edges);
+  assert.deepEqual(legsOf(root, 1, 3), ["0:1:1->5:1"]);
+  assert.deepEqual(legsOf(root, 2, 3), ["0:2:1->5:2"]);
+});
+
+test("a move the scope has no link for travels over nothing", () => {
+  const model = modelOf();
+  const root = routesOf(linksOf(model, 0), model.edges);
+  assert.deepEqual(legsOf(root, 3, 5), []);
 });

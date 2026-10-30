@@ -498,6 +498,132 @@ export function pairKey(from: number, to: number): string {
 }
 
 /**
+ * The key of a step of the flow: the port of a block the flow is at.
+ *
+ * A step is where the flow is: at the port of a block, or at the port of a
+ * container (which is where the flow crosses its border).
+ */
+function stepKey(module: number, ioid: number): string {
+  return `${module}:${ioid}`;
+}
+
+/**
+ * The chain of a move: the links the flow travels, in order.
+ *
+ * The chain is the flow of the engine seen from the links: every link of
+ * the model joins two steps, and the links a move travels are the ones that
+ * join them in a row.
+ *
+ * The app does not resolve the borders of the containers: the links **are**
+ * the borders, written by the editor. The app only walks them, and it walks
+ * them by the rule of the engine: of the links that start at a step, the
+ * first one is the one the flow travels.
+ */
+export interface ChainIndex {
+  /** The first link that starts at each step. */
+  readonly first: Map<string, ModelEdge>;
+  /** The steps of each block that have a link leaving them. */
+  readonly starts: Map<number, string[]>;
+  /** The chains of the moves, by the pair of blocks they join. */
+  readonly chains: Map<string, ModelEdge[] | undefined>;
+}
+
+/**
+ * The index of the chains of the model.
+ *
+ * @param model The links of the whole model.
+ */
+export function chainsOf(model: ModelEdge[]): ChainIndex {
+  const first = new Map<string, ModelEdge>();
+  const starts = new Map<number, string[]>();
+  for (const link of model) {
+    const key = stepKey(link.from_module, link.from_ioid);
+    // The first link that starts at a step is the one the flow travels: the
+    // engine resolves the borders the same way, and the two agree.
+    if (!first.has(key)) {
+      first.set(key, link);
+    }
+    const steps = starts.get(link.from_module);
+    if (steps === undefined) {
+      starts.set(link.from_module, [key]);
+    } else if (!steps.includes(key)) {
+      steps.push(key);
+    }
+  }
+  return { first, starts, chains: new Map() };
+}
+
+/**
+ * The chain of a move: the links the flow travels, in order.
+ *
+ * `undefined` when the flow of the move is not a chain of links: the entity
+ * left a block and reached another one without a link in between (the entry
+ * door of a container with no link inside it, for instance).
+ */
+export function chainFor(
+  index: ChainIndex,
+  from: number,
+  to: number,
+): ModelEdge[] | undefined {
+  const key = pairKey(from, to);
+  if (index.chains.has(key)) {
+    return index.chains.get(key);
+  }
+  const chain = walkChain(index, from, to);
+  index.chains.set(key, chain);
+  return chain;
+}
+
+/**
+ * The walk of the chain: from a step of the block the entity left to a step
+ * of the block it reached.
+ */
+function walkChain(
+  index: ChainIndex,
+  from: number,
+  to: number,
+): ModelEdge[] | undefined {
+  for (const start of index.starts.get(from) ?? []) {
+    const path = walkFrom(index, start, to);
+    if (path !== undefined) {
+      return path;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The walk from one step, following the links the flow travels.
+ */
+function walkFrom(
+  index: ChainIndex,
+  start: string,
+  to: number,
+): ModelEdge[] | undefined {
+  const seen = new Set<string>();
+  const stack: Array<{ step: string; path: ModelEdge[] }> = [
+    { step: start, path: [] },
+  ];
+  while (stack.length > 0) {
+    const { step, path } = stack.pop() ?? { step: start, path: [] };
+    if (seen.has(step)) {
+      continue;
+    }
+    seen.add(step);
+    const link = index.first.get(step);
+    if (link === undefined) {
+      continue;
+    }
+    const next = path.concat(link);
+    if (link.to_module === to) {
+      return next;
+    }
+    stack.push({ step: stepKey(link.to_module, link.to_ioid), path: next });
+  }
+  return undefined;
+}
+
+/**
  * The routes of a scope: the link that carries each move of the trace.
  *
  * The truth is the model's: every link publishes the pairs of activity
@@ -523,6 +649,10 @@ export interface ScopeRoutes {
    * that no link carries, by the key of the pair.
    */
   byChain: Map<string, string>;
+  /** The chains of the moves of the model. */
+  chain: ChainIndex;
+  /** The links the scope owns, by their id. */
+  owned: Set<string>;
 }
 
 /**
@@ -579,7 +709,43 @@ export function routesOf(scope: ModelEdge[], model: ModelEdge[]): ScopeRoutes {
       }
     }
   }
-  return { byPair, byChain };
+  return { byPair, byChain, chain: chainsOf(model), owned: ownedOf(scope) };
+}
+
+/**
+ * The links a scope owns, by their id.
+ */
+function ownedOf(scope: ModelEdge[]): Set<string> {
+  return new Set(scope.map((link) => link.id));
+}
+
+/**
+ * The links of the scope that the entity of a move travels over, in order.
+ *
+ * A move that crosses the border of a container travels over **several**
+ * links: the one that enters the container, and the one that leaves it. The
+ * links of the scope are the ones of the picture the reader is looking at,
+ * and the entity crosses them one after the other.
+ *
+ * A move the scope has no link for travels over nothing: it happens deeper
+ * inside the model, and there is nothing to draw the entity on.
+ */
+export function legsOf(
+  routes: ScopeRoutes,
+  from: number,
+  to: number,
+): string[] {
+  const chain = chainFor(routes.chain, from, to);
+  if (chain !== undefined) {
+    const legs = chain.filter((link) => routes.owned.has(link.id));
+    if (legs.length > 0) {
+      return legs.map((link) => link.id);
+    }
+  }
+  // The move is not a chain of links: the link that carries its pair is the
+  // one the entity travels over.
+  const id = routeFor(routes, from, to);
+  return id === undefined ? [] : [id];
 }
 
 /**

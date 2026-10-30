@@ -86,7 +86,7 @@ ramificar el código por `"in-3"`.
 | T1 | S1, S2 | Las puertas sin flujo van a la grilla del ámbito, como los bloques sin flujo: se cae la rama `pending`, la superposición y el doble desplazamiento | format | **hecho** | — |
 | T2 | S3 | Una lista de colocaciones con identidad discriminado: un aplicador, un deshacer, un comando | format, engine | **hecho** | — |
 | T3 | S5 | Las cifras del contenedor salen de los cruces de frontera, siempre; se borra el heuristic de la primera puerta | app | **hecho** | — |
-| T4 | S6 | Los cruces de frontera viajan en el hop: la puerta es un nodo del flujo y el par deja de ser ambiguo | format, core, app | pendiente | — |
+| T4 | S6 | La entidad cruza el contenedor por la puerta correcta: la cadena de enlaces del pasaje y el círculo que la recorre | app | **hecho** | — |
 | T5 | S7 | La identidad de la puerta en la app es discriminado, y su silueta pasa a la tabla de las clases | app | pendiente | — |
 
 ## Log
@@ -320,4 +320,53 @@ entered it`. El test viejo que pineaba el comportamiento anterior (el total
 del bloque de la primera puerta) se reescribió a la regla nueva.
 
 `node --test tests/*.test.ts`: 305 en verde. `bunx tsc --noEmit`: limpio.
+`cargo test --workspace`: 86 suites en verde.
+
+### L11 — T4 (hecho): la entidad cruza el contenedor por la puerta correcta
+
+El movimiento del trace es de bloque a bloque (`fuera -> dentro`), y el par no
+decía **por qué puerta** pasó la entidad: con dos puertas de entrada al mismo
+bloque, el par era el mismo y la app elegía siempre el primer enlace
+(`byPair`, "el primero gana"). Y el pasaje entero era **un** movimiento: el
+círculo entraba a la caja del contenedor y nunca salía.
+
+La solución no cambia el motor: **los enlaces son el flujo**. Cada enlace del
+modelo une dos pasos (el puerto de un bloque donde el flujo está), y los
+enlaces que un movimiento recorre son los que se encadenan. La app camina esos
+enlaces —no resuelve las fronteras: los enlaces **son** las fronteras, ya
+escritas por el editor— y camina con la regla del motor: de los enlaces que
+arrancan en un paso, el primero es el que recorre el flujo.
+
+- `chainsOf` indexa los enlaces por el paso del que arrancan y por el bloque
+  del que salen.
+- `chainFor` camina la cadena de un movimiento: del bloque del que salió la
+  entidad al bloque al que llegó.
+- `legsOf` dice de la cadena **qué enlaces son del ámbito que se está
+  mirando**: la entidad los recorre uno después del otro.
+- El monitor reparte el vuelo del movimiento entre los enlaces de la cadena:
+  el círculo entra al contenedor y sale de él.
+
+Con esto:
+
+- la entidad que entró por la **segunda** puerta se ve entrar por la segunda
+  puerta (antes se veía por la primera);
+- una entidad que atraviesa un contenedor **sin bloques dentro** se ve entrar y
+  salir, y no quedarse dentro de la caja;
+- el movimiento que un ámbito no tiene sigue sin dibujarse (nada que dibujar).
+
+**Lo que NO se arregla (queda anotado)**: una puerta de entrada **sin enlace
+interno** (el motor entra igual por el primer hijo del contenedor) no tiene
+cadena: el movimiento no es una cadena de enlaces y cae en el respaldo de
+siempre, el enlace que lleva el par. Y el caso de un mismo bloque que alimenta
+**dos** puertas del mismo contenedor sigue sin distinguirse: el trace dice de
+bloque a bloque y no dice el puerto. Los dos necesitan que el trace diga el
+puerto del que salió la entidad: es la unidad siguiente.
+
+Tests nuevos en `route.test.ts`:
+
+- `the move that crosses the border travels over the links of the scope`
+- `each entity travels over the link of ITS door`
+- `a move the scope has no link for travels over nothing`
+
+`node --test tests/*.test.ts`: 308 en verde. `bunx tsc --noEmit`: limpio.
 `cargo test --workspace`: 86 suites en verde.

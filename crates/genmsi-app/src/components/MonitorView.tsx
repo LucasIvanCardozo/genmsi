@@ -3,7 +3,7 @@ import { ChevronRight, CornerLeftUp, Layers } from "lucide-react";
 import { advance, advanceClock, clockWithCrossings, frameAt, stateAt, type ReplayState } from "../monitor/replay";
 import { useApp } from "../state/store";
 import { FLIGHT_SECONDS, MIN_WALL_FLIGHT, travellersAt, type Move } from "../monitor/balls";
-import { graphOf, routeFor, routesOf } from "../graph/graph";
+import { graphOf, legsOf, routesOf } from "../graph/graph";
 import { countsOf, countsWithContainers, crossingsEvents, crossingsUntil } from "../monitor/counts";
 import { figureBlockOf, figuresOf } from "../monitor/figures";
 import { useLive, type LiveBall, type LiveCounts } from "../monitor/live";
@@ -264,18 +264,31 @@ export default function MonitorView({
       // still flies long enough to be seen.
       speed * MIN_WALL_FLIGHT,
     )) {
-      const id = routeFor(current.routes, traveller.from, traveller.to);
-      if (id === undefined) {
+      // The links the entity travels over: a move that crosses the border
+      // of a container travels over several of them, and the entity crosses
+      // them one after the other.
+      const legs = legsOf(current.routes, traveller.from, traveller.to);
+      if (legs.length === 0) {
         // The scope has no link that carries the move: it happens deeper
         // inside the model, and there is nothing to draw the entity on.
         continue;
       }
-      const list = balls.get(id);
-      const ball: LiveBall = { xact: traveller.xact, progress: traveller.progress };
-      if (list === undefined) {
-        balls.set(id, [ball]);
-      } else {
-        list.push(ball);
+      // The flight of the move is split among the links: the entity is on
+      // the way from one link to the next.
+      const share = 1 / legs.length;
+      for (let index = 0; index < legs.length; index += 1) {
+        const progress = traveller.progress / share - index;
+        if (progress < 0 || progress > 1) {
+          continue;
+        }
+        const id = legs[index];
+        const list = balls.get(id);
+        const ball: LiveBall = { xact: traveller.xact, progress };
+        if (list === undefined) {
+          balls.set(id, [ball]);
+        } else {
+          list.push(ball);
+        }
       }
     }
     // The figure every block shows: the figure of the entity it operates

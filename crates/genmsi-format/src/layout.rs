@@ -35,7 +35,7 @@ use dagre::{EdgeLabel, LayoutOptions, NodeLabel, RankDir, Ranker};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use crate::edit::{PortPosition, Position};
+use crate::edit::{PlacedId, Placement, PortPosition, Position};
 use crate::model::{GmdlModel, Layout};
 
 /// Width of a block that has no geometry of its own.
@@ -128,6 +128,39 @@ pub struct ScopeComposition {
     pub positions: Vec<Position>,
     /// The place of every door of the scope.
     pub ports: Vec<PortPosition>,
+}
+
+impl ScopeComposition {
+    /// The places of the scope, as one list.
+    ///
+    /// A block and a door are the same kind of thing for the composition:
+    /// a place on the canvas. The composition gives each one its place, and
+    /// the one list is what the model is told to write.
+    pub fn placements(&self) -> Vec<Placement> {
+        let mut placements: Vec<Placement> = self
+            .positions
+            .iter()
+            .map(|position| Placement {
+                id: PlacedId::Block(position.id),
+                x: position.x,
+                y: position.y,
+                width: position.width,
+                height: position.height,
+            })
+            .collect();
+        placements.extend(self.ports.iter().map(|port| Placement {
+            id: PlacedId::Door {
+                container: port.block,
+                ioid: port.ioid,
+                input: port.input,
+            },
+            x: port.x,
+            y: port.y,
+            width: port.width,
+            height: port.height,
+        }));
+        placements
+    }
 }
 
 /// The positions that compose **one scope** of the model.

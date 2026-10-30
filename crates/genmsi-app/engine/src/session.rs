@@ -229,8 +229,7 @@ impl Session {
             return Ok(self.state());
         }
         self.apply(EditCommand::SetLayouts {
-            positions: composition.positions,
-            ports: composition.ports,
+            placements: composition.placements(),
         })
     }
 

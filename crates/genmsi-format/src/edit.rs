@@ -74,6 +74,52 @@ pub struct PortPosition {
     pub height: Option<i32>,
 }
 
+/// What a placement is: a block of the model, or a door of a container.
+///
+/// A door is a block of the picture in its own right, and it is placed like
+/// one: the composition gives it a place and the model keeps it. The
+/// identity says which of the two a placement is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub enum PlacedId {
+    /// A block of the model.
+    Block(u32),
+    /// A door of a container.
+    Door {
+        /// The container that owns the door.
+        container: u32,
+        /// The id of the door inside the container.
+        ioid: u32,
+        /// Whether the door is an entry one.
+        input: bool,
+    },
+}
+
+/// One thing placed on the canvas: a block of the model, or a door of a
+/// container.
+///
+/// The two are the same kind of thing for the composition: a place on the
+/// canvas. The identity says which one it is, and the applier writes the
+/// place where it belongs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct Placement {
+    /// What is placed.
+    pub id: PlacedId,
+    /// Horizontal position.
+    pub x: i32,
+    /// Vertical position.
+    pub y: i32,
+    /// The new width, when the thing changes its size.
+    #[serde(default)]
+    pub width: Option<i32>,
+    /// The new height, when the thing changes its size.
+    #[serde(default)]
+    pub height: Option<i32>,
+}
+
 /// One editing operation over the model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "camelCase")]
@@ -113,13 +159,14 @@ pub enum EditCommand {
         /// Vertical position.
         y: i32,
     },
-    /// Set the position of many blocks as ONE operation (the re-layout).
+    /// Set the position of many things as ONE operation (the re-layout).
+    ///
+    /// The things are the blocks of the scope that was composed and the
+    /// doors of its container: a door is a block of the picture, and its
+    /// place is written like the place of any other block.
     SetLayouts {
-        /// One position per block.
-        positions: Vec<Position>,
-        /// One position per door of the scope that was composed.
-        #[serde(default)]
-        ports: Vec<PortPosition>,
+        /// One place per thing that was composed.
+        placements: Vec<Placement>,
     },
     /// Move a door of a container.
     ///
@@ -423,8 +470,8 @@ impl EditSession {
                 self.move_block(id, x, y, &mut *steps)?;
                 Vec::new()
             }
-            EditCommand::SetLayouts { positions, ports } => {
-                self.set_layouts(&positions, &ports, &mut *steps)?;
+            EditCommand::SetLayouts { placements } => {
+                self.set_layouts(&placements, &mut *steps)?;
                 Vec::new()
             }
             EditCommand::MovePort {
@@ -728,33 +775,52 @@ impl EditSession {
 
     fn set_layouts(
         &mut self,
-        positions: &[Position],
-        ports: &[PortPosition],
+        placements: &[Placement],
         steps: &mut Vec<UndoStep>,
     ) -> Result<(), FormatError> {
-        for position in positions {
-            self.require_block(position.id)?;
-            let old = self.model.block(position.id).expect("checked").layout;
-            let placed = self.layout_at(position.id, position.x, position.y);
-            // A position may also resize the block: the re-layout grows the
-            // containers so they hold the blocks they own.
-            let new = Layout {
-                width: position.width.unwrap_or(placed.width),
-                height: position.height.unwrap_or(placed.height),
-                ..placed
-            };
-            self.model
-                .block_mut(position.id)
-                .expect("checked")
-                .layout = Some(new);
-            steps.push(UndoStep::LayoutSet {
-                id: position.id,
-                old,
-                new: Some(new),
-            });
-        }
-        for port in ports {
-            self.set_port_layout(port, steps)?;
+        // One list, one applier: a block and a door are the same kind of
+        // thing for the composition, and the place of each one is written
+        // where it belongs.
+        for placement in placements {
+            match placement.id {
+                PlacedId::Block(id) => {
+                    self.require_block(id)?;
+                    let old = self.model.block(id).expect("checked").layout;
+                    let placed = self.layout_at(id, placement.x, placement.y);
+                    // A position may also resize the block: the re-layout
+                    // grows the containers so they hold the blocks they own.
+                    let new = Layout {
+                        width: placement.width.unwrap_or(placed.width),
+                        height: placement.height.unwrap_or(placed.height),
+                        ..placed
+                    };
+                    self.model
+                        .block_mut(id)
+                        .expect("checked")
+                        .layout = Some(new);
+                    steps.push(UndoStep::LayoutSet {
+                        id,
+                        old,
+                        new: Some(new),
+                    });
+                }
+                PlacedId::Door {
+                    container,
+                    ioid,
+                    input,
+                } => self.set_port_layout(
+                    &PortPosition {
+                        block: container,
+                        ioid,
+                        input,
+                        x: placement.x,
+                        y: placement.y,
+                        width: placement.width,
+                        height: placement.height,
+                    },
+                    steps,
+                )?,
+            }
         }
         Ok(())
     }
@@ -1757,11 +1823,10 @@ mod tests {
         let mut session = EditSession::new(model());
         session
             .apply(EditCommand::SetLayouts {
-                positions: vec![
-                    Position { id: 1, x: 1, y: 1, width: None, height: None },
-                    Position { id: 2, x: 2, y: 2, width: None, height: None },
+                placements: vec![
+                    Placement { id: PlacedId::Block(1), x: 1, y: 1, width: None, height: None },
+                    Placement { id: PlacedId::Block(2), x: 2, y: 2, width: None, height: None },
                 ],
-                ports: Vec::new(),
             })
             .expect("sets");
         assert_eq!(session.model().block(1).expect("b").layout.unwrap().x, 1);
@@ -1774,6 +1839,45 @@ mod tests {
     }
 
     #[test]
+    fn the_composition_writes_the_blocks_and_the_doors_in_one_undo_entry() {
+        // The composition of a scope gives a place to the blocks of the
+        // scope and to the doors of its container, and the model is told
+        // about them all at once: one command, one undo entry.
+        let mut session = EditSession::new(model_with_door());
+        let composition = crate::layout::relayout_scope(session.model(), 0);
+        assert!(
+            !composition.placements().is_empty(),
+            "the composition gave no place to anything"
+        );
+        session
+            .apply(EditCommand::SetLayouts {
+                placements: composition.placements(),
+            })
+            .expect("sets");
+        // The door of the container has the place the composition gave it.
+        let door = session
+            .model()
+            .block(0)
+            .expect("container")
+            .input(1)
+            .expect("door")
+            .layout
+            .expect("the door has a place");
+        let composed = composition
+            .ports
+            .iter()
+            .find(|port| port.ioid == 1)
+            .expect("the composition placed the door");
+        assert_eq!((door.x, door.y), (composed.x, composed.y));
+        // And one undo brings the whole picture back.
+        session.undo().expect("undoes");
+        assert!(
+            session.model().block(0).expect("c").input(1).expect("d").layout.is_none(),
+            "the undo did not bring the old place of the door back"
+        );
+    }
+
+    #[test]
     fn a_door_keeps_the_place_the_composition_gave_it() {
         // A door is a block of the picture: the composition writes its
         // place, and the undo brings the old one back.
@@ -1782,11 +1886,8 @@ mod tests {
         let ioid = 1u32;
         session
             .apply(EditCommand::SetLayouts {
-                positions: Vec::new(),
-                ports: vec![PortPosition {
-                    block: container,
-                    ioid,
-                    input: true,
+                placements: vec![Placement {
+                    id: PlacedId::Door { container, ioid, input: true },
                     x: 320,
                     y: 78,
                     width: Some(140),
@@ -2336,11 +2437,10 @@ mod tests {
         // the first position was already applied.
         let error = session
             .apply(EditCommand::SetLayouts {
-                positions: vec![
-                    Position { id: 1, x: 1, y: 1, width: None, height: None },
-                    Position { id: 999, x: 2, y: 2, width: None, height: None },
+                placements: vec![
+                    Placement { id: PlacedId::Block(1), x: 1, y: 1, width: None, height: None },
+                    Placement { id: PlacedId::Block(999), x: 2, y: 2, width: None, height: None },
                 ],
-                ports: Vec::new(),
             })
             .expect_err("the unknown block is refused");
         assert!(error.to_string().contains("999"), "{error}");
@@ -2382,11 +2482,10 @@ mod tests {
             .expect("pastes (one entry though it adds blocks, labels and links)");
         session
             .apply(EditCommand::SetLayouts {
-                positions: vec![
-                    Position { id: 1, x: 1, y: 1, width: None, height: None },
-                    Position { id: 2, x: 2, y: 2, width: None, height: None },
+                placements: vec![
+                    Placement { id: PlacedId::Block(1), x: 1, y: 1, width: None, height: None },
+                    Placement { id: PlacedId::Block(2), x: 2, y: 2, width: None, height: None },
                 ],
-                ports: Vec::new(),
             })
             .expect("sets");
         assert!(session.can_undo());

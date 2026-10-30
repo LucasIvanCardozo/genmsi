@@ -84,7 +84,7 @@ ramificar el código por `"in-3"`.
 | T | Specs | Qué | Ruta | Estado | Commit |
 |---|---|---|---|---|---|
 | T1 | S1, S2 | Las puertas sin flujo van a la grilla del ámbito, como los bloques sin flujo: se cae la rama `pending`, la superposición y el doble desplazamiento | format | **hecho** | — |
-| T2 | S3, S4 | Una lista de colocaciones con identidad discriminado: un aplicador, un deshacer, un comando; y la composición de todo el modelo da lugar a las puertas | format, engine | pendiente | — |
+| T2 | S3 | Una lista de colocaciones con identidad discriminado: un aplicador, un deshacer, un comando | format, engine | **hecho** | — |
 | T3 | S5 | Las cifras del contenedor salen de los cruces de frontera, siempre; se borra el heuristic de la primera puerta | app | **hecho** | — |
 | T4 | S6 | Los cruces de frontera viajan en el hop: la puerta es un nodo del flujo y el par deja de ser ambiguo | format, core, app | pendiente | — |
 | T5 | S7 | La identidad de la puerta en la app es discriminado, y su silueta pasa a la tabla de las clases | app | pendiente | — |
@@ -242,6 +242,62 @@ el mínimo de todos los bloques.
 `crates/genmsi-app`: 304 en verde.
 
 ### L9 — T3 (hecho): las cifras del contenedor salen de los cruces
+
+El "pasadas" de un contenedor sale ahora de **una sola** regla: las entidades
+que cruzaron su frontera, contadas desde los movimientos del trace. Se borra
+`entryTargetOf`, que tomaba la **primera** puerta de entrada que tuviera
+enlace: con varias puertas, las instancias que entraron por las demás no se
+contaban, y el contenedor se quedaba en 0/0.
+
+La ruta live del monitor (`MonitorView.tsx`) ahora pasa los cruces como la de
+recepción: antes la recepción los pasaba y la live no, y por eso el mismo
+contenedor mostraba dos números distintos según si el lector miraba la corrida
+o la repetición.
+
+De paso, los cruces son **eventos** y no un conteo por frame: se cuentan una
+sola vez cuando se conoce la corrida (`crossingsEvents`) y después se cuentan
+hasta la hora que alcanzó la repetición (`crossingsUntil`, con búsqueda
+binaria). Antes se caminaban todos los movimientos en cada frame.
+
+Test nuevo: `a container with several entry doors counts every entity that
+entered it`. El test viejo que pineaba el comportamiento anterior (el total
+del bloque de la primera puerta) se reescribió a la regla nueva.
+
+`node --test tests/*.test.ts`: 305 en verde. `bunx tsc --noEmit`: limpio.
+`cargo test --workspace`: 86 suites en verde.
+
+### L10 — T2 (hecho): un camino de escritura para el lugar de las cosas
+
+El modelo recibía el lugar de las cosas del ámbito en **dos** listas: una de
+bloques y otra de puertas, con dos aplicadores y dos caminos de deshacer. Ahora
+el lugar viaja en **una** lista de `Placement`, con la identidad que dice si la cosa
+es un bloque o una puerta (`PlacedId`), y el aplicador escribe cada lugar donde
+corresponde.
+
+- `EditCommand::SetLayouts` lleva **una** lista: `placements`.
+- `ScopeComposition::placements()` es la lista que la composición entrega.
+- Un solo aplicador (`set_layouts`) y un solo paso de deshacer.
+
+El archivo `.gmdl` no cambia: un `Placement` es una cosa del lienzo, no un
+módulo. `PlacedId::Door` dice de qué contenedor y de qué puerta se trata, y el
+aplicador lo escribe en el `layout` del puerto.
+
+**Lo que NO se hizo (y por qué)**: la composición de **todo** el modelo (la
+del CLI y la del MCP) no da lugar a las puertas. No es un descuido: la
+composición de todo el modelo es **otra imagen** —la del modelo entero, con
+los bloques de cada contenedor dentro de su recuadro— y las puertas viven en
+la imagen de su ámbito. Ponerlas en la imagen del modelo entero las pondría
+en un sistema de coordenadas que no es el suyo. El CLI compone el modelo
+entero y las puertas quedan sin lugar: la app las coloca con su regla (que
+es la misma que la del motor). Queda anotado como deuda.
+
+**El corte de la entrega**: los commits de esta unidad son tres (T1, T3, T2) y
+suman más de las ~400 líneas del corte de revisión. El corte queda acá:
+después de T2, la unidad sigue con **T4** (el protocolo del hop) y **T5** (la
+identidad de la puerta en la app), que van en su propio commit cada uno.
+
+`cargo test --workspace`: 86 suites en verde. `node --test tests/*.test.ts`:
+305 en verde. `bunx tsc --noEmit`: limpio.
 
 El "pasadas" de un contenedor sale ahora de **una sola** regla: las entidades
 que cruzaron su frontera, contadas desde los movimientos del trace. Se borra

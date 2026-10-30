@@ -4,7 +4,9 @@
 
 use std::path::Path;
 
-use genmsi_format::{parse_str, to_string, validate, EditCommand, EditSession, Position};
+use genmsi_format::{
+    parse_str, to_string, validate, EditCommand, EditSession, PlacedId, Placement,
+};
 
 fn load_reference(name: &str) -> genmsi_format::GmdlModel {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -174,14 +176,13 @@ fn undo_restores_the_reference_model_byte_for_byte() {
         .expect("sets");
     session
         .apply(EditCommand::SetLayouts {
-            positions: vec![Position {
-                id: queue,
+            placements: vec![Placement {
+                id: PlacedId::Block(queue),
                 x: x + 5,
                 y: y + 5,
                 width: None,
                 height: None,
             }],
-            ports: Vec::new(),
         })
         .expect("moves");
     assert!(session.dirty());

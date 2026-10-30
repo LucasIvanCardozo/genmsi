@@ -244,8 +244,10 @@ jobs:
           # The remote of Flathub goes in the installation of the user:
           # the runner does not let a user touch the system one.
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-          # The runtime of the manifest: the one of GNOME 47.
-          flatpak install --user -y flathub org.gnome.Platform//47 org.gnome.Sdk//47
+          # The runtime of the manifest: the one of GNOME that is still
+          # supported. The previous one (47) is out of support since
+          # October 2025.
+          flatpak install --user -y flathub org.gnome.Platform//51 org.gnome.Sdk//51
 
       - name: The Flatpak
         run: |
@@ -255,7 +257,10 @@ jobs:
           cp packaging/linux/GenMSI.desktop packaging/flatpak/GenMSI.desktop
           cp crates/genmsi-app/src-tauri/icons/128x128.png packaging/flatpak/GenMSI.png
           flatpak-builder --user --install --force-clean build packaging/flatpak/org.gensmi.desktop.yml
-          flatpak build-export --generate-runtime-sources repo build org.gensmi.desktop
+          # The export takes the repository and the build directory: the
+          # branch, when it is not said, is "master", and that is the one
+          # the bundle looks for afterwards.
+          flatpak build-export repo build
           flatpak build-update-repo repo
           version="$(grep -m1 '^version = ' crates/genmsi-app/src-tauri/Cargo.toml | cut -d'"' -f2)"
           flatpak build-bundle repo "GenMSI_$version.flatpak" org.gensmi.desktop

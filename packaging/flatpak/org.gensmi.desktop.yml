@@ -15,17 +15,27 @@
 #   GenMSI.png           the icon of the repository
 #
 # The runtime is the one of GNOME: it brings gtk3 and webkit2gtk. The
-# version is 47 because GNOME 45 and later ship WebKitGTK 4.1 (the 4.0
-# series was dropped after GNOME 44), and the shell of Tauri links against
-# 4.1, the same version the .deb depends on.
+# version is 51 because it is the one that is still supported (47 is out
+# of support since October 2025), and GNOME 45 and later ship WebKitGTK
+# 4.1 (the 4.0 series was dropped after GNOME 44) — the shell of Tauri
+# links against 4.1, the same version the .deb depends on.
 #
 # The box of the sandbox: the app opens and saves the models wherever the
 # user points, so it needs the home directory of the user.
 app-id: org.gensmi.desktop
 runtime: org.gnome.Platform
-runtime-version: '47'
+runtime-version: '51'
 sdk: org.gnome.Sdk
 command: genmsi-app-desktop
+metadata:
+  name: GenMSI
+  summary: Simulador de eventos discretos al estilo GPSS
+  description: |
+    GenMSI es un simulador de eventos discretos al estilo GPSS: se escribe
+    un modelo con bloques, se corre y se ve la corrida reproducida, con sus
+    gráficos y su reporte.
+  license: MIT
+  developer-name: Lucas Cardozo
 finish-args:
   # The models live wherever the user points: the app opens them there and
   # saves them there.

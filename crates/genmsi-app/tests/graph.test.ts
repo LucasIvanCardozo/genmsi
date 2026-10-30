@@ -124,12 +124,16 @@ test("the doors of a container keep their id and join their block", () => {
     }),
   ]);
   const { nodes } = graphOf(model, 10);
-  const entry = nodes.find((node) => node.id === "in-1");
-  const exit = nodes.find((node) => node.id === "out-1");
+  const entry = nodes.find((node) => node.id === "door:10:1:in");
+  const exit = nodes.find((node) => node.id === "door:10:1:out");
   assert.ok(entry !== undefined, "the entry door is a node");
   assert.ok(exit !== undefined, "the exit door is a node");
   assert.equal(entry.data.kind, "PortIn");
   assert.equal(exit.data.kind, "PortOut");
+  // The identity of a door is data, and it names the container the door
+  // belongs to: two containers can have a door with the same port id.
+  assert.deepEqual(entry.data.door, { container: 10, ioid: 1, input: true });
+  assert.deepEqual(exit.data.door, { container: 10, ioid: 1, input: false });
   // The doors have no place of their own yet, so they go to the free spot
   // of the scope, one under the other: two doors never share a place.
   assert.deepEqual(entry.position, { x: 80, y: 80 });
@@ -232,8 +236,10 @@ test("the link of a container leaves by the container's port", () => {
     ],
   );
   const { edges } = graphOf(model);
-  // A container is entered and left through its own ports.
-  assert.equal(edges[0].sourceHandle, "in-7");
+  // A container is entered and left through its own ports, and the handle
+  // of an end is the id of its port: a handle that does not exist makes
+  // the edge disappear without a word.
+  assert.equal(edges[0].sourceHandle, "7");
   assert.equal(edges[0].targetHandle, "1");
 });
 
@@ -384,11 +390,11 @@ test("graphOf scopes nodes and edges by container", () => {
 
   // Sub-container view: containerId = 10
   const sub = graphOf(model, 10);
-  assert.equal(sub.nodes.length, 4, "sub-container shows blocks 2, 3 and boundary ports in-1, out-1");
+  assert.equal(sub.nodes.length, 4, "sub-container shows blocks 2, 3 and its two doors");
   assert.ok(sub.nodes.some((n) => n.id === "2"));
   assert.ok(sub.nodes.some((n) => n.id === "3"));
-  assert.ok(sub.nodes.some((n) => n.id === "in-1"));
-  assert.ok(sub.nodes.some((n) => n.id === "out-1"));
+  assert.ok(sub.nodes.some((n) => n.id === "door:10:1:in"));
+  assert.ok(sub.nodes.some((n) => n.id === "door:10:1:out"));
   assert.equal(sub.edges.length, 1);
   assert.equal(sub.edges[0].id, "10:2:1->3:1");
 });

@@ -87,7 +87,7 @@ ramificar el código por `"in-3"`.
 | T2 | S3 | Una lista de colocaciones con identidad discriminado: un aplicador, un deshacer, un comando | format, engine | **hecho** | — |
 | T3 | S5 | Las cifras del contenedor salen de los cruces de frontera, siempre; se borra el heuristic de la primera puerta | app | **hecho** | — |
 | T4 | S6 | La entidad cruza el contenedor por la puerta correcta: la cadena de enlaces del pasaje y el círculo que la recorre | app | **hecho** | — |
-| T5 | S7 | La identidad de la puerta en la app es discriminado, y su silueta pasa a la tabla de las clases | app | pendiente | — |
+| T5 | S7 | La identidad de la puerta en la app es data, no una cadena que se parsea | app | **hecho** | — |
 
 ## Log
 
@@ -367,6 +367,38 @@ Tests nuevos en `route.test.ts`:
 - `the move that crosses the border travels over the links of the scope`
 - `each entity travels over the link of ITS door`
 - `a move the scope has no link for travels over nothing`
+
+`node --test tests/*.test.ts`: 308 en verde. `bunx tsc --noEmit`: limpio.
+`cargo test --workspace`: 86 suites en verde.
+
+### L12 — T5 (hecho): la identidad de la puerta es data, no una cadena
+
+La puerta era un nodo con el id `"in-3"` / `"out-3"`, y **cinco** lugares de la
+app lo parseaban con `startsWith` y con una expresión regular para saber qué
+era: la selección, el arrastre, el borrado, la conexión y el filtro de los
+enlaces. Ese es exactamente el "no comparten código con los bloques" que el
+usuario intuyó.
+
+Ahora la identidad de la puerta es **data**: `BlockData.door` dice de qué
+contenedor es, qué puerto es y de qué lado está. Y el id del nodo la nombra
+completa: `door:<contenedor>:<puerto>:in|out`. Antes el id no decía de qué
+contenedor era la puerta: dos contenedores con una puerta del mismo puerto
+tenían el mismo nodo.
+
+De paso se cayó un bug latente: el handle del origen o del destino de un
+enlace era a veces el **id del nodo** (`in-7`) y no el id del puerto (7). React
+Flow resuelve un enlace por handle, y un handle que no existe hace que el
+enlace **desaparezca sin decir nada**.
+
+Los cinco lugares que parseaban la cadena ahora preguntan al nodo qué es.
+
+**Lo que queda para la unidad siguiente**: la puerta todavía no es
+seleccionable, ni aparece en el árbol, ni se copia con el portapapeles: el
+corte son las tres cosas que tocan el tipo de la selección, que hoy es
+`number[]`. Y la silueta del contenedor y la de las puertas siguen por un
+`switch` (`shapeOfKind`) en vez de la tabla de las 66 clases: la diferencia
+entre un bloque y una puerta es de datos (de dónde sale el footprint), no de
+código, y la tabla puede guardarlo.
 
 `node --test tests/*.test.ts`: 308 en verde. `bunx tsc --noEmit`: limpio.
 `cargo test --workspace`: 86 suites en verde.

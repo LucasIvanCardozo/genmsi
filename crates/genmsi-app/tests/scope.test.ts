@@ -200,7 +200,7 @@ test("a door is drawn where the model puts it", () => {
   assert.ok(container !== undefined);
   container.inputs[0].layout = { x: 250, y: 300, width: 140, height: 44 };
   const { nodes } = graphOf(model, 10);
-  const entry = nodes.find((node) => node.id === "in-1");
+  const entry = nodes.find((node) => node.id === "door:10:1:in");
   assert.deepEqual(entry?.position, { x: 250, y: 300 });
 });
 
@@ -210,8 +210,8 @@ test("a door with no place goes to the free spot of the scope", () => {
   // never share a place.
   const model = scopeModel();
   const { nodes } = graphOf(model, 10);
-  const entry = nodes.find((node) => node.id === "in-1");
-  const exit = nodes.find((node) => node.id === "out-2");
+  const entry = nodes.find((node) => node.id === "door:10:1:in");
+  const exit = nodes.find((node) => node.id === "door:10:2:out");
   assert.ok(entry !== undefined && exit !== undefined);
   assert.notDeepEqual(entry.position, exit.position);
   // And the place of the door is in the canvas of the scope.
@@ -234,7 +234,7 @@ test("moving a block does not move the doors", () => {
   queue.layout = { ...queue.layout, x: 320, y: 460 };
   const after = graphOf(model, 10);
   const door = (graph: ReturnType<typeof graphOf>) =>
-    graph.nodes.find((node) => node.id === "in-1")?.position;
+    graph.nodes.find((node) => node.id === "door:10:1:in")?.position;
   assert.deepEqual(door(after), door(before));
 });
 

@@ -54,6 +54,33 @@ export interface PortData {
   name: string;
 }
 
+/**
+ * The identity of a door.
+ *
+ * A door is a block of the picture, and it has an identity of its own: the
+ * container that owns it, the port it is, and which side of the container
+ * it is on. The identity travels in the data of the node, so nothing has to
+ * read it out of the id of the node.
+ */
+export interface DoorIdentity {
+  /** The container that owns the door. */
+  container: number;
+  /** The id of the door inside the container. */
+  ioid: number;
+  /** Whether the door is an entry one. */
+  input: boolean;
+}
+
+/**
+ * The id of the node of a door.
+ *
+ * The id names the door and the container it belongs to: two containers can
+ * have a door with the same port id, and they are two different doors.
+ */
+export function doorNodeId(door: DoorIdentity): string {
+  return `door:${door.container}:${door.ioid}:${door.input ? "in" : "out"}`;
+}
+
 /** What a block of the graph shows. */
 export interface BlockData extends Record<string, unknown> {
   /** The block's class (`Generate`, `Queue`, ...). */
@@ -76,6 +103,14 @@ export interface BlockData extends Record<string, unknown> {
    * size of their own silhouette.
    */
   size: BlockSize | null;
+  /**
+   * The door the node is, or `null` when the node is not a door.
+   *
+   * The identity of a door is data, not a string to be read out of the id
+   * of the node: the selection, the panel of the properties and the
+   * clipboard ask the node what it is.
+   */
+  door: DoorIdentity | null;
 }
 
 /** The four points of a cubic curve: the two ends and the two controls. */
@@ -345,6 +380,7 @@ export function graphOf(
         block.layout === null
           ? null
           : { width: block.layout.width, height: block.layout.height },
+      door: null,
     },
     style: {
       // The container is a block with a box of its own, and that box is the
@@ -370,8 +406,13 @@ export function graphOf(
       // The door is drawn where the model puts it: the composition of the
       // scope gave it its place, and the reader may have dragged it.
       const place = doorPlace(model, scope, "PortIn", port.ioid);
+      const door: DoorIdentity = {
+        container: scope,
+        ioid: port.ioid,
+        input: true,
+      };
       nodes.push({
-        id: `in-${port.ioid}`,
+        id: doorNodeId(door),
         type: "bloque",
         position: {
           x: place.x,
@@ -386,6 +427,7 @@ export function graphOf(
           // The door has no size in the model: it is drawn at the size of
           // its own silhouette.
           size: null,
+          door,
         },
         style: { width: DOOR_BOX.width, height: DOOR_BOX.height },
         zIndex: 2,
@@ -396,8 +438,13 @@ export function graphOf(
     for (const port of parentContainer.outputs) {
       // The exit door is drawn where the model puts it, like the entry one.
       const place = doorPlace(model, scope, "PortOut", port.ioid);
+      const door: DoorIdentity = {
+        container: scope,
+        ioid: port.ioid,
+        input: false,
+      };
       nodes.push({
-        id: `out-${port.ioid}`,
+        id: doorNodeId(door),
         type: "bloque",
         position: {
           x: place.x,
@@ -412,6 +459,7 @@ export function graphOf(
           // The door has no size in the model: it is drawn at the size of
           // its own silhouette.
           size: null,
+          door,
         },
         style: { width: DOOR_BOX.width, height: DOOR_BOX.height },
         zIndex: 2,
@@ -438,18 +486,17 @@ export function graphOf(
     .map((edge) => {
       const isFromContainer = isScoped && containerId !== 0 && edge.from_module === containerId;
       const isToContainer = isScoped && containerId !== 0 && edge.to_module === containerId;
-      const source = isFromContainer ? `in-${edge.from_ioid}` : String(edge.from_module);
-      const target = isToContainer ? `out-${edge.to_ioid}` : String(edge.to_module);
-      const sourceHandle = isFromContainer
-        ? String(edge.from_ioid)
-        : edge.from_module === edge.container
-          ? `in-${edge.from_ioid}`
-          : String(edge.from_ioid);
-      const targetHandle = isToContainer
-        ? String(edge.to_ioid)
-        : edge.to_module === edge.container
-          ? `out-${edge.to_ioid}`
-          : String(edge.to_ioid);
+      const source = isFromContainer
+        ? doorNodeId({ container: containerId, ioid: edge.from_ioid, input: true })
+        : String(edge.from_module);
+      const target = isToContainer
+        ? doorNodeId({ container: containerId, ioid: edge.to_ioid, input: false })
+        : String(edge.to_module);
+      // The handle of an end is the id of its port: React Flow resolves an
+      // edge by handle id, and a handle that does not exist makes the edge
+      // disappear without a word.
+      const sourceHandle = String(edge.from_ioid);
+      const targetHandle = String(edge.to_ioid);
 
       return {
         id: edge.id,

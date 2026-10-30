@@ -421,6 +421,10 @@ export default memo(function GraphView({
 }) {
   const [nodes, setNodes] = useState<Node<BlockData>[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  // The nodes of the canvas, always the ones on screen: a connection says
+  // which node it joins by its id, and the identity of a door is in the
+  // data of its node.
+  const nodesRef = useRef<Node<BlockData>[]>([]);
   // The instance of the graph, to frame it when a model arrives.
   const instance = useRef<ReactFlowInstance<Node<BlockData>, Edge> | null>(null);
   // The framing of the picture: a model that arrives is framed whole, and
@@ -436,25 +440,25 @@ export default memo(function GraphView({
 
   useEffect(() => {
     const graph = graphOf(model, containerId);
-    setNodes(
-      graph.nodes.map((node) => {
-        const drawn = { ...node, selected: selected.current.has(node.id) };
-        // The block is drawn at the size of its shape: the shape is the
-        // truth, and the box the model carries is not rewritten. A class
-        // the shape module does not know, the container and the doors are
-        // drawn at the box the model gives them.
-        const size = nodeSizeOf({
-          className: node.data.kind === "A" ? node.data.title : "",
-          kind: node.data.kind,
-          title: node.data.title,
-          subtitle: node.data.subtitle,
-          size: node.data.size,
-          inputs: node.data.inputs,
-          outputs: node.data.outputs,
-        });
-        return { ...drawn, style: { ...drawn.style, width: size.width, height: size.height } };
-      }),
-    );
+    const drawn = graph.nodes.map((node) => {
+      const marked = { ...node, selected: selected.current.has(node.id) };
+      // The block is drawn at the size of its shape: the shape is the
+      // truth, and the box the model carries is not rewritten. A class
+      // the shape module does not know, the container and the doors are
+      // drawn at the box the model gives them.
+      const size = nodeSizeOf({
+        className: node.data.kind === "A" ? node.data.title : "",
+        kind: node.data.kind,
+        title: node.data.title,
+        subtitle: node.data.subtitle,
+        size: node.data.size,
+        inputs: node.data.inputs,
+        outputs: node.data.outputs,
+      });
+      return { ...marked, style: { ...marked.style, width: size.width, height: size.height } };
+    });
+    nodesRef.current = drawn;
+    setNodes(drawn);
     // The links are drawn by the component that carries the balls.
     setEdges([
       ...graph.edges.map((edge) => ({ ...edge, type: "bloque" })),
@@ -524,19 +528,18 @@ export default memo(function GraphView({
       if (connection.sourceHandle === null || connection.targetHandle === null) {
         return;
       }
-      let from = Number(connection.source);
-      let fromIoid = Number(connection.sourceHandle);
-      if (connection.source.startsWith("in-")) {
-        from = containerId;
-        fromIoid = Number(connection.source.slice(3));
+      // The ends of the connection: a block of the scope, or one of its
+      // doors. The identity of a door is in the data of its node: nothing
+      // reads it out of the id.
+      const source = nodesRef.current.find((node) => node.id === connection.source);
+      const target = nodesRef.current.find((node) => node.id === connection.target);
+      if (source === undefined || target === undefined) {
+        return;
       }
-
-      let to = Number(connection.target);
-      let toIoid = Number(connection.targetHandle);
-      if (connection.target.startsWith("out-")) {
-        to = containerId;
-        toIoid = Number(connection.target.slice(4));
-      }
+      const from = source.data.door?.container ?? Number(connection.source);
+      const fromIoid = Number(connection.sourceHandle);
+      const to = target.data.door?.container ?? Number(connection.target);
+      const toIoid = Number(connection.targetHandle);
 
       if (
         Number.isNaN(from) ||
@@ -549,7 +552,7 @@ export default memo(function GraphView({
 
       actions.onConnect(from, fromIoid, to, toIoid);
     },
-    [actions, containerId],
+    [actions],
   );
 
   const onDrop = useCallback(
@@ -610,7 +613,7 @@ export default memo(function GraphView({
         onEdgesChange={onEdgesChange}
         onNodeDoubleClick={onNodeDoubleClick}
         onNodeClick={(_event, node) => {
-          if (!node.id.startsWith("in-") && !node.id.startsWith("out-")) {
+          if (node.data.door === null) {
             actions.onSelect([Number(node.id)]);
           }
         }}
@@ -618,25 +621,22 @@ export default memo(function GraphView({
         onSelectionChange={({ nodes: picked }) => {
           selected.current = new Set(picked.map((node) => node.id));
           const validIds = picked
-            .filter((node) => !node.id.startsWith("in-") && !node.id.startsWith("out-"))
+            .filter((node) => node.data.door === null)
             .map((node) => Number(node.id));
           actions.onSelect(validIds);
         }}
         onNodeDragStop={(_event, node) => {
-          if (node.id.startsWith("in-") || node.id.startsWith("out-")) {
+          const door = node.data.door;
+          if (door !== null) {
             // A door is a block of the picture in its own right: it moves
             // like one, and its place is kept.
-            const door = /^(in|out)-(\d+)$/.exec(node.id);
-            if (door !== null) {
-              const input = door[1] === "in";
-              actions.onMovePort(
-                containerId,
-                Number(door[2]),
-                input,
-                Math.round(node.position.x),
-                Math.round(node.position.y),
-              );
-            }
+            actions.onMovePort(
+              door.container,
+              door.ioid,
+              door.input,
+              Math.round(node.position.x),
+              Math.round(node.position.y),
+            );
             return;
           }
           // The place on the canvas is the place in the model: the picture
@@ -649,13 +649,13 @@ export default memo(function GraphView({
           // A door is a block of the picture in its own right: removing it
           // removes the door, and the links that touch it.
           for (const node of deleted) {
-            const door = /^(in|out)-(\d+)$/.exec(node.id);
+            const door = node.data.door;
             if (door !== null) {
-              actions.onRemovePort(containerId, Number(door[2]), door[1] === "in");
+              actions.onRemovePort(door.container, door.ioid, door.input);
             }
           }
           const blockIds = deleted
-            .filter((node) => !node.id.startsWith("in-") && !node.id.startsWith("out-"))
+            .filter((node) => node.data.door === null)
             .map((node) => Number(node.id));
           if (blockIds.length > 0) {
             actions.onRemove(blockIds);

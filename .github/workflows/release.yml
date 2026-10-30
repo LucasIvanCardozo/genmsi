@@ -212,7 +212,7 @@ jobs:
           path: |
             target/arch-package/*.pkg.tar.zst
             target/arch-package/PKGBUILD
-            target/arch-package/PKGBUILD.srcinfo
+            target/arch-package/.SRCINFO
 
   # The Flatpak: the app with the WebKitGTK of the system, so it works on
   # any distribution.
@@ -384,7 +384,7 @@ jobs:
                   que="El PKGBUILD del paquete de pacman, con la suma real de la fuente: es el archivo que se sube a la AUR."
                   como=""
                   ;;
-                *.srcinfo)
+                .SRCINFO)
                   que="El .SRCINFO del paquete de pacman: el archivo que la AUR sirve."
                   como=""
                   ;;

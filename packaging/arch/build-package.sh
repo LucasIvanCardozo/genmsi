@@ -19,8 +19,9 @@
 #                                        versión del código empaquetado. La
 #                                        AUR no acepta SKIP, así que este es
 #                                        el archivo que hay que publicar.
-#   target/arch-package/PKGBUILD.srcinfo el .SRCINFO que sirve la AUR, hecho
-#                                        a partir de ese PKGBUILD.
+#   target/arch-package/.SRCINFO       el .SRCINFO que sirve la AUR, hecho
+#                                        a partir de ese PKGBUILD. El nombre es
+#                                        el que la AUR espera.
 #   target/arch-package/*.pkg.tar.zst    el paquete en sí.
 #
 # La CI publica los dos archivos junto al paquete, como assets del release.
@@ -99,7 +100,7 @@ sed -e "s|^pkgver=.*|pkgver=$version|" \
     "$pkgbuild" >"$work/PKGBUILD"
 
 # El .SRCINFO que sirve la AUR: el de ese PKGBUILD.
-(cd "$work" && makepkg --printsrcinfo) >"$work/PKGBUILD.srcinfo"
+(cd "$work" && makepkg --printsrcinfo) >"$work/.SRCINFO"
 
 echo "==> el paquete: genmsi $version (suma $sum)"
 (cd "$work" && makepkg --nodeps)
@@ -108,7 +109,7 @@ package="$(ls -t "$work"/genmsi-*.pkg.tar.zst 2>/dev/null | head -1 || true)"
 [[ -n "$package" ]] || die "makepkg no dejó ningún paquete"
 echo "==> el paquete: $package"
 echo "==> el PKGBUILD relleno: $work/PKGBUILD"
-echo "==> el .SRCINFO: $work/PKGBUILD.srcinfo"
+echo "==> el .SRCINFO: $work/.SRCINFO"
 
 if [[ "$install" -eq 1 ]]; then
   sudo pacman -U "$package"

@@ -214,7 +214,10 @@ jobs:
         with:
           name: genmsi-pacman
           path: |
-            target/arch-package/*.pkg.tar.zst
+            # The package of the symbols (genmsi-debug-...) stays out: it
+            # is a convention of the repositories of Arch, not an
+            # installer of a release.
+            target/arch-package/genmsi-[0-9]*-x86_64.pkg.tar.zst
             target/arch-package/PKGBUILD
             target/arch-package/.SRCINFO
 

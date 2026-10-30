@@ -67,6 +67,9 @@ workspace_version() {
 }
 
 cd "$repo"
+# Quién firma el paquete: sin esto, el .PKGINFO dice "Unknown Packager".
+export PACKAGER="${PACKAGER:-Lucas Cardozo <lucasivancardozo27@gmail.com>}"
+
 # La versión del paquete: la de la etiqueta cuando hay etiqueta, la del
 # código que se empaqueta (el workspace) cuando no.
 version=""

@@ -580,7 +580,7 @@ export interface ChainIndex {
  *
  * @param model The links of the whole model.
  */
-export function chainsOf(model: ModelEdge[]): ChainIndex {
+export function chainsOf(model: readonly ModelEdge[]): ChainIndex {
   const first = new Map<string, ModelEdge>();
   const starts = new Map<number, string[]>();
   for (const link of model) {

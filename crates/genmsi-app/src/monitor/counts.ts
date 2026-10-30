@@ -23,6 +23,7 @@
  */
 import type { LiveCounts } from "./live";
 import type { ReportBlockLike } from "./replay";
+import { chainsOf, chainFor } from "../graph/graph.ts";
 import type { ModelBlock, ModelEdge } from "../types";
 
 /** The counters the replay keeps, per line of the program. */
@@ -198,21 +199,60 @@ export function crossingsEvents(
   for (const block of model.blocks) {
     owner.set(block.id, block.container);
   }
+  const byId = new Map<number, ModelBlock>();
+  for (const block of model.blocks) {
+    byId.set(block.id, block);
+  }
+  // The chain of a move says which containers it entered: the flow goes in
+  // by an entry door and comes out by an exit door.
+  const index = chainsOf(model.edges);
   const times: number[] = [];
   const containers: number[] = [];
   for (const move of transitions) {
-    const from = chainOf(owner, move.from);
-    const to = chainOf(owner, move.to);
-    // The move enters the containers the destination is inside of and the
-    // origin is not: those are the borders it crosses coming in.
-    for (const container of to) {
-      if (!from.has(container)) {
-        times.push(move.time);
-        containers.push(container);
-      }
+    for (const container of containersEntered(index, move, owner, byId)) {
+      times.push(move.time);
+      containers.push(container);
     }
   }
   return { times, containers };
+}
+
+/**
+ * The containers a move entered.
+ *
+ * A move that crosses the border of a container enters it. The chain of the
+ * move says which ones: the links of the chain that end at an **entry**
+ * door of a container. The links that leave a container are not an entry:
+ * an entity that goes in and out went through the container once.
+ *
+ * A move whose flow is not a chain of links (the entry door of a container
+ * with no link inside it) falls back to the containers the destination is
+ * inside of and the origin is not.
+ */
+function containersEntered(
+  index: ReturnType<typeof chainsOf>,
+  move: { from: number; to: number },
+  owner: ReadonlyMap<number, number>,
+  byId: ReadonlyMap<number, ModelBlock>,
+): number[] {
+  const chain = chainFor(index, move.from, move.to);
+  if (chain !== undefined) {
+    const entered = new Set<number>();
+    for (const link of chain) {
+      const block = byId.get(link.to_module);
+      if (
+        block !== undefined &&
+        block.kind === "C" &&
+        block.inputs.some((port) => port.ioid === link.to_ioid)
+      ) {
+        entered.add(block.id);
+      }
+    }
+    return [...entered];
+  }
+  const from = chainOf(owner, move.from);
+  const to = chainOf(owner, move.to);
+  return [...to].filter((container) => !from.has(container));
 }
 
 /**

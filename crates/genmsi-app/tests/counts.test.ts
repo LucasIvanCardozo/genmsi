@@ -342,3 +342,71 @@ test("the container shows the entities that crossed its border", () => {
   assert.deepEqual(counts.get(10), { now: 2, ever: 1 });
   assert.equal(containerPair(counts.get(10)), "2/1");
 });
+
+test("the container whose flow is only its doors counts the entities that entered it", () => {
+  // The flow of the container is the door that enters and the door that
+  // leaves: the entity goes in and comes out without touching a block of
+  // activity, and the whole passage is ONE move. The container counts it
+  // all the same: the move crossed its border.
+  //
+  // The crossings used to be counted by the ends of the move, and the ends
+  // of this one are outside the container: the container stayed in 0/0.
+  const model = {
+    blocks: [
+      container(10, [port(2, "Entrada2")], [port(3, "Salida3")]),
+      block(1, { container: 0 }),
+      block(4, { container: 0 }),
+    ],
+    edges: [
+      // The link that enters the container.
+      {
+        id: "0:1:1->10:2",
+        container: 0,
+        from_module: 1,
+        from_ioid: 1,
+        from_port: "Salida1",
+        to_module: 10,
+        to_ioid: 2,
+        to_port: "Entrada2",
+        label: null,
+        hops: [],
+      },
+      // The link between the two doors of the container.
+      {
+        id: "10:10:2->10:3",
+        container: 10,
+        from_module: 10,
+        from_ioid: 2,
+        from_port: "Entrada2",
+        to_module: 10,
+        to_ioid: 3,
+        to_port: "Salida3",
+        label: null,
+        hops: [],
+      },
+      // The link that leaves the container.
+      {
+        id: "0:10:3->4:1",
+        container: 0,
+        from_module: 10,
+        from_ioid: 3,
+        from_port: "Salida3",
+        to_module: 4,
+        to_ioid: 1,
+        to_port: "Entrada1",
+        label: null,
+        hops: [],
+      },
+    ],
+  };
+  const moves = [{ from: 1, to: 4, time: 10 }];
+  const crossings = crossingsUntil(crossingsEvents(model, moves), 100);
+  assert.equal(crossings.get(10), 1, "the container did not count the entity");
+  // And the entity that came out is not counted again: it went through the
+  // container once.
+  const leaving = crossingsUntil(
+    crossingsEvents(model, [{ from: 4, to: 1, time: 20 }]),
+    100,
+  );
+  assert.equal(leaving.get(10), undefined, "the entity was counted twice");
+});

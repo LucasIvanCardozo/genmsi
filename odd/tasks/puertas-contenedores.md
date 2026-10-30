@@ -79,6 +79,27 @@ La puerta es una cosa con identidad propia en la app: la selección, el panel
 de propiedades, el portapapeles y el foco la tratan como lo que es, sin
 ramificar el código por `"in-3"`.
 
+### S8 — El nombre de una puerta numera las puertas de su clase
+
+> "al generar portin como portout comparten el numero del nombre para sumar,
+> esto no deberia ser asi, por ejemplo ahora sui pongo un portin se llama
+> entrada1 y si pongo otro portout se llama salida2 cuando deberia llamarse
+> salida 1"
+
+Las puertas de una clase se numeran entre sí: las de entrada son `Entrada1`,
+`Entrada2`, ... y las de salida `Salida1`, `Salida2`, ... El **id** del puerto
+es otra cosa, y sigue siendo único entre todas las puertas del contenedor
+(un enlace nombra un puerto por su id). El editor original numera los nombres
+así (`Entrada 1` y `Salida 1` en los modelos de referencia).
+
+### S9 — El contenedor cuenta las entradas aunque su flujo sean sus puertas
+
+> "El conteioner no cuenta las entidades que entran a el si solo hay un portin
+> y portout conectados entre si."
+
+Un contenedor cuyo flujo es sólo sus puertas (la entrada conectada con la
+salida) cuenta las entidades que entraron por él, como cualquier otro.
+
 ## Tasks
 
 | T | Specs | Qué | Ruta | Estado | Commit |
@@ -89,6 +110,7 @@ ramificar el código por `"in-3"`.
 | T4 | S6 | La entidad cruza el contenedor por la puerta correcta: la cadena de enlaces del pasaje y el círculo que la recorre | app | **hecho** | — |
 | T5 | S7 | La identidad de la puerta en la app es data, no una cadena que se parsea | app | **hecho** | — |
 | T6 | S7 | El botón de borrar borra las puertas seleccionadas, como borra los bloques | app | **hecho** | — |
+| T7 | S8, S9 | El nombre de una puerta numera las puertas de su clase; y el contenedor cuenta las entradas cuando el flujo es sólo sus puertas | format, app | **hecho** | — |
 
 ## Log
 
@@ -432,3 +454,40 @@ Test nuevo: `crates/genmsi-app/tests/selection.test.ts`
 cargado por el servidor de Vite, como lo carga `horizon.test.ts`.
 
 `node --test tests/*.test.ts`: 310 en verde. `bunx tsc --noEmit`: limpio.
+
+### L14 — T7 (hecho): el nombre de la puerta y la cuenta del contenedor
+
+**El nombre** (`crates/genmsi-format/src/edit.rs`): el nombre de una puerta
+numeraba las puertas **de su clase** con el id del puerto, que es único entre
+todas las puertas del contenedor. Por eso la primera puerta de entrada se
+llamaba `Entrada1` y la primera de salida `Salida2`.
+
+Ahora el nombre se numera entre las puertas de su clase (el número es el
+mayor que ya hay de esa clase, así una puerta borrada no le cede su número a
+otra) y el **id** sigue siendo el que era: único entre todas las puertas del
+contenedor, porque un enlace nombra un puerto por su id.
+
+**La cuenta** (`crates/genmsi-app/src/monitor/counts.ts`): los cruces de
+frontera se contaban por los **extremos** del movimiento (los bloques de
+actividad de origen y de destino). En un contenedor cuyo flujo es sólo sus
+puertas, el movimiento va de fuera a fuera: los extremos están fuera, y el
+contenedor no contaba nada (0/0).
+
+Ahora los cruces se cuentan por la **cadena** del movimiento —la misma que
+usa la animación (L11)—: los enlaces de la cadena que terminan en una puerta
+de **entrada** son las entradas a un contenedor. Los enlaces que **salen** de
+un contenedor no son una entrada: una entidad que entra y sale pasó una vez.
+
+Test nuevo: `the container whose flow is only its doors counts the entities
+that entered it` (en RED antes del arreglo ✓). El test del motor que pineaba
+el nombre viejo (`Salida2`) se actualizó a la regla nueva.
+
+**Observación (no se cambió)**: el editor original escribe los nombres con un
+espacio (`Entrada 1`, `Salida 1`) y la app sin (`Entrada1`). Los modelos que
+vienen del editor original y los que nacen en la app mezclan las dos formas
+en un mismo contenedor. Unificarlo es una decisión de forma, no de fondo: si
+se unifica hacia el original, los modelos que la app ya escribió quedan
+mezclados; si se unifica hacia la app, los de referencia quedan mezclados.
+
+`cargo test --workspace`: 86 suites en verde. `node --test tests/*.test.ts`:
+311 en verde. `bunx tsc --noEmit`: limpio.

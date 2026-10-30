@@ -974,9 +974,14 @@ fn adding_a_container_creates_a_submodule() {
 
     // Can add a PortIn and PortOut inside this container.
     //
-    // The ports of a container share one numbering, and the container is
-    // born empty: the first door the reader adds is the 1, the next one the
-    // 2. An id never names two doors of the same container.
+    // The **id** of a port is shared by all the doors of the container: the
+    // first door the reader adds is the 1, the next one the 2. An id never
+    // names two doors of the same container, because a link names a port by
+    // its id.
+    //
+    // The **name** is another thing: it numbers the doors of its own kind.
+    // The entry doors are Entrada1, Entrada2, ... and the exit doors are
+    // Salida1, Salida2, ... like the original editor names them.
     session
         .apply(EditCommand::AddBlock {
             class: "PortIn".into(),
@@ -999,7 +1004,7 @@ fn adding_a_container_creates_a_submodule() {
         .expect("adds port out");
     assert_eq!(session.model().block(container_id).unwrap().outputs.len(), 1);
     assert_eq!(session.model().block(container_id).unwrap().outputs[0].ioid, 2);
-    assert_eq!(session.model().block(container_id).unwrap().outputs[0].name, "Salida2");
+    assert_eq!(session.model().block(container_id).unwrap().outputs[0].name, "Salida1");
 
     // Cannot add PortIn at root (container 0)
     assert!(

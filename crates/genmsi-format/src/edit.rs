@@ -603,12 +603,18 @@ impl EditSession {
                 .max()
                 .unwrap_or(0);
             let ioid = max_ioid + 1;
+            // The **name** of a door numbers the doors of its own kind: the
+            // entry doors are Entrada1, Entrada2, ... and the exit doors
+            // are Salida1, Salida2, ... The id of the port is another
+            // thing: it is unique among all the doors of the container,
+            // because a link names a port by its id.
+            let number = next_number(&block.inputs, "Entrada");
             // The door is a block of the picture from the first moment: it
             // is born where the reader dropped it, and its place lives in
             // the model like the place of any other block.
             let port = Port {
                 ioid,
-                name: format!("Entrada{ioid}"),
+                name: format!("Entrada{number}"),
                 caption: String::new(),
                 mylabel: String::new(),
                 layout: Some(PortLayout {
@@ -642,12 +648,15 @@ impl EditSession {
                 .max()
                 .unwrap_or(0);
             let ioid = max_ioid + 1;
+            // The name of an exit door numbers the exit doors, like the
+            // name of an entry door numbers the entry ones.
+            let number = next_number(&block.outputs, "Salida");
             // The door is a block of the picture from the first moment: it
             // is born where the reader dropped it, and its place lives in
             // the model like the place of any other block.
             let port = Port {
                 ioid,
-                name: format!("Salida{ioid}"),
+                name: format!("Salida{number}"),
                 caption: String::new(),
                 mylabel: String::new(),
                 layout: Some(PortLayout {
@@ -1529,6 +1538,22 @@ fn port_label(block: &Block, ioid: u32, is_input: bool) -> Option<String> {
 }
 
 /// Remove the given links from a container's link list, by their two ends.
+/// The number that the next door of a kind gets.
+///
+/// The doors of a kind are numbered among themselves: the entry doors of a
+/// container are Entrada1, Entrada2, ... and the exit doors are Salida1,
+/// Salida2, ... The number is the biggest one that is already there, so a
+/// door that the reader deleted does not give its number to another one.
+fn next_number(ports: &[Port], prefix: &str) -> i32 {
+    ports
+        .iter()
+        .filter_map(|port| port.name.strip_prefix(prefix))
+        .filter_map(|rest| rest.trim().parse::<i32>().ok())
+        .max()
+        .unwrap_or(0)
+        + 1
+}
+
 fn remove_links(model: &mut GmdlModel, container: u32, links: &[(usize, Link)]) {
     if let Some(owner) = model.block_mut(container) {
         owner
@@ -1597,6 +1622,20 @@ mod tests {
 <module moduleid="0" moduleclass="main" owner="0" caption="m" name="m" kind="C" genprefer="" exehead="" nonexehead="" exefoot="" nonexefoot=""><links><link frommoduleid="1" fromioid="1" tomoduleid="2" toioid="1"/><link frommoduleid="0" fromioid="1" tomoduleid="2" toioid="1"/></links><inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Queue"/></inputs><outputs/></module>\
 <module moduleid="1" moduleclass="Generate" owner="0" caption="g" name="Generate" kind="A" width="120" height="63" x="10" y="20"><outputs><output ioid="1" name="Salida1" caption="" mylabel="A_Queue"/></outputs></module>\
 <module moduleid="2" moduleclass="Terminate" owner="0" caption="t" name="Terminate" kind="A" width="84" height="64" x="100" y="200"><inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Queue"/></inputs></module>\
+</modules></gmodel>"#,
+        )
+        .expect("parses")
+    }
+
+    /// A model with a container that has an entry door.
+    ///
+    /// The root of the model is not a container for this purpose: a door
+    /// lives in a container, and the root is not one.
+    fn model_with_a_container() -> GmdlModel {
+        parse_str(
+            r#"<gmodel versioncode="1"><gclasses/><modules>\
+<module moduleid="0" moduleclass="main" owner="0" caption="m" name="m" kind="C" genprefer="" exehead="" nonexehead="" exefoot="" nonexefoot=""><links/><inputs/><outputs/></module>\
+<module moduleid="2" moduleclass="" owner="0" caption="c" name="Contenedor" kind="C" width="160" height="56" x="100" y="100"><inputs><input ioid="1" name="Entrada1" caption="" mylabel="A_Contenedor"/></inputs><outputs/><links/></module>\
 </modules></gmodel>"#,
         )
         .expect("parses")
@@ -1875,6 +1914,47 @@ mod tests {
             session.model().block(0).expect("c").input(1).expect("d").layout.is_none(),
             "the undo did not bring the old place of the door back"
         );
+    }
+
+    #[test]
+    fn the_doors_of_a_kind_are_numbered_among_themselves() {
+        // The name of a door numbers the doors of its own kind: the entry
+        // doors are Entrada1, Entrada2, ... and the exit doors are Salida1,
+        // Salida2, ... The id of the port is another thing, and it is unique
+        // among all the doors of the container.
+        let mut session = EditSession::new(model_with_a_container());
+        let container = 2u32;
+        session
+            .apply(EditCommand::AddBlock {
+                class: "PortOut".into(),
+                container,
+                x: 10,
+                y: 20,
+            })
+            .expect("adds the exit door");
+        let exit = session
+            .model()
+            .block(container)
+            .expect("container")
+            .output(2)
+            .expect("the exit door");
+        assert_eq!(exit.name, "Salida1", "the exit door is not the first one");
+        assert_eq!(exit.ioid, 2, "the id of the port is not the name's number");
+
+        // And the next exit door is the second one, even though the entry
+        // door took the id 1.
+        session
+            .apply(EditCommand::AddBlock {
+                class: "PortOut".into(),
+                container,
+                x: 30,
+                y: 40,
+            })
+            .expect("adds the second exit door");
+        let exits = session.model().block(container).expect("container").outputs.clone();
+        assert_eq!(exits.len(), 2);
+        assert_eq!(exits[1].name, "Salida2");
+        assert_eq!(exits[1].ioid, 3);
     }
 
     #[test]

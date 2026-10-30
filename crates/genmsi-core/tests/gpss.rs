@@ -11,10 +11,24 @@ use genmsi_core::gpss::render;
 use genmsi_core::program::Program;
 
 /// Compile the bench of a class, the way the CLI does.
+///
+/// The benches are **generated artefacts** (they need the original editor
+/// under wine, and they are not tracked). A clone without them has no bench
+/// to check: the test skips itself instead of failing, the same way the
+/// other tests that need the oracle's answers do.
 fn bench(class: &str) -> Program {
     let path = bench_path(class);
     let model = genmsi_format::load(&path).expect("the bench loads");
     genmsi_core::compile_model(&model).expect("the bench compiles")
+}
+
+/// Whether the benches are there.
+///
+/// They are generated artefacts (they need the original editor under wine,
+/// and they are not tracked): a clone without them has no bench to check,
+/// and the test skips itself instead of failing.
+fn benches_are_there() -> bool {
+    bench_path("GateF").exists()
 }
 
 fn bench_path(class: &str) -> PathBuf {
@@ -54,6 +68,9 @@ fn starting(program: &Program, prefix: &str) -> String {
 
 #[test]
 fn the_gates_write_a_gate_with_their_condition() {
+    if !benches_are_there() {
+        return;
+    }
     assert_eq!(named(&bench("GateF"), "GateF"), "GateF GATE NU Recurso");
     assert_eq!(named(&bench("GateL"), "GateL"), "GateL GATE LS 1");
     assert_eq!(named(&bench("GateS"), "GateS"), "GateS GATE SNF Almacen");
@@ -61,6 +78,9 @@ fn the_gates_write_a_gate_with_their_condition() {
 
 #[test]
 fn the_transfer_names_its_statement_after_its_input_port() {
+    if !benches_are_there() {
+        return;
+    }
     assert_eq!(
         named(&bench("Transfer"), "Entrada1"),
         "Entrada1 TRANSFER 1000,,A_Terminate"
@@ -69,11 +89,17 @@ fn the_transfer_names_its_statement_after_its_input_port() {
 
 #[test]
 fn the_split_names_its_statement_after_what_it_does() {
+    if !benches_are_there() {
+        return;
+    }
     assert_eq!(named(&bench("Split"), "Clona"), "Clona SPLIT 1");
 }
 
 #[test]
 fn the_storage_use_keeps_the_name_of_its_module() {
+    if !benches_are_there() {
+        return;
+    }
     assert_eq!(
         named(&bench("StorageUse"), "StorageUse"),
         "StorageUse QUEUE qAlmacen"
@@ -82,6 +108,9 @@ fn the_storage_use_keeps_the_name_of_its_module() {
 
 #[test]
 fn the_counter_writes_a_savevalue_and_an_assignment() {
+    if !benches_are_there() {
+        return;
+    }
     let program = bench("Counter");
     let statements = statements(&program);
     assert!(
@@ -96,6 +125,9 @@ fn the_counter_writes_a_savevalue_and_an_assignment() {
 
 #[test]
 fn the_match_writes_the_transfer_to_its_conjugate() {
+    if !benches_are_there() {
+        return;
+    }
     let program = bench("Match");
     let statements = statements(&program);
     assert!(
@@ -110,6 +142,9 @@ fn the_match_writes_the_transfer_to_its_conjugate() {
 
 #[test]
 fn two_blocks_of_the_same_class_take_different_names() {
+    if !benches_are_there() {
+        return;
+    }
     let program = bench("Unlink");
     let statements = statements(&program);
     assert!(
@@ -124,6 +159,9 @@ fn two_blocks_of_the_same_class_take_different_names() {
 
 #[test]
 fn the_definitions_are_written_before_the_blocks() {
+    if !benches_are_there() {
+        return;
+    }
     let program = bench("Function");
     let gpss = render(&program);
     let function = gpss.find("FUNCTION").expect("a function");
@@ -139,6 +177,9 @@ fn the_definitions_are_written_before_the_blocks() {
 
 #[test]
 fn an_expression_is_written_with_the_dollar_of_gpss() {
+    if !benches_are_there() {
+        return;
+    }
     assert_eq!(
         named(&bench("Table"), "Tabla"),
         "Tabla TABLE P$Atrib,0,10,10"
@@ -147,12 +188,18 @@ fn an_expression_is_written_with_the_dollar_of_gpss() {
 
 #[test]
 fn the_initial_values_are_written_without_a_name() {
+    if !benches_are_there() {
+        return;
+    }
     assert_eq!(starting(&bench("InitiaSV"), "INITIAL"), "INITIAL X1,0");
     assert_eq!(starting(&bench("InitialLS"), "INITIAL"), "INITIAL LS1");
 }
 
 #[test]
 fn the_blocks_write_the_operands_of_their_class() {
+    if !benches_are_there() {
+        return;
+    }
     for (class, expected) in [
         ("Alter", "A_Alter ALTER E ungrupo,1,param,0,otro,1"),
         ("Assemble", "A_Assemble ASSEMBLE 1"),
@@ -195,6 +242,9 @@ fn the_blocks_write_the_operands_of_their_class() {
 
 #[test]
 fn the_variable_n_class_writes_its_function_and_its_variable() {
+    if !benches_are_there() {
+        return;
+    }
     // The GPSS of the original for this bench:
     //
     //     NORMAL   FUNCTION  RN90,C25
@@ -225,6 +275,9 @@ fn the_variable_n_class_writes_its_function_and_its_variable() {
 
 #[test]
 fn the_multifurcacion_writes_the_two_functions_the_original_creates() {
+    if !benches_are_there() {
+        return;
+    }
     // The GPSS of the original for this bench:
     //
     //     MultifurcacionCH FUNCTION  RN2,D5

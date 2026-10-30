@@ -67,9 +67,11 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: brew install create-dmg
 
-      - uses: taiki-e/install-action@v2
+      # Bun: el binario que publica Bun (el de crates.io es otro crate, y
+      # no compila con un rustc estable).
+      - uses: oven-sh/setup-bun@v2
         with:
-          tool: bun
+          bun-version: latest
 
       - name: Las dependencias del frontend
         working-directory: crates/genmsi-app

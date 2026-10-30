@@ -10,7 +10,7 @@ import {
   type ReplayIndex,
   type TransitionIndex,
 } from "../monitor/replay";
-import { freeSpotOf } from "../graph/graph";
+import { freeSpotOf, type DoorIdentity } from "../graph/graph";
 import type {
   CatalogueDocument,
   Diagnostics,
@@ -131,6 +131,13 @@ export interface AppState {
   speed: number;
   /** The blocks the user selected in the graph. */
   selectedBlockIds: number[];
+  /**
+   * The doors the reader has selected.
+   *
+   * A door is not a module: the selection of the blocks and the selection
+   * of the doors are two things, and the reader can have both at once.
+   */
+  selectedDoors: DoorIdentity[];
   /** The container currently shown in the canvas (0 = model root). */
   activeContainerId: number;
   /**
@@ -230,7 +237,7 @@ export interface AppState {
   /** Set how fast the replay runs. */
   setSpeed: (speed: number) => void;
   /** Select the blocks of the graph. */
-  select: (ids: number[]) => void;
+  select: (ids: number[], doors?: DoorIdentity[]) => void;
   /**
    * Tell the canvas to follow a block.
    *
@@ -423,6 +430,7 @@ export const useApp = create<AppState>((set, get) => ({
   playing: false,
   speed: 1,
   selectedBlockIds: [],
+  selectedDoors: [],
   activeContainerId: 0,
   focusBlockId: null,
   focusToken: 0,
@@ -488,6 +496,7 @@ export const useApp = create<AppState>((set, get) => ({
         playhead: 0,
         playing: false,
         selectedBlockIds: [],
+  selectedDoors: [],
         activeContainerId: 0,
         focusBlockId: null,
         clipboard: [],
@@ -538,6 +547,7 @@ export const useApp = create<AppState>((set, get) => ({
         playhead: 0,
         playing: false,
         selectedBlockIds: [],
+  selectedDoors: [],
         activeContainerId: 0,
         focusBlockId: null,
         clipboard: [],
@@ -982,14 +992,23 @@ export const useApp = create<AppState>((set, get) => ({
 
   setSpeed: (speed: number) => set({ speed }),
 
-  select: (ids: number[]) => {
+  select: (ids: number[], doors: DoorIdentity[] = []) => {
     // The same selection does not change the state: the graph reports it
     // again on every render, and a new array would start a loop.
     const current = get().selectedBlockIds;
+    const picked = get().selectedDoors;
     const same =
-      current.length === ids.length && current.every((id) => ids.includes(id));
+      current.length === ids.length &&
+      current.every((id) => ids.includes(id)) &&
+      picked.length === doors.length &&
+      doors.every(
+        (door, index) =>
+          picked[index]?.container === door.container &&
+          picked[index]?.ioid === door.ioid &&
+          picked[index]?.input === door.input,
+      );
     if (!same) {
-      set({ selectedBlockIds: ids });
+      set({ selectedBlockIds: ids, selectedDoors: doors });
     }
   },
 
@@ -1041,15 +1060,26 @@ export const useApp = create<AppState>((set, get) => ({
 
   deleteSelection: async () => {
     const ids = get().selectedBlockIds;
-    if (ids.length === 0) {
+    const doors = get().selectedDoors;
+    if (ids.length === 0 && doors.length === 0) {
       return;
+    }
+    // The doors go first: a door belongs to a container, and a container
+    // that is deleted takes its doors with it.
+    for (const door of doors) {
+      await get().apply({
+        op: "removePort",
+        block: door.container,
+        ioid: door.ioid,
+        input: door.input,
+      });
     }
     if (ids.length === 1) {
       await get().apply({ op: "removeBlock", id: ids[0] });
-    } else {
+    } else if (ids.length > 1) {
       await get().apply({ op: "removeBlocks", ids });
     }
-    set({ selectedBlockIds: [] });
+    set({ selectedBlockIds: [], selectedDoors: [] });
   },
 
   copy: () => set({ clipboard: [...get().selectedBlockIds] }),

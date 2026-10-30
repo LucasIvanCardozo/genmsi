@@ -24,7 +24,7 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { graphOf, type BlockData } from "../graph/graph";
+import { graphOf, type BlockData, type DoorIdentity } from "../graph/graph";
 import { decideFrame, type FrameState } from "../graph/frame";
 import {
   CAPTION_SIZE,
@@ -350,7 +350,7 @@ void graphOfUnused;
 /** What the graph asks the app to do. */
 export interface GraphActions {
   /** The blocks the user selected. */
-  onSelect: (ids: number[]) => void;
+  onSelect: (ids: number[], doors: DoorIdentity[]) => void;
   /** The user moved a block. */
   onMove: (id: number, x: number, y: number) => void;
   /** The user moved a door of a container. */
@@ -613,17 +613,25 @@ export default memo(function GraphView({
         onEdgesChange={onEdgesChange}
         onNodeDoubleClick={onNodeDoubleClick}
         onNodeClick={(_event, node) => {
-          if (node.data.door === null) {
-            actions.onSelect([Number(node.id)]);
+          const door = node.data.door;
+          if (door !== null) {
+            // A door is a block of the picture: it is selected like one.
+            actions.onSelect([], [door]);
+            return;
           }
+          actions.onSelect([Number(node.id)], []);
         }}
-        onPaneClick={() => actions.onSelect([])}
+        onPaneClick={() => actions.onSelect([], [])}
         onSelectionChange={({ nodes: picked }) => {
           selected.current = new Set(picked.map((node) => node.id));
           const validIds = picked
             .filter((node) => node.data.door === null)
             .map((node) => Number(node.id));
-          actions.onSelect(validIds);
+          const validDoors = picked
+            .filter((node) => node.data.door !== null)
+            .map((node) => node.data.door)
+            .filter((door): door is DoorIdentity => door !== null);
+          actions.onSelect(validIds, validDoors);
         }}
         onNodeDragStop={(_event, node) => {
           const door = node.data.door;

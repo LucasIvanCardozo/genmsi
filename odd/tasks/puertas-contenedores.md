@@ -88,6 +88,7 @@ ramificar el código por `"in-3"`.
 | T3 | S5 | Las cifras del contenedor salen de los cruces de frontera, siempre; se borra el heuristic de la primera puerta | app | **hecho** | — |
 | T4 | S6 | La entidad cruza el contenedor por la puerta correcta: la cadena de enlaces del pasaje y el círculo que la recorre | app | **hecho** | — |
 | T5 | S7 | La identidad de la puerta en la app es data, no una cadena que se parsea | app | **hecho** | — |
+| T6 | S7 | El botón de borrar borra las puertas seleccionadas, como borra los bloques | app | **hecho** | — |
 
 ## Log
 
@@ -402,3 +403,32 @@ código, y la tabla puede guardarlo.
 
 `node --test tests/*.test.ts`: 308 en verde. `bunx tsc --noEmit`: limpio.
 `cargo test --workspace`: 86 suites en verde.
+
+### L13 — T6 (hecho): el borrado es el mismo para los bloques y para las puertas
+
+Había **dos caminos de borrado** con comportamientos distintos: la tecla
+Delete de React Flow borra la puerta (`onNodesDelete` → `removePort`) y el
+botón de la barra de herramientas borra los bloques (`deleteSelection` →
+`removeBlock`). El lector que seleccionaba una puerta y apretaba el botón no
+pasaba nada.
+
+Ahora la app tiene **dos selecciones**: la de los bloques (`selectedBlockIds`)
+y la de las puertas (`selectedDoors`), porque una puerta no es un módulo y no
+puede entrar en una lista de ids de módulo. El botón de borrar borra las dos
+cosas, y las puertas **primero**: una puerta es de su contenedor, y un
+contenedor que se borra se lleva sus puertas.
+
+El canvas dice qué está seleccionado en las dos listas, y el estado sólo
+cambia cuando la selección cambia de verdad (el canvas la reporta en cada
+render, y un array nuevo empezaría un bucle).
+
+**Lo que queda anotado**: borrar un bloque y una puerta a la vez son **dos**
+entradas de deshacer (una por comando). El motor no tiene un comando de lote
+para las puertas, y agregarlo es otra unidad.
+
+Test nuevo: `crates/genmsi-app/tests/selection.test.ts`
+(`the button that deletes what is selected deletes a door too`,
+`the selection of the doors is the selection of the reader`), con el store
+cargado por el servidor de Vite, como lo carga `horizon.test.ts`.
+
+`node --test tests/*.test.ts`: 310 en verde. `bunx tsc --noEmit`: limpio.

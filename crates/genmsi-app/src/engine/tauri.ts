@@ -8,7 +8,7 @@ import type {
   SessionState,
   TraceDocument,
 } from "../types";
-import { EngineError } from "./adapter";
+import { EngineError } from "./adapter.ts";
 import type {
   EngineAdapter,
   FileFingerprint,
@@ -17,7 +17,7 @@ import type {
   SaveResult,
   SimulationOptions,
 } from "./adapter";
-import { invoke } from "./host";
+import { invoke } from "./host.ts";
 
 /**
  * Send one request of the session protocol.
@@ -71,6 +71,11 @@ function documentOf<T>(answer: SessionAnswer): T {
  */
 export const tauri: EngineAdapter = {
   listModels: () => invoke<ModelRef[]>("list_models"),
+  /**
+   * The version of the app: the one of the shell, the one that travels in
+   * the bundle that was installed.
+   */
+  appVersion: () => invoke<string>("app_version"),
   loadModel: async (path: string) =>
     parsed<ModelDocument>(await invoke<string>("load_model", { path })),
   lint: async (path: string) =>

@@ -8,7 +8,7 @@ import type {
   SessionState,
   TraceDocument,
 } from "../types";
-import { EngineError } from "./adapter";
+import { EngineError } from "./adapter.ts";
 import type {
   EngineAdapter,
   FileFingerprint,
@@ -120,6 +120,11 @@ function documentOf<T>(answer: SessionAnswer): T {
 /** The dev bridge backend: the Vite middleware of the development server. */
 export const devBridge: EngineAdapter = {
   listModels: async () => (await get<ModelsDocument>("models", {})).models,
+  /**
+   * The version of the app: the bridge answers with the one of the
+   * manifest of the app, the same number the shell's crate carries.
+   */
+  appVersion: () => get<string>("version", {}),
   loadModel: (path: string) => get<ModelDocument>("model", { path }),
   lint: (path: string) => get<LintDocument>("lint", { path }),
   fingerprint: (path: string) => fingerprintOf(path),

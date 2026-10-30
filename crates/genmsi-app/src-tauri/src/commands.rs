@@ -139,6 +139,16 @@ impl RunControl {
     }
 }
 
+/// The version of the app that is running.
+///
+/// The version travels in the bundle: it is the one of the shell's crate,
+/// the same number the installer writes in the name of the file it
+/// publishes.
+#[tauri::command]
+pub fn app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 /// The models the app offers.
 #[tauri::command]
 pub fn list_models() -> Result<Vec<ModelFile>, String> {
@@ -746,6 +756,16 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("genmsi-app-{name}-{}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("the scratch directory is created");
         dir
+    }
+
+    /// The command of the version answers the version of the shell.
+    ///
+    /// The version that travels in the bundle is the one of the shell's
+    /// crate: the command says that one, and not another.
+    #[test]
+    fn the_version_command_answers_the_version_of_the_shell() {
+        assert_eq!(app_version(), env!("CARGO_PKG_VERSION"));
+        assert!(!app_version().is_empty(), "the version is empty");
     }
 
     /// The file the app publishes: the model it has open.

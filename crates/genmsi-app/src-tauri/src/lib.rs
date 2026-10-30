@@ -41,6 +41,7 @@ pub fn run() {
         // with them, and the frontend asks the plugin's commands.
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            commands::app_version,
             commands::list_models,
             commands::load_model,
             commands::lint_model,

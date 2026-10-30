@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdirSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -80,6 +80,20 @@ export function fingerprintOf(file: string): {
     // The file is not there: the app has nothing to reload.
     return null;
   }
+}
+
+/**
+ * The version of the app.
+ *
+ * It is the one of the manifest of the app: the same number the shell's
+ * crate carries in the bundle, so the browser and the installed app say
+ * the same thing.
+ */
+export function appVersion(): string {
+  const manifest = JSON.parse(
+    readFileSync(path.resolve(here, "../package.json"), "utf8"),
+  ) as { version?: string };
+  return manifest.version ?? "";
 }
 
 /**
@@ -225,6 +239,13 @@ export function devBridge(): Plugin {
         const modelPath = url.searchParams.get("path") ?? "";
         try {
           switch (route) {
+            case "version": {
+              // The version of the app: the same one the shell answers.
+              res.statusCode = 200;
+              res.setHeader("content-type", "application/json; charset=utf-8");
+              res.end(JSON.stringify(appVersion()));
+              return;
+            }
             case "models": {
               // The models of the reference set and of the development work
               // directory, where the copy the user edits lives.

@@ -1,4 +1,4 @@
-import { EngineError } from "./adapter";
+import { EngineError } from "./adapter.ts";
 
 /**
  * The host the app runs in.

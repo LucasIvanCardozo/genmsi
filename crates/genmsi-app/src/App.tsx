@@ -31,6 +31,7 @@ export default function App() {
     clearNotice,
     loadModels,
     loadCatalogue,
+    loadAppVersion,
     loadRecentModels,
     newModel,
     apply,
@@ -52,8 +53,9 @@ export default function App() {
   useEffect(() => {
     void loadModels();
     void loadCatalogue();
+    void loadAppVersion();
     void loadRecentModels();
-  }, [loadModels, loadCatalogue, loadRecentModels]);
+  }, [loadModels, loadCatalogue, loadAppVersion, loadRecentModels]);
 
   // The notice of a save goes away on its own: a notice that stays is a
   // message that takes the place of the work.

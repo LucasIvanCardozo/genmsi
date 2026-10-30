@@ -191,6 +191,12 @@ export interface AppState {
   canRedo: boolean;
   /** The block classes the editor offers to create. */
   catalogue: CatalogueDocument | null;
+  /**
+   * The version of the app that is running.
+   *
+   * `null` means the app has not asked for it yet.
+   */
+  appVersion: string | null;
   /** The path of a save that waits for the user's confirmation. */
   pendingSave: string | null;
   /** The message of the last save. */
@@ -208,6 +214,8 @@ export interface AppState {
   loadModels: () => Promise<void>;
   /** Ask the engine for the block classes the editor offers. */
   loadCatalogue: () => Promise<void>;
+  /** Ask the host for the version of the app that is running. */
+  loadAppVersion: () => Promise<void>;
   /** Open a model: its graph and its diagnostics. */
   openModel: (path: string) => Promise<void>;
   /** Start a new, empty model. */
@@ -450,6 +458,7 @@ export const useApp = create<AppState>((set, get) => ({
   canUndo: false,
   canRedo: false,
   catalogue: null,
+  appVersion: null,
   pendingSave: null,
   savedMessage: null,
   recentModels: [],
@@ -473,6 +482,15 @@ export const useApp = create<AppState>((set, get) => ({
       set({ catalogue, error: null });
     } catch (error) {
       set({ error: `No se pudo cargar el catálogo de bloques: ${messageOf(error)}` });
+    }
+  },
+
+  loadAppVersion: async () => {
+    try {
+      const version = await engine().appVersion();
+      set({ appVersion: version });
+    } catch {
+      // The version is a convenience: the app works without it.
     }
   },
 

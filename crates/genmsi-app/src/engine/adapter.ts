@@ -83,6 +83,13 @@ export class EngineError extends Error {
 export interface EngineAdapter {
   /** The models the app offers. */
   listModels(): Promise<ModelRef[]>;
+  /**
+   * The version of the app that is running.
+   *
+   * The Tauri backend asks the shell —the version that travels in the
+   * bundle— and the dev bridge answers with the one of `package.json`.
+   */
+  appVersion(): Promise<string>;
   /** The model's graph (`genmsi.model/1`). */
   loadModel(path: string): Promise<ModelDocument>;
   /** The model's lint (`genmsi.lint/1`). */

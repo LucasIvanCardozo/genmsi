@@ -1,9 +1,8 @@
 # The desktop shell's build output.
 target/
 
-# The desktop shell's icons are generated, not committed: the repository
-# carries no images. Recreate them with:
+# The desktop shell's icons ARE committed: the header of the app shows the
+# icon of the app and the bundle needs them, so a clone without them cannot
+# build. They are the ones the tool of Tauri generates:
 #
 #     bunx @tauri-apps/cli icon <source.png> -o crates/genmsi-app/src-tauri/icons
-#
-icons/

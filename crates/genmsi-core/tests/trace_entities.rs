@@ -137,6 +137,9 @@ fn block_of(program: &Program, name: &str) -> Option<usize> {
 
 #[test]
 fn enter_trace_carries_the_queue_name() {
+    if !benches_are_there() {
+        return;
+    }
     let (program, result) = run_model();
     let queue = block_of(&program, "centro").expect("the centro queue is in the model");
     let enters: Vec<_> = result
@@ -152,6 +155,9 @@ fn enter_trace_carries_the_queue_name() {
 
 #[test]
 fn enter_trace_carries_the_name_resolved_from_a_parameter() {
+    if !benches_are_there() {
+        return;
+    }
     // A queue named by a parameter (`*caja`) is only known at run time.
     let program = linear(
         &[
@@ -189,6 +195,9 @@ fn enter_trace_carries_the_name_resolved_from_a_parameter() {
 
 #[test]
 fn enter_trace_is_empty_for_blocks_without_an_entity() {
+    if !benches_are_there() {
+        return;
+    }
     let (program, result) = run_model();
     let mut covered = 0;
     for event in result.trace.iter().filter(|event| event.event == "enter") {
@@ -219,6 +228,9 @@ fn enter_trace_is_empty_for_blocks_without_an_entity() {
 
 #[test]
 fn wait_trace_still_carries_the_entity_name() {
+    if !benches_are_there() {
+        return;
+    }
     let (program, result) = run_model();
     let waits: Vec<_> = result
         .trace
@@ -243,6 +255,9 @@ fn wait_trace_still_carries_the_entity_name() {
 
 #[test]
 fn leave_trace_still_carries_the_target() {
+    if !benches_are_there() {
+        return;
+    }
     let (program, result) = run_model();
     let leaves: Vec<_> = result
         .trace
@@ -267,6 +282,9 @@ fn leave_trace_still_carries_the_target() {
 
 #[test]
 fn the_generator_publishes_the_leave_of_the_transaction_it_born() {
+    if !benches_are_there() {
+        return;
+    }
     let (program, result) = run_model();
     let generators: Vec<usize> = program
         .blocks
@@ -329,6 +347,9 @@ fn the_generator_publishes_the_leave_of_the_transaction_it_born() {
 
 #[test]
 fn table_trace_carries_the_name_and_the_value() {
+    if !benches_are_there() {
+        return;
+    }
     let (_program, result) = run_fixture("TP4__supermercado");
     let samples: Vec<_> = result
         .trace
@@ -364,6 +385,9 @@ fn table_trace_carries_the_name_and_the_value() {
 
 #[test]
 fn table_trace_rebuilds_the_histogram() {
+    if !benches_are_there() {
+        return;
+    }
     let (_program, result) = run_fixture("TP4__supermercado");
     for (name, table) in result
         .entities
@@ -412,6 +436,9 @@ fn table_trace_rebuilds_the_histogram() {
 
 #[test]
 fn logic_trace_carries_the_switch_and_its_state() {
+    if !benches_are_there() {
+        return;
+    }
     let (_program, result) = run_fixture("Problema 1__semaforo-1");
     let switches: Vec<_> = result
         .trace
@@ -463,6 +490,9 @@ fn logic_trace_carries_the_switch_and_its_state() {
 
 #[test]
 fn value_trace_carries_the_name_and_the_value() {
+    if !benches_are_there() {
+        return;
+    }
     let (_program, result) = run_fixture("TP4__supermercado");
     let values: Vec<_> = result
         .trace
@@ -497,6 +527,9 @@ fn value_trace_carries_the_name_and_the_value() {
 
 #[test]
 fn unlink_trace_carries_the_members_that_left_the_chain() {
+    if !benches_are_there() {
+        return;
+    }
     let (program, result) = run_fixture("TP7__Clase 7_1_Link_Unlink");
     let unlinks: Vec<_> = result
         .trace
@@ -557,6 +590,9 @@ fn unlink_trace_carries_the_members_that_left_the_chain() {
 
 #[test]
 fn a_run_without_the_trace_publishes_no_events() {
+    if !benches_are_there() {
+        return;
+    }
     let (_program, result) = run_fixture_untraced("TP4__supermercado");
     assert!(
         result.trace.is_empty(),
@@ -566,6 +602,9 @@ fn a_run_without_the_trace_publishes_no_events() {
 
 #[test]
 fn the_trace_does_not_change_the_run() {
+    if !benches_are_there() {
+        return;
+    }
     let (_program, traced) = run_fixture("TP4__supermercado");
     let (program, untraced) = run_fixture_untraced("TP4__supermercado");
     assert!(!traced.trace.is_empty(), "the traced run publishes events");
@@ -629,6 +668,9 @@ fn entries(program: &Program, result: &RunResult, label: &str) -> u64 {
 
 #[test]
 fn the_preempt_class_takes_the_facility_and_gives_it_back() {
+    if !benches_are_there() {
+        return;
+    }
     // The report of the original for this bench:
     //
     //     1  60  GENERATE 60,30
@@ -674,6 +716,9 @@ fn the_preempt_class_takes_the_facility_and_gives_it_back() {
 
 #[test]
 fn the_return_class_is_the_release_of_the_facility() {
+    if !benches_are_there() {
+        return;
+    }
     // The report of the original for this bench:
     //
     //     2  60  A_Seize     SEIZE Recurso
@@ -781,6 +826,9 @@ fn preemption_model(newcomer_priority: &'static str) -> Program {
 
 #[test]
 fn the_preempt_class_gives_the_facility_to_the_transaction_that_outranks_the_owner() {
+    if !benches_are_there() {
+        return;
+    }
     // The `PR` operand of the original: the preempting transaction's own
     // priority decides whether it may take the facility.
     let program = preemption_model("1");
@@ -798,6 +846,9 @@ fn the_preempt_class_gives_the_facility_to_the_transaction_that_outranks_the_own
 
 #[test]
 fn the_preempt_class_leaves_the_facility_to_the_owner_that_outranks_the_newcomer() {
+    if !benches_are_there() {
+        return;
+    }
     // The owner keeps the facility when it has the priority: the newcomer
     // waits for it, as a `SEIZE` that finds the facility busy does.
     let program = preemption_model("0");
@@ -900,6 +951,9 @@ fn interrupted_owner_model(remove_owner: bool) -> Program {
 
 #[test]
 fn the_preempt_class_sends_the_owner_it_interrupts_to_its_own_output() {
+    if !benches_are_there() {
+        return;
+    }
     // The macro code of the original routes the owner of the interrupted
     // facility to the `SalidaAlt` output (`Propietaria`).
     //
@@ -934,6 +988,9 @@ fn the_preempt_class_sends_the_owner_it_interrupts_to_its_own_output() {
 
 #[test]
 fn the_preempt_class_removes_the_owner_it_interrupts_when_the_class_says_so() {
+    if !benches_are_there() {
+        return;
+    }
     // The `ModoArrebato` of the original: `Remover` takes the owner out of
     // the model instead of routing it.
     //
@@ -966,6 +1023,9 @@ fn the_preempt_class_removes_the_owner_it_interrupts_when_the_class_says_so() {
 
 #[test]
 fn the_mark_class_writes_the_hour_in_the_parameter() {
+    if !benches_are_there() {
+        return;
+    }
     // The macro code of the original: `MARK [Parametro:'Parametro donde se
     // guarda la hora']`. The class writes the time of the model in the
     // parameter and lets the transaction go on.
@@ -1035,6 +1095,9 @@ fn the_mark_class_writes_the_hour_in_the_parameter() {
 
 #[test]
 fn the_remove_me_class_takes_the_transaction_out_of_its_group() {
+    if !benches_are_there() {
+        return;
+    }
     // The class of the original removes the transaction from the group it
     // names; the examination that follows finds it in no group.
     let nodes = [
@@ -1089,6 +1152,9 @@ fn the_remove_me_class_takes_the_transaction_out_of_its_group() {
 
 #[test]
 fn the_select_l_class_picks_the_logic_switch_that_is_set() {
+    if !benches_are_there() {
+        return;
+    }
     // The class of the original selects a logic switch: `SELECT LS
     // param,1,10`. The number of the switch goes to the parameter.
     let nodes = [
@@ -1150,6 +1216,9 @@ fn the_select_l_class_picks_the_logic_switch_that_is_set() {
 
 #[test]
 fn the_select_s_class_picks_the_storage_that_is_not_full() {
+    if !benches_are_there() {
+        return;
+    }
     // `SELECT SNF param,1,10`: the class picks a storage that has room.
     let nodes = [
         node(
@@ -1197,6 +1266,9 @@ fn the_select_s_class_picks_the_storage_that_is_not_full() {
 
 #[test]
 fn the_select_sna_class_picks_the_entity_whose_value_is_the_compared_one() {
+    if !benches_are_there() {
+        return;
+    }
     // `SELECT E param,1,10,*1,Q,`: the class picks the entity of the class
     // whose value is the one that is compared against.
     let nodes = [
@@ -1247,6 +1319,9 @@ fn the_select_sna_class_picks_the_entity_whose_value_is_the_compared_one() {
 
 #[test]
 fn the_select_classes_go_on_when_there_is_nothing_to_pick() {
+    if !benches_are_there() {
+        return;
+    }
     // The report of the original for the benches of the three classes shows
     // every transaction going on by the first output, although there is
     // nothing to select: no logic switch is set, no storage exists and the
@@ -1317,6 +1392,9 @@ fn the_select_classes_go_on_when_there_is_nothing_to_pick() {
 
 #[test]
 fn the_variable_n_class_defines_a_normal_variable() {
+    if !benches_are_there() {
+        return;
+    }
     // The class creates the standard normal distribution with the seed it
     // names and the variable that reads it: `60+(1#FN$NORMAL)/10`. The
     // variable is a normal one around its mean, not a constant.
@@ -1382,4 +1460,13 @@ fn the_variable_n_class_defines_a_normal_variable() {
         (0.45..0.75).contains(&share),
         "the variable is a normal one around its mean, measured {share:.3}"
     );
+}
+
+/// Whether the benches of the oracle are there.
+///
+/// They are generated artefacts (they need the original editor under wine,
+/// and they are not tracked): a clone without them has no bench to check,
+/// and the test skips itself instead of failing.
+fn benches_are_there() -> bool {
+    root().join("scripts/wine-oracle/benches/GateF.gmdl").exists()
 }

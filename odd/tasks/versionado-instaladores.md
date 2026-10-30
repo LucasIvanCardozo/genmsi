@@ -265,3 +265,31 @@ empaquetado. T9 toca las dos (el manifiesto es de la app, el job es de la CI).
   versión desalineada) y una que comprueba que el script no escribe nada
   cuando la fuente no coincide (`7da2401`). La app pasó de 311 a 327
   pruebas.
+- **L16** — **La corrida del release encontró seis fallos que ningún test
+  local podía ver** (todos en la CI, ninguno en el código):
+  1. El contenedor de Arch **no tiene git**: el checkout bajaba el
+     repositorio como tarball y no dejaba historia, así que el `git archive`
+     del script no tenía de dónde sacar el código (`f39556c`: git antes del
+     checkout).
+  2. `flatpak remote-add` sin `--user` pedía una operación de sistema, que
+     el runner no le deja hacer a un usuario (`f302c79`).
+  3. `flatpak build-export --generate-runtime-sources`: la opción no existe;
+     y `build-export` **no toma el app id como posicional** (lo tomaba como
+     rama, y el bundle busca la rama `master`) (`5bc3551`).
+  4. `upload-artifact` **no ve los archivos que empiezan con punto**: el
+     `.SRCINFO` se quedaba en el runner y el release nunca lo vio
+     (`a359dc0`).
+  5. `makepkg` arma un segundo paquete con los símbolos del binario
+     (`genmsi-debug-...`): es una convención de los repositorios de Arch,
+     no un instalador de un release, así que queda fuera (`80014b9`).
+  6. El runtime **GNOME 47 estaba fin de vida desde el 15 de octubre de
+     2025**: el runtime pasa a 51, que es el vigente (`5bc3551`).
+- **L17** — El **paquete de pacman, abierto y mirado dentro**: el binario
+  pesa 10,2 MB y está stripped (compilación de release ✓), el lanzador pide
+  `Icon=GenMSI` y el icono está instalado con ese nombre (el bug del icono,
+  cerrado ✓), y depende de `gtk3` y de `webkit2gtk-4.1` ✓.
+- **L18** — La versión del release: el usuario eligió **subirla a 0.3.1**
+  ("Subir la versión a 0.3.1") en vez de mover la etiqueta `v0.3.0`. La
+  fuente cambió a mano en `Cargo.toml` y `scripts/bump-version.sh 0.3.1`
+  escribió las seis copias ✓ (commit `5f1383f`, etiqueta `v0.3.1`). El
+  borrador `v0.3.0` queda como estaba, sin publicar.

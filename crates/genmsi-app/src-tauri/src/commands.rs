@@ -847,16 +847,28 @@ mod tests {
             .expect("the shell answers");
         assert!(missing.is_none(), "a file that is not there has a fingerprint");
 
-        // Another write is another fingerprint: the date is in nanoseconds,
-        // so two writes in the same millisecond look different.
-        std::fs::write(&path, "otro contenido").expect("the file is written again");
-        let again = model_fingerprint(path.display().to_string())
-            .expect("the shell answers")
-            .expect("the file is there");
-        assert_ne!(
-            again.modified_nanos, fingerprint.modified_nanos,
-            "two writes look the same"
-        );
+        // Another write is another fingerprint: the size moves, and the
+        // date moves too.
+        //
+        // The date is expressed in nanoseconds, but that is the unit of
+        // the value, not the resolution of the clock of the filesystem:
+        // two writes in a row can land in the same tick of that clock
+        // (the runner of the CI does it), and then the date is the same.
+        // So the test waits for the clock to move instead of assuming it
+        // does.
+        let mut again = None;
+        for _ in 0..500 {
+            std::fs::write(&path, "otro contenido").expect("the file is written again");
+            let fingerprint_again = model_fingerprint(path.display().to_string())
+                .expect("the shell answers")
+                .expect("the file is there");
+            if fingerprint_again.modified_nanos != fingerprint.modified_nanos {
+                again = Some(fingerprint_again);
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let again = again.expect("the date of the file never moved");
         assert_ne!(again.size, fingerprint.size, "the size did not move");
 
         std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");

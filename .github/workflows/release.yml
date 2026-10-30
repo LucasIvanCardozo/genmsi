@@ -293,7 +293,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          find paquete -type f -print0 \
+          # GitHub renames the assets whose name starts with a point (the
+          # .SRCINFO becomes default.SRCINFO), so it travels with the name
+          # it can have: whoever pushes it to the AUR renames it back.
+          if [ -f paquete/.SRCINFO ]; then
+            cp paquete/.SRCINFO paquete/SRCINFO
+          fi
+          find paquete -type f ! -name '.SRCINFO' -print0 \
             | xargs -0 -r gh release upload "$RELEASE_TAG" --clobber --repo "$GITHUB_REPOSITORY"
 
   # The Flatpak joins the release, next to the other installers.
@@ -330,7 +336,8 @@ jobs:
           # The sums of a previous run are not part of this one.
           rm -f archivos/SHA256SUMS
           cd archivos
-          sha256sum -- * > ../SHA256SUMS
+          # The glob with a point in front sees the files that hide.
+          sha256sum -- ./* > ../SHA256SUMS
 
       - name: Las sumas, en el release
         env:
@@ -353,7 +360,7 @@ jobs:
             echo "QUÉ HAY EN CADA ARCHIVO Y CÓMO SE INSTALA"
             echo "------------------------------------------"
             echo
-            for f in archivos/*; do
+            for f in $(find archivos -type f | sort); do
               name="$(basename "$f")"
               sum="$(awk -v n="$name" '$2 == n {print $1}' SHA256SUMS)"
               case "$name" in
@@ -401,8 +408,8 @@ jobs:
                   que="El PKGBUILD del paquete de pacman, con la suma real de la fuente: es el archivo que se sube a la AUR."
                   como=""
                   ;;
-                .SRCINFO)
-                  que="El .SRCINFO del paquete de pacman: el archivo que la AUR sirve."
+                SRCINFO)
+                  que="El .SRCINFO del paquete de pacman: el archivo que la AUR sirve (bajalo con este nombre y ponele el nombre .SRCINFO antes de subirlo)."
                   como=""
                   ;;
                 *)

@@ -13,6 +13,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   copyFileSync,
   existsSync,
@@ -147,6 +148,29 @@ test("the readme of the installer carries the version of the source", () => {
   }
 });
 
+test("the formats the readme names are the ones the workflow publishes", () => {
+  // The readme of the installer and the release have to say the same
+  // thing: a reader who installs from the readme and a reader who
+  // downloads from the release get the same formats.
+  const workflow = readFileSync(
+    path.join(repoRoot, ".github/workflows/release.yml"),
+    "utf8",
+  );
+  for (const format of publishedFormats) {
+    assert.ok(
+      workflow.includes(format),
+      `the workflow does not publish the format ${format}`,
+    );
+  }
+  // The AppImage stays out: it does not work (the WebKitGTK that travels
+  // inside it cannot find its helpers), and an artifact that does not run
+  // is worse than no artifact.
+  assert.ok(
+    !workflow.includes("AppImage"),
+    "the workflow publishes an AppImage, and the AppImage does not work",
+  );
+});
+
 test("the script that writes the copies is there", () => {
   assert.ok(existsSync(bumpScript), "scripts/bump-version.sh does not exist");
   assert.ok(statSync(bumpScript).mode & 0o111, "the script is not executable");
@@ -267,3 +291,29 @@ test("the script fails when it cannot leave a copy with the version", (t) => {
   const result = runScript(dir, sourceVersion());
   assert.notEqual(result.code, 0, "the script did not fail with a copy missing");
 });
+
+/** The seven files the version lives in, relative to a root. */
+const seven = [
+  "Cargo.toml",
+  "crates/genmsi-app/engine/Cargo.toml",
+  "crates/genmsi-app/package.json",
+  "crates/genmsi-app/src-tauri/Cargo.toml",
+  "crates/genmsi-app/src-tauri/tauri.conf.json",
+  "packaging/arch/PKGBUILD",
+  "crates/genmsi-app/LEEME.txt",
+];
+
+test("the script does not write anything when the source is out of date", (t) => {
+  const dir = scratch();
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const before = seven.map((file) =>
+    createHash("sha256").update(readFileSync(path.join(dir, file))).digest("hex"),
+  );
+  const result = runScript(dir, "9.9.9");
+  assert.notEqual(result.code, 0, "the script did not say the source is out of date");
+  const after = seven.map((file) =>
+    createHash("sha256").update(readFileSync(path.join(dir, file))).digest("hex"),
+  );
+  assert.deepEqual(after, before, "the script wrote something with the source out of date");
+});
+

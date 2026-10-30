@@ -53,8 +53,11 @@ case "$1" in
 esac
 
 version="$1"
-[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]] ||
-  die "esto no parece una versión: $version"
+# Only `x.y.z`: the whole chain of the version (the readme, the names of
+# the files, the guardián) speaks that language, and a version with a
+# suffix would leave the copies saying one thing and the readme another.
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] ||
+  die "esto no parece una versión (se pide X.Y.Z): $version"
 
 cargo_root="$repo/Cargo.toml"
 engine_cargo="$repo/crates/genmsi-app/engine/Cargo.toml"

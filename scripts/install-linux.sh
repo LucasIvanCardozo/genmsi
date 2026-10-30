@@ -12,7 +12,7 @@
 #   ./scripts/install-linux.sh              # compila e instala
 #   ./scripts/install-linux.sh --no-build   # sólo reinstala lo ya compilado
 #   ./scripts/install-linux.sh --with-mcp   # además instala la CLI y
-#                                             configura el MCP de Pi
+#                                             # configura el MCP de Pi
 #
 # El MCP es lo que permite que un agente (Pi, u otro cliente MCP) lea,
 # valide y simule los modelos: lo publica la misma CLI, con `genmsi mcp`.
@@ -108,7 +108,7 @@ if [[ $with_mcp -eq 1 ]]; then
       echo "MCP configurado. En una sesión de Pi, /reload para que aparezcan sus herramientas."
     else
       echo "Para conectarlo a Pi:"
-      echo "  pi mcp add genmsi -- ${HOME}/.local/bin/genmsi" mcp
+      echo "  pi mcp add genmsi -- ${HOME}/.local/bin/genmsi mcp"
     fi
   fi
 

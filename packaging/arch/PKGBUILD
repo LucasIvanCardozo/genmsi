@@ -28,14 +28,13 @@ source=("$pkgname-$pkgver.tar.gz::https://github.com/LucasIvanCardozo/genmsi/arc
 sha256sums=('SKIP')
 
 build() {
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$srcdir/$pkgname-$pkgver/crates/genmsi-app"
   # El frontend: el mismo que la app de escritorio arma.
-  cd crates/genmsi-app
   bun install --frozen-lockfile
-  bun run build
-  cd "$srcdir/$pkgname-$pkgver"
-  # El shell: el motor va dentro del programa.
-  cargo build --release --manifest-path crates/genmsi-app/src-tauri/Cargo.toml
+  # El shell: el motor va dentro del programa y el frontend con él. El
+  # bundle de Tauri no hace falta (el paquete de pacman no es su formato):
+  # sólo se arma el programa.
+  bunx @tauri-apps/cli build --no-bundle
 }
 
 package() {

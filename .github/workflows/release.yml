@@ -88,3 +88,58 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  # The package of pacman: the one format Tauri does not make, and the one
+  # CachyOS needs (it is an Arch distribution).
+  #
+  # It is built inside a container of Arch, because `makepkg` is of Arch.
+  pacman:
+    name: El paquete de pacman (CachyOS)
+    runs-on: ubuntu-latest
+    container: archlinux/base:latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Las dependencias
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm \
+            base-devel \
+            rust \
+            cargo \
+            webkit2gtk-4.1 \
+            gtk3 \
+            patchelf \
+            git
+          # Bun: its own release (the crate of crates.io is another
+          # program), installed for everybody and not for one user.
+          BUN_INSTALL=/usr/local bash -c "curl -fsSL https://bun.sh/install | bash"
+
+      - name: El paquete
+        run: |
+          # makepkg no corre como root.
+          useradd -m builder
+          chown -R builder "$GITHUB_WORKSPACE"
+          su builder -c "cd '$GITHUB_WORKSPACE' && PATH=/usr/local/bin:\$PATH packaging/arch/build-package.sh"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: genmsi-pacman
+          path: target/arch-package/*.pkg.tar.zst
+
+  # The package of pacman joins the release, next to the other installers.
+  publicar-pacman:
+    name: El paquete de pacman, en el release
+    needs: [release, pacman]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: genmsi-pacman
+          path: paquete
+
+      - name: Al release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: gh release upload "$TAG" paquete/*.pkg.tar.zst --clobber --repo "$GITHUB_REPOSITORY"

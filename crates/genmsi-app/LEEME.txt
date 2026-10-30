@@ -33,6 +33,21 @@ Para instalarlo como un programa del sistema, mejor el paquete:
   - CachyOS, Arch y derivados:  genmsi-0.3.0-1-x86_64.pkg.tar.zst
     (sudo pacman -U)
 
+QUÉ SE PUBLICA
+--------------
+Estos son los formatos de cada versión, todos con el mismo número:
+  - GenMSI_0.3.0_amd64.deb             Debian y Ubuntu (x86_64)
+  - GenMSI_0.3.0_arm64.deb             Debian y Ubuntu (aarch64)
+  - GenMSI-0.3.0-1.x86_64.rpm          Fedora y openSUSE (x86_64)
+  - GenMSI-0.3.0-1.aarch64.rpm         Fedora y openSUSE (aarch64)
+  - genmsi-0.3.0-1-x86_64.pkg.tar.zst  CachyOS y Arch (x86_64)
+  - GenMSI_0.3.0_universal.dmg         macOS (Intel y Apple Silicon)
+  - GenMSI_0.3.0_x64-setup.exe         Windows (x64)
+  - GenMSI_0.3.0_x64_en-US.msi         Windows (x64)
+  - GenMSI_0.3.0.flatpak               Flatpak
+  - GenMSI-0.3.0-linux-x86_64.tar.gz   la versión portátil, sin instalar
+  - SHA256SUMS                         la suma de cada instalador
+
 QUÉ HAY DENTRO
 --------------
   genmsi-app-desktop   la aplicación (el motor va dentro: no hace falta nada más)

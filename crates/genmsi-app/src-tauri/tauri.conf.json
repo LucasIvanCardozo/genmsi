@@ -1,7 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "GenMSI",
-  "version": "0.3.0",
   "identifier": "org.gensmi.desktop",
   "build": {
     "beforeDevCommand": "bun run dev",

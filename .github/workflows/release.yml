@@ -241,7 +241,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y flatpak flatpak-builder
-          flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          # The remote of Flathub goes in the installation of the user:
+          # the runner does not let a user touch the system one.
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
           # The runtime of the manifest: the one of GNOME 47.
           flatpak install --user -y flathub org.gnome.Platform//47 org.gnome.Sdk//47
 

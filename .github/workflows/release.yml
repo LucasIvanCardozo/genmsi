@@ -96,7 +96,7 @@ jobs:
   pacman:
     name: El paquete de pacman (CachyOS)
     runs-on: ubuntu-latest
-    container: archlinux/base:latest
+    container: archlinux:base-devel
     steps:
       - uses: actions/checkout@v4
 
@@ -104,7 +104,6 @@ jobs:
         run: |
           pacman -Syu --noconfirm
           pacman -S --noconfirm \
-            base-devel \
             rust \
             cargo \
             webkit2gtk-4.1 \

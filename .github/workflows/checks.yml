@@ -1,7 +1,11 @@
-# Las pruebas, en cada cambio.
+# The tests, on every change.
 #
-# El motor (Rust) y la app (TypeScript) se prueban por separado: el motor
-# es el que se compara con el original, y la app es la que se usa.
+# The engine (Rust) and the app (TypeScript) are tested separately: the
+# engine is the one that is compared with the original, and the app is the
+# one that is used.
+#
+# The desktop shell has its own job: the workspace excludes it, so nothing
+# compiled it in the CI.
 name: Comprobaciones
 
 on:
@@ -22,18 +26,63 @@ jobs:
         with:
           workspaces: .
 
-      # Bun: el binario que publica Bun (el de crates.io es otro crate, y
-      # no compila con un rustc estable).
+      # Bun: the binary that publishes Bun (the one of crates.io is another
+      # crate, and it does not compile with a stable rustc).
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - name: Las pruebas del motor
+      - name: The tests of the engine
         run: cargo test --workspace
 
-      - name: Las pruebas de la app
+      - name: The tests of the app
         working-directory: crates/genmsi-app
         run: |
           bun install --frozen-lockfile
           bun run test
           bun run typecheck
+
+  # The desktop shell: the crate that the workspace excludes, so it was never
+  # compiled in the CI. Here it is compiled and tested.
+  shell:
+    name: El shell de escritorio
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "crates/genmsi-app/src-tauri -> target"
+
+      # The libraries the shell needs on Ubuntu: GTK 3 and WebKitGTK 4.1.
+      - name: The libraries of the shell
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      # Bun: the binary that publishes Bun (the one of crates.io is another
+      # crate, and it does not compile with a stable rustc).
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # The frontend: the shell carries it inside, so it has to exist before
+      # the shell is compiled.
+      - name: The frontend of the app
+        working-directory: crates/genmsi-app
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: The tests of the shell
+        working-directory: crates/genmsi-app/src-tauri
+        run: cargo test

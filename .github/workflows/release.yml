@@ -1,12 +1,12 @@
-# Los instaladores de los tres sistemas.
+# The installers of every system.
 #
-# Tauri arma el instalador del sistema en el que corre: el `.deb` y el
-# `.rpm` en Linux, el `.msi` y el `.exe` en Windows, el `.dmg` en macOS.
-# Por eso el trabajo está en la matriz: un runner por sistema, y los
-# instaladores de la misma versión en todos.
+# Tauri builds the installer of the system it runs on: the `.deb` and the
+# `.rpm` on Linux, the `.msi` and the `.exe` on Windows, the `.dmg` on macOS.
+# That is why the work is in the matrix: one runner per system, and the
+# installers of the same version everywhere.
 #
-# El release se abre como borrador: lo publica quien decide que la versión
-# está para publicar.
+# The release is a draft: who decides that the version is ready to publish
+# publishes it. The workflow never does.
 name: Release
 
 on:
@@ -16,12 +16,17 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "La etiqueta del release (v0.3.0)"
-        required: true
-        default: "v0.3.0"
+        description: "The tag of the release (v0.3.0). Empty: the tag of the run."
+        required: false
+        default: ""
 
 permissions:
   contents: write
+
+env:
+  # The tag of the release: the one of the input, or the one of the run.
+  # It stays empty when the run has no tag: the workflow never invents one.
+  RELEASE_TAG: ${{ inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || '' }}
 
 jobs:
   release:
@@ -29,31 +34,51 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Linux x86_64: the `.deb` and the `.rpm`.
           - platform: ubuntu-22.04
-            name: linux
+            name: linux-x86_64
             args: ""
+            targets: ""
+          # Linux arm64: the same two packages, on a runner of arm64.
+          # On a private repository the runner of arm64 is billed apart: a
+          # few cents per release.
+          - platform: ubuntu-24.04-arm
+            name: linux-aarch64
+            args: "--target aarch64-unknown-linux-gnu"
+            targets: "aarch64-unknown-linux-gnu"
+          # macOS: one `.dmg` for the two Macs (Intel and Apple Silicon).
           - platform: macos-latest
             name: macos
-            args: ""
+            args: "--target universal-apple-darwin"
+            targets: "x86_64-apple-darwin aarch64-apple-darwin"
+          # Windows x64: the `-setup.exe` and the `.msi`.
           - platform: windows-latest
             name: windows
             args: ""
+            targets: ""
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
 
+      # The universal binary of macOS and the one of arm64 need their Rust
+      # target in the runner.
+      - name: The Rust targets of this runner
+        if: matrix.targets != ''
+        run: rustup target add ${{ matrix.targets }}
+
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: "crates/genmsi-app/src-tauri -> target"
 
-      - name: Las dependencias de Linux
-        if: matrix.platform == 'ubuntu-22.04'
+      - name: The dependencies of Linux
+        if: startsWith(matrix.platform, 'ubuntu-')
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
             build-essential \
             curl \
             wget \
@@ -63,31 +88,90 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev
 
-      - name: Las dependencias de macOS
-        if: matrix.platform == 'macos-latest'
+      - name: The dependencies of macOS
+        if: matrix.name == 'macos'
         run: brew install create-dmg
 
-      # Bun: el binario que publica Bun (el de crates.io es otro crate, y
-      # no compila con un rustc estable).
+      # Bun: the binary that publishes Bun (the one of crates.io is another
+      # crate, and it does not compile with a stable rustc).
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
-      - name: Las dependencias del frontend
+      - name: The dependencies of the frontend
         working-directory: crates/genmsi-app
         run: bun install --frozen-lockfile
 
-      - name: El bundle
+      # A release needs a tag: without one there is nothing to publish, and
+      # the workflow does not make up a version.
+      - name: The tag of the release
+        if: env.RELEASE_TAG == ''
+        run: |
+          echo "This run has no tag: run the workflow from a tag, or pass one to workflow_dispatch." >&2
+          exit 1
+
+      - name: The bundle
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: crates/genmsi-app
-          tagName: ${{ inputs.tag || github.ref_name }}
-          releaseName: "GenMSI ${{ inputs.tag || github.ref_name }}"
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: "GenMSI ${{ env.RELEASE_TAG }}"
+          # The body of the release: what each file is and how it is
+          # installed. The job of the notes replaces this one with the list
+          # of the files that the release really has.
+          releaseBody: |
+            GenMSI: simulador de eventos discretos al estilo GPSS.
+
+            Los instaladores de los sistemas, todos de la misma versión:
+
+            - `.deb` y `.rpm` para Linux (x86_64 y arm64).
+            - `.pkg.tar.zst` para CachyOS y Arch.
+            - `.dmg` para macOS (Intel y Apple Silicon).
+            - `-setup.exe` y `.msi` para Windows x64.
+            - `.flatpak` para Linux.
+            - El `.tar.gz` portable, para correr sin instalar.
+
+            `SHA256SUMS` tiene la suma SHA256 de cada archivo, y el cuerpo de
+            este release dice cómo se instala cada uno.
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+          # The matrix creates the release at the same time: the one that
+          # finds it already there retries instead of failing.
+          retryAttempts: "3"
+
+      # The binary of Linux, for the Flatpak: the manifest takes it as a
+      # local source.
+      - name: The binary of Linux
+        if: matrix.name == 'linux-x86_64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: genmsi-linux-x86_64
+          path: crates/genmsi-app/src-tauri/target/release/genmsi-app-desktop
+          if-no-files-found: error
+
+      # The portable: the program, the launcher, the icon and the README,
+      # with nothing to install.
+      - name: The portable of Linux
+        if: matrix.name == 'linux-x86_64'
+        run: |
+          version="$(grep -m1 '^version = ' crates/genmsi-app/src-tauri/Cargo.toml | cut -d'"' -f2)"
+          dir="GenMSI_$version-linux-x86_64"
+          mkdir -p "$dir"
+          cp crates/genmsi-app/src-tauri/target/release/genmsi-app-desktop "$dir/"
+          cp packaging/linux/GenMSI.desktop "$dir/"
+          cp crates/genmsi-app/src-tauri/icons/128x128.png "$dir/GenMSI.png"
+          cp crates/genmsi-app/LEEME.txt "$dir/"
+          tar -czf "$dir.tar.gz" "$dir"
+          rm -rf "$dir"
+
+      - name: The portable, in the release
+        if: matrix.name == 'linux-x86_64'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$RELEASE_TAG" GenMSI_*-linux-x86_64.tar.gz --clobber --repo "$GITHUB_REPOSITORY"
 
   # The package of pacman: the one format Tauri does not make, and the one
   # CachyOS needs (it is an Arch distribution).
@@ -100,7 +184,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Las dependencias
+      - name: The dependencies
         run: |
           pacman -Syu --noconfirm
           pacman -S --noconfirm \
@@ -109,14 +193,15 @@ jobs:
             webkit2gtk-4.1 \
             gtk3 \
             patchelf \
-            git
+            git \
+            unzip
           # Bun: its own release (the crate of crates.io is another
           # program), installed for everybody and not for one user.
           BUN_INSTALL=/usr/local bash -c "curl -fsSL https://bun.sh/install | bash"
 
-      - name: El paquete
+      - name: The package
         run: |
-          # makepkg no corre como root.
+          # makepkg does not run as root.
           useradd -m builder
           chown -R builder "$GITHUB_WORKSPACE"
           su builder -c "cd '$GITHUB_WORKSPACE' && PATH=/usr/local/bin:\$PATH packaging/arch/build-package.sh"
@@ -124,7 +209,57 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: genmsi-pacman
-          path: target/arch-package/*.pkg.tar.zst
+          path: |
+            target/arch-package/*.pkg.tar.zst
+            target/arch-package/PKGBUILD
+            target/arch-package/PKGBUILD.srcinfo
+
+  # The Flatpak: the app with the WebKitGTK of the system, so it works on
+  # any distribution.
+  #
+  # The manifest packages the binary that the job of Linux already built:
+  # it comes as an artifact of the workflow and the manifest takes it as a
+  # local source.
+  flatpak:
+    name: El paquete de Flatpak
+    needs: [release]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The binary of Linux
+        uses: actions/download-artifact@v4
+        with:
+          name: genmsi-linux-x86_64
+          path: crates/genmsi-app/src-tauri/target/release
+
+      - name: The tools of the Flatpak
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          # The runtime of the manifest: the one of GNOME 47.
+          flatpak install --user -y flathub org.gnome.Platform//47 org.gnome.Sdk//47
+
+      - name: The Flatpak
+        run: |
+          # The manifest takes the binary of Linux as a local source: the
+          # three files it expects go next to it.
+          cp crates/genmsi-app/src-tauri/target/release/genmsi-app-desktop packaging/flatpak/genmsi-app-desktop
+          cp packaging/linux/GenMSI.desktop packaging/flatpak/GenMSI.desktop
+          cp crates/genmsi-app/src-tauri/icons/128x128.png packaging/flatpak/GenMSI.png
+          flatpak-builder --user --install --force-clean build packaging/flatpak/org.gensmi.desktop.yml
+          flatpak build-export --generate-runtime-sources repo build org.gensmi.desktop
+          flatpak build-update-repo repo
+          version="$(grep -m1 '^version = ' crates/genmsi-app/src-tauri/Cargo.toml | cut -d'"' -f2)"
+          flatpak build-bundle repo "GenMSI_$version.flatpak" org.gensmi.desktop
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: genmsi-flatpak
+          path: |
+            GenMSI_*.flatpak
+            repo/org.gensmi.desktop.flatpakref
 
   # The package of pacman joins the release, next to the other installers.
   publicar-pacman:
@@ -140,5 +275,140 @@ jobs:
       - name: Al release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag || github.ref_name }}
-        run: gh release upload "$TAG" paquete/*.pkg.tar.zst --clobber --repo "$GITHUB_REPOSITORY"
+        run: |
+          find paquete -type f -print0 \
+            | xargs -0 -r gh release upload "$RELEASE_TAG" --clobber --repo "$GITHUB_REPOSITORY"
+
+  # The Flatpak joins the release, next to the other installers.
+  publicar-flatpak:
+    name: El Flatpak, en el release
+    needs: [release, flatpak]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: genmsi-flatpak
+          path: flatpak
+
+      - name: Al release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          find flatpak -type f -print0 \
+            | xargs -0 -r gh release upload "$RELEASE_TAG" --clobber --repo "$GITHUB_REPOSITORY"
+
+  # The release can be verified: the sums of every file, and a body that says
+  # what each file is and how it is installed.
+  notas:
+    name: El cuerpo del release y las sumas
+    needs: [release, publicar-pacman, publicar-flatpak]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Los archivos del release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p archivos
+          gh release download "$RELEASE_TAG" --dir archivos --repo "$GITHUB_REPOSITORY" --clobber
+          # The sums of a previous run are not part of this one.
+          rm -f archivos/SHA256SUMS
+          cd archivos
+          sha256sum -- * > ../SHA256SUMS
+
+      - name: Las sumas, en el release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$RELEASE_TAG" SHA256SUMS --clobber --repo "$GITHUB_REPOSITORY"
+
+      # The body of the release, in Spanish: it is what the person who
+      # installs the app reads.
+      - name: El cuerpo del release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "GenMSI: simulador de eventos discretos al estilo GPSS."
+            echo
+            echo "Este release trae un instalador por sistema, todos de la misma"
+            echo "versión. \`SHA256SUMS\` tiene la suma SHA256 de cada archivo: se"
+            echo "verifica con \`sha256sum -c SHA256SUMS\`."
+            echo
+            echo "QUÉ HAY EN CADA ARCHIVO Y CÓMO SE INSTALA"
+            echo "------------------------------------------"
+            echo
+            for f in archivos/*; do
+              name="$(basename "$f")"
+              sum="$(awk -v n="$name" '$2 == n {print $1}' SHA256SUMS)"
+              case "$name" in
+                *.deb)
+                  que="Linux (Debian, Ubuntu y derivados): el paquete de Debian."
+                  como="sudo dpkg -i $name"
+                  ;;
+                *.rpm)
+                  que="Linux (Fedora, openSUSE y derivados): el paquete RPM."
+                  como="sudo dnf install ./$name"
+                  ;;
+                *.pkg.tar.zst)
+                  que="CachyOS, Arch y derivados: el paquete de pacman."
+                  como="sudo pacman -U $name"
+                  ;;
+                *.dmg)
+                  que="macOS (Intel y Apple Silicon): la imagen de disco."
+                  como="abrirla y arrastrar GenMSI a «Aplicaciones»"
+                  ;;
+                *.app.tar.gz)
+                  que="macOS: la aplicación, sin instalar."
+                  como="descomprimirla y abrir GenMSI.app"
+                  ;;
+                *-setup.exe)
+                  que="Windows x64: el instalador."
+                  como="abrirlo y seguir los pasos"
+                  ;;
+                *.msi)
+                  que="Windows x64: el instalador para el sistema."
+                  como="abrirlo, o pasarlo a una política del sistema"
+                  ;;
+                *.flatpak)
+                  que="Linux: el paquete de Flatpak (usa el WebKitGTK del sistema)."
+                  como="flatpak install --bundle $name"
+                  ;;
+                *.flatpakref)
+                  que="Linux: la referencia del Flatpak."
+                  como="flatpak install --from $name"
+                  ;;
+                *.tar.gz)
+                  que="Linux x86_64: la versión portable, sin instalar."
+                  como="descomprimirlo y correr ./genmsi-app-desktop"
+                  ;;
+                PKGBUILD)
+                  que="El PKGBUILD del paquete de pacman, con la suma real de la fuente: es el archivo que se sube a la AUR."
+                  como=""
+                  ;;
+                *.srcinfo)
+                  que="El .SRCINFO del paquete de pacman: el archivo que la AUR sirve."
+                  como=""
+                  ;;
+                *)
+                  que="Un archivo de este release."
+                  como=""
+                  ;;
+              esac
+              echo "### \`$name\`"
+              echo
+              echo "$que"
+              echo
+              if [ -n "$como" ]; then
+                echo "Se instala con:"
+                echo
+                echo "    $como"
+                echo
+              fi
+              echo "SHA256: \`$sum\`"
+              echo
+            done
+            echo "QUÉ NECESITA"
+            echo "------------"
+            echo "El programa usa el WebKitGTK del sistema (GTK 3 y WebKitGTK 4.1), que"
+            echo "traen las distribuciones de escritorio."
+          } > notas.md
+          gh release edit "$RELEASE_TAG" --notes-file notas.md --repo "$GITHUB_REPOSITORY"

@@ -1,21 +1,24 @@
 # Maintainer: Lucas Cardozo <lucasivancardozo27@gmail.com>
 #
-# El paquete de CachyOS y de la familia Arch (pacman).
+# GenMSI: simulador de eventos discretos al estilo GPSS.
 #
 # El bundle de Tauri no tiene un formato de pacman: el `.deb` es de la
 # familia Debian y el `.rpm` de la Fedora, y ninguno de los dos sirve acá.
 # Este PKGBUILD arma el paquete de Arch: el mismo programa, con las mismas
 # dependencias del sistema (GTK 3 y WebKitGTK 4.1).
 #
-# Para armarlo desde el repositorio local:
+# La fuente es el tarball de la etiqueta del repositorio, con su suma real:
+# la AUR no acepta `SKIP` y buida la fuente ella misma, en su propia
+# máquina de construcción.
+#
+# Para armarlo desde el repositorio local (con el tarball del checkout, sin
+# red):
 #
 #     packaging/arch/build-package.sh
 #
-# Para publicarlo en la AUR: el `source` apunta a la etiqueta del
-# repositorio y el `sha256sums` tiene que ser el de esa etiqueta (la AUR no
-# acepta SKIP). El script de la CI escribe el PKGBUILD relleno y su .SRCINFO
-# en `target/arch-package`, y la CI los publica como assets del release: esos
-# son los archivos que hay que subir a la AUR.
+# Para refrescar la suma cuando hay una versión nueva:
+#
+#     packaging/arch/aur-pkgbuild.sh
 pkgname=genmsi
 pkgver=0.3.2
 pkgrel=1
@@ -24,12 +27,13 @@ arch=('x86_64')
 url="https://github.com/LucasIvanCardozo/genmsi"
 license=('MIT')
 depends=('gtk3' 'webkit2gtk-4.1')
-makedepends=('rust' 'cargo' 'bun' 'patchelf' 'make' 'pkgconf')
+# El build compila el frontend (bun) y el shell de escritorio (cargo), y
+# el shell enlaza contra GTK 3 y WebKitGTK 4.1: por eso las dos librerías
+# están también entre las dependencias de construcción (el `pkg-config` de
+# cada una las pide al compilar, no sólo al correr).
+makedepends=('rust' 'cargo' 'bun' 'patchelf' 'make' 'pkgconf' 'gtk3' 'webkit2gtk-4.1')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/LucasIvanCardozo/genmsi/archive/refs/tags/v$pkgver.tar.gz")
-# La suma real del tarball de la fuente: la CI rellena esta línea (el
-# script packaging/arch/build-package.sh escribe el PKGBUILD relleno en
-# target/arch-package), porque la AUR no acepta SKIP.
-sha256sums=('SKIP')
+sha256sums=('f154af9c3a91201995785ffa6d10442ae864831b3917430796cd2528fae8522f')
 
 build() {
   cd "$srcdir/$pkgname-$pkgver/crates/genmsi-app"

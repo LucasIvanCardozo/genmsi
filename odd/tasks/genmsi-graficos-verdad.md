@@ -157,3 +157,12 @@ esperan al diseño aprobado.
 - L6 — El sistema de diseño del proyecto se sync-eó de su código (`crates/genmsi-app/src/styles.css`, `charts/palette.ts` y las reglas de las tarjetas): `design/system.md` y `design/system.html`, el tablero que el lienzo muestra antes de cualquier diseño.
 - L7 — T7 cerrado: `docs/app.md` ya no promete la agrupación de los intervalos de más de 200 (no existe en el código) y dice la verdad: una barra por intervalo, con el ancho que sigue al número de intervalos.
 - L8 — El diseño y la unidad U2 corren en paralelo, con superficies de edición disjuntas: el diseño toca `design/graficos-verdad/` y U2 toca el motor del replay, el panel y sus tests.
+- L9 — **El diseño**: `design/graficos-verdad/`, con tres direcciones del mismo contenido y el mismo modelo de ejemplo (hospital: «Mesa 1»/«Mesa 2», «Sala de espera»/«Laboratorio», «Reactivos», «Paciente», «Tiempos de servicio»; reloj 960,0 s de 1.200,0 s; semilla 20260415). Las tres muestran los tres estados, el pie con el divisor real y la información nueva de U3 («esperando al final» 6, media/desviación de los desbordes 18,6 s / 2,1 s, los switches y los valores guardados, la semilla y el título):
+
+  | Arteboard | Dirección | Lo que gana | Lo que paga |
+  |---|---|---|---|
+  | `01-una-leyenda-arriba.html` | Una leyenda arriba | los tres estados se explican una sola vez; las tarjetas conservan su forma | hay que volver arriba para recordar la leyenda; el pie queda corto |
+  | `02-procedencia-por-tarjeta.html` | Cada tarjeta declara su procedencia | cada tarjeta se sostiene sola; panel denso | el metadato se repite en las trece; más alto y más ruidoso |
+  | `03-panel-lateral-estado.html` | Un panel lateral con el estado de la corrida | lo que describe la corrida junto, en un panel fijo | la sección depende del ancho: angosta, las columnas se apilan |
+
+  Los tres son **alternativas**: la elección es del usuario, y el handoff de implementación (`gentle_design implement`) necesita el arteboard elegido. El self-check del diseño: sólo las fuentes del sistema (`--font-sans` y `--font-mono`), slate/indigo/amber/rose/emerald y las series `#6366f1`, `#0d9488`, `#ea580c`, `#7c3aed`; sin URLs externas ni CDN.

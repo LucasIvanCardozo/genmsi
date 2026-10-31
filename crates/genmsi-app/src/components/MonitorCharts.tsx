@@ -158,8 +158,8 @@ export default function MonitorCharts({
           <ChartCard
             title="Los recursos que aprietan"
             subtitle="Cada barra tiene su escala: el tiempo que estuvo ocupada la facility, el máximo que alcanzó la cola o el de la capacidad del almacén."
-            badge="instant"
-            footnote={`Utilización = tiempo ocupado ÷ ${until} · contenido medio = área ÷ ${until} · utilización media = área ÷ ${until} ÷ capacidad. Las familias no se comparan entre sí: cada una tiene su escala.`}
+            badge="derived"
+            footnote={`Utilización * = tiempo ocupado ÷ ${until} · contenido medio * = área ÷ ${until} · utilización media * = área ÷ ${until} ÷ capacidad. Las familias no se comparan entre sí: cada una tiene su escala.`}
           >
             <ResourceRanking report={report} live={closed} elapsed={elapsed} />
           </ChartCard>
@@ -211,7 +211,8 @@ export default function MonitorCharts({
               <ChartCard
                 title="Indicadores por facility"
                 subtitle="El estado de este instante y las medias del motor, con su fórmula en el pie."
-                badge="instant"
+                badge="published"
+                badgeLabel="mezcla de estados"
                 footnote={`Utilización = tiempo ocupado ÷ ${until} · servicio medio = tiempo ocupado ÷ entradas. Los reintentos de las compuertas los publica el motor para la corrida completa.`}
               >
                 <FacilityTable facilities={facilities} />
@@ -244,7 +245,8 @@ export default function MonitorCharts({
               <ChartCard
                 title="Histograma de la tabla"
                 subtitle="Cada barra es una clase de la tabla del modelo y la curva su acumulada; la banda, la media ± desviación."
-                badge="instant"
+                badge="published"
+                badgeLabel="mezcla de estados"
                 footnote="Media * = suma ÷ muestras · desviación * = √(E[x²] − E[x]²) · la media y la desviación de los desbordes las publica el motor, para la corrida completa. Las clases vacías del final se recortan."
               >
                 <TableHistogram report={report} live={closed} />
@@ -265,7 +267,8 @@ export default function MonitorCharts({
             <ChartCard
               title="Transacciones por bloque"
               subtitle="Cuántas transacciones pasaron por cada bloque hasta el reloj, y cuántas cuenta el motor para la corrida completa."
-              badge="instant"
+              badge="published"
+              badgeLabel="mezcla de estados"
               footnote="La primera cifra es la del instante y la segunda la que publicó el motor para la corrida completa. Un bloque del modelo puede ser varios del programa: la cifra es la de la fila que cuenta el bloque, para no contarla cinco veces. El generador crea las transacciones: su cifra cuenta las que creó."
             >
               <BlockRanking rows={blocks} />

@@ -1,9 +1,15 @@
 /**
  * The tables of the model, one row each.
  *
- * The row says what the engine published of the table: how many values it
+ * The row says what the instant knows of the table: how many values it
  * tabulated, their mean and their deviation, and how many of them did not
- * fit in any interval.
+ * fit in any interval. A table the replay has not tabulated yet says
+ * "todavía no": it is not a table with no values, it is a table nobody
+ * knows yet.
+ *
+ * The type of the table is in the row: a `TABLE` tabulates a value of the
+ * model and a `QTABLE` the waits of a queue, and the two are not the same
+ * thing.
  */
 import { decimals, number } from "../../format.ts";
 import { tableDerived } from "../../monitor/derived.ts";
@@ -15,6 +21,8 @@ import StatTable from "./StatTable.tsx";
 interface Row {
   /** The name of the table. */
   name: string;
+  /** What the table tabulates: a value of the model or the waits of a queue. */
+  kind: string;
   /** How many values it tabulated. */
   samples: number;
   /** The mean of the values. */
@@ -39,7 +47,7 @@ export default function TablesList({
   live: Figures | null;
 }) {
   const rows: Row[] = [];
-  const push = (table: Table) => {
+  const push = (table: Table, kind: string) => {
     const figure = live?.tables[table.name];
     // Los números son los del instante: lo que se tabuló hasta ahora.
     const samples = figure?.samples ?? 0;
@@ -49,6 +57,7 @@ export default function TablesList({
     const derived = tableDerived({ samples, sum, sumSquares, overflow });
     rows.push({
       name: table.name,
+      kind,
       samples,
       mean: derived.mean,
       stdDev: derived.stdDev,
@@ -58,10 +67,10 @@ export default function TablesList({
     });
   };
   for (const table of Object.values(report.entities.tables)) {
-    push(table);
+    push(table, "tabla");
   }
   for (const table of Object.values(report.entities.qtables)) {
-    push(table);
+    push(table, "tabla de cola");
   }
 
   return (
@@ -70,30 +79,35 @@ export default function TablesList({
       columns={[
         { label: "Tabla", name: true, value: (row) => row.name },
         {
+          label: "Tipo",
+          name: true,
+          value: (row) => row.kind,
+        },
+        {
           label: "Muestras",
-          live: (row) => row.live,
+          state: (row) => (row.live ? "instant" : "unknown"),
           value: (row) => number(row.samples),
         },
         {
           label: "Media",
           derived: true,
-          live: (row) => row.live,
+          state: (row) => (row.live ? "derived" : "unknown"),
           value: (row) => decimals(row.mean),
         },
         {
           label: "Desviación",
           derived: true,
-          live: (row) => row.live,
+          state: (row) => (row.live ? "derived" : "unknown"),
           value: (row) => decimals(row.stdDev),
         },
         {
           label: "Desbordes",
-          live: (row) => row.live,
+          state: (row) => (row.live ? "instant" : "unknown"),
           value: (row) => number(row.overflow),
         },
         {
           label: "Máximo",
-          live: (row) => row.live,
+          state: (row) => (row.live ? "instant" : "unknown"),
           value: (row) => number(row.max),
         },
       ]}

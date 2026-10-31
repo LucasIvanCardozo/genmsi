@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { useLive, type LiveBall, type LiveCounts } from "../src/monitor/live.ts";
+import { emptyFigures } from "../src/monitor/stats.ts";
 
 /** The counts of a block. */
 const counts = (now: number, ever: number): LiveCounts => ({ now, ever });
@@ -174,4 +175,38 @@ test("a reset empties the picture", () => {
   assert.equal(state.clock, 0);
   assert.equal(state.counts.size, 0);
   assert.equal(state.balls.size, 0);
+});
+
+test("the picture carries the clock, the figures and the population of the same instant", () => {
+  useLive.getState().reset();
+  // A picture without the figures leaves the ones of the last published
+  // instant: the clock is not there yet, and the instant is not known.
+  useLive.getState().publish({ clock: 3, counts: new Map(), balls: new Map() });
+  assert.equal(useLive.getState().known, false, "the picture carried no figures");
+
+  // A picture with the figures and the population carries the whole
+  // instant: they are of one instant.
+  useLive.getState().publish({
+    clock: 4,
+    counts: new Map(),
+    balls: new Map(),
+    figures: emptyFigures(),
+    population: 0,
+  });
+  assert.equal(useLive.getState().known, true, "the picture carried the figures and the population");
+
+  // A picture without the population leaves the one of the last published
+  // instant: the instant is not known either.
+  useLive.getState().publish({
+    clock: 5,
+    counts: new Map(),
+    balls: new Map(),
+    figures: emptyFigures(),
+  });
+  assert.equal(useLive.getState().known, false, "the picture carried no population");
+
+  // The clock can be moved on its own: the figures stay, and the instant
+  // is not known any more.
+  useLive.getState().setClock(9);
+  assert.equal(useLive.getState().known, false, "the clock moved on its own");
 });

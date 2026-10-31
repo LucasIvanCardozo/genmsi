@@ -128,7 +128,7 @@ test("the derived metrics of the instant are divided by the time of the instant"
   const queues = queuesOf(report, live, elapsed);
   const cola = queues.find((queue) => queue.name === "cola")!;
   assert.equal(cola.meanContent, 1.2, "the area of 12 over the 10 seconds");
-  assert.equal(cola.meanWait, 8 / 3);
+  assert.equal(cola.engineMeanWait, 4, "the area of 12 over the 3 entries");
 });
 
 test("the derived metrics of an entity that did not happen yet are zero", () => {

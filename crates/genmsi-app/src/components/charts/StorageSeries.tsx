@@ -84,7 +84,7 @@ export default function StorageSeries({
         }
         yDomain={[0, Math.max(storage.capacity, 1)]}
       />
-      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard
           label="En uso ahora"
           value={`${number(storage.inUse)} u`}
@@ -93,25 +93,31 @@ export default function StorageSeries({
               ? `de ${number(storage.capacity)} disponibles`
               : "sin capacidad declarada"
           }
-          live={storage.live}
+          state={storage.live ? "instant" : "unknown"}
         />
         <StatCard
           label="Máximo"
           value={`${number(storage.maxUse)} u`}
           note="unidades ocupadas a la vez"
-          live={storage.live}
+          state={storage.live ? "instant" : "unknown"}
         />
         <StatCard
           label="Utilización media"
           value={`${Math.round(meanUtilization * 100)} %`}
           note="derivada: área / tiempo / capacidad"
-          live={storage.live}
+          state={storage.live ? "derived" : "unknown"}
         />
         <StatCard
-          label="Reintentos"
+          label="Esperas"
           value={number(storage.retry)}
-          note="intentos que no tuvieron unidades"
-          live={storage.live}
+          note="las veces que no pudo tomar unidades"
+          state={storage.live ? "instant" : "unknown"}
+        />
+        <StatCard
+          label="Entradas"
+          value={number(storage.entries)}
+          note="veces que se tomaron unidades"
+          state={storage.live ? "instant" : "unknown"}
         />
       </div>
     </div>

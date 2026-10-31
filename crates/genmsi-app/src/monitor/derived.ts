@@ -13,14 +13,21 @@
  * - the **mean content** of a queue is its area over the elapsed time
  *   (`Queue::area`), the same integral the engine closes at the end of the
  *   run;
- * - the **mean wait** of a queue is its accumulated wait over its entries;
+ * - the **wait of the engine** (`AVE.TIME`) is the area of the queue over its
+ *   entries: the integral counts the transactions that are still waiting,
+ *   which the sum of the waits of the ones that left does not
+ *   (`crates/genmsi-core/src/stat.rs:211-223`);
+ * - the **mean of the departures** is the accumulated wait over the
+ *   transactions that left: it is the mean of the ones that are already
+ *   gone, and it is not the mean wait of the queue;
  * - the **utilization** of a facility is the time it was busy over the
  *   elapsed time (`Facility::utilization`);
  * - the **mean service** of a facility is the time it was busy over the
  *   seizures that took it;
  * - the **mean utilization** of a storage is its area over the elapsed time
  *   and its capacity;
- * - the **mean size** of a chain is its area over the elapsed time;
+ * - the **mean size** of a chain is its area over the elapsed time, and its
+ *   **mean time** (`AVE.TIME`) is its area over its entries;
  * - the **mean** and the **deviation** of a table come from the sum and the
  *   sum of squares the engine publishes (`Table::sum`, `Table::sum_squares`).
  */
@@ -35,14 +42,36 @@ export interface QueueSample {
   totalTime: number;
   /** Its content times the time, added up. */
   area: number;
+  /**
+   * How many transactions left the queue.
+   *
+   * It is not the entries: the transactions that are still waiting entered
+   * the queue too, and their wait is not in the sum of the waits.
+   */
+  departures: number;
 }
 
 /** The metrics derived from a queue. */
 export interface QueueDerived {
   /** The mean content: `area / elapsed`. */
   meanContent: number;
-  /** The mean wait: `totalTime / entries`. */
-  meanWait: number;
+  /**
+   * The wait of the engine, its `AVE.TIME`: `area / entries`.
+   *
+   * It is not the mean wait above: the integral of the queue counts the
+   * transactions that are still waiting in it, and the sum of the waits
+   * does not. The engine publishes this one, and the app shows both so
+   * that the two numbers never carry the same name.
+   */
+  engineMeanWait: number;
+  /**
+   * The mean wait of the transactions that left: `totalTime / departures`.
+   *
+   * It is the mean of the ones that are already gone, and it says nothing
+   * about the ones that are still waiting: that is what the mean wait of
+   * the engine says.
+   */
+  departureMeanWait: number;
   /** The share of the entries that waited no time: `zeroEntries / entries`. */
   zeroShare: number;
 }
@@ -56,7 +85,9 @@ export interface QueueDerived {
 export function queueDerived(queue: QueueSample, elapsed: number): QueueDerived {
   return {
     meanContent: elapsed > 0 ? queue.area / elapsed : 0,
-    meanWait: queue.entries > 0 ? queue.totalTime / queue.entries : 0,
+    engineMeanWait: queue.entries > 0 ? queue.area / queue.entries : 0,
+    departureMeanWait:
+      queue.departures > 0 ? queue.totalTime / queue.departures : 0,
     zeroShare: queue.entries > 0 ? queue.zeroEntries / queue.entries : 0,
   };
 }
@@ -119,17 +150,67 @@ export function storageDerived(storage: StorageSample, elapsed: number): Storage
 export interface ChainSample {
   /** Its size times the time, added up. */
   area: number;
+  /** How many transactions joined it. */
+  entries: number;
 }
 
 /** The metrics derived from a chain. */
 export interface ChainDerived {
   /** The mean size: `area / elapsed`. */
   meanSize: number;
+  /**
+   * The mean time of the engine (`AVE.TIME`): `area / entries`.
+   *
+   * It is the integral of the size of the chain over the transactions that
+   * joined it, the same number the report of the engine prints.
+   */
+  meanTime: number;
 }
 
 /** The metrics of a chain. */
 export function chainDerived(chain: ChainSample, elapsed: number): ChainDerived {
-  return { meanSize: elapsed > 0 ? chain.area / elapsed : 0 };
+  return {
+    meanSize: elapsed > 0 ? chain.area / elapsed : 0,
+    meanTime: chain.entries > 0 ? chain.area / chain.entries : 0,
+  };
+}
+
+/** The numbers of the values that did not fit in any class of a table. */
+export interface OverflowSample {
+  /** How many values did not fit. */
+  overflow: number;
+  /** The sum of the values that did not fit. */
+  sum: number;
+  /** The sum of the squares of the values that did not fit. */
+  sumSquares: number;
+}
+
+/** The metrics derived from the overflow of a table. */
+export interface OverflowDerived {
+  /** The mean of the values that did not fit: `sum / overflow`. */
+  mean: number;
+  /** The deviation of the values that did not fit. */
+  stdDev: number;
+}
+
+/**
+ * The metrics of the values that did not fit in any class of a table.
+ *
+ * The engine publishes the sum and the sum of the squares of the values
+ * that overflowed (`Table::overflow_sum`, `Table::overflow_sum_squares`), and
+ * the report of the CLI prints their mean and their deviation. The app
+ * derives them the same way, so the two say the same thing.
+ */
+export function overflowDerived(overflow: OverflowSample): OverflowDerived {
+  if (overflow.overflow <= 0) {
+    return { mean: 0, stdDev: 0 };
+  }
+  const mean = overflow.sum / overflow.overflow;
+  const variance = Math.max(
+    0,
+    overflow.sumSquares / overflow.overflow - mean * mean,
+  );
+  return { mean, stdDev: Math.sqrt(variance) };
 }
 
 /** The numbers of a table that the metrics are derived from. */

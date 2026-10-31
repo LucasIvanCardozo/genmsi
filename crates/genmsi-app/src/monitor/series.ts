@@ -206,24 +206,87 @@ export interface HistogramRow {
   overflowClass: boolean;
 }
 
-/** Compute the histogram rows and labels for table intervals. */
+/**
+ * How many classes at the end of a table hold nothing.
+ *
+ * The report of the engine stops the table when the classes add up to the
+ * whole and says how many empty classes are left
+ * (`crates/genmsi-core/src/report.rs:512-518`). The chart does the same:
+ * a class that holds nothing is not drawn.
+ */
+export function trailingEmptyClasses(frequencies: readonly number[]): number {
+  let empty = 0;
+  for (let index = frequencies.length - 1; index >= 0; index -= 1) {
+    if ((frequencies[index] ?? 0) !== 0) {
+      break;
+    }
+    empty += 1;
+  }
+  return empty;
+}
+
+/**
+ * Compute the histogram rows and labels for table intervals.
+ *
+ * The empty classes at the end are trimmed: the table of the model declares
+ * its intervals, but only the ones that hold a value are worth a bar.
+ */
 export function histogramRows(
   table: { first: number; width: number; intervals: number },
   frequencies: readonly number[],
 ): HistogramRow[] {
   const total = frequencies.reduce((sum, count) => sum + count, 0);
   let running = 0;
-  return frequencies.map((count, index) => {
+  const kept = frequencies.slice(
+    0,
+    frequencies.length - trailingEmptyClasses(frequencies),
+  );
+  return kept.map((count, index) => {
     running += count;
     const low = index === 0 ? 0 : table.first + (index - 1) * table.width;
     const high = table.first + index * table.width;
     const isOverflow = index === frequencies.length - 1 && table.intervals > 1;
     return {
       x: isOverflow ? low + table.width / 2 : (low + high) / 2,
-      label: isOverflow ? `> ${number(low)}` : `${number(low)} - ${number(high)}`,
+      // The first class of a table holds every value up to its first
+      // bound: it has no lower bound, and the engine says so by writing
+      // the class as "first - first" (`report.rs`).
+      label:
+        index === 0
+          ? `≤ ${number(table.first)}`
+          : isOverflow
+            ? `> ${number(low)}`
+            : `${number(low)} - ${number(high)}`,
       frequency: count,
       accumulated: total > 0 ? (running / total) * 100 : 0,
       overflowClass: isOverflow,
     };
   });
+}
+
+/** The widths a histogram of waits can have. */
+const WAIT_STEPS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 30, 60, 120, 300, 600];
+
+/**
+ * The width of the intervals of the histogram of the waits.
+ *
+ * The width is the smallest one that leaves about a dozen intervals: a
+ * histogram with a hundred bars is not read, and one with three bars says
+ * nothing.
+ *
+ * It is chosen **once per queue**, from the longest wait of the whole
+ * trace: a width that changes with the clock would re-bin the histogram
+ * while the run advances, and two instants of the same queue would not be
+ * comparable.
+ *
+ * @param longest the longest wait of the queue, in seconds
+ */
+export function waitWidth(longest: number): number {
+  const wanted = Math.max(longest, 1) / 12;
+  for (const step of WAIT_STEPS) {
+    if (step >= wanted) {
+      return step;
+    }
+  }
+  return WAIT_STEPS[WAIT_STEPS.length - 1];
 }

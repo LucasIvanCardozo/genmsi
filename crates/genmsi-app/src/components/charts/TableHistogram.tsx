@@ -1,11 +1,19 @@
 /**
  * The histogram of a table of the model.
  *
- * The bars are the **published frequencies** and the accumulated curve is
- * their running total: the engine's own numbers, not a metric the app
- * computes. The mean and the deviation come from the sum and the sum of
- * squares that the engine publishes, and the last class of the table —the
- * one of the values that do not fit— is drawn apart.
+ * The bars are the frequencies of the **instant**: the table shows what
+ * was tabulated up to the clock, not what will be tabulated at the end of
+ * the run. The accumulated curve is their running total, and the last
+ * class of the table —the one of the values that do not fit— is drawn
+ * apart.
+ *
+ * The empty classes at the end are not drawn: the report of the engine
+ * stops the table when the classes add up to the whole and says how many
+ * empty ones are left.
+ *
+ * The mean and the deviation come from the sum and the sum of squares that
+ * the engine publishes; the mean and the deviation of the overflows come
+ * from the sums that the engine publishes for them.
  */
 import { useMemo, useState } from "react";
 import {
@@ -22,10 +30,11 @@ import {
   YAxis,
 } from "recharts";
 import { decimals, number } from "../../format.ts";
-import { tableDerived } from "../../monitor/derived.ts";
+import { overflowDerived, tableDerived } from "../../monitor/derived.ts";
 import { histogramRows } from "../../monitor/series.ts";
 import type { Figures } from "../../monitor/stats.ts";
 import type { ReportDocument, Table } from "../../types";
+import { FIGURE_STATES } from "./states.ts";
 
 /** One table of the model, with the numbers the chart reads. */
 interface TableEntry {
@@ -33,6 +42,30 @@ interface TableEntry {
   name: string;
   /** The definition of the table. */
   table: Table;
+}
+
+/** One figure of the card, with the state it is in. */
+function Figure({
+  label,
+  value,
+  state,
+}: {
+  /** The name of the figure. */
+  label: string;
+  /** The figure. */
+  value: string;
+  /** The state the figure is in. */
+  state: "instant" | "derived";
+}) {
+  return (
+    <li className="flex items-baseline justify-between gap-3">
+      <span className="text-slate-500">
+        {label}
+        {state === "derived" ? " *" : ""}
+      </span>
+      <b className={`font-mono ${FIGURE_STATES[state].textClass}`}>{value}</b>
+    </li>
+  );
 }
 
 export default function TableHistogram({
@@ -72,9 +105,23 @@ export default function TableHistogram({
     const sumSquares = figure?.sumSquares ?? 0;
     const overflow = figure?.overflow ?? 0;
     const derived = tableDerived({ samples, sum, sumSquares, overflow });
+    // La media y la desviación de los desbordes las publica el motor: son
+    // las de la corrida completa, y el replay no lleva esa cuenta.
+    const spilled = overflowDerived({
+      overflow: entry.table.overflow,
+      sum: entry.table.overflow_sum,
+      sumSquares: entry.table.overflow_sum_squares,
+    });
     const rows = histogramRows(entry.table, frequencies);
     const barSize = Math.max(4, Math.round(620 / Math.max(rows.length, 1)) - 8);
-    return { rows, derived, samples, overflow, width: entry.table.width, barSize };
+    return {
+      rows,
+      derived,
+      spilled,
+      samples,
+      overflow,
+      barSize,
+    };
   }, [entry, live]);
 
   if (entry === null || chart === null) {
@@ -106,11 +153,42 @@ export default function TableHistogram({
           ))}
         </div>
       )}
-      <p className="mb-1 text-[11px] text-slate-500">
-        {number(chart.samples)} valores · media {decimals(chart.derived.mean, 2)}{" "}
-        · desviación {decimals(chart.derived.stdDev, 2)} ·{" "}
-        {number(chart.overflow)} desbordes. La banda es la desviación.
-      </p>
+      <ul className="mb-1 flex flex-col gap-0.5 text-[11px]">
+        <Figure
+          label="muestras"
+          value={number(chart.samples)}
+          state="instant"
+        />
+        <Figure
+          label="media"
+          value={`${decimals(chart.derived.mean, 2)} s`}
+          state="derived"
+        />
+        <Figure
+          label="desviación"
+          value={`${decimals(chart.derived.stdDev, 2)} s`}
+          state="derived"
+        />
+        <Figure
+          label="desbordes"
+          value={number(chart.overflow)}
+          state="instant"
+        />
+        {chart.spilled.mean > 0 && (
+          <>
+            <Figure
+              label="media de los desbordes"
+              value={`${decimals(chart.spilled.mean, 2)} s`}
+              state="derived"
+            />
+            <Figure
+              label="desviación de los desbordes"
+              value={`${decimals(chart.spilled.stdDev, 2)} s`}
+              state="derived"
+            />
+          </>
+        )}
+      </ul>
       <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chart.rows} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
@@ -134,7 +212,14 @@ export default function TableHistogram({
               formatter={(value, name) =>
                 name === "acumulado" ? `${number(Number(value))} %` : number(Number(value))
               }
-              labelFormatter={(value) => `valor ${number(Number(value))}`}
+              labelFormatter={(value, payload) => {
+                // El tooltip dice el intervalo, no su punto medio: una
+                // espera de 0,05 s pertenece al intervalo que lo dice.
+                const row = payload?.[0]?.payload as
+                  | { label?: string }
+                  | undefined;
+                return row?.label ?? `valor ${number(Number(value))}`;
+              }}
             />
             <ReferenceArea
               x1={chart.derived.mean - chart.derived.stdDev}

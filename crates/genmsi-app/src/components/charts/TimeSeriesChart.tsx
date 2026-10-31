@@ -22,6 +22,7 @@ import {
 } from "recharts";
 import { number } from "../../format.ts";
 import type { SeriesRow } from "../../monitor/series.ts";
+import { strokeOf } from "./states.ts";
 
 /** One series of the chart. */
 export interface SeriesSpec {
@@ -85,7 +86,7 @@ export default function TimeSeriesChart({
             <ReferenceLine
               key={`media ${entry.name}`}
               y={entry.mean}
-              stroke={entry.color}
+              stroke={strokeOf("derived")}
               strokeDasharray="4 3"
               strokeWidth={1}
             />

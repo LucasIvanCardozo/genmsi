@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "chosen": "03-panel-lateral-estado.html",
+  "handoffs": {
+    "03-panel-lateral-estado.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-10-31T20:13:24.382Z",
+      "startedAt": "2026-10-31T20:13:31.149Z",
+      "implementedAt": "2026-10-31T22:02:32.596Z",
+      "feature": "odd/tasks/genmsi-graficos-verdad.md",
+      "note": "Implementado en el stack real: el panel lateral con el estado de la corrida, la leyenda de los cuatro estados y las trece tarjetas con su rotulado. Verificado con la suite (381 tests), el typecheck y la mirada a la app con el dev server.",
+      "previewUrl": "http://127.0.0.1:5173/"
+    }
+  }
+}

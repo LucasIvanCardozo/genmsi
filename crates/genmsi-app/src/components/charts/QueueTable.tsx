@@ -1,19 +1,18 @@
 /**
  * The indicators of the queues.
  *
- * The table answers the question of every queue: how much it held, how long
- * its transactions waited and how many of them went through it. The
- * columns with an asterisk are derived from the numbers the engine
- * publishes.
+ * The table answers the question of every queue: how much it holds right
+ * now, how long its transactions waited and how many of them went through
+ * it.
+ *
+ * The wait of the engine is the one of the table: the area of the queue
+ * over its entries (`AVE.TIME`). The mean of the departures is the other
+ * one —the sum of the waits of the ones that left over the ones that left—
+ * and it is a different number with a different name.
  */
 import { decimals, number } from "../../format.ts";
 import type { QueueNumbers } from "./entities.ts";
 import StatTable from "./StatTable.tsx";
-
-/** A share of the entries, in percent. */
-function percent(share: number): string {
-  return `${Math.round(share * 100)} %`;
-}
 
 export default function QueueTable({
   queues,
@@ -31,32 +30,43 @@ export default function QueueTable({
           value: (row) => row.name,
         },
         {
-          label: "Contenido medio",
+          label: "Ahora (u)",
+          state: (row) => (row.live ? "instant" : "unknown"),
+          value: (row) => number(row.content),
+        },
+        {
+          label: "Contenido medio (u)",
           derived: true,
-          live: (row) => row.live,
+          state: (row) => (row.live ? "derived" : "unknown"),
           value: (row) => decimals(row.meanContent),
         },
         {
-          label: "Espera media",
+          label: "Espera media (s)",
           derived: true,
-          live: (row) => row.live,
-          value: (row) => decimals(row.meanWait),
+          state: (row) => (row.live ? "derived" : "unknown"),
+          value: (row) => decimals(row.engineMeanWait),
         },
         {
-          label: "Máximo",
-          live: (row) => row.live,
+          label: "Media de las salidas (s)",
+          derived: true,
+          state: (row) => (row.live ? "derived" : "unknown"),
+          value: (row) => decimals(row.departureMeanWait),
+        },
+        {
+          label: "Máximo (u)",
+          state: (row) => (row.live ? "instant" : "unknown"),
           value: (row) => number(row.max),
         },
         {
           label: "Entradas",
-          live: (row) => row.live,
+          state: (row) => (row.live ? "instant" : "unknown"),
           value: (row) => number(row.entries),
         },
         {
-          label: "Espera cero",
+          label: "Espera cero (%)",
           derived: true,
-          live: (row) => row.live,
-          value: (row) => percent(row.zeroShare),
+          state: (row) => (row.live ? "derived" : "unknown"),
+          value: (row) => decimals(row.zeroShare * 100),
         },
       ]}
     />

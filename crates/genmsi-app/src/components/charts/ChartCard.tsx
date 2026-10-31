@@ -5,12 +5,19 @@
  * sentence that says what the chart shows, a badge that says where the
  * numbers come from, the chart itself, and a footnote that says how the
  * numbers were made.
+ *
+ * The badge is a **state** of the vocabulary of the section (`states.ts`):
+ * the card says where its numbers come from with the same words and the
+ * same colors that the legend explains, and no card writes a badge of its
+ * own.
  */
+import { FIGURE_STATES, badgeClassOf, type FigureState } from "./states.ts";
+
 export default function ChartCard({
   title,
   subtitle,
   badge,
-  badgeClass,
+  badgeLabel,
   footnote,
   children,
 }: {
@@ -18,10 +25,15 @@ export default function ChartCard({
   title: string;
   /** The sentence that says what the chart shows. */
   subtitle?: string;
-  /** The badge that says where the numbers come from. */
-  badge?: string;
-  /** The color of the badge. */
-  badgeClass?: string;
+  /** The state the numbers of the card are in. */
+  badge?: FigureState;
+  /**
+   * The word of the badge, when the card mixes states and cannot say one.
+   *
+   * The color is still the one of the state: the word says what the card
+   * holds and the color says how to read it.
+   */
+  badgeLabel?: string;
   /** The sentence that says how the numbers were made. */
   footnote?: string;
   /** The chart. */
@@ -38,12 +50,9 @@ export default function ChartCard({
         </div>
         {badge !== undefined && (
           <span
-            className={
-              badgeClass ??
-              "shrink-0 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700"
-            }
+            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${badgeClassOf(badge)}`}
           >
-            {badge}
+            {badgeLabel ?? FIGURE_STATES[badge].label}
           </span>
         )}
       </header>

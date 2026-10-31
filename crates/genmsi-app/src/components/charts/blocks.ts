@@ -10,10 +10,12 @@
  *
  * The retries are the other way round: each row counts its own, and the
  * block adds the ones of its rows.
+ *
+ * The counts and the retries are the ones of the instant the clock marks:
+ * they come from the live layer, which publishes them with the clock of
+ * the frame the replay reached.
  */
-import { countsOf } from "../../monitor/counts.ts";
 import type { LiveCounts } from "../../monitor/live.ts";
-import type { ReplayState } from "../../monitor/replay.ts";
 import type { ModelBody, ReportDocument } from "../../types";
 
 /** The figures of one block of the model. */
@@ -22,12 +24,26 @@ export interface BlockRow {
   name: string;
   /** The class of the block. */
   class: string;
+  /** The GPSS label of the block, when it declares one. */
+  label: string | null;
   /** How many transactions went through it. */
   entries: number;
   /** How many transactions are inside it right now. */
   current: number;
   /** How many times a transaction could not enter it. */
   retries: number;
+  /**
+   * How many transactions the engine counted in it during the whole run,
+   * or null when the report does not know the block.
+   */
+  published: number | null;
+  /**
+   * Whether the block generates the transactions of the model.
+   *
+   * A generator does not receive the transactions: it creates them, so its
+   * figure counts the transactions it created.
+   */
+  generator: boolean;
   /** Whether the figures are the ones of the instant. */
   live: boolean;
 }
@@ -53,38 +69,74 @@ function classOf(model: ModelBody | null, node: number): string {
 }
 
 /**
+ * The name a reader knows a block by.
+ *
+ * The model can call two blocks the same, so the name of the card carries
+ * the class of the block: two rows of the ranking that say the same thing
+ * are two different blocks of the model.
+ */
+export function blockNameOf(row: BlockRow): string {
+  if (row.generator) {
+    // El generador ya se llama así en la mayoría de los modelos: sólo se
+    // dice cuando el nombre del modelo no lo dice.
+    return row.name.toLowerCase().includes("generador")
+      ? row.name
+      : `${row.name} · generador`;
+  }
+  if (row.class !== "") {
+    return `${row.name} · ${row.class}`;
+  }
+  // Sin clase, la etiqueta del GPSS es lo que distingue dos bloques que
+  // el modelo llama igual.
+  return row.label === null ? row.name : `${row.name} · ${row.label}`;
+}
+
+/**
+ * What the figure of a block counts, when it is not the transactions that
+ * went through it.
+ *
+ * A generator creates the transactions: its figure is the number of
+ * transactions it created, and the card says so.
+ */
+export function blockNoteOf(row: BlockRow): string | undefined {
+  return row.generator ? "las transacciones que creó" : undefined;
+}
+
+/**
  * The figures of every block of the model.
  *
  * The transactions that went through a block are the ones the row that
  * counts it holds; the retries are the ones of all of its rows.
+ *
+ * @param report the report of the run
+ * @param model the model of the run, for the names of the blocks
+ * @param counts the counts of every block at the instant, by node
+ * @param retries the times every program block could not be entered
  */
 export function blockRows(
   report: ReportDocument,
   model: ModelBody | null,
-  state: ReplayState | null,
+  counts: ReadonlyMap<number, LiveCounts>,
+  retries: Readonly<Record<number, number>>,
 ): BlockRow[] {
-  const counts: Map<number, LiveCounts> =
-    state === null
-      ? new Map()
-      : countsOf(report.blocks, state);
-
-  // The retries of every program row, and the rows that count their block.
-  const retries = new Map<number, number>();
-  const counting = new Set<number>();
+  // The retries of every program row, added up by the block they belong
+  // to: each row counts its own, and the block adds the ones of its rows.
+  const perNode = new Map<number, number>();
+  // The rows that count the block: the engine says which row that is, and
+  // its count is the one the engine published for the whole run.
+  const counting = new Map<
+    number,
+    { entries: number; label: string | null }
+  >();
   for (const row of report.blocks) {
     const line = row.line - 1;
-    const live = state?.retries[line] ?? 0;
-    const published = row.retries ?? 0;
-    retries.set(row.node, (retries.get(row.node) ?? 0) + (state === null ? published : live));
-    if (row.counts_block === true) {
-      counting.add(row.node);
+    perNode.set(row.node, (perNode.get(row.node) ?? 0) + (retries[line] ?? 0));
+    if (row.counts_block) {
+      counting.set(row.node, { entries: row.entries, label: row.label });
     }
   }
 
-  const nodes = new Set<number>([
-    ...report.blocks.map((row) => row.node),
-    ...counts.keys(),
-  ]);
+  const nodes = new Set<number>(report.blocks.map((row) => row.node));
   const rows: BlockRow[] = [];
   for (const node of nodes) {
     // Las cifras son las del instante: hasta ahora el bloque no vio
@@ -92,12 +144,17 @@ export function blockRows(
     const count = counts.get(node);
     const entries = count?.ever ?? 0;
     const current = count?.now ?? 0;
+    const published = counting.get(node);
+    const className = classOf(model, node);
     rows.push({
       name: nameOf(model, node, `bloque ${node}`),
-      class: classOf(model, node),
+      class: className,
+      label: published?.label ?? null,
       entries,
       current,
-      retries: retries.get(node) ?? 0,
+      retries: perNode.get(node) ?? 0,
+      published: published?.entries ?? null,
+      generator: className === "Generate",
       live: count !== undefined,
     });
   }

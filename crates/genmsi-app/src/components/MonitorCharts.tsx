@@ -1,10 +1,9 @@
 import { useMemo } from "react";
-import { number } from "../format";
-import { useLive } from "../monitor/live";
+import { useInstant, useLive } from "../monitor/live";
 import { countAt } from "../monitor/series.ts";
-import { closeFigures } from "../monitor/stats.ts";
 import type { ReplayIndex, ReplayState } from "../monitor/replay";
 import type { ModelBody, ReportDocument } from "../types";
+import { decimals } from "../format.ts";
 import BlockRanking from "./charts/BlockRanking.tsx";
 import ChainSeries from "./charts/ChainSeries.tsx";
 import ChartCard from "./charts/ChartCard.tsx";
@@ -21,7 +20,8 @@ import QueueSeries from "./charts/QueueSeries.tsx";
 import QueueTable from "./charts/QueueTable.tsx";
 import ResourceRanking from "./charts/ResourceRanking.tsx";
 import RetryRanking from "./charts/RetryRanking.tsx";
-import RunSummary from "./charts/RunSummary.tsx";
+import RunStatePanel from "./charts/RunStatePanel.tsx";
+import RunSummary, { RUN_SUMMARY_FOOTNOTE } from "./charts/RunSummary.tsx";
 import StorageSeries from "./charts/StorageSeries.tsx";
 import TableHistogram from "./charts/TableHistogram.tsx";
 import TablesList from "./charts/TablesList.tsx";
@@ -30,13 +30,21 @@ import WaitDistribution from "./charts/WaitDistribution.tsx";
 /**
  * The charts of the run.
  *
- * The section is one column that scrolls: the summary of the run first,
- * and then one group of charts per family of entities.
+ * The section is two columns: the cards of the charts on the left, and the
+ * state of the run on the right, in a panel that does not scroll away with
+ * the cards. In a narrow window the two stack and the panel goes first,
+ * because it says what the run is before the charts say anything about it.
  *
  * The time series come from the replay (the state over the run, rebuilt by
  * walking the trace) and the histograms come from the report document (the
  * published frequencies). The charts read the documents; the only numbers
  * they compute are the ratios of the engine's numbers, and those say so.
+ *
+ * Every card says **where its numbers come from** —the badge, with the
+ * state of the section— and **how they were made** —the foot, with the
+ * formulas and the divisor. The divisor of every derived figure is the
+ * clock of the instant: the time the reader is at, not the length of the
+ * run.
  *
  * Every chart that has the time in its axis starts at **zero**: the axis
  * is the time of the run, from 0 to its end, and the vertical line marks
@@ -57,23 +65,23 @@ export default function MonitorCharts({
   /** The model of the run, for the names of the blocks. */
   model: ModelBody | null;
 }) {
-  // The clock of the replay: the charts show the run as it is now, not the
-  // run as it will be.
-  const clock = useLive((live) => live.clock);
-  // The figures of the entities at this instant, with the integrals that are
-  // still open closed at the clock: the area of a queue is the area it has
-  // covered so far.
-  const closed = useMemo(
-    () => (state === null ? null : closeFigures(state.figures, clock)),
-    [state, clock],
-  );
+  // The instant the numbers are of: the clock and the figures come from
+  // the live layer, which publishes them together, so they are of the same
+  // instant. The clock of the replay is the clock the reader is at, not
+  // the run as it will be.
+  const instant = useInstant(report.start_time, report.end_time, state);
+  const clock = instant.clock;
   // The time the numbers were measured over: the clock for the numbers of
   // the instant, the length of the run for the published ones. Each set of
   // numbers is divided by its own time.
   const elapsed = {
-    live: clock - report.start_time,
-    published: report.end_time - report.start_time,
+    live: instant.live,
+    published: instant.published,
   };
+  // The figures of the entities at this instant, with the integrals that
+  // are still open closed at the clock: the area of a queue is the area it
+  // has covered so far.
+  const closed = instant.figures;
 
   const queues = useMemo(
     () => queuesOf(report, closed, elapsed),
@@ -91,9 +99,14 @@ export default function MonitorCharts({
     () => chainsOf(report, closed, elapsed),
     [report, closed, elapsed.live, elapsed.published],
   );
+  // The counts of every block and the retries it could not be entered: they
+  // come from the live layer too, so the ranking of the blocks is of the
+  // instant the clock marks.
+  const counts = useLive((live) => live.counts);
+  const retries = useLive((live) => live.retries);
   const blocks = useMemo(
-    () => blockRows(report, model, state),
-    [report, model, state],
+    () => blockRows(report, model, counts, retries),
+    [report, model, counts, retries],
   );
 
   const hasTables =
@@ -101,146 +114,177 @@ export default function MonitorCharts({
       Object.keys(report.entities.qtables).length >
     0;
 
+  // How many transactions were created up to the clock: the transactions
+  // of the instant, against the total the engine published.
+  const generated = countAt(monitor.generateTimes, clock);
+
+  // The divisor of every derived figure: the clock of the instant, not
+  // the length of the run.
+  const until =
+    instant.live > 0
+      ? `tiempo hasta el reloj (${decimals(instant.live)} s)`
+      : "tiempo hasta el reloj";
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto">
-      <section className="rounded-lg border border-slate-200 bg-white p-4">
-        <header className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="text-sm font-semibold text-slate-800">La corrida en números</h3>
-          <span className="text-[11px] text-slate-500">
-            Los números del instante, con el reloj de la reproducción
-          </span>
-        </header>
-        <RunSummary
-          report={report}
-          state={state}
-          clock={clock}
-          generated={countAt(monitor.generateTimes, clock)}
-        />
-      </section>
+      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_372px]">
+        {/* The panel comes first in the order of the document: in a narrow
+            window it stacks above the cards, and in a wide one the order
+            puts it on the right, where it does not scroll away. */}
+        <aside className="order-1 lg:order-2 lg:sticky lg:top-3">
+          <RunStatePanel
+            report={report}
+            instant={instant}
+            generated={generated}
+          />
+        </aside>
 
-      <ChartCard
-        title="Los recursos que aprietan"
-        subtitle="El recurso que más aprieta es el que más se acerca al 100 % o el que más cola carga."
-        badge="derivado del reporte"
-        badgeClass="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
-        footnote="Utilización = tiempo ocupado / tiempo de la corrida. Contenido medio = área / tiempo de la corrida."
-      >
-        <ResourceRanking report={report} live={closed} elapsed={elapsed} />
-      </ChartCard>
-
-      <div className="grid gap-3 lg:grid-cols-2">
-        <ChartCard
-          title="Contenido de las colas a lo largo del tiempo"
-          subtitle="Cada escalón es un instante en que la cola cambia: no es una muestra, es la historia exacta."
-          badge="replay"
-        >
-          <QueueSeries monitor={monitor} queues={queues} clock={clock} />
-        </ChartCard>
-
-        <ChartCard
-          title="Distribución de las esperas"
-          subtitle="Cada barra son las transacciones que esperaron ese tiempo; la curva, su acumulada."
-          badge="derivado de la traza"
-          badgeClass="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
-        >
-          <WaitDistribution monitor={monitor} clock={clock} />
-        </ChartCard>
-
-        <ChartCard
-          title="Indicadores por cola"
-          subtitle="Los indicadores con * se derivan del reporte del motor: el área y el tiempo total, divididos por el tiempo de la corrida."
-        >
-          <QueueTable queues={queues} />
-        </ChartCard>
-
-        {facilities.length > 0 && (
+        <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
           <ChartCard
-            title="Ocupación de las facilities a lo largo del tiempo"
-            subtitle="Cada tramo es un intervalo: el color es la facility ocupada, el gris la libre."
-            badge="replay"
+            title="La corrida en números"
+            subtitle="Lo que el reloj ya no tiene que repetir: el reloj, el fin y la identidad de la corrida están en el panel lateral."
+            badge="published"
+            badgeLabel="mezcla de estados"
+            footnote={RUN_SUMMARY_FOOTNOTE}
           >
-            <FacilityTimeline
-              monitor={monitor}
-              facilities={facilities}
-              clock={clock}
+            <RunSummary
+              report={report}
+              instant={instant}
+              generated={generated}
+              queues={queues}
             />
           </ChartCard>
-        )}
 
-        {facilities.length > 0 && (
           <ChartCard
-            title="Indicadores por facility"
-            subtitle="La utilización y el servicio medio se derivan del reporte del motor; las interrupciones y los reintentos los cuenta el motor."
+            title="Los recursos que aprietan"
+            subtitle="Cada barra tiene su escala: el tiempo que estuvo ocupada la facility, el máximo que alcanzó la cola o el de la capacidad del almacén."
+            badge="derived"
+            footnote={`Utilización * = tiempo ocupado ÷ ${until} · contenido medio * = área ÷ ${until} · utilización media * = área ÷ ${until} ÷ capacidad. Las familias no se comparan entre sí: cada una tiene su escala.`}
           >
-            <FacilityTable facilities={facilities} />
+            <ResourceRanking report={report} live={closed} elapsed={elapsed} />
           </ChartCard>
-        )}
 
-        {storages.length > 0 && (
-          <ChartCard
-            title="Unidades en uso — almacén"
-            subtitle="Las unidades ocupadas en cada instante y el límite del almacén: cuando la curva toca el límite, el modelo está bloqueado."
-            badge="replay"
-          >
-            <StorageSeries monitor={monitor} storages={storages} clock={clock} />
-          </ChartCard>
-        )}
+          <div className="grid gap-3 lg:grid-cols-2">
+            <ChartCard
+              title="Contenido de las colas a lo largo del tiempo"
+              subtitle="Unidades en la cola, instante a instante: cada escalón es un cambio real, no una muestra."
+              badge="instant"
+              footnote={`Contenido medio * = área acumulada ÷ ${until}, no ÷ el tiempo de la corrida. A la derecha del reloj todavía no se sabe.`}
+            >
+              <QueueSeries monitor={monitor} queues={queues} clock={clock} />
+            </ChartCard>
 
-        {chains.length > 0 && (
-          <ChartCard
-            title="Tamaño de la cadena"
-            subtitle="Cuántas transacciones hay encadenadas a la vez: la cadena crece cuando una entra y mengua cuando sale."
-            badge="replay"
-          >
-            <ChainSeries monitor={monitor} chains={chains} clock={clock} />
-          </ChartCard>
-        )}
+            <ChartCard
+              title="Distribución de las esperas"
+              subtitle="Cada barra son las transacciones que esperaron ese tiempo hasta el reloj; la curva, su acumulada."
+              badge="instant"
+              footnote="Media de las salidas * = suma de las esperas de las que salieron ÷ las que salieron. El ancho de los intervalos se elige una vez por cola, para que dos instantes de la misma cola sean comparables."
+            >
+              <WaitDistribution monitor={monitor} clock={clock} />
+            </ChartCard>
 
-        {hasTables && (
-          <ChartCard
-            title="Histograma de la tabla"
-            subtitle="La tabla del modelo: cada barra es un intervalo de valores y la curva su acumulada. La banda es la desviación."
-            badge="reporte del motor"
-          >
-            <TableHistogram report={report} live={closed} />
-          </ChartCard>
-        )}
+            <ChartCard
+              title="Indicadores por cola"
+              subtitle="El contenido de este instante y las medias del motor, en las mismas cifras que muestra la serie de arriba."
+              badge="instant"
+              footnote={`Contenido medio * = área ÷ ${until} · espera media * = área ÷ entradas (la del motor) · espera cero * = entradas sin espera ÷ entradas · media de las salidas * = suma de las esperas de las que salieron ÷ las que salieron. Ahora y Máximo en unidades; Entradas en transacciones.`}
+            >
+              <QueueTable queues={queues} />
+            </ChartCard>
 
-        {hasTables && (
-          <ChartCard
-            title="Las tablas del modelo"
-            subtitle="Cada tabla que el modelo tabula, con lo que el motor publica de ella."
-            badge="reporte del motor"
-          >
-            <TablesList report={report} live={closed} />
-          </ChartCard>
-        )}
+            {facilities.length > 0 && (
+              <ChartCard
+                title="Ocupación de las facilities a lo largo del tiempo"
+                subtitle="Cada tramo es un intervalo: el color es la facility ocupada, el gris el tiempo que estuvo libre."
+                badge="instant"
+                footnote={`Utilización = tiempo ocupado ÷ ${until}. El gris dice que estuvo libre hasta el reloj: a la derecha del reloj todavía no se sabe.`}
+              >
+                <FacilityTimeline
+                  monitor={monitor}
+                  facilities={facilities}
+                  clock={clock}
+                />
+              </ChartCard>
+            )}
 
-        <ChartCard
-          title="Transacciones por bloque"
-          subtitle="Cuántas transacciones pasaron por cada bloque. La barra más larga es donde se acumula el trabajo."
-          badge="reporte del motor"
-          footnote="Un bloque del modelo puede ser varios del programa: la cifra es la de la fila que cuenta el bloque, para no contarla cinco veces."
-        >
-          <BlockRanking rows={blocks} />
-        </ChartCard>
+            {facilities.length > 0 && (
+              <ChartCard
+                title="Indicadores por facility"
+                subtitle="El estado de este instante y las medias del motor, con su fórmula en el pie."
+                badge="published"
+                badgeLabel="mezcla de estados"
+                footnote={`Utilización = tiempo ocupado ÷ ${until} · servicio medio = tiempo ocupado ÷ entradas. Los reintentos de las compuertas los publica el motor para la corrida completa.`}
+              >
+                <FacilityTable facilities={facilities} />
+              </ChartCard>
+            )}
 
-        <ChartCard
-          title="Reintentos por bloque — la contención"
-          subtitle="Un reintento es un intento que no pudo entrar: el bloque estaba ocupado o no había unidades. No es un error: es la señal del cuello de botella."
-          badge="reporte del motor"
-          badgeClass="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700"
-        >
-          <RetryRanking rows={blocks} />
-        </ChartCard>
+            {storages.length > 0 && (
+              <ChartCard
+                title="Unidades en uso — almacén"
+                subtitle="Unidades ocupadas del almacén y su límite. Llenar el almacén no es lo mismo que estar bloqueado."
+                badge="instant"
+                footnote={`Utilización media * = área ÷ ${until} ÷ capacidad. Las esperas las cuenta la traza: son las veces que una transacción no pudo tomar unidades. Lo que dice si la corrida terminó bloqueada es el «esperando al final» del panel lateral.`}
+              >
+                <StorageSeries monitor={monitor} storages={storages} clock={clock} />
+              </ChartCard>
+            )}
+
+            {chains.length > 0 && (
+              <ChartCard
+                title="Tamaño de la cadena"
+                subtitle="Cuántas transacciones hay encadenadas a la vez: la cadena crece cuando una entra y mengua cuando sale."
+                badge="instant"
+                footnote={`Tiempo medio * = área ÷ entradas (la del motor) · tamaño medio * = área ÷ ${until}. El máximo es el de esta cadena, y las entradas son los enlaces hechos hasta el reloj.`}
+              >
+                <ChainSeries monitor={monitor} chains={chains} clock={clock} />
+              </ChartCard>
+            )}
+
+            {hasTables && (
+              <ChartCard
+                title="Histograma de la tabla"
+                subtitle="Cada barra es una clase de la tabla del modelo y la curva su acumulada; la banda, la media ± desviación."
+                badge="published"
+                badgeLabel="mezcla de estados"
+                footnote="Media * = suma ÷ muestras · desviación * = √(E[x²] − E[x]²) · la media y la desviación de los desbordes las publica el motor, para la corrida completa. Las clases vacías del final se recortan."
+              >
+                <TableHistogram report={report} live={closed} />
+              </ChartCard>
+            )}
+
+            {hasTables && (
+              <ChartCard
+                title="Las tablas del modelo"
+                subtitle="Cada tabla que el modelo tabula, con lo que el instante sabe de ella."
+                badge="instant"
+                footnote="Media * = suma ÷ muestras · desviación * = √(E[x²] − E[x]²) · una tabla que el replay todavía no ha tabulado dice «todavía no»."
+              >
+                <TablesList report={report} live={closed} />
+              </ChartCard>
+            )}
+
+            <ChartCard
+              title="Transacciones por bloque"
+              subtitle="Cuántas transacciones pasaron por cada bloque hasta el reloj, y cuántas cuenta el motor para la corrida completa."
+              badge="published"
+              badgeLabel="mezcla de estados"
+              footnote="La primera cifra es la del instante y la segunda la que publicó el motor para la corrida completa. Un bloque del modelo puede ser varios del programa: la cifra es la de la fila que cuenta el bloque, para no contarla cinco veces. El generador crea las transacciones: su cifra cuenta las que creó."
+            >
+              <BlockRanking rows={blocks} />
+            </ChartCard>
+
+            <ChartCard
+              title="Esperas por bloque — la contención"
+              subtitle="Una espera es un intento que no pudo entrar: el bloque estaba ocupado o no había unidades. No es un error: es la señal del cuello de botella."
+              badge="instant"
+              footnote={`Las esperas las cuenta la traza del replay, no el motor, y están acumuladas ${until}.`}
+            >
+              <RetryRanking rows={blocks} />
+            </ChartCard>
+          </div>
+        </div>
       </div>
-
-      <p className="px-1 text-[11px] text-slate-400">
-        Las cifras en violeta son las del instante que marca el reloj; las
-        demás son las que el motor publicó para la corrida completa. El tiempo
-        de todos los gráficos empieza en 0 y termina en{" "}
-        {number(report.end_time - report.start_time)} s.
-      </p>
     </div>
   );
 }

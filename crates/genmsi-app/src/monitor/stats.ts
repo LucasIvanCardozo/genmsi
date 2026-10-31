@@ -38,6 +38,13 @@ export interface QueueFigure {
   totalTime: number;
   /** Its content times the time, added up. */
   area: number;
+  /**
+   * How many transactions left the queue.
+   *
+   * The entries count the ones that arrived, and some of them are still
+   * waiting: the departures are the ones that are already gone.
+   */
+  departures: number;
   /** When its content last changed. */
   lastChange: number;
 }
@@ -184,6 +191,7 @@ function emptyQueue(now: number): QueueFigure {
     zeroEntries: 0,
     totalTime: 0,
     area: 0,
+    departures: 0,
     lastChange: now,
   };
 }
@@ -286,6 +294,7 @@ export function applyChange(figures: Figures, change: FigureChange): Figures {
         content,
         totalTime: before.totalTime + change.waited,
         zeroEntries: before.zeroEntries + (change.waited === 0 ? 1 : 0),
+        departures: before.departures + 1,
       };
       return { ...figures, queues: { ...figures.queues, [change.name]: queue } };
     }
@@ -420,6 +429,146 @@ export function applyChange(figures: Figures, change: FigureChange): Figures {
     default:
       return figures;
   }
+}
+
+/**
+ * The state of the replay at the playhead: the figures of that frame and
+ * the instant they are of.
+ *
+ * The playhead does not move while the reproduction runs, so its figures
+ * are of the instant of the playhead and not of the clock that advances.
+ */
+export interface Playhead {
+  /** The figures of the entities at that frame. */
+  figures: Figures | null;
+  /** The time of that frame, in seconds of the run. */
+  time: number;
+}
+
+/**
+ * What the live layer carries of the instant it shows.
+ *
+ * The clock and the figures are published together, every frame, so they
+ * are of the same instant. The clock can also be moved on its own (the
+ * slider of the header moves the run by hand): the figures are then of the
+ * last published instant and the clock is not there yet, and the instant is
+ * **not known**.
+ */
+export interface LiveSnapshot {
+  /** The time the run has reached, in seconds of the run. */
+  clock: number;
+  /** The figures of the entities at that time, or null when the run has published none. */
+  figures: Figures | null;
+  /** The transactions inside the model at that time, or null when the run has published none. */
+  population: number | null;
+  /** Whether the clock and the figures are of the same instant. */
+  known: boolean;
+}
+
+/**
+ * One instant of the run: the clock, the figures of that instant and the
+ * time the numbers were measured over.
+ *
+ * The numbers a chart shows are the ones of an instant: the clock says
+ * where the run is, and the figures say what the entities are at that
+ * point. The two have to be of the same instant, or the ratios that
+ * divide one by the other are numbers that were never true.
+ */
+export interface Instant {
+  /** The time the run has reached, in seconds of the run. */
+  clock: number;
+  /**
+   * The figures of the entities at that instant, with the integrals that
+   * were still open closed at the clock; null when the instant is not
+   * known.
+   */
+  figures: Figures | null;
+  /**
+   * The transactions inside the model at that instant; null when the
+   * instant is not known.
+   */
+  population: number | null;
+  /**
+   * The time the numbers of the instant were measured over; zero when the
+   * instant is not known.
+   */
+  live: number;
+  /** The time the published numbers were measured over. */
+  published: number;
+  /** Whether the clock and the figures are of the same instant. */
+  known: boolean;
+}
+
+/**
+ * The instant the charts are at.
+ *
+ * The figures of the entities come from the live layer, which publishes
+ * them with the clock of the frame it reached: the two are of the same
+ * instant, and the integrals that are still open are closed at that clock
+ * (the area of a queue is the area it has covered so far).
+ *
+ * The figures of the replay at the playhead do not move while the
+ * reproduction runs, so they are of another instant: they are only a
+ * fallback, and only when the clock is the instant of the playhead.
+ *
+ * When the instant is **not known** —the clock was moved by hand and the
+ * window has not published the figures of that instant yet— no metric is
+ * derived: the time of the numbers is zero and there are no figures, so
+ * nothing is divided by a clock that does not match them. The population
+ * follows the same rule: there is none when the layer does not know the
+ * instant.
+ *
+ * @param live the clock and the figures the live layer carries
+ * @param playhead the state of the replay at the playhead
+ * @param start the time the run started
+ * @param end the time the run ended
+ */
+export function instantOf(
+  live: LiveSnapshot,
+  playhead: Playhead | null,
+  start: number,
+  end: number,
+): Instant {
+  // The figures of the entities, of the clock's own instant: the ones the
+  // live layer carries (it publishes them with the clock of the same
+  // frame), or the ones of the playhead when the clock is the instant of
+  // the playhead.
+  const layer = live.known ? live.figures : null;
+  const frozen =
+    playhead !== null && playhead.time === live.clock ? playhead.figures : null;
+  const figures = layer ?? frozen;
+  // The clock and the figures are of the same instant when there are
+  // figures of it: nothing is derived otherwise.
+  const known = figures !== null;
+  return {
+    clock: live.clock,
+    figures: figures === null ? null : closeFigures(figures, live.clock),
+    // The population is the one the live layer published with the clock:
+    // there is none when the layer does not know this instant.
+    population: live.known ? live.population : null,
+    live: known ? live.clock - start : 0,
+    published: end - start,
+    known,
+  };
+}
+
+/**
+ * The transactions that are inside the model at an instant.
+ *
+ * The population is the sum of the transactions every program block holds:
+ * a transaction is inside one block at a time, so the sum is the number of
+ * transactions the model holds. It is the number the report publishes for
+ * the finished run (`block.current` added up), so the two agree at the end
+ * of the run.
+ *
+ * @param blocks the transactions inside every program block
+ */
+export function populationOf(blocks: Record<number, number>): number {
+  let total = 0;
+  for (const count of Object.values(blocks)) {
+    total += count;
+  }
+  return total;
 }
 
 /**

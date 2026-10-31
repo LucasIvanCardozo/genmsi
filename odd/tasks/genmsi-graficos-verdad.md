@@ -132,7 +132,7 @@ módulos puros para poder probarla, como ya se hace con `derived.ts`.
 | T1 | S1 | Documento de la feature, rama `work/graficos-verdad` | inline | pendiente |
 | T2 | S7 | Sync del sistema de diseño (`design/system.md` + `design/system.html`) | inline | pendiente |
 | T3 | S7 | Diseño de U1 y U3 con gentle-design (`design/graficos-verdad/`) | subagente | pendiente |
-| T4 | S2 | **U2**: el reloj y las cifras del mismo instante | subagente | pendiente |
+| T4 | S2 | **U2**: el reloj y las cifras del mismo instante | subagente | `f7e587f` |
 | T5 | S3, S4, S5 | **U1**: rotulado, leyenda, tres estados, pies y nombres | subagente | pendiente |
 | T6 | S6 | **U3**: delay, desbordes, estado del modelo, semilla | subagente | pendiente |
 | T7 | S8 | Corregir la promesa de la agrupación de 200 intervalos en `docs/app.md` | inline | pendiente |
@@ -147,7 +147,7 @@ el commit sino la unidad:
 |---|---|---|
 | La base | La feature, el sistema de diseño (`design/system.md` + `design/system.html`) y la corrección de la promesa del histograma en `docs/app.md` | `84a8a0c`, `bdc6893` |
 | El diseño | Los tres artboards de `design/graficos-verdad/` y el lienzo | pendiente |
-| **U2** | El reloj y las cifras del mismo instante | pendiente |
+| **U2** | El reloj y las cifras del mismo instante | `f7e587f` |
 | **U1** | El rotulado: badges, leyenda, tres estados, pies y nombres de columna | pendiente |
 | **U3** | Lo que el motor publica y la app no muestra | pendiente |
 
@@ -179,3 +179,5 @@ esperan al diseño aprobado.
 - L10 — **Arteboard elegido**: `design/graficos-verdad/03-panel-lateral-estado.html` («Un panel lateral con el estado de la corrida»); los otros dos quedan como alternativas. El handoff quedó registrado en `design/graficos-verdad/handoffs.json` y el lienzo lo muestra como el arteboard en curso. U1 y U3 se implementan con este arteboard como especificación visual: las tarjetas a la izquierda, y a la derecha un panel fijo con el título, la semilla, el reloj, el fin, los switches, los valores guardados, «esperando al final» y la leyenda de los estados.
 - L11 — El artefacto del handoff define la leyenda de los cuatro estados (S3): **del instante** (indigo), **derivada \*** (ámbar, con asterisco), **publicada** (pizarra) y **todavía no** (pizarra clara, con marca de vacío). Las palabras son las del arteboard, textual.
 - L12 — Los datos de U3 ya existen y no hay que inventar nada: `report.title`, `report.seed` y `report.end_reason` (`types/generated/JsonReport.ts`), el `delay` de los almacenes (`types/generated/Storage.ts:48`, publicado), y los switches y los valores guardados, que el replay ya calcula vivos (`monitor/replay.ts:739-747` → `Figures.logic` y `Figures.values`, `monitor/stats.ts:126-128`) y el motor publica (`types/generated/Entities.ts:31,35`).
+- L13 — **U2 cerrada** (`f7e587f`): la capa viva publica el reloj, las cifras, la población, los counts y los retries en una sola `picture` atómica; el seam `instantOf` (`monitor/stats.ts`) sólo usa cifras del instante —las de la capa viva si la capa dice que son de ese frame, el respaldo del playhead sólo si su tiempo es el del reloj— y `live = 0` implica cifras nulas, así que no se deriva ninguna métrica sin instante conocido. La tarjeta *Población* deja de leer el prop congelado: dice "Sin datos." cuando el instante no se conoce. Tests nuevos: `instant.test.ts` (oráculo a mano), `population.test.ts`, `blocks.test.ts` y la regla de `known` en `live.test.ts`. Suite: 340 en verde; typecheck limpio.
+- L14 — La población se calcula como la suma por línea de programa, no como la suma del `now` de los counts por bloque: sólo la fila que cuenta el bloque lleva las transacciones (un uso de facility son cinco filas y una sola cuenta), y la suma por línea es la que coincide con la rama publicada al final de la corrida.

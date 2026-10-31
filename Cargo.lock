@@ -438,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "genmsi-app-engine"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "clap",
  "genmsi-core",
@@ -450,7 +450,7 @@ dependencies = [
 
 [[package]]
 name = "genmsi-cli"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "clap",
  "genmsi-core",
@@ -464,7 +464,7 @@ dependencies = [
 
 [[package]]
 name = "genmsi-core"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "genmsi-format",
  "insta",
@@ -482,7 +482,7 @@ dependencies = [
 
 [[package]]
 name = "genmsi-format"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "dagre",
  "roxmltree",
@@ -494,7 +494,7 @@ dependencies = [
 
 [[package]]
 name = "genmsi-mcp"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "genmsi-core",
  "genmsi-format",

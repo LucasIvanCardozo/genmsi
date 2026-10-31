@@ -1,7 +1,7 @@
 {
   "name": "genmsi-app",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "description": "GenMSI desktop application: a thin client over the GenMSI engine",
   "scripts": {

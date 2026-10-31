@@ -17,7 +17,7 @@
 # en `target/arch-package`, y la CI los publica como assets del release: esos
 # son los archivos que hay que subir a la AUR.
 pkgname=genmsi
-pkgver=0.3.1
+pkgver=0.3.2
 pkgrel=1
 pkgdesc="GenMSI: simulador de eventos discretos al estilo GPSS"
 arch=('x86_64')

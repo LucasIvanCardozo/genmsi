@@ -1,4 +1,4 @@
-GenMSI 0.3.1 — simulador GPSS
+GenMSI 0.3.2 — simulador GPSS
 ================================
 
 Esta carpeta lleva la aplicación para Linux (x86_64), sin instalar.
@@ -28,24 +28,24 @@ Un escritorio Linux con GTK 3 y WebKitGTK 4.1 (los tiene cualquier
 distribución de escritorio: Debian, Ubuntu, Fedora, openSUSE, Arch, CachyOS...).
 
 Para instalarlo como un programa del sistema, mejor el paquete:
-  - Debian, Ubuntu y derivados:  GenMSI_0.3.1_amd64.deb   (sudo dpkg -i)
-  - Fedora, openSUSE y derivados:  GenMSI-0.3.1-1.x86_64.rpm
-  - CachyOS, Arch y derivados:  genmsi-0.3.1-1-x86_64.pkg.tar.zst
+  - Debian, Ubuntu y derivados:  GenMSI_0.3.2_amd64.deb   (sudo dpkg -i)
+  - Fedora, openSUSE y derivados:  GenMSI-0.3.2-1.x86_64.rpm
+  - CachyOS, Arch y derivados:  genmsi-0.3.2-1-x86_64.pkg.tar.zst
     (sudo pacman -U)
 
 QUÉ SE PUBLICA
 --------------
 Estos son los formatos de cada versión, todos con el mismo número:
-  - GenMSI_0.3.1_amd64.deb             Debian y Ubuntu (x86_64)
-  - GenMSI_0.3.1_arm64.deb             Debian y Ubuntu (aarch64)
-  - GenMSI-0.3.1-1.x86_64.rpm          Fedora y openSUSE (x86_64)
-  - GenMSI-0.3.1-1.aarch64.rpm         Fedora y openSUSE (aarch64)
-  - genmsi-0.3.1-1-x86_64.pkg.tar.zst  CachyOS y Arch (x86_64)
-  - GenMSI_0.3.1_universal.dmg         macOS (Intel y Apple Silicon)
-  - GenMSI_0.3.1_x64-setup.exe         Windows (x64)
-  - GenMSI_0.3.1_x64_en-US.msi         Windows (x64)
-  - GenMSI_0.3.1.flatpak               Flatpak
-  - GenMSI-0.3.1-linux-x86_64.tar.gz   la versión portátil, sin instalar
+  - GenMSI_0.3.2_amd64.deb             Debian y Ubuntu (x86_64)
+  - GenMSI_0.3.2_arm64.deb             Debian y Ubuntu (aarch64)
+  - GenMSI-0.3.2-1.x86_64.rpm          Fedora y openSUSE (x86_64)
+  - GenMSI-0.3.2-1.aarch64.rpm         Fedora y openSUSE (aarch64)
+  - genmsi-0.3.2-1-x86_64.pkg.tar.zst  CachyOS y Arch (x86_64)
+  - GenMSI_0.3.2_universal.dmg         macOS (Intel y Apple Silicon)
+  - GenMSI_0.3.2_x64-setup.exe         Windows (x64)
+  - GenMSI_0.3.2_x64_en-US.msi         Windows (x64)
+  - GenMSI_0.3.2.flatpak               Flatpak
+  - GenMSI-0.3.2-linux-x86_64.tar.gz   la versión portátil, sin instalar
   - SHA256SUMS                         la suma de cada instalador
 
 QUÉ HAY DENTRO

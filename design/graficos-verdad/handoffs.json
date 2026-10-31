@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "03-panel-lateral-estado.html",
+  "handoffs": {
+    "03-panel-lateral-estado.html": {
+      "status": "in_progress",
+      "queued": false,
+      "sentAt": "2026-10-31T20:13:24.382Z",
+      "startedAt": "2026-10-31T20:13:31.149Z",
+      "implementedAt": null,
+      "feature": "odd/tasks/genmsi-graficos-verdad.md",
+      "note": "Dirección elegida por el usuario: panel lateral con el estado de la corrida. U1 (rotulado, leyenda, tres estados, pies) y U3 (delay, desbordes, switches, semilla) se implementan con este arteboard como especificación visual. U2 (el reloj y las cifras del mismo instante) va aparte y ya está en curso."
+    }
+  }
+}

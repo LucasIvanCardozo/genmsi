@@ -1,8 +1,7 @@
 import { useMemo } from "react";
 import { number } from "../format";
-import { useLive } from "../monitor/live";
+import { useInstant, useLive } from "../monitor/live";
 import { countAt } from "../monitor/series.ts";
-import { closeFigures } from "../monitor/stats.ts";
 import type { ReplayIndex, ReplayState } from "../monitor/replay";
 import type { ModelBody, ReportDocument } from "../types";
 import BlockRanking from "./charts/BlockRanking.tsx";
@@ -57,23 +56,23 @@ export default function MonitorCharts({
   /** The model of the run, for the names of the blocks. */
   model: ModelBody | null;
 }) {
-  // The clock of the replay: the charts show the run as it is now, not the
-  // run as it will be.
-  const clock = useLive((live) => live.clock);
-  // The figures of the entities at this instant, with the integrals that are
-  // still open closed at the clock: the area of a queue is the area it has
-  // covered so far.
-  const closed = useMemo(
-    () => (state === null ? null : closeFigures(state.figures, clock)),
-    [state, clock],
-  );
+  // The instant the numbers are of: the clock and the figures come from
+  // the live layer, which publishes them together, so they are of the same
+  // instant. The clock of the replay is the clock the reader is at, not
+  // the run as it will be.
+  const instant = useInstant(report.start_time, report.end_time, state);
+  const clock = instant.clock;
   // The time the numbers were measured over: the clock for the numbers of
   // the instant, the length of the run for the published ones. Each set of
   // numbers is divided by its own time.
   const elapsed = {
-    live: clock - report.start_time,
-    published: report.end_time - report.start_time,
+    live: instant.live,
+    published: instant.published,
   };
+  // The figures of the entities at this instant, with the integrals that
+  // are still open closed at the clock: the area of a queue is the area it
+  // has covered so far.
+  const closed = instant.figures;
 
   const queues = useMemo(
     () => queuesOf(report, closed, elapsed),
@@ -91,9 +90,14 @@ export default function MonitorCharts({
     () => chainsOf(report, closed, elapsed),
     [report, closed, elapsed.live, elapsed.published],
   );
+  // The counts of every block and the retries it could not be entered: they
+  // come from the live layer too, so the ranking of the blocks is of the
+  // instant the clock marks.
+  const counts = useLive((live) => live.counts);
+  const retries = useLive((live) => live.retries);
   const blocks = useMemo(
-    () => blockRows(report, model, state),
-    [report, model, state],
+    () => blockRows(report, model, counts, retries),
+    [report, model, counts, retries],
   );
 
   const hasTables =
@@ -112,7 +116,8 @@ export default function MonitorCharts({
         </header>
         <RunSummary
           report={report}
-          state={state}
+          population={instant.population}
+          live={state !== null}
           clock={clock}
           generated={countAt(monitor.generateTimes, clock)}
         />

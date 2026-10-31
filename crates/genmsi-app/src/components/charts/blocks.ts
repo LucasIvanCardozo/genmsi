@@ -10,10 +10,12 @@
  *
  * The retries are the other way round: each row counts its own, and the
  * block adds the ones of its rows.
+ *
+ * The counts and the retries are the ones of the instant the clock marks:
+ * they come from the live layer, which publishes them with the clock of
+ * the frame the replay reached.
  */
-import { countsOf } from "../../monitor/counts.ts";
 import type { LiveCounts } from "../../monitor/live.ts";
-import type { ReplayState } from "../../monitor/replay.ts";
 import type { ModelBody, ReportDocument } from "../../types";
 
 /** The figures of one block of the model. */
@@ -57,34 +59,27 @@ function classOf(model: ModelBody | null, node: number): string {
  *
  * The transactions that went through a block are the ones the row that
  * counts it holds; the retries are the ones of all of its rows.
+ *
+ * @param report the report of the run
+ * @param model the model of the run, for the names of the blocks
+ * @param counts the counts of every block at the instant, by node
+ * @param retries the times every program block could not be entered
  */
 export function blockRows(
   report: ReportDocument,
   model: ModelBody | null,
-  state: ReplayState | null,
+  counts: ReadonlyMap<number, LiveCounts>,
+  retries: Readonly<Record<number, number>>,
 ): BlockRow[] {
-  const counts: Map<number, LiveCounts> =
-    state === null
-      ? new Map()
-      : countsOf(report.blocks, state);
-
-  // The retries of every program row, and the rows that count their block.
-  const retries = new Map<number, number>();
-  const counting = new Set<number>();
+  // The retries of every program row, added up by the block they belong
+  // to: each row counts its own, and the block adds the ones of its rows.
+  const perNode = new Map<number, number>();
   for (const row of report.blocks) {
     const line = row.line - 1;
-    const live = state?.retries[line] ?? 0;
-    const published = row.retries ?? 0;
-    retries.set(row.node, (retries.get(row.node) ?? 0) + (state === null ? published : live));
-    if (row.counts_block === true) {
-      counting.add(row.node);
-    }
+    perNode.set(row.node, (perNode.get(row.node) ?? 0) + (retries[line] ?? 0));
   }
 
-  const nodes = new Set<number>([
-    ...report.blocks.map((row) => row.node),
-    ...counts.keys(),
-  ]);
+  const nodes = new Set<number>(report.blocks.map((row) => row.node));
   const rows: BlockRow[] = [];
   for (const node of nodes) {
     // Las cifras son las del instante: hasta ahora el bloque no vio
@@ -97,7 +92,7 @@ export function blockRows(
       class: classOf(model, node),
       entries,
       current,
-      retries: retries.get(node) ?? 0,
+      retries: perNode.get(node) ?? 0,
       live: count !== undefined,
     });
   }

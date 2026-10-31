@@ -9,7 +9,6 @@
  */
 import { number } from "../../format.ts";
 import { endReasonText } from "../../engine/reasons.ts";
-import type { ReplayState } from "../../monitor/replay.ts";
 import type { ReportDocument } from "../../types";
 import StatCard from "./StatCard.tsx";
 
@@ -19,18 +18,6 @@ function decimals(value: number): string {
     return "0,00";
   }
   return value.toFixed(2).replace(".", ",");
-}
-
-/** The transactions that are inside the model at this instant. */
-function populationOf(state: ReplayState | null): number | null {
-  if (state === null) {
-    return null;
-  }
-  let total = 0;
-  for (const count of Object.values(state.blocks)) {
-    total += count;
-  }
-  return total;
 }
 
 /** The transactions the model ended with, inside it. */
@@ -44,22 +31,26 @@ function publishedPopulation(report: ReportDocument): number {
 
 export default function RunSummary({
   report,
-  state,
+  population,
+  live,
   clock,
   generated,
 }: {
   /** The report of the run. */
   report: ReportDocument;
-  /** The state of the replay at the instant the reader is at. */
-  state: ReplayState | null;
+  /**
+   * The transactions inside the model at the instant the reader is at, or
+   * null when the live layer does not know that instant.
+   */
+  population: number | null;
+  /** Whether the numbers are the ones of the instant the reader is at. */
+  live: boolean;
   /** The clock of the replay. */
   clock: number;
   /** How many transactions were created up to the instant. */
   generated: number;
 }) {
   const elapsed = report.end_time - report.start_time;
-  const live = state !== null;
-  const population = live ? populationOf(state) : null;
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -99,11 +90,20 @@ export default function RunSummary({
         note="transacciones por segundo"
         live={live}
       />
+      {/* The population is the one the live layer published with the clock.
+          When the layer does not know the instant, the card says so: no
+          number is derived from a clock that does not match the figures. */}
       <StatCard
         label="Población"
-        value={number(population ?? publishedPopulation(report))}
+        value={
+          population !== null
+            ? number(population)
+            : live
+              ? "Sin datos."
+              : number(publishedPopulation(report))
+        }
         note={live ? "dentro del modelo ahora" : "dentro del modelo al terminar"}
-        live={live}
+        live={population !== null}
       />
     </div>
   );

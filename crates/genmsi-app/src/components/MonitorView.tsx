@@ -7,6 +7,7 @@ import { graphOf, legsOf, routesOf } from "../graph/graph";
 import { countsOf, countsWithContainers, crossingsEvents, crossingsUntil } from "../monitor/counts";
 import { figureBlockOf, figuresOf } from "../monitor/figures";
 import { useLive, type LiveBall, type LiveCounts } from "../monitor/live";
+import { populationOf, type Figures } from "../monitor/stats.ts";
 import ClassList from "./ClassList";
 import ModelTree from "./ModelTree";
 import StatusLine from "./StatusLine";
@@ -20,6 +21,29 @@ type Panel = "reproduccion" | "graficos" | "reporte";
 
 /** The part of the lateral panel the window shows. */
 type Aside = "bloque" | "bloques" | "arbol";
+
+/** The retries of a run that has none yet. */
+const NO_RETRIES: Record<number, number> = {};
+
+/**
+ * What the replay reached at the last frame: the figures of the entities,
+ * the retries of the blocks and the counts of the blocks.
+ *
+ * The state of the replay at the playhead does not move while the
+ * reproduction runs, so the picture of the window is published from these
+ * and not from it: the clock and the figures have to be of the same
+ * instant.
+ */
+interface Reached {
+  /** The figures of the entities at that frame. */
+  figures: Figures | null;
+  /** The times every program block could not be entered. */
+  retries: Record<number, number>;
+  /** The transactions that are inside the model at that frame. */
+  population: number;
+  /** The counts of every block, by node. */
+  counts: Map<number, LiveCounts>;
+}
 
 /**
  * The window of the simulation: the model, its run and its report.
@@ -199,6 +223,16 @@ export default function MonitorView({
     return current?.container ?? 0;
   }, [model, activeContainerId]);
 
+  // The figures, the retries and the counts of the last frame the replay
+  // reached.
+  //
+  // The state of the replay at the playhead does not move while the
+  // reproduction runs: publishing its figures with the clock that advances
+  // would divide a frozen content by a clock that runs. These are the ones
+  // of the frame the replay reached, and they are kept apart so that a
+  // redraw of the window does not throw them away.
+  const reachedFrame = useRef<Reached | null>(null);
+
   // What the animation needs to publish the picture, kept up to date without
   // restarting the animation.
   const live = useRef({
@@ -209,18 +243,22 @@ export default function MonitorView({
     moves: [] as Move[],
     times: [] as number[],
     figures: state?.figures ?? null,
+    retries: state?.retries ?? NO_RETRIES,
+    population: populationOf(state?.blocks ?? {}),
     report,
     blocks: figureBlocks,
     model,
   });
   live.current = {
-    counts,
+    counts: reachedFrame.current?.counts ?? counts,
     edges,
     routes,
     crossings,
     moves: (transitions?.moves ?? []) as Move[],
     times: transitions?.times ?? [],
-    figures: state?.figures ?? null,
+    figures: reachedFrame.current?.figures ?? state?.figures ?? null,
+    retries: reachedFrame.current?.retries ?? state?.retries ?? NO_RETRIES,
+    population: reachedFrame.current?.population ?? populationOf(state?.blocks ?? {}),
     report,
     blocks: figureBlocks,
     model,
@@ -246,12 +284,25 @@ export default function MonitorView({
   const setRef = useRef(-1);
   const frameRef = useRef(playhead);
   const stateRef = useRef<ReplayState | null>(state);
+  // The state the picture was published for: the reader moving the
+  // playhead is not the same as pausing the run, and only the first one
+  // changes the instant the picture shows.
+  const publishedState = useRef<ReplayState | null>(null);
   frameRef.current = playhead;
   stateRef.current = state;
 
-  // The picture of this instant: the clock, the counts of the blocks and the
-  // balls that are on their way.
-  const publish = (clock: number) => {
+  // The picture of this instant: the clock, the counts of the blocks, the
+  // balls that are on their way and the figures of the entities.
+  //
+  // The clock and the figures are published together: they are of the same
+  // instant, and so are the numbers that divide one by the other.
+  const publish = (
+    clock: number,
+    figures: Figures | null,
+    retries: Record<number, number>,
+    population: number,
+    counts: Map<number, LiveCounts>,
+  ) => {
     const current = live.current;
     const balls = new Map<string, LiveBall[]>();
     for (const traveller of travellersAt(
@@ -296,16 +347,18 @@ export default function MonitorView({
     // read with the clock of this instant, because the occupancy of a
     // resource is the time it was held over the time the run has reached.
     const blockFigures = figuresOf(current.blocks, {
-      figures: current.figures,
+      figures,
       report: current.report,
       clock,
-      counts: current.counts,
+      counts,
     });
     useLive.getState().publish({
       clock,
-      counts: current.counts,
+      counts,
       balls,
-      figures: current.figures ?? undefined,
+      figures: figures ?? undefined,
+      retries,
+      population,
       blockFigures,
     });
   };
@@ -365,21 +418,39 @@ export default function MonitorView({
         // The figures of the containers are computed with the ones of the
         // blocks, so they are computed again with every new state.
         const currentModel = live.current.model;
-        live.current.counts =
-          currentModel === null
-            ? countsOf(report.blocks, nextState)
-            : countsWithContainers(
-                report.blocks,
-                nextState,
-                currentModel,
-                crossingsUntil(live.current.crossings, nextState.time),
-              );
-        live.current.figures = nextState.figures;
+        // The figures, the retries and the counts of this frame are the
+        // ones of the instant: they are published with the clock.
+        reachedFrame.current = {
+          figures: nextState.figures,
+          retries: nextState.retries,
+          population: populationOf(nextState.blocks),
+          counts:
+            currentModel === null
+              ? countsOf(report.blocks, nextState)
+              : countsWithContainers(
+                  report.blocks,
+                  nextState,
+                  currentModel,
+                  crossingsUntil(live.current.crossings, nextState.time),
+                ),
+        };
       }
 
       // The clock the reader sees follows the animation, so it ticks instead
       // of jumping from one record to the next.
-      publish(clockRef.current);
+      const picture = reachedFrame.current ?? {
+        figures: stateRef.current?.figures ?? null,
+        retries: stateRef.current?.retries ?? NO_RETRIES,
+        population: populationOf(stateRef.current?.blocks ?? {}),
+        counts: live.current.counts,
+      };
+      publish(
+        clockRef.current,
+        picture.figures,
+        picture.retries,
+        picture.population,
+        picture.counts,
+      );
 
       if (reached) {
         setPlayhead(monitor.frames.length - 1);
@@ -401,6 +472,7 @@ export default function MonitorView({
   useEffect(() => {
     clockRef.current = monitor === null ? null : monitor.startTime;
     setRef.current = -1;
+    reachedFrame.current = null;
     useLive.getState().reset();
     if (monitor !== null) {
       useLive.getState().setClock(monitor.startTime);
@@ -411,15 +483,36 @@ export default function MonitorView({
   //
   // The slider of the header moves the run while the reproduction is
   // paused, and the picture has to move with it: this effect publishes the
-  // picture again every time the state of the replay changes.
+  // picture again every time the reader moves the playhead.
+  //
+  // Pausing alone does not move the playhead: the figures of the frame the
+  // replay reached are still the ones of the instant, and the picture the
+  // animation published last is still the truth.
   //
   // When playing, the animation step already publishes on each frame with fresh
   // figures, so publishing here would duplicate the work.
   useEffect(() => {
-    if (!playing) {
-      publish(useLive.getState().clock);
+    if (!playing && publishedState.current !== state) {
+      publishedState.current = state;
+      // The state of the replay is the truth of the instant the reader
+      // picked: the figures, the retries and the counts are the ones of
+      // the playhead.
+      const picture: Reached = {
+        figures: state?.figures ?? null,
+        retries: state?.retries ?? NO_RETRIES,
+        population: populationOf(state?.blocks ?? {}),
+        counts,
+      };
+      reachedFrame.current = picture;
+      publish(
+        useLive.getState().clock,
+        picture.figures,
+        picture.retries,
+        picture.population,
+        picture.counts,
+      );
     }
-  }, [state, playing]);
+  }, [state, playing, counts]);
 
   if (model === null) {
     return (

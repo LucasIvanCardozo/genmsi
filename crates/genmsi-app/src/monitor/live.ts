@@ -24,9 +24,11 @@
  * record, the balls change when a transaction is on its way, and the figures
  * change when the run moves an entity.
  */
+import { useMemo } from "react";
 import { create } from "zustand";
 import { sameFigure, type BlockFigure } from "./figures.ts";
-import { emptyFigures, type Figures } from "./stats.ts";
+import type { ReplayState } from "./replay.ts";
+import { instantOf, type Figures, type Instant } from "./stats.ts";
 
 /** What a block shows of the run. */
 export interface LiveCounts {
@@ -58,16 +60,47 @@ export interface LivePicture {
    * They are optional in a picture: a caller that only moves the clock
    * does not have to carry them, and the ones the store holds are kept.
    */
-  figures?: Figures;
+  figures?: Figures | null;
   /** The figure every block shows, by block id. */
   blockFigures?: Map<number, BlockFigure>;
+  /**
+   * The times every program block could not be entered, since the run
+   * started.
+   *
+   * They are published with the clock and the figures of the same frame,
+   * so the ranking of the blocks is of the instant the clock marks.
+   */
+  retries?: Record<number, number>;
+  /**
+   * The transactions that are inside the model at that instant.
+   *
+   * It is published with the clock and the figures of the same frame, so
+   * the population of the card is of the instant the clock marks.
+   */
+  population?: number | null;
 }
 
 export interface LiveState extends LivePicture {
-  /** The figures of the entities of the run. */
-  figures: Figures;
+  /** The figures of the entities of the run, or null before the run published them. */
+  figures: Figures | null;
   /** The figure every block shows, by block id. */
   blockFigures: Map<number, BlockFigure>;
+  /** The times every program block could not be entered, since the run started. */
+  retries: Record<number, number>;
+  /**
+   * The transactions that are inside the model right now, or null before
+   * the run published them.
+   */
+  population: number | null;
+  /**
+   * Whether the clock and the figures are of the same instant.
+   *
+   * The picture carries the two of them, so they are. The clock can also
+   * be moved on its own (the slider of the header moves the run by hand),
+   * and then the figures are of the last published instant and the clock
+   * is not there yet.
+   */
+  known: boolean;
   /** Publish what the picture shows right now. */
   publish: (picture: LivePicture) => void;
   /**
@@ -86,19 +119,24 @@ const EMPTY: LivePicture = {
   clock: 0,
   counts: new Map(),
   balls: new Map(),
-  figures: emptyFigures(),
+  figures: null,
   blockFigures: new Map(),
+  retries: {},
+  population: 0,
 };
 
 export const useLive = create<LiveState>((set) => ({
-  // The state always holds the figures; a picture may come without them (the
-  // replay has not built them yet), so the initial state is built here and
-  // not spread from the picture.
+  // The state holds the figures of the last picture that carried them: a
+  // picture may come without them (the replay has not built them yet), so
+  // the ones the state holds are kept.
   clock: 0,
   counts: new Map(),
   balls: new Map(),
-  figures: emptyFigures(),
+  figures: null,
   blockFigures: new Map(),
+  retries: {},
+  population: null,
+  known: false,
   publish: (picture) =>
     set((state) => {
       // The clock always moves, so the picture is never the same.
@@ -106,16 +144,28 @@ export const useLive = create<LiveState>((set) => ({
       const balls = reuseBalls(state.balls, picture.balls);
       const figures = reuseFigures(state.figures, picture.figures);
       const blockFigures = reuseBlockFigures(state.blockFigures, picture.blockFigures);
-      return { clock: picture.clock, counts, balls, figures, blockFigures };
+      const retries = picture.retries ?? state.retries;
+      const population = picture.population ?? state.population;
+      // The clock and the figures are of the same instant when the picture
+      // carries the figures and the population of that instant. A picture
+      // without them leaves the ones of the last published instant, and the
+      // clock is not there yet.
+      const known =
+        picture.figures !== undefined && picture.figures !== null &&
+        picture.population !== undefined;
+      return { clock: picture.clock, counts, balls, figures, blockFigures, retries, population, known };
     }),
-  setClock: (clock) => set({ clock }),
+  setClock: (clock) => set({ clock, known: false }),
   reset: () =>
     set({
       ...EMPTY,
       counts: new Map(),
       balls: new Map(),
-      figures: emptyFigures(),
+      figures: null,
       blockFigures: new Map(),
+      retries: {},
+      population: null,
+      known: false,
     }),
 }));
 
@@ -201,8 +251,41 @@ function reuseBalls(
  * component that reads one of them is not redrawn when another entity
  * moves.
  */
-export function useFigures(): Figures {
+export function useFigures(): Figures | null {
   return useLive((state) => state.figures);
+}
+
+/**
+ * The instant the charts are at.
+ *
+ * The clock and the figures come from the live layer, which publishes them
+ * together: they are of the same instant, and the charts divide the figures
+ * of that instant by the clock of that instant.
+ *
+ * @param start the time the run started
+ * @param end the time the run ended
+ * @param playhead the state of the replay at the playhead, the fallback
+ *        for a live layer that carries no figures of the instant
+ */
+export function useInstant(
+  start: number,
+  end: number,
+  playhead: ReplayState | null,
+): Instant {
+  const clock = useLive((state) => state.clock);
+  const figures = useLive((state) => state.figures);
+  const population = useLive((state) => state.population);
+  const known = useLive((state) => state.known);
+  return useMemo(
+    () =>
+      instantOf(
+        { clock, figures, population, known },
+        playhead === null ? null : { figures: playhead.figures, time: playhead.time },
+        start,
+        end,
+      ),
+    [clock, figures, population, known, playhead, start, end],
+  );
 }
 
 /**
@@ -235,9 +318,12 @@ export function useRunHasPublished(): boolean {
  * entities that did not move. The figures of the run keep their identity
  * when nothing moved at all.
  */
-function reuseFigures(before: Figures, after: Figures | undefined): Figures {
-  if (after === undefined) {
+function reuseFigures(before: Figures | null, after: Figures | null | undefined): Figures | null {
+  if (after === undefined || after === null) {
     return before;
+  }
+  if (before === null) {
+    return after;
   }
   const same =
     before.queues === after.queues &&

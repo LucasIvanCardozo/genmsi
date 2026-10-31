@@ -26,6 +26,19 @@ test("the mean wait of a queue is its total time over its entries", () => {
   assert.equal(derived.meanWait, 7.5);
 });
 
+test("the mean wait of the engine is the area over the entries", () => {
+  // The engine's AVE.TIME: the queue covered an area of 20 and 4
+  // transactions entered it, so it is 5 seconds — not the 7.5 of the sum of
+  // the waits of the ones that left.
+  const derived = queueDerived({ entries: 4, zeroEntries: 1, totalTime: 30, area: 20 }, 40);
+  assert.equal(derived.engineMeanWait, 5);
+});
+
+test("a queue that saw nobody derives no wait of the engine", () => {
+  const derived = queueDerived({ entries: 0, zeroEntries: 0, totalTime: 0, area: 0 }, 40);
+  assert.equal(derived.engineMeanWait, 0);
+});
+
 test("the share of waits that were zero is the zero entries over the entries", () => {
   const derived = queueDerived({ entries: 4, zeroEntries: 1, totalTime: 30, area: 20 }, 40);
   assert.equal(derived.zeroShare, 0.25);

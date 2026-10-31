@@ -61,6 +61,13 @@ export interface QueueNumbers {
   meanContent: number;
   /** The mean wait: `totalTime / entries`. */
   meanWait: number;
+  /**
+   * The wait of the engine, its `AVE.TIME`: `area / entries`.
+   *
+   * It is a different number than the mean wait above, and the section
+   * shows both with their own name.
+   */
+  engineMeanWait: number;
   /** The share of the entries that waited no time. */
   zeroShare: number;
   /** Whether the replay knows this queue yet. */
@@ -170,6 +177,7 @@ export function queuesOf(
       area: figure?.area ?? 0,
       meanContent: derived.meanContent,
       meanWait: derived.meanWait,
+      engineMeanWait: derived.engineMeanWait,
       zeroShare: derived.zeroShare,
       live: figure !== undefined,
     };

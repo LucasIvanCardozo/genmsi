@@ -14,6 +14,10 @@
  *   (`Queue::area`), the same integral the engine closes at the end of the
  *   run;
  * - the **mean wait** of a queue is its accumulated wait over its entries;
+ * - the **wait of the engine** (`AVE.TIME`) is the area of the queue over its
+ *   entries: the integral counts the transactions that are still waiting,
+ *   which the sum of the waits of the ones that left does not
+ *   (`crates/genmsi-core/src/stat.rs:211-223`);
  * - the **utilization** of a facility is the time it was busy over the
  *   elapsed time (`Facility::utilization`);
  * - the **mean service** of a facility is the time it was busy over the
@@ -43,6 +47,15 @@ export interface QueueDerived {
   meanContent: number;
   /** The mean wait: `totalTime / entries`. */
   meanWait: number;
+  /**
+   * The wait of the engine, its `AVE.TIME`: `area / entries`.
+   *
+   * It is not the mean wait above: the integral of the queue counts the
+   * transactions that are still waiting in it, and the sum of the waits
+   * does not. The engine publishes this one, and the app shows both so
+   * that the two numbers never carry the same name.
+   */
+  engineMeanWait: number;
   /** The share of the entries that waited no time: `zeroEntries / entries`. */
   zeroShare: number;
 }
@@ -57,6 +70,7 @@ export function queueDerived(queue: QueueSample, elapsed: number): QueueDerived 
   return {
     meanContent: elapsed > 0 ? queue.area / elapsed : 0,
     meanWait: queue.entries > 0 ? queue.totalTime / queue.entries : 0,
+    engineMeanWait: queue.entries > 0 ? queue.area / queue.entries : 0,
     zeroShare: queue.entries > 0 ? queue.zeroEntries / queue.entries : 0,
   };
 }

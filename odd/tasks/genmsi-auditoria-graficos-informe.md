@@ -28,6 +28,49 @@ y `docs/app.md`), y contra las que se juzga cada tarjeta:
 - Toda afirmación lleva evidencia `path:line`. Lo que no se pudo verificar
   desde el código está marcado como tal.
 
+## Verificación
+
+Los hallazgos se verificaron dos veces y por dos vías distintas:
+
+1. **El padre** contrastó uno por uno contra el código los hallazgos de
+   severidad alta: el divisor del pie, el veredicto "el que más aprieta",
+   `AVE.TIME` de colas y cadenas, el productor inexistente de `facility-retry`,
+   la divergencia del contador de reintentos, el badge mentiroso de las tablas,
+   la agrupación de 200 intervalos que la documentación promete y el código no
+   hace, el `countsOf` sin el conjunto de generadores, y el reloj desalineado
+   de las cifras durante la reproducción.
+2. **Un verificador independiente** (`gentle-ai-verify`) releyó este informe
+   contra el código, sin ver el trabajo del padre.
+
+**Resultado**: de los 19 hallazgos `[alta]`, **18 CONFIRMADOS y ninguno
+incorrecto**; uno queda **UNVERIFIABLE** (el posible "+1" de las cadenas con
+`LINK` y salida conectada: requiere ejecutar un modelo que el repo no tiene).
+Los `[media]` con afirmación factual: todos confirmados. Cuatro citas
+`path:line` no eran exactas y se corrigieron (deriva menor; el contenido
+de los hallazgos era correcto).
+
+**Lo que no se puede verificar desde el código** (necesita correr la app):
+
+- el "+1" fantasma de las cadenas (`LINK` con destino);
+- la coherencia de los tramos de ocupación con la utilización bajo `PREEMPT`
+  (verificado leyendo el código: el motor tampoco acumula `busyTime` en el
+  preempt, `crates/genmsi-core/src/sim.rs:1411-1414`);
+- la magnitud concreta de la divergencia de "Transacciones" y "Población" en
+  un modelo con `SPLIT` (la divergencia de código está probada);
+- que Recharts interprete un nombre de cola con punto como ruta anidada, y el
+  ancho de barra fijo de 620 px dentro de un `ResponsiveContainer` (requiere
+  `recharts` instalado y pantalla).
+
+**Regresiones que deja anotadas** (no se escribieron: la auditoría no toca
+código), en `crates/genmsi-app/tests/`:
+
+- `audit-clock-figures.test.ts` — la utilización de una facility con el área
+  congelada tiende a 100 %, y la columna de reintentos de facility es 0;
+- `audit-engine-metrics.test.ts` — la "espera media" de la app no es el
+  `AVE.TIME` del motor;
+- `tests/series.test.ts:138` **hay que cambiarlo** si se corrige el rótulo de
+  la primera clase del histograma: hoy fija el rótulo defectuoso "0 - 10".
+
 ## Resumen
 
 Ninguna tarjeta sobra **como información**: las trece cuentan cosas distintas
@@ -64,7 +107,7 @@ y ninguna se puede borrar sin perder algo. Lo que sobra son las **repeticiones**
 2. **El reloj y las cifras no son del mismo instante durante la
    reproducción.** `closeFigures` (`monitor/stats.ts:434-464`) cierra el área con
    el contenido congelado del playhead mientras el reloj del store avanza
-   (`MonitorCharts.tsx:57`, `:63-66`): la utilización de una facility ocupada
+   (`MonitorCharts.tsx:62`, `:66-69`): la utilización de una facility ocupada
    en ese frame tiende a 100 % y el contenido medio de una cola vacía decae a 0.
    El store ya publica las figuras frescas (`monitor/live.ts:204`) y ningún
    gráfico las usa.
@@ -229,7 +272,7 @@ figuras del **replay** cerradas en el reloj (`closeFigures`), y las métricas
 son ratios: `busyTime/elapsed` (`monitor/derived.ts:81-83`),
 `area/elapsed` (`monitor/derived.ts:56-58`), `area/(elapsed·capacity)`
 (`monitor/derived.ts:109-113`). El reporte sólo aporta los **nombres** y la
-**capacidad** del almacén (`charts/entities.ts:15-20`, `:216`); el tiempo es
+**capacidad** del almacén (`charts/entities.ts:12-17`, `:216`); el tiempo es
 `elapsed.live = clock - start_time` (`MonitorCharts.tsx:74`).
 
 **1. ¿Tiene sentido?** La idea es buena —el cuello de botella de un vistazo—,
@@ -256,7 +299,7 @@ tarjeta es la comparación entre familias… que es justo la parte rota.
   con la duración de la corrida obtiene otra cifra.
 - [alta] **El badge miente:** "derivado del reporte" (`MonitorCharts.tsx:124`)
   cuando las cifras son del replay; el reporte sólo da nombres y capacidad
-  (`charts/entities.ts:15-20`). El badge es la promesa de procedencia de la
+  (`charts/entities.ts:12-17`). El badge es la promesa de procedencia de la
   sección (`ChartCard.tsx:6-7`).
 - [media] **Las barras no tienen escala:** cada panel divide por su máximo
   (`ResourceRanking.tsx:46-53`), sin eje ni referencia al 100 %; un panel cuyo
@@ -335,7 +378,7 @@ la media divide el área *viva* por el tiempo *vivo*, no mezcla cifras
 publicadas (`entities.ts:161` + `MonitorCharts.tsx:74`); al final de la corrida
 esa media coincide con la del motor (ambos integran desde la primera
 referencia de la cola: `monitor/stats.ts:179-187` vs
-`crates/genmsi-core/src/stat.rs:615-618`); el reloj nunca pasa de `endTime`
+`crates/genmsi-core/src/stat.rs:180-243`); el reloj nunca pasa de `endTime`
 (`components/MonitorView.tsx:350-352`), así que la vertical nunca sale del
 eje; no hay colisión de claves (los nombres son únicos,
 `TimeSeriesChart.tsx:85`, `:109`). Los hallazgos:
@@ -970,7 +1013,9 @@ etiquetas y el rotulado no.
   (`MonitorCharts.tsx:149-151`). El motor publica MEDIA y DESVIACION ESTANDAR
   en el reporte de texto (`crates/genmsi-core/src/report.rs:456-462`); el JSON
   no las trae, así que la app las recalcula y debe decirlo.
-- [media] La **primera clase está mal rotulada** cuando `first > 0`: la app
+- [media] La **primera clase está mal rotulada** cuando `first > 0`
+  *Al corregirlo hay que cambiar `tests/series.test.ts:138`, que hoy fija el
+  rótulo defectuoso "0 - 10" (el verificador lo signalé).*: la app
   escribe "0 – first" (`monitor/series.ts:216-217`, fijado por
   `tests/series.test.ts:138`), pero la clase 0 del motor es "todo valor ≤
   `first`" (`crates/genmsi-core/src/stat.rs:522-524`) y el reporte la imprime
@@ -1328,8 +1373,8 @@ La familia sobre la que se construye cada tarjeta: `ChartCard.tsx`
 - [alta] — **La familia no ata el reloj a sus cifras.** `entities.ts` recibe
   `live: Figures` y `elapsed.live` por separado
   (`charts/entities.ts:154`, `:161`, `:189`, `:219`, `:243`), y el panel los
-  toma de fuentes distintas: el reloj del store vivo (`MonitorCharts.tsx:57`) y
-  las figuras del prop `state` (`MonitorCharts.tsx:63-66`). `state` sólo se
+  toma de fuentes distintas: el reloj del store vivo (`MonitorCharts.tsx:62`) y
+  las figuras del prop `state` (`MonitorCharts.tsx:66-69`). `state` sólo se
   recalcula cuando cambia el playhead (`MonitorView.tsx:94-107`) y durante la
   reproducción el playhead no se actualiza hasta el final
   (`MonitorView.tsx:385`). El store sí publica las figuras frescas
@@ -1393,7 +1438,7 @@ La familia sobre la que se construye cada tarjeta: `ChartCard.tsx`
   `useRunHasPublished()` (`live.ts:225`, que sí usa el canvas en
   `GraphView.tsx:125`) no los usa ningún gráfico.
 - [baja] — Claves: `BarList.tsx:38` (`name+index`) y `StatTable.tsx:53`
-  (`index`) se rompen al reordenar en vivo (`blocks.ts:112` ordena por
+  (`index`) se rompen al reordenar en vivo (`blocks.ts:104` ordena por
   entradas).
 - [baja] — `series.ts` tiene dos convenciones de intervalo: `histogram()` usa
   `[low, high)` (`series.ts:140-156`) y `histogramRows()` la del motor

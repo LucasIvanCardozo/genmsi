@@ -38,6 +38,13 @@ export interface QueueFigure {
   totalTime: number;
   /** Its content times the time, added up. */
   area: number;
+  /**
+   * How many transactions left the queue.
+   *
+   * The entries count the ones that arrived, and some of them are still
+   * waiting: the departures are the ones that are already gone.
+   */
+  departures: number;
   /** When its content last changed. */
   lastChange: number;
 }
@@ -184,6 +191,7 @@ function emptyQueue(now: number): QueueFigure {
     zeroEntries: 0,
     totalTime: 0,
     area: 0,
+    departures: 0,
     lastChange: now,
   };
 }
@@ -286,6 +294,7 @@ export function applyChange(figures: Figures, change: FigureChange): Figures {
         content,
         totalTime: before.totalTime + change.waited,
         zeroEntries: before.zeroEntries + (change.waited === 0 ? 1 : 0),
+        departures: before.departures + 1,
       };
       return { ...figures, queues: { ...figures.queues, [change.name]: queue } };
     }

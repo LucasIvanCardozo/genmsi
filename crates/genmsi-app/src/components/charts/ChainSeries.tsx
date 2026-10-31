@@ -41,8 +41,6 @@ export default function ChainSeries({
     );
   }
 
-  const meanTime = chain.entries > 0 ? chain.totalTime / chain.entries : 0;
-
   return (
     <div>
       {chains.length > 1 && (
@@ -71,30 +69,36 @@ export default function ChainSeries({
         clock={clock}
         height={200}
       />
-      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard
           label="Ahora"
           value={number(chain.content)}
           note="transacciones encadenadas"
-          live={chain.live}
+          state={chain.live ? "instant" : "unknown"}
         />
         <StatCard
           label="Máximo"
           value={number(chain.max)}
-          note="la cadena más larga"
-          live={chain.live}
+          note="el máximo de esta cadena"
+          state={chain.live ? "instant" : "unknown"}
         />
         <StatCard
           label="Entradas"
           value={number(chain.entries)}
-          note="enlaces hechos en la corrida"
-          live={chain.live}
+          note="enlaces hechos hasta el reloj"
+          state={chain.live ? "instant" : "unknown"}
         />
         <StatCard
           label="Tiempo medio"
-          value={`${decimals(meanTime)} s`}
-          note="derivado: tiempo total / entradas"
-          live={chain.live}
+          value={`${decimals(chain.meanTime)} s`}
+          note="derivado: área / entradas (la del motor)"
+          state={chain.live ? "derived" : "unknown"}
+        />
+        <StatCard
+          label="Tamaño medio"
+          value={`${decimals(chain.meanSize)} u`}
+          note="derivado: área / tiempo hasta el reloj"
+          state={chain.live ? "derived" : "unknown"}
         />
       </div>
     </div>

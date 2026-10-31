@@ -31,6 +31,7 @@ function runFigures(): Figures {
         zeroEntries: 0,
         totalTime: 12,
         area: 30,
+        departures: 5,
         lastChange: 4,
       },
       ColaB: {
@@ -40,6 +41,7 @@ function runFigures(): Figures {
         zeroEntries: 1,
         totalTime: 2,
         area: 4,
+        departures: 2,
         lastChange: 6,
       },
     },

@@ -24,12 +24,26 @@ export interface BlockRow {
   name: string;
   /** The class of the block. */
   class: string;
+  /** The GPSS label of the block, when it declares one. */
+  label: string | null;
   /** How many transactions went through it. */
   entries: number;
   /** How many transactions are inside it right now. */
   current: number;
   /** How many times a transaction could not enter it. */
   retries: number;
+  /**
+   * How many transactions the engine counted in it during the whole run,
+   * or null when the report does not know the block.
+   */
+  published: number | null;
+  /**
+   * Whether the block generates the transactions of the model.
+   *
+   * A generator does not receive the transactions: it creates them, so its
+   * figure counts the transactions it created.
+   */
+  generator: boolean;
   /** Whether the figures are the ones of the instant. */
   live: boolean;
 }
@@ -55,6 +69,40 @@ function classOf(model: ModelBody | null, node: number): string {
 }
 
 /**
+ * The name a reader knows a block by.
+ *
+ * The model can call two blocks the same, so the name of the card carries
+ * the class of the block: two rows of the ranking that say the same thing
+ * are two different blocks of the model.
+ */
+export function blockNameOf(row: BlockRow): string {
+  if (row.generator) {
+    // El generador ya se llama así en la mayoría de los modelos: sólo se
+    // dice cuando el nombre del modelo no lo dice.
+    return row.name.toLowerCase().includes("generador")
+      ? row.name
+      : `${row.name} · generador`;
+  }
+  if (row.class !== "") {
+    return `${row.name} · ${row.class}`;
+  }
+  // Sin clase, la etiqueta del GPSS es lo que distingue dos bloques que
+  // el modelo llama igual.
+  return row.label === null ? row.name : `${row.name} · ${row.label}`;
+}
+
+/**
+ * What the figure of a block counts, when it is not the transactions that
+ * went through it.
+ *
+ * A generator creates the transactions: its figure is the number of
+ * transactions it created, and the card says so.
+ */
+export function blockNoteOf(row: BlockRow): string | undefined {
+  return row.generator ? "las transacciones que creó" : undefined;
+}
+
+/**
  * The figures of every block of the model.
  *
  * The transactions that went through a block are the ones the row that
@@ -74,9 +122,18 @@ export function blockRows(
   // The retries of every program row, added up by the block they belong
   // to: each row counts its own, and the block adds the ones of its rows.
   const perNode = new Map<number, number>();
+  // The rows that count the block: the engine says which row that is, and
+  // its count is the one the engine published for the whole run.
+  const counting = new Map<
+    number,
+    { entries: number; label: string | null }
+  >();
   for (const row of report.blocks) {
     const line = row.line - 1;
     perNode.set(row.node, (perNode.get(row.node) ?? 0) + (retries[line] ?? 0));
+    if (row.counts_block) {
+      counting.set(row.node, { entries: row.entries, label: row.label });
+    }
   }
 
   const nodes = new Set<number>(report.blocks.map((row) => row.node));
@@ -87,12 +144,17 @@ export function blockRows(
     const count = counts.get(node);
     const entries = count?.ever ?? 0;
     const current = count?.now ?? 0;
+    const published = counting.get(node);
+    const className = classOf(model, node);
     rows.push({
       name: nameOf(model, node, `bloque ${node}`),
-      class: classOf(model, node),
+      class: className,
+      label: published?.label ?? null,
       entries,
       current,
       retries: perNode.get(node) ?? 0,
+      published: published?.entries ?? null,
+      generator: className === "Generate",
       live: count !== undefined,
     });
   }

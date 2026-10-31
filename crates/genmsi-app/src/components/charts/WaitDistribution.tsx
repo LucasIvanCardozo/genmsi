@@ -5,6 +5,11 @@
  * many of them waited that time, and the curve says the share of the
  * transactions that left by then.
  *
+ * The width of the intervals is chosen **once per queue**, from the
+ * longest wait of the whole trace: a width that changed with the clock
+ * would re-bin the histogram while the run advances, and two instants of
+ * the same queue would not be comparable.
+ *
  * The mean of the histogram is the mean **of the samples** (the
  * transactions that left), which is not the mean wait of the queue: that
  * one divides the accumulated wait by every entry, including the
@@ -23,27 +28,19 @@ import {
   YAxis,
 } from "recharts";
 import { decimals, number } from "../../format.ts";
-import { cumulative, histogram } from "../../monitor/series.ts";
+import { cumulative, histogram, waitWidth } from "../../monitor/series.ts";
 import type { ReplayIndex } from "../../monitor/replay.ts";
+import { FIGURE_STATES } from "./states.ts";
 
-/** The widths a histogram of waits can have. */
-const STEPS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 30, 60, 120, 300, 600];
-
-/**
- * The width of the intervals of the histogram.
- *
- * The width is the smallest one that leaves about a dozen intervals: a
- * histogram with a hundred bars is not read, and one with three bars says
- * nothing.
- */
-function widthOf(longest: number): number {
-  const wanted = Math.max(longest, 1) / 12;
-  for (const step of STEPS) {
-    if (step >= wanted) {
-      return step;
+/** The longest wait of a list of samples. */
+function longestOf(waits: number[]): number {
+  let longest = 0;
+  for (const wait of waits) {
+    if (wait > longest) {
+      longest = wait;
     }
   }
-  return STEPS[STEPS.length - 1];
+  return longest;
 }
 
 export default function WaitDistribution({
@@ -59,21 +56,31 @@ export default function WaitDistribution({
   const [selected, setSelected] = useState<string | null>(null);
   const queue = selected ?? names[0] ?? null;
 
-  const samples = useMemo(() => {
-    if (queue === null) {
-      return [];
-    }
-    return (monitor.waits.get(queue) ?? [])
-      .filter((sample) => sample.time <= clock)
-      .map((sample) => sample.wait);
-  }, [monitor, queue, clock]);
+  const all = useMemo(
+    () => (queue === null ? [] : (monitor.waits.get(queue) ?? [])),
+    [monitor, queue],
+  );
+  // The width of the intervals is chosen once per queue, from the whole
+  // trace: two instants of the same queue are drawn with the same
+  // intervals.
+  const width = useMemo(
+    () => waitWidth(longestOf(all.map((sample) => sample.wait))),
+    [all],
+  );
+
+  const samples = useMemo(
+    () =>
+      all
+        .filter((sample) => sample.time <= clock)
+        .map((sample) => sample.wait),
+    [all, clock],
+  );
 
   const chart = useMemo(() => {
     if (samples.length === 0) {
       return null;
     }
-    const longest = Math.max(...samples);
-    const width = widthOf(longest);
+    const longest = longestOf(samples);
     const bins = histogram(samples, width);
     const shares = cumulative(bins);
     const mean = samples.reduce((sum, wait) => sum + wait, 0) / samples.length;
@@ -85,7 +92,7 @@ export default function WaitDistribution({
       accumulated: shares[index],
     }));
     return { rows, mean, width, longest, empty: longest === 0, barSize };
-  }, [samples]);
+  }, [samples, width]);
 
   if (names.length === 0) {
     return (
@@ -120,20 +127,32 @@ export default function WaitDistribution({
         </p>
       ) : (
         <>
-          <p className="mb-1 text-[11px] text-slate-500">
-            {chart.empty ? (
-              <>
-                Las {number(samples.length)} salidas de esta cola no esperaron
-                nada: no hubo cola que esperar.
-              </>
-            ) : (
-              <>
-                {number(samples.length)} salidas · media de las salidas{" "}
-                {decimals(chart.mean, 2)} s · intervalos de{" "}
-                {decimals(chart.width, 2)} s.
-              </>
-            )}
-          </p>
+          <ul className="mb-1 flex flex-col gap-0.5 text-[11px]">
+            <li className="flex items-baseline justify-between gap-3">
+              <span className="text-slate-500">salidas</span>
+              <b className={`font-mono ${FIGURE_STATES.instant.textClass}`}>
+                {number(samples.length)}
+              </b>
+            </li>
+            <li className="flex items-baseline justify-between gap-3">
+              <span className="text-slate-500">media de las salidas *</span>
+              <b className={`font-mono ${FIGURE_STATES.derived.textClass}`}>
+                {decimals(chart.mean, 2)} s
+              </b>
+            </li>
+            <li className="flex items-baseline justify-between gap-3">
+              <span className="text-slate-500">intervalos de</span>
+              <b className="font-mono text-slate-700">
+                {decimals(chart.width, 2)} s
+              </b>
+            </li>
+          </ul>
+          {monitor.truncated && (
+            <p className="mb-1 text-[10px] leading-snug text-slate-400">
+              La traza se cortó en {number(monitor.limit)} registros: las
+              esperas que pasaron después no están.
+            </p>
+          )}
           <div className={chart.empty ? "hidden" : "h-64"}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
@@ -168,13 +187,20 @@ export default function WaitDistribution({
                       ? `${number(Number(value))} %`
                       : number(Number(value))
                   }
-                  labelFormatter={(value) => `espera ${number(Number(value))} s`}
+                  labelFormatter={(value, payload) => {
+                    // El tooltip dice el intervalo, no su punto medio: una
+                    // espera de 0,05 s pertenece al intervalo que lo dice.
+                    const row = payload?.[0]?.payload as
+                      | { label?: string }
+                      | undefined;
+                    return row?.label ?? `espera ${number(Number(value))} s`;
+                  }}
                 />
                 <ReferenceLine
                   x={chart.mean}
                   stroke="#0f172a"
                   strokeWidth={1.5}
-                    />
+                />
                 <Bar
                   yAxisId="left"
                   dataKey="frequency"

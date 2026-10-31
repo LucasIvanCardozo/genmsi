@@ -135,7 +135,11 @@ test("the segments of a facility stop at the instant the reader is at", () => {
 test("the intervals of a table histogram are correctly stepped", () => {
   const rows = histogramRows({ first: 10, width: 5, intervals: 4 }, [2, 5, 3, 1]);
   assert.equal(rows.length, 4);
-  assert.equal(rows[0].label, "0 - 10");
+  assert.equal(
+    rows[0].label,
+    "≤ 10",
+    "the first class holds every value up to its first bound: it has no lower bound",
+  );
   assert.equal(rows[1].label, "10 - 15");
   assert.equal(rows[2].label, "15 - 20");
   assert.equal(rows[3].label, "> 20");

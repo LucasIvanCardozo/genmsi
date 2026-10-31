@@ -17,42 +17,49 @@ import {
 test("the mean content of a queue is its area over the time of the run", () => {
   // The queue held 2 units for 10 seconds: the area is 20 and the run took
   // 40 seconds, so the mean content is 0.5.
-  const derived = queueDerived({ entries: 4, zeroEntries: 1, totalTime: 30, area: 20 }, 40);
+  const derived = queueDerived({ entries: 4, zeroEntries: 1, totalTime: 30, area: 20, departures: 3 }, 40);
   assert.equal(derived.meanContent, 0.5);
 });
 
-test("the mean wait of a queue is its total time over its entries", () => {
-  const derived = queueDerived({ entries: 4, zeroEntries: 1, totalTime: 30, area: 20 }, 40);
-  assert.equal(derived.meanWait, 7.5);
+test("the mean of the departures is the wait of the ones that left over the ones that left", () => {
+  // Three transactions left the queue, having waited 30 seconds between
+  // them: their mean wait is 10 seconds.
+  const derived = queueDerived({ entries: 4, zeroEntries: 1, totalTime: 30, area: 20, departures: 3 }, 40);
+  assert.equal(derived.departureMeanWait, 10);
+});
+
+test("a queue that nobody left derives no mean of the departures", () => {
+  const derived = queueDerived({ entries: 4, zeroEntries: 1, totalTime: 30, area: 20, departures: 0 }, 40);
+  assert.equal(derived.departureMeanWait, 0);
 });
 
 test("the mean wait of the engine is the area over the entries", () => {
   // The engine's AVE.TIME: the queue covered an area of 20 and 4
   // transactions entered it, so it is 5 seconds — not the 7.5 of the sum of
   // the waits of the ones that left.
-  const derived = queueDerived({ entries: 4, zeroEntries: 1, totalTime: 30, area: 20 }, 40);
+  const derived = queueDerived({ entries: 4, zeroEntries: 1, totalTime: 30, area: 20, departures: 3 }, 40);
   assert.equal(derived.engineMeanWait, 5);
 });
 
 test("a queue that saw nobody derives no wait of the engine", () => {
-  const derived = queueDerived({ entries: 0, zeroEntries: 0, totalTime: 0, area: 0 }, 40);
+  const derived = queueDerived({ entries: 0, zeroEntries: 0, totalTime: 0, area: 0, departures: 0 }, 40);
   assert.equal(derived.engineMeanWait, 0);
 });
 
 test("the share of waits that were zero is the zero entries over the entries", () => {
-  const derived = queueDerived({ entries: 4, zeroEntries: 1, totalTime: 30, area: 20 }, 40);
+  const derived = queueDerived({ entries: 4, zeroEntries: 1, totalTime: 30, area: 20, departures: 3 }, 40);
   assert.equal(derived.zeroShare, 0.25);
 });
 
 test("a queue that saw nothing derives nothing", () => {
-  const derived = queueDerived({ entries: 0, zeroEntries: 0, totalTime: 0, area: 0 }, 40);
+  const derived = queueDerived({ entries: 0, zeroEntries: 0, totalTime: 0, area: 0, departures: 0 }, 40);
   assert.equal(derived.meanContent, 0);
-  assert.equal(derived.meanWait, 0);
+  assert.equal(derived.departureMeanWait, 0);
   assert.equal(derived.zeroShare, 0);
 });
 
 test("a run of no time divides by nothing", () => {
-  const derived = queueDerived({ entries: 4, zeroEntries: 1, totalTime: 30, area: 20 }, 0);
+  const derived = queueDerived({ entries: 4, zeroEntries: 1, totalTime: 30, area: 20, departures: 3 }, 0);
   assert.equal(derived.meanContent, 0, "there was no time to divide by");
 });
 
@@ -86,8 +93,13 @@ test("a storage with no capacity derives nothing", () => {
 });
 
 test("the mean size of a chain is its area over the time of the run", () => {
-  const derived = chainDerived({ area: 120 }, 40);
+  const derived = chainDerived({ area: 120, entries: 6 }, 40);
   assert.equal(derived.meanSize, 3);
+});
+
+test("the mean time of a chain is its area over its entries", () => {
+  const derived = chainDerived({ area: 120, entries: 6 }, 40);
+  assert.equal(derived.meanTime, 20);
 });
 
 test("the mean of a table is its sum over its samples", () => {

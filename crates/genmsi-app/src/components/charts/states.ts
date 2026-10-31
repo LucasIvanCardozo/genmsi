@@ -49,6 +49,12 @@ export interface FigureStateRule {
   badgeClass: string;
   /** The mark of the legend. */
   markClass: string;
+  /**
+   * The color of the state as a stroke, for the SVG of the charts: the
+   * dashed line of a mean is drawn in the color of the derived state, the
+   * one of the clock in the color of the instant.
+   */
+  stroke: string;
 }
 
 /**
@@ -68,6 +74,7 @@ export const FIGURE_STATES: Readonly<Record<FigureState, FigureStateRule>> = {
     textClass: "text-indigo-700",
     badgeClass: "bg-indigo-50 text-indigo-700",
     markClass: "bg-indigo-700",
+    stroke: "#4338ca",
   },
   derived: {
     id: "derived",
@@ -77,6 +84,7 @@ export const FIGURE_STATES: Readonly<Record<FigureState, FigureStateRule>> = {
     textClass: "text-amber-700",
     badgeClass: "bg-amber-50 text-amber-700",
     markClass: "bg-amber-700",
+    stroke: "#b45309",
   },
   published: {
     id: "published",
@@ -86,6 +94,7 @@ export const FIGURE_STATES: Readonly<Record<FigureState, FigureStateRule>> = {
     textClass: "text-slate-500",
     badgeClass: "bg-slate-100 text-slate-600",
     markClass: "bg-slate-500",
+    stroke: "#64748b",
   },
   unknown: {
     id: "unknown",
@@ -96,6 +105,7 @@ export const FIGURE_STATES: Readonly<Record<FigureState, FigureStateRule>> = {
     textClass: "text-slate-300",
     badgeClass: "border border-dashed border-slate-400 bg-white text-slate-500",
     markClass: "border border-dashed border-slate-500 bg-white",
+    stroke: "#cbd5e1",
   },
 };
 
@@ -132,4 +142,9 @@ export function badgeClassOf(state: FigureState): string {
 /** The mark of the legend of this state. */
 export function markClassOf(state: FigureState): string {
   return FIGURE_STATES[state].markClass;
+}
+
+/** The color of this state as a stroke, for the SVG of the charts. */
+export function strokeOf(state: FigureState): string {
+  return FIGURE_STATES[state].stroke;
 }

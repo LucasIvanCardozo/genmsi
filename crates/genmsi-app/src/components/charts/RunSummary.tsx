@@ -19,7 +19,7 @@ import type { Instant } from "../../monitor/stats.ts";
 import type { ReportDocument } from "../../types";
 import type { QueueNumbers } from "./entities.ts";
 import { busiestQueueOf } from "./runState.ts";
-import { FIGURE_STATES, type FigureState } from "./states.ts";
+import StatCard from "./StatCard.tsx";
 
 /**
  * The foot of the card: what the asterisks mean.
@@ -30,49 +30,6 @@ import { FIGURE_STATES, type FigureState } from "./states.ts";
  */
 export const RUN_SUMMARY_FOOTNOTE =
   "Caudal * = transacciones ÷ tiempo hasta el reloj · contenido medio * = área ÷ tiempo hasta el reloj · espera media * = área ÷ entradas (la del motor).";
-
-/**
- * One figure of the card.
- *
- * It follows the rules of the `StatCard` of the section (the label, the
- * figure in the mono and the note under it) and takes the color of its
- * state from the vocabulary of the states: the `StatCard` only knew two
- * colors, and the section now has four.
- */
-function Stat({
-  label,
-  value,
-  note,
-  state,
-}: {
-  /** The name of the figure. */
-  label: string;
-  /** The figure, already written the way the app writes them. */
-  value: React.ReactNode;
-  /** The sentence that says what the figure is. */
-  note?: string;
-  /** The state the figure is in. */
-  state: FigureState;
-}) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3.5 py-2.5">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-        {label}
-      </p>
-      <p
-        className={[
-          "mt-0.5 font-mono text-lg font-semibold leading-tight",
-          FIGURE_STATES[state].textClass,
-        ].join(" ")}
-      >
-        {value}
-      </p>
-      {note !== undefined && (
-        <p className="mt-0.5 text-[11px] leading-snug text-slate-500">{note}</p>
-      )}
-    </div>
-  );
-}
 
 /** A figure with its unit written smaller, the way the artboard writes it. */
 function measure(value: string, unit: string) {
@@ -117,20 +74,20 @@ export default function RunSummary({
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-      <Stat
+      <StatCard
         label="Transacciones"
         value={number(generated)}
         note={`de ${number(report.transactions)} en la corrida`}
         state="instant"
       />
-      <Stat
+      <StatCard
         label="Eventos"
         value={number(report.events)}
         note="los cuenta el motor"
         state="published"
       />
-      <Stat
-        label="Caudal *"
+      <StatCard
+        label="Caudal"
         value={
           throughput === null
             ? "Sin datos."
@@ -141,9 +98,9 @@ export default function RunSummary({
             ? `transacciones ÷ ${decimals(elapsed)} s`
             : "transacciones ÷ tiempo hasta el reloj"
         }
-        state="derived"
+        state={throughput === null ? "unknown" : "derived"}
       />
-      <Stat
+      <StatCard
         label="Población"
         value={
           instant.population !== null ? number(instant.population) : "Sin datos."
@@ -151,21 +108,21 @@ export default function RunSummary({
         note="dentro del modelo ahora"
         state={instant.population !== null ? "instant" : "unknown"}
       />
-      <Stat
-        label="Contenido medio de las colas *"
+      <StatCard
+        label="Contenido medio de las colas"
         value={meanContent === null ? "Sin datos." : measure(decimals(meanContent), "u")}
         note={
           queue === null
             ? "el modelo no tiene colas"
             : `${queue.name}, área ÷ ${decimals(elapsed)} s`
         }
-        state="derived"
+        state={meanContent === null ? "unknown" : "derived"}
       />
-      <Stat
-        label="Espera media *"
+      <StatCard
+        label="Espera media"
         value={meanWait === null ? "Sin datos." : measure(decimals(meanWait), "s")}
         note={queue === null ? "el modelo no tiene colas" : `${queue.name}, área ÷ entradas`}
-        state="derived"
+        state={meanWait === null ? "unknown" : "derived"}
       />
     </div>
   );

@@ -3,14 +3,16 @@
  *
  * A chart shows the **instant the reader is at**: the numbers of the
  * replay, never the numbers the engine published for the whole run. A
- * storage that has not been touched yet shows zero units, not the twenty
+ * storage that has not been touched yet carries zero units, not the twenty
  * it will hold at the end of the run — a chart that shows the future at
- * the second zero is a chart that lies.
+ * the second zero is a chart that lies. The cards do not show that zero:
+ * an entity the replay has not reached says "todavía no".
  *
- * The engine's report is the source of two things only: the **names** of the
- * entities (the model declares them) and the **capacity** of a storage (a
- * property of the model, not of the run). The values come from the replay;
- * the ones the replay does not know yet are zero.
+ * The engine's report is the source of three things: the **names** of the
+ * entities (the model declares them), the **capacity** of a storage (a
+ * property of the model, not of the run) and the **retries** of a facility
+ * (the replay never emits one, so only the engine can say how many there
+ * were). The other values come from the replay.
  *
  * At the end of the run the two agree: the replay's fidelity check
  * (`checkFidelity`) proves it on every run, so the charts end where the
@@ -53,21 +55,25 @@ export interface QueueNumbers {
   entries: number;
   /** How many of them waited no time at all. */
   zeroEntries: number;
+  /** How many transactions left the queue. */
+  departures: number;
   /** The time its transactions waited, added up. */
   totalTime: number;
   /** Its content times the time, added up. */
   area: number;
   /** The mean content: `area / elapsed`. */
   meanContent: number;
-  /** The mean wait: `totalTime / entries`. */
-  meanWait: number;
   /**
    * The wait of the engine, its `AVE.TIME`: `area / entries`.
    *
-   * It is a different number than the mean wait above, and the section
-   * shows both with their own name.
+   * It is a different number than the mean of the departures, and the
+   * section shows both with their own name.
    */
   engineMeanWait: number;
+  /**
+   * The mean wait of the transactions that left: `totalTime / departures`.
+   */
+  departureMeanWait: number;
   /** The share of the entries that waited no time. */
   zeroShare: number;
   /** Whether the replay knows this queue yet. */
@@ -90,6 +96,15 @@ export interface FacilityNumbers {
   inter: number;
   /** How many times a transaction could not take it. */
   retry: number;
+  /**
+   * The retry the engine published for the whole run, or null when the
+   * report does not know the facility.
+   *
+   * The figure of the instant is always zero: the replay never emits a
+   * facility retry. The number the engine counts is the one that is worth
+   * showing, and it is a number of the finished run.
+   */
+  publishedRetry: number | null;
   /** The utilization: `busyTime / elapsed`. */
   utilization: number;
   /** The mean service: `busyTime / entries`. */
@@ -136,6 +151,10 @@ export interface ChainNumbers {
   area: number;
   /** The mean size: `area / elapsed`. */
   meanSize: number;
+  /**
+   * The mean time of the engine (`AVE.TIME`): `area / entries`.
+   */
+  meanTime: number;
   /** Whether the replay knows this chain yet. */
   live: boolean;
 }
@@ -164,6 +183,7 @@ export function queuesOf(
         zeroEntries: figure?.zeroEntries ?? 0,
         totalTime: figure?.totalTime ?? 0,
         area: figure?.area ?? 0,
+        departures: figure?.departures ?? 0,
       },
       elapsed.live,
     );
@@ -173,11 +193,12 @@ export function queuesOf(
       max: figure?.max ?? 0,
       entries: figure?.entries ?? 0,
       zeroEntries: figure?.zeroEntries ?? 0,
+      departures: figure?.departures ?? 0,
       totalTime: figure?.totalTime ?? 0,
       area: figure?.area ?? 0,
       meanContent: derived.meanContent,
-      meanWait: derived.meanWait,
       engineMeanWait: derived.engineMeanWait,
+      departureMeanWait: derived.departureMeanWait,
       zeroShare: derived.zeroShare,
       live: figure !== undefined,
     };
@@ -204,6 +225,7 @@ export function facilitiesOf(
       owner: figure?.owner ?? null,
       inter: figure?.inter ?? 0,
       retry: figure?.retry ?? 0,
+      publishedRetry: report.entities.facilities[name]?.retry ?? null,
       utilization: derived.utilization,
       meanService: derived.meanService,
       live: figure !== undefined,
@@ -248,7 +270,10 @@ export function chainsOf(
 ): ChainNumbers[] {
   return namesOf(report.entities.chains, live?.chains).map((name) => {
     const figure = live?.chains[name];
-    const derived = chainDerived({ area: figure?.area ?? 0 }, elapsed.live);
+    const derived = chainDerived(
+      { area: figure?.area ?? 0, entries: figure?.entries ?? 0 },
+      elapsed.live,
+    );
     return {
       name,
       content: figure?.content ?? 0,
@@ -257,7 +282,80 @@ export function chainsOf(
       totalTime: figure?.totalTime ?? 0,
       area: figure?.area ?? 0,
       meanSize: derived.meanSize,
+      meanTime: derived.meanTime,
       live: figure !== undefined,
     };
   });
+}
+
+/**
+ * The pressure of a resource: how much of its limit it uses.
+ *
+ * The bars of the card that ranks the resources used to be normalized by
+ * the biggest bar of their own panel: a resource at 3 % drew a full bar
+ * and one at 98 % drew the same one. Each bar now has an **absolute
+ * scale**:
+ *
+ * - a facility: the share of the time up to the clock it was held;
+ * - a queue: the mean content over the maximum the queue ever held;
+ * - a storage: the share of its capacity it used on average.
+ */
+export interface ResourcePressure {
+  /** The name of the resource. */
+  name: string;
+  /** The figure, in its own unit: a share of a hundred or units. */
+  value: number;
+  /** The share of the scale the bar takes, from 0 to 1. */
+  share: number;
+  /** Whether the figure is a percentage of a hundred. */
+  percent: boolean;
+  /** Whether the replay knows this resource yet. */
+  live: boolean;
+}
+
+/** The pressure of the resources of the run, one family at a time. */
+export interface ResourcePressures {
+  /** The facilities: the share of the time up to the clock they were held. */
+  facilities: ResourcePressure[];
+  /** The queues: the mean content over the maximum they reached. */
+  queues: ResourcePressure[];
+  /** The storages: the share of their capacity they used on average. */
+  storages: ResourcePressure[];
+}
+
+/**
+ * The pressure of every resource of the run.
+ *
+ * The three families do not share a scale, and the card does not pretend
+ * that they do: each one is measured against its own limit.
+ */
+export function resourcePressuresOf(
+  facilities: FacilityNumbers[],
+  queues: QueueNumbers[],
+  storages: StorageNumbers[],
+): ResourcePressures {
+  return {
+    facilities: facilities.map((facility) => ({
+      name: facility.name,
+      value: facility.utilization,
+      share: facility.live ? facility.utilization : 0,
+      percent: true,
+      live: facility.live,
+    })),
+    queues: queues.map((queue) => ({
+      name: queue.name,
+      value: queue.meanContent,
+      share:
+        queue.live && queue.max > 0 ? queue.meanContent / queue.max : 0,
+      percent: false,
+      live: queue.live,
+    })),
+    storages: storages.map((storage) => ({
+      name: storage.name,
+      value: storage.meanUtilization,
+      share: storage.live ? storage.meanUtilization : 0,
+      percent: true,
+      live: storage.live,
+    })),
+  };
 }

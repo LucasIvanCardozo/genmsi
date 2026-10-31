@@ -68,7 +68,7 @@ export default function FacilityTimeline({
                 ) : null,
               )}
             </div>
-            <span className="w-12 shrink-0 text-right font-mono text-[11px] text-slate-600">
+            <span className="w-12 shrink-0 text-right font-mono text-[11px] text-indigo-700">
               {Math.round(row.facility.utilization * 100)} %
             </span>
           </div>

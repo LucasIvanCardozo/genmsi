@@ -123,24 +123,27 @@ export default function RunStatePanel({
         </ul>
 
         {/* The waiting of the end: a published number, and the box is the
-            alarm of a run that ended blocked. */}
+            alarm of a run that ended blocked. The alarm is of the error
+            family of the app: in this section the amber means "derived". */}
         <div
           className={
             state.waiting > 0
-              ? "mt-2.5 rounded-md border border-amber-500 bg-amber-50 px-3 py-2.5"
+              ? "mt-2.5 rounded-md border border-rose-300 bg-rose-50 px-3 py-2.5"
               : "mt-2.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5"
           }
         >
           <p
             className={
               state.waiting > 0
-                ? "text-[10px] font-semibold uppercase tracking-wider text-amber-700"
+                ? "text-[10px] font-semibold uppercase tracking-wider text-rose-700"
                 : "text-[10px] font-semibold uppercase tracking-wider text-slate-500"
             }
           >
             Esperando al final
           </p>
-          <p className="mt-0.5 font-mono text-2xl font-semibold leading-tight text-slate-800">
+          <p
+            className={`mt-0.5 font-mono text-2xl font-semibold leading-tight ${FIGURE_STATES.published.textClass}`}
+          >
             {number(state.waiting)}
           </p>
           <p className="mt-1 text-[11px] leading-snug text-slate-600">

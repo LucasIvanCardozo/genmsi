@@ -128,6 +128,19 @@ módulos puros para poder probarla, como ya se hace con `derived.ts`.
 | T7 | S8 | Corregir la promesa de la agrupación de 200 intervalos en `docs/app.md` | inline | pendiente |
 | T8 | S9 | Verificación: suite del frontend + typecheck + mirada a la app | inline | pendiente |
 
+### El corte de la entrega
+
+Cada unidad es un commit revisable con sus tests. El corte de revisión no es
+el commit sino la unidad:
+
+| Unidad | Qué entra | Commit |
+|---|---|---|
+| La base | La feature, el sistema de diseño (`design/system.md` + `design/system.html`) y la corrección de la promesa del histograma en `docs/app.md` | `84a8a0c`, `bdc6893` |
+| El diseño | Los tres artboards de `design/graficos-verdad/` y el lienzo | pendiente |
+| **U2** | El reloj y las cifras del mismo instante | pendiente |
+| **U1** | El rotulado: badges, leyenda, tres estados, pies y nombres de columna | pendiente |
+| **U3** | Lo que el motor publica y la app no muestra | pendiente |
+
 ### El orden y por qué
 
 T4 (U2) va primero y no espera al diseño: es el bug. T3 (el diseño) va en
@@ -141,3 +154,6 @@ esperan al diseño aprobado.
 - L3 — Decisiones que el usuario acepta al decir "vamos con tu recomendación": tres unidades (U2, U1, U3), no implementar la familia de P2, no implementar la agrupación de 200 intervalos, y que la cifra titular de la espera sea la del motor (`área/entradas`) para que la app y el reporte del CLI digan lo mismo.
 - L4 — El diseño pasa de Pen a **gentle-design**: los artboards van en `design/graficos-verdad/` y se revisan en el lienzo.
 - L5 — La rama de la implementación es `work/graficos-verdad`, nacida de `work/auditoria-graficos` (que ya tiene la auditoría), en el mismo worktree `/home/lucas/Documentos/Workspace/Genmsi-worktrees/auditoria-graficos`.
+- L6 — El sistema de diseño del proyecto se sync-eó de su código (`crates/genmsi-app/src/styles.css`, `charts/palette.ts` y las reglas de las tarjetas): `design/system.md` y `design/system.html`, el tablero que el lienzo muestra antes de cualquier diseño.
+- L7 — T7 cerrado: `docs/app.md` ya no promete la agrupación de los intervalos de más de 200 (no existe en el código) y dice la verdad: una barra por intervalo, con el ancho que sigue al número de intervalos.
+- L8 — El diseño y la unidad U2 corren en paralelo, con superficies de edición disjuntas: el diseño toca `design/graficos-verdad/` y U2 toca el motor del replay, el panel y sus tests.

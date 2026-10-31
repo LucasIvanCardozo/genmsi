@@ -373,9 +373,10 @@ intervals: a line of ones and zeros says less and takes more.
   first datum would hide the time before it. The vertical line that marks
   the instant the reader is at crosses every chart.
 - the **histogram** of every table and QTable of the model: the bars are the
-  frequencies the report publishes and the curve is their running total. A
-  table with more than 200 intervals is grouped, and the label says how many
-  intervals each bar covers.
+  frequencies the report publishes and the curve is their running total. Each
+  bar is one interval of the table; a table with many intervals draws many
+  thin bars (the width of the bar follows the number of intervals, with a
+  floor of four pixels).
 
 The only numbers the charts compute are the **ratios of the engine's own
 numbers** —the mean content of a queue, the utilization of a facility, the

@@ -20,6 +20,9 @@ dist/
 # Python (the tests of the bench generator)
 __pycache__/
 
+# The canvas of the design (the drawings, not the product)
+design/
+
 # Phase 0 Wine oracle: backup of the original + isolated wineprefix (never tracked)
 /Genmsi_20230711.backup/
 /scripts/wine-oracle/wineprefix/

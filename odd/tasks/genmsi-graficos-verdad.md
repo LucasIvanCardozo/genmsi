@@ -41,7 +41,7 @@ elapsed.published}`— armado desde el store vivo (`useFigures`,
 `monitor/live.ts:204`, que hoy no lo usa ningún gráfico), y **ninguna métrica
 derivada si el reloj y las figuras no son del mismo instante**.
 
-### S3 — U1: una sola leyenda, un solo color, tres estados
+### S3 — U1: una sola leyenda, un solo color, cuatro estados
 
 Hoy el violeta significa tres cosas: "derivado" (`StatTable.tsx:62`), "del
 instante" (`:63`) y "origen: replay" (el badge por defecto,
@@ -49,9 +49,19 @@ instante" (`:63`) y "origen: replay" (el badge por defecto,
 entidad", así que una entidad no alcanzada muestra 0 en slate, que la leyenda
 reserva para "publicado" (`MonitorCharts.tsx:239-240`).
 
-La corrección: un color por significado (instante · derivado · publicado), una
-leyenda sola que el panel genera, y **tres estados**: del instante, publicado
-y todavía no.
+La corrección: **un color por significado**, **una leyenda sola** (la genera el
+panel, no cada tarjeta) y **cuatro estados**, con estas palabras exactas (las
+del arteboard elegido):
+
+| Estado | Se lee | Color | Qué es |
+|---|---|---|---|
+| **Del instante** | medido en el segundo que marca el reloj | `indigo-700` (`#4338ca`) | la cifra del replay en el instante |
+| **Derivada \*** | un ratio del motor; la fórmula está en el pie de su tarjeta | `amber-700` (`#b45309`) + asterisco | un ratio de dos cifras del motor |
+| **Publicada** | lo que el motor publicó para la corrida completa | `slate-800` / `slate-500` | la cifra del reporte del motor |
+| **Todavía no** | el replay todavía no la alcanzó: no es un cero, es que no se sabe | `slate-300`, con marca de vacío | la entidad que el instante todavía no conoce |
+
+Un estado por cifra, en un solo módulo compartido (`charts/states.ts`), para
+que ninguna tarjeta invente el suyo.
 
 ### S4 — U1: los pies dicen el divisor real
 
@@ -167,3 +177,5 @@ esperan al diseño aprobado.
 
   Los tres son **alternativas**: la elección es del usuario, y el handoff de implementación (`gentle_design implement`) necesita el arteboard elegido. El self-check del diseño: sólo las fuentes del sistema (`--font-sans` y `--font-mono`), slate/indigo/amber/rose/emerald y las series `#6366f1`, `#0d9488`, `#ea580c`, `#7c3aed`; sin URLs externas ni CDN.
 - L10 — **Arteboard elegido**: `design/graficos-verdad/03-panel-lateral-estado.html` («Un panel lateral con el estado de la corrida»); los otros dos quedan como alternativas. El handoff quedó registrado en `design/graficos-verdad/handoffs.json` y el lienzo lo muestra como el arteboard en curso. U1 y U3 se implementan con este arteboard como especificación visual: las tarjetas a la izquierda, y a la derecha un panel fijo con el título, la semilla, el reloj, el fin, los switches, los valores guardados, «esperando al final» y la leyenda de los estados.
+- L11 — El artefacto del handoff define la leyenda de los cuatro estados (S3): **del instante** (indigo), **derivada \*** (ámbar, con asterisco), **publicada** (pizarra) y **todavía no** (pizarra clara, con marca de vacío). Las palabras son las del arteboard, textual.
+- L12 — Los datos de U3 ya existen y no hay que inventar nada: `report.title`, `report.seed` y `report.end_reason` (`types/generated/JsonReport.ts`), el `delay` de los almacenes (`types/generated/Storage.ts:48`, publicado), y los switches y los valores guardados, que el replay ya calcula vivos (`monitor/replay.ts:739-747` → `Figures.logic` y `Figures.values`, `monitor/stats.ts:126-128`) y el motor publica (`types/generated/Entities.ts:31,35`).

@@ -288,6 +288,11 @@ empaquetado. T9 toca las dos (el manifiesto es de la app, el job es de la CI).
   pesa 10,2 MB y está stripped (compilación de release ✓), el lanzador pide
   `Icon=GenMSI` y el icono está instalado con ese nombre (el bug del icono,
   cerrado ✓), y depende de `gtk3` y de `webkit2gtk-4.1` ✓.
+- **L18** — La versión del release: el usuario eligió **subirla a 0.3.1**
+  ("Subir la versión a 0.3.1") en vez de mover la etiqueta `v0.3.0`. La
+  fuente cambió a mano en `Cargo.toml` y `scripts/bump-version.sh 0.3.1`
+  escribió las seis copias ✓ (commit `5f1383f`, etiqueta `v0.3.1`). El
+  borrador `v0.3.0` queda como estaba, sin publicar.
 - **L19** — La corrida final del release (`41146039833`) terminó **con los
   nueve jobs en verde**: los cuatro sistemas de la matriz (Linux x86_64 y
   arm64, macOS universal y Windows x64), el paquete de pacman, el Flatpak,
@@ -297,8 +302,3 @@ empaquetado. T9 toca las dos (el manifiesto es de la app, el job es de la CI).
   los assets que empiezan con punto), el `SHA256SUMS` y el cuerpo en español
   que dice qué hay en cada archivo y cómo se instala. **Publicarlo es del
   usuario.**
-- **L18** — La versión del release: el usuario eligió **subirla a 0.3.1**
-  ("Subir la versión a 0.3.1") en vez de mover la etiqueta `v0.3.0`. La
-  fuente cambió a mano en `Cargo.toml` y `scripts/bump-version.sh 0.3.1`
-  escribió las seis copias ✓ (commit `5f1383f`, etiqueta `v0.3.1`). El
-  borrador `v0.3.0` queda como estaba, sin publicar.

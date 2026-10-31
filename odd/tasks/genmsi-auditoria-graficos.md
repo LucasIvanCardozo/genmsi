@@ -63,15 +63,30 @@ posterior, del usuario.
 
 | ID | Specs | Tarea | Ruta | Commit |
 |---|---|---|---|---|
-| T1 | S1-S6 | Documento de la feature, inventario de las trece tarjetas y las piezas compartidas | inline | pendiente |
+| T1 | S1-S6 | Documento de la feature, inventario de las trece tarjetas y las piezas compartidas | inline | `ec22bf3` |
 | T2 | S1, S2 | Un subagente por tarjeta (trece, en tandas) | subagentes | — |
 | T3 | S2 | Un subagente para las piezas compartidas | subagente | — |
 | T4 | S3 | Un subagente para los gráficos que faltan: lo que el motor publica y la app no muestra | subagente | — |
-| T5 | S2, S3, S5 | Síntesis: el informe único con una sección por gráfico y el resumen de los veredictos | inline | pendiente |
+| T5 | S2, S3, S5 | Síntesis: el informe único con una sección por gráfico y el resumen de los veredictos | inline | `ec22bf3` |
 | T6 | S2, S3 | Verificación: cada hallazgo comprobado contra el código; ninguna afirmación sin evidencia | inline + subagente verificador | — |
 
-### El reparto de los subagentes
+### El corte de la entrega
 
+La auditoría es **un documento**: no hay código, así que el commit es una sola
+unidad revisable (`ec22bf3`, 1811 líneas de prosa con evidencia). El corte de
+revisión, si el usuario decide implementar, no es este commit sino los tres
+bloques de prioridades del informe:
+
+| Unidad | Qué entra | Tamaño esperado |
+|---|---|---|
+| P0 | El rotulado (badge, color, pies), las medias del motor, los reintentos del motor y el reloj atado a las cifras | una unidad, con su test |
+| P1 | Lo que el motor publica y la app no muestra, y el tercer estado ("todavía no") | una unidad, con su test |
+| P2 | La familia: `Metric` único, `Instant` único, `EmptyState`, `EntityPicker` único, `shareOf`, `TimeSeriesChart` con dominio Y desde 0, y el HISTOGRAMA fusionado con la lista de tablas | una o dos unidades |
+
+Cada unidad arranca con su test en rojo y termina con la suite entera del
+frontend (`node --test tests/*.test.ts`) y el typecheck.
+
+### El reparto de los subagentes
 | # | Tarjeta | Componente | Datos |
 |---|---|---|---|
 | 1 | La corrida en números | `charts/RunSummary.tsx` | reporte + reloj |

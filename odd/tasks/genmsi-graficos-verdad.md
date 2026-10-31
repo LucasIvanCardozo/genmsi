@@ -133,7 +133,7 @@ módulos puros para poder probarla, como ya se hace con `derived.ts`.
 | T2 | S7 | Sync del sistema de diseño (`design/system.md` + `design/system.html`) | inline | pendiente |
 | T3 | S7 | Diseño de U1 y U3 con gentle-design (`design/graficos-verdad/`) | subagente | pendiente |
 | T4 | S2 | **U2**: el reloj y las cifras del mismo instante | subagente | `f7e587f` |
-| T5 | S3, S4, S5 | **U1**: rotulado, leyenda, tres estados, pies y nombres | subagente | pendiente |
+| T5 | S3, S4, S5 | **U1**: rotulado, leyenda, cuatro estados, pies y nombres | subagente | `70064e4` |
 | T6 | S6 | **U3**: delay, desbordes, estado del modelo, semilla | subagente | pendiente |
 | T7 | S8 | Corregir la promesa de la agrupación de 200 intervalos en `docs/app.md` | inline | pendiente |
 | T8 | S9 | Verificación: suite del frontend + typecheck + mirada a la app | inline | pendiente |
@@ -148,7 +148,7 @@ el commit sino la unidad:
 | La base | La feature, el sistema de diseño (`design/system.md` + `design/system.html`) y la corrección de la promesa del histograma en `docs/app.md` | `84a8a0c`, `bdc6893` |
 | El diseño | Los tres artboards de `design/graficos-verdad/` y el lienzo | pendiente |
 | **U2** | El reloj y las cifras del mismo instante | `f7e587f` |
-| **U1** | El rotulado: badges, leyenda, tres estados, pies y nombres de columna | pendiente |
+| **U1** | El rotulado: el panel lateral del estado de la corrida, la leyenda de los cuatro estados, los pies y los nombres | `70064e4` (panel y leyenda), la verdad de las tarjetas queda en la unidad siguiente |
 | **U3** | Lo que el motor publica y la app no muestra | pendiente |
 
 ### El orden y por qué
@@ -181,3 +181,5 @@ esperan al diseño aprobado.
 - L12 — Los datos de U3 ya existen y no hay que inventar nada: `report.title`, `report.seed` y `report.end_reason` (`types/generated/JsonReport.ts`), el `delay` de los almacenes (`types/generated/Storage.ts:48`, publicado), y los switches y los valores guardados, que el replay ya calcula vivos (`monitor/replay.ts:739-747` → `Figures.logic` y `Figures.values`, `monitor/stats.ts:126-128`) y el motor publica (`types/generated/Entities.ts:31,35`).
 - L13 — **U2 cerrada** (`f7e587f`): la capa viva publica el reloj, las cifras, la población, los counts y los retries en una sola `picture` atómica; el seam `instantOf` (`monitor/stats.ts`) sólo usa cifras del instante —las de la capa viva si la capa dice que son de ese frame, el respaldo del playhead sólo si su tiempo es el del reloj— y `live = 0` implica cifras nulas, así que no se deriva ninguna métrica sin instante conocido. La tarjeta *Población* deja de leer el prop congelado: dice "Sin datos." cuando el instante no se conoce. Tests nuevos: `instant.test.ts` (oráculo a mano), `population.test.ts`, `blocks.test.ts` y la regla de `known` en `live.test.ts`. Suite: 340 en verde; typecheck limpio.
 - L14 — La población se calcula como la suma por línea de programa, no como la suma del `now` de los counts por bloque: sólo la fila que cuenta el bloque lleva las transacciones (un uso de facility son cinco filas y una sola cuenta), y la suma por línea es la que coincide con la rama publicada al final de la corrida.
+- L15 — **W1 cerrada** (`70064e4`): el panel lateral *Estado de la corrida* (título, semilla, reloj, fin, motivo del fin, transacciones, «esperando al final» con el `delay` de los almacenes, los switches y los valores guardados, con «todavía no» para lo que el replay no alcanzó), la leyenda de los cuatro estados en su propio componente, el vocabulario compartido en `charts/states.ts` y el layout de dos columnas (el panel en un `<aside>` fuera de la grilla de tarjetas, fijo a la derecha en pantalla ancha, primero en la pila cuando es angosta). La tarjeta *La corrida en números* queda como la del arteboard y el pie de la sección con la leyenda vieja —que meanings distintos tenía— se va. Suite: 359 en verde; typecheck limpio.
+- L16 — Dos cosas que W2 tiene que recoger: el `StatCard` y el `StatTable` todavía no conocen los cuatro estados (W1 dejó un `Stat` local en `RunSummary` que hay que borrar), y la caja «esperando al final» conserva la alarma ámbar del arteboard, pero en esta sección el ámbar significa «derivado»: la alarma tiene que usar la familia del error de la app.

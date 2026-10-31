@@ -120,7 +120,106 @@ dice**.
 
 ### La corrida en números
 
-<!-- SECCION:RunSummary -->
+**Qué muestra.** Seis tarjetas (`StatCard`) con las cifras globales de la
+corrida: **Transacciones** (en vivo, `generateTimes` contados hasta el reloj; en
+publicado, `report.transactions`), **Eventos** (`report.events`), **Reloj**
+(reloj del replay en vivo / `end_time - start_time` en publicado), **Fin**
+(`end_reason` traducido), **Caudal** (ratio transacciones/segundo) y
+**Población** (suma de `state.blocks` en vivo / suma de `block.current` en
+publicado) — `charts/RunSummary.tsx:66-107`, armado en
+`MonitorCharts.tsx:106-119` con `generated={countAt(monitor.generateTimes, clock)}`
+(`MonitorCharts.tsx:117`). Fuentes del motor: `transactions` = `next_xact`
+(`crates/genmsi-core/src/sim.rs:863`), `events` = contador de eventos del motor
+(`sim.rs:757`), publicado en `crates/genmsi-core/src/report.rs:1469-1480` /
+`crates/genmsi-app/src/types/generated/JsonReport.ts:17-43`. Las cifras vivas
+van en violeta y las publicadas en pizarra (`charts/StatCard.tsx:33-35`), y el
+pie de la sección lo explica (`MonitorCharts.tsx:234-239`).
+
+**1. ¿Tiene sentido.** Sí: es la orientación mínima de la corrida (cuánto pasó,
+cuánto duró, cómo terminó, cuánto quedó vivo) y no repite ninguna otra
+tarjeta de la sección. Es parcialmente redundante con otras pantallas: "Fin",
+"Transacciones" y "Eventos" ya están en la cabecera del panel Reporte
+(`components/ReportView.tsx:167-175`) y el reloj ya está en la consola del
+replay (`components/RunConsole.tsx:215`).
+
+**2. ¿Se muestra correctamente.** Hay tres desvíos y dos detalles de forma.
+
+- [media] **"Transacciones" mide dos cosas distintas según el modo.** La cifra
+  viva cuenta eventos `generate` de la traza
+  (`monitor/replay.ts:753-765`), o sea solo nacimientos de generadores; la
+  publicada es `next_xact`, el total de identificadores de transacción creados,
+  que **incluye las copias de `SPLIT`** (`crates/genmsi-core/src/sim.rs:1071-1073`,
+  `:1817-1819`), y las copias no dejan evento `generate` (sólo `enter`). En un
+  modelo con `SPLIT` (p. ej. `fixtures/outputs/TP5__burgerShop.report.txt:14`)
+  el panel de Reporte y esta tarjeta dan dos totales distintos para la misma
+  corrida, con la misma etiqueta. **No verificado en ejecución: deducido del
+  código.**
+- [media] **"Población" publicada y viva no coinciden ni al final de la
+  corrida.** La publicada suma `block.current` de todas las filas, y el motor
+  da `current = 1` al generador mientras tenga una llegada pendiente
+  (`crates/genmsi-core/src/sim.rs:625`, y sólo lo pone en 0 al agotar su
+  límite, `sim.rs:993`, `:1037`; evidencia en los reportes:
+  `fixtures/outputs/Problema_1__semaforo-1.report.txt:17,19,47` frente a `:8`).
+  El replay, en cambio, nunca cuenta el generador como bloque con transacción
+  (`monitor/replay.ts:753-765`) y su propia verificación de fidelidad lo
+  excluye explícitamente (`monitor/replay.ts:1383-1388`). La población viva
+  queda así un número menor por cada generador vivo.
+- [media] **La cabecera de la sección miente sobre dos de las seis tarjetas.**
+  Dice "Los números del instante, con el reloj de la reproducción"
+  (`MonitorCharts.tsx:108-111`), pero **Eventos** y **Fin** son siempre cifras
+  publicadas (`RunSummary.tsx:72-87`) y **Fin** es el final de una corrida que
+  todavía no terminó en el reloj.
+- [media] **"Caudal" es una métrica derivada sin marcar.** Es un ratio
+  calculado por la app (`RunSummary.tsx:88-101`), pero no lleva asterisco ni
+  dice la fórmula, como sí hacen las demás de la sección
+  (`MonitorCharts.tsx:127` footnote de "Utilización = …",
+  `charts/QueueTable.tsx:36-56`). La regla 2 del contrato pide exactamente esa
+  marca.
+- [media] **La rama "publicada" de la tarjeta es código muerto.** `state` es
+  `null` sólo cuando `monitor` es `null` (`MonitorView.tsx:94-97`) y
+  `MonitorCharts` sólo se monta con `monitor !== null`
+  (`MonitorView.tsx:581-592`), luego `live` es siempre `true` en la app: las
+  cinco variantes publicadas (incluida `publishedPopulation`,
+  `RunSummary.tsx:37-42`) nunca se ven. El mismo contrato se respeta bien en el
+  reparto del tiempo: el caudal vivo divide por `clock - start_time` y el
+  publicado por `end_time - start_time` (`RunSummary.tsx:91-97`,
+  `monitor/entities.ts:28-42`).
+- [baja] La tarjeta no tiene badge ni pie propios (no es un `ChartCard`), así
+  que no dice de dónde sale cada número ni que dos de ellos son publicados.
+- [baja] `RunSummary.tsx:16-22` redefine un `decimals` propio con 2 decimales,
+  duplicando `format.ts:29-34` (que usa 1 decimal y por defecto
+  `places = 1`).
+- [baja] "Reloj" en vivo muestra el reloj del replay con fracciones
+  (`format.ts:12-21` escribe 3 decimales con coma), mientras la consola lo
+  muestra como `h:mm:ss`: dos lecturas del mismo número.
+
+**Cobertura de tests.** La tarjeta **no está cubierta**: no hay ningún test que
+la importe (`crates/genmsi-app/tests/` no la menciona). Sí están cubiertos sus
+insumos: `countAt` (`tests/series.test.ts:111-113`), `generateTimes`
+(`tests/replay.test.ts:200-211`) y `entities.ts` (`tests/entities.test.ts`). Las
+dos funciones de población son privadas dentro del `.tsx`, así que ni siquiera
+son alcanzables desde un test.
+
+**Lo que el motor publica y la sección ignora.** `report.diagnostics`
+(`crates/genmsi-core/src/report.rs:1434`, `JsonReport.ts:48`) lleva el detalle
+del corte por el guard de eventos con los bloques más calientes
+(`sim.rs:945-973`); el panel Reporte tampoco lo muestra, y en una corrida
+cortada por `event_limit` el "Fin" de esta tarjeta
+(`engine/reasons.ts:89-91`) no dice ni dónde se cortó.
+
+**3. ¿Otra forma.** Mantener las seis cifras pero en una sola tarjeta por
+métrica con **el número vivo y, en la nota, el total publicado** ("1.234 de
+2.345 en la corrida"), de modo que las dos cifras sean comparables por
+construcción —en vez de dos tarjetas que no se pueden contrastar—; y añadir a
+"Caudal" el asterisco con su fórmula, como el resto de la sección. Añadir una
+línea "generadores pendientes" o quitar el `current` del generador de la
+población publicada.
+
+**Veredicto.** KEEP WITH CHANGES
+**Riesgo de equivocarse.** Que el lector tome la tarjeta por el resumen de la
+corrida y la compare con el panel Reporte: verá dos "Transacciones" distintas
+(nacimientos vs. identificadores creados) y dos "Poblaciones" distintas (con y
+sin el generador), y creerá que una de las dos está mal.
 
 ### Los recursos que aprietan
 
@@ -207,89 +306,6 @@ la cifra publicada que el motor ya da.
 aprieta a rediseñar el modelo; las barras llenas le hacen creer que un recurso
 al 3 % está al límite; y el pie, al decir "tiempo de la corrida", lo lleva a
 calcular una utilización distinta de la mostrada.
-
-### Indicadores por cola
-
-**Qué muestra.** Una tabla con una fila por cola y cinco columnas: *Contenido
-medio\**, *Espera media\**, *Máximo*, *Entradas*, *Espera cero\**
-(`charts/QueueTable.tsx:28-60`). Las filas las arma `queuesOf`
-(`charts/entities.ts:148-176`) a partir de las figuras del replay cerradas en
-el reloj (`MonitorCharts.tsx:66-70`); del reporte sólo se toman los **nombres**
-(`entities.ts:136-146`). Los valores del motor que existen y no se usan:
-`content`, `total_time`, `area`, `retry` (`types/generated/Queue.ts:18-42`).
-
-**1. ¿Tiene sentido?** Sí: la serie da el contenido a lo largo del tiempo y el
-histograma la forma de las esperas, pero ninguna de las dos dice por cola
-cuántas entradas tuvo, cuál fue su máximo ni qué share esperó cero. La única
-redundancia real es *Contenido medio*, ya mostrado como ranking en *Los
-recursos que aprietan* (`ResourceRanking.tsx:110-112`).
-
-**2. ¿Se muestra correctamente.** El corte en el reloj sí está bien:
-`closeFigures(state.figures, clock)` cierra el área en el reloj y el divisor es
-`clock - report.start_time` (`MonitorCharts.tsx:66-76`), con `start_time = 0`
-(`crates/genmsi-core/src/sim.rs:860`) y el reloj en segundos de corrida
-(`monitor/live.ts:50`); *Contenido medio* coincide con el `AVE.CONT` del motor
-al final de la corrida (`crates/genmsi-core/src/stat.rs:204-210`,
-`crates/genmsi-core/src/report.rs:199`). Los problemas:
-
-- [alta] ***Espera media* no es la espera media que publica el motor.** El
-  motor define `AVE.TIME = área / entradas` (`crates/genmsi-core/src/stat.rs:211-223`,
-  `report.rs:205`) —la integral del contenido, que incluye a las que siguen
-  esperando—; la app calcula `totalTime / entradas`
-  (`monitor/derived.ts:59`), la suma de las esperas reales de las que
-  salieron. No son el mismo número ni la misma unidad, y el propio
-  `derived.ts:17-18` afirma que la fórmula es la del motor.
-  *Verificado contra `crates/genmsi-core/src/stat.rs:211-223`.*
-- [alta] La tarjeta no tiene badge ni pie (`MonitorCharts.tsx:149-154`;
-  `ChartCard.tsx:44-48` sólo los pinta si se los pasan), contra la regla 5 de la
-  sección. Y el subtítulo dice tres cosas falsas: "se derivan del reporte del
-  motor" (los datos son del replay), "divididos por el tiempo de la corrida"
-  (el divisor es el tiempo del instante) y "el área y el tiempo total,
-  divididos por el tiempo" (sólo *Contenido medio* se divide por el tiempo;
-  *Espera media* y *Espera cero* se dividen por entradas,
-  `monitor/derived.ts:58-60`).
-- [media] La leyenda de la sección miente aquí: "las demás son las que el
-  motor publicó" (`MonitorCharts.tsx:238-240`), pero en esta tabla lo no
-  violeta es una cola que el replay todavía no tocó y muestra ceros
-  (`entities.ts:155-174`): un 0 que no es el 0 publicado.
-- [media] Falta el **contenido actual**, que ya está calculado
-  (`entities.ts:165`) y publicado (`Queue.ts:18`): es el número vivo más útil
-  de una cola; en su lugar la tabla muestra el máximo, que es histórico.
-- [media] El motor publica el `retry` de la cola (`Queue.ts:42`,
-  `report.rs:212`) y la app no lo muestra; el replay no tiene cambio de
-  reintento de cola (`monitor/stats.ts:107-175`), así que sólo se puede leer
-  del reporte.
-- [baja] Unidades mezcladas sin rótulo: *Máximo* es en unidades, *Entradas*
-  son transacciones, *Espera media* en segundos.
-- [baja] *Espera cero* redondea al entero (`QueueTable.tsx:14-16`) mientras el
-  resto usa 3 decimales (`format.ts:12-18`).
-- [baja] Las filas se ordenan con `localeCompare` (`entities.ts:142-145`) y no
-  con el orden numérico del motor (`report.rs:189`, `:770`); cosmético.
-- [baja] La tarjeta se dibuja aunque no haya colas (`MonitorCharts.tsx:149-154`,
-  frente a las condicionales de facilities/almacenes/cadenas en `:156`, `:175`,
-  `:187`) y muestra "Sin datos." (`StatTable.tsx:33`).
-- [baja] Las filas se keyan por índice (`StatTable.tsx:53`): hoy no rompe nada
-  (los nombres son únicos, `entities.ts:141`); no verificado en runtime.
-
-**Cobertura de tests.** Hay cobertura de datos, no del componente:
-`tests/entities.test.ts:99-132` (contenido/entradas/zeroShare/meanWait y "el
-tiempo del instante"), `tests/derived.test.ts:17-44` (las tres fórmulas y el
-caso sin tiempo), `tests/stats.test.ts:7-58` (área, esperas nulas, unidades) y
-`tests/replay.test.ts:121-197` (contenido y esperas de la traza). **No hay
-ningún test que compare *Espera media* con el `AVE.TIME` del motor**, ni tests
-de render (no hay `.tsx` en `tests/`).
-
-**3. ¿Otra forma?** Una fila por cola con *contenido actual* (unidades) +
-*entradas* + *máximo* + *espera media* + *% de espera nula*, ordenada por
-entradas, y una minigráfica de contenido tomada de la serie que ya existe
-(`QueueSeries`), con las unidades en el rótulo y la fórmula en el pie.
-
-**Veredicto.** KEEP WITH CHANGES
-**Riesgo de equivocarse.** Si el lector compara *Espera media* con el
-`AVE.TIME` del reporte del CLI (o se apoya en el subtítulo "derivado del
-reporte"), concluye que la app calcula mal la espera; y si lee los ceros de una
-cola que el replay aún no tocó como "el motor publicó 0", diagnostica una cola
-que no existe.
 
 ### Contenido de las colas a lo largo del tiempo
 
@@ -387,88 +403,173 @@ al reloj —el error que ya mordió una vez
 unidades aparecería con contenido medio 330. Sin etiqueta de unidades, una
 cola de *lugares* se lee como una cola de transacciones.
 
-### Indicadores por facility
+### Distribución de las esperas
 
-**Qué muestra.** Una tabla de 7 columnas (`Facility`, `Ahora`, `Utilización`,
-`Servicio medio`, `Entradas`, `Interrupciones`, `Reintentos`) construida sobre
-`FacilityNumbers` (`charts/FacilityTable.tsx:25-58`). Los valores salen de
-`facilitiesOf()` (`charts/entities.ts:180-202`), que combina los **nombres**
-publicados por el motor (`entities.ts:141-143`) con las **figuras del replay**
-cerradas en el reloj (`MonitorCharts.tsx:66-76`). La columna `Ahora` es el
-dueño de la facility en el instante (`FacilityTable.tsx:28-30`). Todo es cifra
-viva: las dos derivadas se dividen por `elapsed.live = clock - report.start_time`
-(`MonitorCharts.tsx:73-74`, `monitor/derived.ts:81-84`), la misma aritmética
-del motor (`crates/genmsi-core/src/stat.rs:89-105`). La tarjeta se monta en
-`MonitorCharts.tsx:170-177`.
+**Qué muestra.** El histograma de las esperas de **una cola**, con una barra por
+intervalo y la curva acumulada; el selector de pestañas elige la cola. Las
+muestras salen de la **traza**: el replay recuerda la entrada de cada
+transacción en la cola (`monitor/replay.ts:548`) y anota una muestra por salida,
+con la espera = instante de salida − instante de entrada
+(`monitor/replay.ts:561-574`); la tarjeta las filtra por el reloj
+(`charts/WaitDistribution.tsx:67`), las mete en intervalos con `histogram()`
+(`monitor/series.ts:134-152`) y calcula la acumulada con `cumulative()`
+(`series.ts:159-175`). La media y el ancho de los intervalos los calcula la app
+(`WaitDistribution.tsx:76-79`). Badge: "derivado de la traza"
+(`MonitorCharts.tsx:140-147`).
 
-**1. ¿Tiene sentido?** Sí: es el resumen por recurso de la sección, y la
-columna `Ahora` (quién tiene la facility en este instante) no la dice ninguna
-otra tarjeta; el `FacilityTimeline` (`MonitorCharts.tsx:156-168`) muestra
-*cuándo* estuvo ocupada, no *quién* la tiene. Parcialmente redundante, en
-cambio, con el panel "Utilización de facilities" de *Los recursos que
-aprietan* (`ResourceRanking.tsx:70-77`), que recalcula el mismo `utilization`
-con el mismo `facilitiesOf` para el top-5.
+**1. ¿Tiene sentido?** Sí, y no es redundante: es la única tarjeta que muestra
+la **forma** de las esperas; *Indicadores por cola* sólo da media, máximo y
+proporción de espera cero (`QueueTable.tsx:33-59`). Excepción: si el modelo
+declara un `QTable` de esa cola, el motor ya tabula sus tiempos de espera
+(`crates/genmsi-core/src/sim.rs:3080-3100`, `report.rs:315-340`) y *Histograma
+de la tabla* lo dibuja con las frecuencias publicadas
+(`TableHistogram.tsx:47-49`) → la misma distribución aparece dos veces, con
+anchos de intervalo distintos.
 
-**2. ¿Se muestra correctamente.** El reloj y los denominadores están bien; el
-origen declarado y una columna, no.
+**2. ¿Se muestra correctamente.** Parcialmente: el origen de los datos es
+correcto y el corte por el reloj se respeta, pero las cifras y los rótulos no.
 
-- [alta] **La columna `Reintentos` es siempre 0**: el replay nunca emite el
-  cambio `facility-retry` (el `case "Seize"` sólo genera `facility-seize`,
-  `monitor/replay.ts:582-599`; el único que suma el contador es
-  `monitor/stats.ts:327-330`, sin productor), así que `retry` sale siempre de
-  `figure?.retry ?? 0` (`entities.ts:198`). El motor sí publica `retry`
-  (`crates/genmsi-core/src/stat.rs:44-46`) y la app lo ignora: ni la tabla de
-  esta tarjeta ni la pestaña "Facilidades" del reporte lo muestran
-  (`components/ReportView.tsx:236-259`). El propio test lo delata: el reporte
-  publica `retry: 1` y la figura viva `retry: 0`
-  (`crates/genmsi-app/tests/entities.test.ts:43` vs `:88`). Y el chequeo de
-  fidelidad no lo compara (`monitor/replay.ts:1435-1441` compara `busy`,
-  `entries`, `busyTime`, `inter`), o sea que nadie lo atrapa.
-  *Verificado*: `facility-retry` no tiene productor en `monitor/replay.ts`;
-  el único `kind: "...-retry"` emitido es el de storage (`:664`).
-- [media] **El subtítulo atribuye al motor cifras que salen del replay**:
-  "se derivan del reporte del motor; las interrupciones y los reintentos los
-  cuenta el motor" (`MonitorCharts.tsx:173`), pero todo lo que se ve son
-  figuras del instante (`entities.ts:180-202`). La tarjeta se contradice con
-  su propio texto.
-- [media] **No dice las fórmulas**: el asterisco marca las derivadas
-  (`StatTable.tsx:46`) y la tarjeta no da ni el denominador de la utilización
-  ni el del servicio medio, como sí hace la tarjeta de recursos
-  (`MonitorCharts.tsx:126`). Además **no tiene badge**
-  (`MonitorCharts.tsx:170-175`; `ChartCard.tsx:36-45`), que es la regla 5 de
-  la sección.
-- [media] **`Servicio medio` de una facility nunca tomada muestra "0,0 s"**
-  (`FacilityTable.tsx:42`), donde el motor escribe "no computado" para el caso
-  sin divisor (`crates/genmsi-core/src/report.rs:64-71` y `:162-168`).
-- [baja] `libre` no distingue "libre ahora" de "el replay todavía no la
-  conoce" (`FacilityTable.tsx:30` vs `entities.ts:201`).
-- [baja] La clave de fila es el índice (`StatTable.tsx:53`); hoy no rompe nada
-  porque los nombres son únicos por construcción (`entities.ts:142`), pero por
-  nombre sería más robusto.
-- [baja] El motor publica también los **waiters** de cada facility (columna
-  `DELAY`, `crates/genmsi-core/src/report.rs:176`), que no llegan al JSON
-  (`stat.rs:36-39`, `serde(skip)`) y que la app no muestra; el replay sí tiene
-  el dato (`monitor/replay.ts:783-787`).
+- [media] La **media que muestra no es la del motor** y no va marcada: es la
+  media de las *salidas* (`WaitDistribution.tsx:79`), sin asterisco ni fórmula
+  en el pie (la tarjeta no pasa `footnote`, `MonitorCharts.tsx:140-147`),
+  mientras la tabla hermana muestra "Espera media \*" = `totalTime/entradas`
+  (`QueueTable.tsx:40-43`, `monitor/derived.ts:59`). Son dos medias distintas
+  para la misma cola, y contradice el diseño
+  (`odd/tasks/genmsi-graficos-estadisticas.md:175`).
+- [media] Las cifras **vivas van en gris** (`WaitDistribution.tsx:123,131-133`,
+  `text-slate-500`), sin el violeta que la sección reserva para "el instante que
+  marca el reloj" (`MonitorCharts.tsx:238-241`, `StatTable.tsx:62-63`): el
+  lector puede leerlas como publicadas.
+- [media] El **tooltip muestra el centro del intervalo**, no el intervalo: usa
+  el `x` = `low + width/2` (`WaitDistribution.tsx:82,171`), y el campo `label`
+  con el intervalo real (`:83`) no se usa en ninguna parte → "espera 0,05 s" por
+  un intervalo [0; 0,1).
+- [media] El **ancho de los intervalos depende del reloj**: `widthOf()` elige el
+  paso según el mayor valor observado hasta ese instante
+  (`WaitDistribution.tsx:39-47,75-76`), así que el histograma se re-binea y el
+  eje se estira mientras corre (`:147`). Dos instantes no son comparables y el
+  ancho no es una cifra del motor.
+- [media] La **truncatura de la traza no se refleja**: si la traza se cortó,
+  faltan las salidas posteriores y "N salidas" (`WaitDistribution.tsx:131`)
+  subestima la corrida; hay aviso global (`MonitorView.tsx:438-442`) y el
+  límite es 200.000 registros (`src/state/store.ts:66`), pero la tarjeta no lo
+  dice.
+- [baja] La línea de la media está **duplicada**
+  (`WaitDistribution.tsx:173-177` y `:186-190`) y sin rótulo que diga qué es.
+- [baja] La acumulada con `stepAfter` sobre los centros de los intervalos
+  (`:191-199`) salta a mitad de intervalo: la CDF queda corrida medio intervalo.
+- [baja] `barSize` se calcula sobre 620 px fijos (`:80`) dentro de un
+  `ResponsiveContainer` al 100 % en una grilla de dos columnas
+  (`MonitorCharts.tsx:131`): el ancho de barra no sigue al ancho real (no
+  verificado en pantalla).
+- [baja] `Math.max(...samples)` (`:75`) con hasta 200.000 registros de traza.
+- [baja] Las pestañas salen de toda la traza (`:58`): desde el segundo cero ya
+  listan colas que no han salido, en orden de primera salida y no alfabético
+  (`charts/entities.ts:129-134` ordena); una cola que nunca tuvo salidas no
+  aparece.
 
-**Cobertura de tests.** La aritmética sí (`tests/derived.test.ts:46-61`), el
-armado de filas también (`tests/entities.test.ts:108-116`), pero **el
-componente no se renderiza en ningún test** (nada importa `FacilityTable`) y
-`entities.test.ts` no afirma `utilization`, `meanService`, `inter` ni `retry`
-de la facility.
+**Cobertura.** **Nada** de la tarjeta se prueba. Hay soporte indirecto:
+`histogram`/`cumulative` (`tests/series.test.ts:86-108`) y el mapa de esperas
+(`tests/replay.test.ts:193-198`, un solo ejemplo). `widthOf` no se exporta y no
+se prueba; tampoco el filtro por reloj, el caso vacío ni la truncatura.
 
-**3. ¿Otra forma.** Una fila por facility con: chip de estado (`libre` /
-`tx N` / `esperando N`), una barra fina de utilización (en vez del porcentaje
-redondeado) y las cifras de contención (`interrupciones`, `esperando`),
-ordenadas por utilización; el `Reintentos` sale de la fila publicada o se
-elimina. Justificación: se lee de un vistazo y reemplaza una columna muerta por
-la métrica que sí muestra el motor (`DELAY`).
+**3. ¿Otra forma.** Mantener el histograma, pero: (a) ancho de intervalo
+**estable** (elegido una vez por cola, no por reloj) o los intervalos del
+`QTable` del motor cuando exista; (b) partir el primer bin con la proporción de
+**espera cero**, que el motor ya cuenta
+(`crates/genmsi-core/src/stat.rs:197-199`) y la app tiene vivo
+(`monitor/stats.ts:287-288`); (c) un solo cuadro de texto en violeta con
+`salidas N · espera media (motor) = tiempo total/entradas *` y pie con la
+fórmula; (d) rótulo del intervalo en el tooltip. Todo con los mismos datos.
 
 **Veredicto.** KEEP WITH CHANGES
-**Riesgo de equivocarse.** Alto: una columna que dice "0" cuando el reporte
-dice "1" hace creer que no hubo contención; y si el pie de la sección no se
-lee, el lector entiende estas cifras como las publicadas de la corrida
-completa y las compara con el reporte, que no coinciden hasta el final (y con
-`Reintentos` nunca coinciden).
+**Riesgo de equivocarse.** Que el lector tome la distribución por la de la
+corrida completa (es sólo lo que salió hasta el reloj, y puede estar recortada
+por la traza) y que confunda la "media de las salidas" con la "espera media" de
+la cola, que divide por las entradas e incluye a las que siguen esperando.
+
+### Indicadores por cola
+
+**Qué muestra.** Una tabla con una fila por cola y cinco columnas: *Contenido
+medio\**, *Espera media\**, *Máximo*, *Entradas*, *Espera cero\**
+(`charts/QueueTable.tsx:28-60`). Las filas las arma `queuesOf`
+(`charts/entities.ts:148-176`) a partir de las figuras del replay cerradas en
+el reloj (`MonitorCharts.tsx:66-70`); del reporte sólo se toman los **nombres**
+(`entities.ts:136-146`). Los valores del motor que existen y no se usan:
+`content`, `total_time`, `area`, `retry` (`types/generated/Queue.ts:18-42`).
+
+**1. ¿Tiene sentido?** Sí: la serie da el contenido a lo largo del tiempo y el
+histograma la forma de las esperas, pero ninguna de las dos dice por cola
+cuántas entradas tuvo, cuál fue su máximo ni qué share esperó cero. La única
+redundancia real es *Contenido medio*, ya mostrado como ranking en *Los
+recursos que aprietan* (`ResourceRanking.tsx:110-112`).
+
+**2. ¿Se muestra correctamente.** El corte en el reloj sí está bien:
+`closeFigures(state.figures, clock)` cierra el área en el reloj y el divisor es
+`clock - report.start_time` (`MonitorCharts.tsx:66-76`), con `start_time = 0`
+(`crates/genmsi-core/src/sim.rs:860`) y el reloj en segundos de corrida
+(`monitor/live.ts:50`); *Contenido medio* coincide con el `AVE.CONT` del motor
+al final de la corrida (`crates/genmsi-core/src/stat.rs:204-210`,
+`crates/genmsi-core/src/report.rs:199`). Los problemas:
+
+- [alta] ***Espera media* no es la espera media que publica el motor.** El
+  motor define `AVE.TIME = área / entradas` (`crates/genmsi-core/src/stat.rs:211-223`,
+  `report.rs:205`) —la integral del contenido, que incluye a las que siguen
+  esperando—; la app calcula `totalTime / entradas`
+  (`monitor/derived.ts:59`), la suma de las esperas reales de las que
+  salieron. No son el mismo número ni la misma unidad, y el propio
+  `derived.ts:17-18` afirma que la fórmula es la del motor.
+  *Verificado contra `crates/genmsi-core/src/stat.rs:211-223`.*
+- [alta] La tarjeta no tiene badge ni pie (`MonitorCharts.tsx:149-154`;
+  `ChartCard.tsx:44-48` sólo los pinta si se los pasan), contra la regla 5 de la
+  sección. Y el subtítulo dice tres cosas falsas: "se derivan del reporte del
+  motor" (los datos son del replay), "divididos por el tiempo de la corrida"
+  (el divisor es el tiempo del instante) y "el área y el tiempo total,
+  divididos por el tiempo" (sólo *Contenido medio* se divide por el tiempo;
+  *Espera media* y *Espera cero* se dividen por entradas,
+  `monitor/derived.ts:58-60`).
+- [media] La leyenda de la sección miente aquí: "las demás son las que el
+  motor publicó" (`MonitorCharts.tsx:238-240`), pero en esta tabla lo no
+  violeta es una cola que el replay todavía no tocó y muestra ceros
+  (`entities.ts:155-174`): un 0 que no es el 0 publicado.
+- [media] Falta el **contenido actual**, que ya está calculado
+  (`entities.ts:165`) y publicado (`Queue.ts:18`): es el número vivo más útil
+  de una cola; en su lugar la tabla muestra el máximo, que es histórico.
+- [media] El motor publica el `retry` de la cola (`Queue.ts:42`,
+  `report.rs:212`) y la app no lo muestra; el replay no tiene cambio de
+  reintento de cola (`monitor/stats.ts:107-175`), así que sólo se puede leer
+  del reporte.
+- [baja] Unidades mezcladas sin rótulo: *Máximo* es en unidades, *Entradas*
+  son transacciones, *Espera media* en segundos.
+- [baja] *Espera cero* redondea al entero (`QueueTable.tsx:14-16`) mientras el
+  resto usa 3 decimales (`format.ts:12-18`).
+- [baja] Las filas se ordenan con `localeCompare` (`entities.ts:142-145`) y no
+  con el orden numérico del motor (`report.rs:189`, `:770`); cosmético.
+- [baja] La tarjeta se dibuja aunque no haya colas (`MonitorCharts.tsx:149-154`,
+  frente a las condicionales de facilities/almacenes/cadenas en `:156`, `:175`,
+  `:187`) y muestra "Sin datos." (`StatTable.tsx:33`).
+- [baja] Las filas se keyan por índice (`StatTable.tsx:53`): hoy no rompe nada
+  (los nombres son únicos, `entities.ts:141`); no verificado en runtime.
+
+**Cobertura de tests.** Hay cobertura de datos, no del componente:
+`tests/entities.test.ts:99-132` (contenido/entradas/zeroShare/meanWait y "el
+tiempo del instante"), `tests/derived.test.ts:17-44` (las tres fórmulas y el
+caso sin tiempo), `tests/stats.test.ts:7-58` (área, esperas nulas, unidades) y
+`tests/replay.test.ts:121-197` (contenido y esperas de la traza). **No hay
+ningún test que compare *Espera media* con el `AVE.TIME` del motor**, ni tests
+de render (no hay `.tsx` en `tests/`).
+
+**3. ¿Otra forma?** Una fila por cola con *contenido actual* (unidades) +
+*entradas* + *máximo* + *espera media* + *% de espera nula*, ordenada por
+entradas, y una minigráfica de contenido tomada de la serie que ya existe
+(`QueueSeries`), con las unidades en el rótulo y la fórmula en el pie.
+
+**Veredicto.** KEEP WITH CHANGES
+**Riesgo de equivocarse.** Si el lector compara *Espera media* con el
+`AVE.TIME` del reporte del CLI (o se apoya en el subtítulo "derivado del
+reporte"), concluye que la app calcula mal la espera; y si lee los ceros de una
+cola que el replay aún no tocó como "el motor publicó 0", diagnostica una cola
+que no existe.
 
 ### Ocupación de las facilities a lo largo del tiempo
 
@@ -560,92 +661,88 @@ que el recurso no se vuelve a necesitar; si la pista pintada no cuadra con el
 % (preempciones), la utilización que el lector calcula a ojo contradice la de
 la tabla de al lado y la sección pierde su garantía de coherencia.
 
-### Tamaño de la cadena
+### Indicadores por facility
 
-**Qué muestra.** El tamaño de una *cadena de usuario* GPSS (la que se llena con
-`LINK` y se vacía con `UNLINK`), no la cadena del flujo del diagrama ni el
-ensamblaje: el motor sólo crea entidades de cadena en las ramas `Link`/`Unlink`
-(`crates/genmsi-core/src/sim.rs:1711`, `:2770`) y en la expresión `CH:`
-(`sim.rs:3294`). La curva es la serie exacta del tamaño, reconstruida desde la
-traza (`monitor/replay.ts:1284-1292`, `monitor/series.ts:41-77`); las cuatro
-cifras salen de las figuras vivas de la cadena (`charts/entities.ts:236-254`,
-`monitor/stats.ts:362-390`). Sólo se monta si hay cadenas
-(`MonitorCharts.tsx:189`), así que en un modelo sin cadenas la tarjeta no
-aparece.
+**Qué muestra.** Una tabla de 7 columnas (`Facility`, `Ahora`, `Utilización`,
+`Servicio medio`, `Entradas`, `Interrupciones`, `Reintentos`) construida sobre
+`FacilityNumbers` (`charts/FacilityTable.tsx:25-58`). Los valores salen de
+`facilitiesOf()` (`charts/entities.ts:180-202`), que combina los **nombres**
+publicados por el motor (`entities.ts:141-143`) con las **figuras del replay**
+cerradas en el reloj (`MonitorCharts.tsx:66-76`). La columna `Ahora` es el
+dueño de la facility en el instante (`FacilityTable.tsx:28-30`). Todo es cifra
+viva: las dos derivadas se dividen por `elapsed.live = clock - report.start_time`
+(`MonitorCharts.tsx:73-74`, `monitor/derived.ts:81-84`), la misma aritmética
+del motor (`crates/genmsi-core/src/stat.rs:89-105`). La tarjeta se monta en
+`MonitorCharts.tsx:170-177`.
 
-**1. ¿Tiene sentido?** Sí, y no es redundante: es la única vista de las
-cadenas, y en los modelos de referencia con `LINK` describe el backlog de un
-conjunto de transacciones encadenadas, que ni las colas ni las facilities
-muestran (p. ej. `MONORRIEL` con 504 entradas y 215 en la cadena al final:
-`fixtures/outputs/monorriel__monorriel.report.txt:126-130`; también TP7, TP8,
-TP10). El riesgo de confusión de vocabulario es real: `chainsOf` también
-existe en `graph/graph.ts:583` y ahí "cadena" es otra cosa.
+**1. ¿Tiene sentido?** Sí: es el resumen por recurso de la sección, y la
+columna `Ahora` (quién tiene la facility en este instante) no la dice ninguna
+otra tarjeta; el `FacilityTimeline` (`MonitorCharts.tsx:156-168`) muestra
+*cuándo* estuvo ocupada, no *quién* la tiene. Parcialmente redundante, en
+cambio, con el panel "Utilización de facilities" de *Los recursos que
+aprietan* (`ResourceRanking.tsx:70-77`), que recalcula el mismo `utilization`
+con el mismo `facilitiesOf` para el top-5.
 
-**2. ¿Se muestra correctamente.** Bien en lo esencial (eje de 0 al final, línea
-del reloj, serie exacta, cifras del instante), pero:
+**2. ¿Se muestra correctamente.** El reloj y los denominadores están bien; el
+origen declarado y una columna, no.
 
-- [media] "Tiempo medio" no es el `AVE.TIME` del motor: la tarjeta calcula
-  `totalTime / entradas` (`charts/ChainSeries.tsx:44`), mientras el motor
-  define el tiempo medio de la cadena como `área / entradas`
-  (`crates/genmsi-core/src/stat.rs:439-451`) y lo imprime como `AVE.TIME`
-  (`crates/genmsi-core/src/report.rs:254`, `:272`). Además `total_time` sólo
-  suma los miembros que ya salieron (`monitor/stats.ts:389`), así que la cifra
-  subestima el tiempo en cadena mientras la corrida avanza.
-  *Verificado contra `crates/genmsi-core/src/stat.rs:439-451`.*
-- [media] La app ya calcula el tamaño medio (`area / elapsed`,
-  `charts/entities.ts:243,251`, `monitor/derived.ts:131-132`) y el motor lo
-  publica (`AVE.CONT`, `report.rs:264`), pero la tarjeta no lo muestra: es la
-  métrica que acompaña naturalmente a la curva.
-- [media] Posible "+1" fantasma: el motor tiene el indicador de `LINK`; la
-  primera transacción que llega a una cadena con el indicador apagado pasa al
-  destino y **no** entra en la cadena, y las entradas sólo se incrementan para
-  las que entran (`sim.rs:1705-1722`, `:1730-1735`). El replay cuenta una
-  entrada en cada `enter` de un bloque `Link` (`monitor/replay.ts:683-690`), y
-  la traza registra el `enter` antes de decidir (`sim.rs:1166-1169`). Si el
-  bloque `Link` tiene salida conectada
-  (`crates/genmsi-core/src/program.rs:815-821`), contenido, máximo y entradas
-  quedarían +1 desde ese instante. **No verificado en ejecución**; ningún
-  modelo de las fixtures tiene `LINK` con destino
-  (`fixtures/outputs/TP7__Clase_7_1_Link_Unlink.gpss.txt:3`), por lo que el
-  test de fidelidad nunca lo ejercita.
-- [baja] El rótulo "Máximo / la cadena más larga" (`ChainSeries.tsx:82-84`) no
-  describe lo que muestra: es el tamaño máximo de *esta* cadena
-  (`monitor/stats.ts:367`).
-- [baja] "Entradas / enlaces hechos en la corrida" (`ChainSeries.tsx:88-90`) es
-  acumulado hasta el reloj, no de la corrida completa; el pie debería decirlo.
-- [baja] El color de las cuatro cifras depende de `live` = "el replay ya conoce
-  esta cadena" (`entities.ts:252`). La cadena existe en el reporte desde el
-  inicio (`entities.ts:126-133`), así que antes del primer `LINK` la tarjeta
-  muestra ceros en pizarra (el color reservado para lo publicado) cuando en
-  realidad son ceros del instante.
-- [baja] El estado vacío "El modelo no tiene cadenas" (`ChainSeries.tsx:36-42`)
-  es inalcanzable: la tarjeta sólo se monta con `chains.length > 0`
-  (`MonitorCharts.tsx:189`).
-- [baja] La tarjeta muestra una sola cadena por vez con color fijo
-  (`ChainSeries.tsx:69`) y duplica el marcado de los botones
-  (`ChainSeries.tsx:50-68`) en vez de usar `EntityPicker` y `palette.colorOf`
-  como hace `QueueSeries.tsx:46-51`; con cuatro cadenas hay que pulsarlas una
-  por una.
+- [alta] **La columna `Reintentos` es siempre 0**: el replay nunca emite el
+  cambio `facility-retry` (el `case "Seize"` sólo genera `facility-seize`,
+  `monitor/replay.ts:582-599`; el único que suma el contador es
+  `monitor/stats.ts:327-330`, sin productor), así que `retry` sale siempre de
+  `figure?.retry ?? 0` (`entities.ts:198`). El motor sí publica `retry`
+  (`crates/genmsi-core/src/stat.rs:44-46`) y la app lo ignora: ni la tabla de
+  esta tarjeta ni la pestaña "Facilidades" del reporte lo muestran
+  (`components/ReportView.tsx:236-259`). El propio test lo delata: el reporte
+  publica `retry: 1` y la figura viva `retry: 0`
+  (`crates/genmsi-app/tests/entities.test.ts:43` vs `:88`). Y el chequeo de
+  fidelidad no lo compara (`monitor/replay.ts:1435-1441` compara `busy`,
+  `entries`, `busyTime`, `inter`), o sea que nadie lo atrapa.
+  *Verificado*: `facility-retry` no tiene productor en `monitor/replay.ts`;
+  el único `kind: "...-retry"` emitido es el de storage (`:664`).
+- [media] **El subtítulo atribuye al motor cifras que salen del replay**:
+  "se derivan del reporte del motor; las interrupciones y los reintentos los
+  cuenta el motor" (`MonitorCharts.tsx:173`), pero todo lo que se ve son
+  figuras del instante (`entities.ts:180-202`). La tarjeta se contradice con
+  su propio texto.
+- [media] **No dice las fórmulas**: el asterisco marca las derivadas
+  (`StatTable.tsx:46`) y la tarjeta no da ni el denominador de la utilización
+  ni el del servicio medio, como sí hace la tarjeta de recursos
+  (`MonitorCharts.tsx:126`). Además **no tiene badge**
+  (`MonitorCharts.tsx:170-175`; `ChartCard.tsx:36-45`), que es la regla 5 de
+  la sección.
+- [media] **`Servicio medio` de una facility nunca tomada muestra "0,0 s"**
+  (`FacilityTable.tsx:42`), donde el motor escribe "no computado" para el caso
+  sin divisor (`crates/genmsi-core/src/report.rs:64-71` y `:162-168`).
+- [baja] `libre` no distingue "libre ahora" de "el replay todavía no la
+  conoce" (`FacilityTable.tsx:30` vs `entities.ts:201`).
+- [baja] La clave de fila es el índice (`StatTable.tsx:53`); hoy no rompe nada
+  porque los nombres son únicos por construcción (`entities.ts:142`), pero por
+  nombre sería más robusto.
+- [baja] El motor publica también los **waiters** de cada facility (columna
+  `DELAY`, `crates/genmsi-core/src/report.rs:176`), que no llegan al JSON
+  (`stat.rs:36-39`, `serde(skip)`) y que la app no muestra; el replay sí tiene
+  el dato (`monitor/replay.ts:783-787`).
 
-**Tests.** La aritmética de las cadenas sí está cubierta:
-`tests/stats.test.ts:139-174` (entrar/salir, salida múltiple),
-`tests/derived.test.ts:75-78` (tamaño medio), `tests/replay.test.ts:238-252`
-(`chainPoints`) y `tests/replay.test.ts:398-425` (los miembros que salen se
-leen de la traza). No están cubiertos `chainsOf` (`tests/entities.test.ts:10-15`
-sólo importa colas, facilities y almacenes) ni el componente. Y aunque la
-fidelidad compara las cadenas con el reporte (`monitor/replay.ts:1462-1479`),
-el modelo del test no tiene cadenas (`tests/replay.test.ts:31`).
+**Cobertura de tests.** La aritmética sí (`tests/derived.test.ts:46-61`), el
+armado de filas también (`tests/entities.test.ts:108-116`), pero **el
+componente no se renderiza en ningún test** (nada importa `FacilityTable`) y
+`entities.test.ts` no afirma `utilization`, `meanService`, `inter` ni `retry`
+de la facility.
 
-**3. ¿Otra forma.** Multi-serie como *Colas*: `EntityPicker` + `colorOf` y
-todas las cadenas superpuestas con su línea de tamaño medio punteada; y
-sustituir "Tiempo medio" por "Tamaño medio" (`area/tiempo`), que sí es una
-métrica del motor, dejando el tiempo total como cifra leída.
+**3. ¿Otra forma.** Una fila por facility con: chip de estado (`libre` /
+`tx N` / `esperando N`), una barra fina de utilización (en vez del porcentaje
+redondeado) y las cifras de contención (`interrupciones`, `esperando`),
+ordenadas por utilización; el `Reintentos` sale de la fila publicada o se
+elimina. Justificación: se lee de un vistazo y reemplaza una columna muerta por
+la métrica que sí muestra el motor (`DELAY`).
 
 **Veredicto.** KEEP WITH CHANGES
-**Riesgo de equivocarse.** El lector cree que hay una transacción más
-encadenada de la que hay, compara un "tiempo medio" que no es el `AVE.TIME` del
-reporte con el número del reporte, y toma el máximo de una cadena por el de la
-más larga.
+**Riesgo de equivocarse.** Alto: una columna que dice "0" cuando el reporte
+dice "1" hace creer que no hubo contención; y si el pie de la sección no se
+lee, el lector entiende estas cifras como las publicadas de la corrida
+completa y las compara con el reporte, que no coinciden hasta el final (y con
+`Reintentos` nunca coinciden).
 
 ### Unidades en uso — almacén
 
@@ -733,6 +830,190 @@ ambigüedad del eje superior.
 **Riesgo de equivocarse.** Que un lector equipare "Reintentos" con la columna
 `RETRY` del reporte (o con `delay`), o que lea los ceros grises de un almacén
 intacto como su valor final; y que tome "lleno" por "bloqueado".
+
+### Tamaño de la cadena
+
+**Qué muestra.** El tamaño de una *cadena de usuario* GPSS (la que se llena con
+`LINK` y se vacía con `UNLINK`), no la cadena del flujo del diagrama ni el
+ensamblaje: el motor sólo crea entidades de cadena en las ramas `Link`/`Unlink`
+(`crates/genmsi-core/src/sim.rs:1711`, `:2770`) y en la expresión `CH:`
+(`sim.rs:3294`). La curva es la serie exacta del tamaño, reconstruida desde la
+traza (`monitor/replay.ts:1284-1292`, `monitor/series.ts:41-77`); las cuatro
+cifras salen de las figuras vivas de la cadena (`charts/entities.ts:236-254`,
+`monitor/stats.ts:362-390`). Sólo se monta si hay cadenas
+(`MonitorCharts.tsx:189`), así que en un modelo sin cadenas la tarjeta no
+aparece.
+
+**1. ¿Tiene sentido?** Sí, y no es redundante: es la única vista de las
+cadenas, y en los modelos de referencia con `LINK` describe el backlog de un
+conjunto de transacciones encadenadas, que ni las colas ni las facilities
+muestran (p. ej. `MONORRIEL` con 504 entradas y 215 en la cadena al final:
+`fixtures/outputs/monorriel__monorriel.report.txt:126-130`; también TP7, TP8,
+TP10). El riesgo de confusión de vocabulario es real: `chainsOf` también
+existe en `graph/graph.ts:583` y ahí "cadena" es otra cosa.
+
+**2. ¿Se muestra correctamente.** Bien en lo esencial (eje de 0 al final, línea
+del reloj, serie exacta, cifras del instante), pero:
+
+- [media] "Tiempo medio" no es el `AVE.TIME` del motor: la tarjeta calcula
+  `totalTime / entradas` (`charts/ChainSeries.tsx:44`), mientras el motor
+  define el tiempo medio de la cadena como `área / entradas`
+  (`crates/genmsi-core/src/stat.rs:439-451`) y lo imprime como `AVE.TIME`
+  (`crates/genmsi-core/src/report.rs:254`, `:272`). Además `total_time` sólo
+  suma los miembros que ya salieron (`monitor/stats.ts:389`), así que la cifra
+  subestima el tiempo en cadena mientras la corrida avanza.
+  *Verificado contra `crates/genmsi-core/src/stat.rs:439-451`.*
+- [media] La app ya calcula el tamaño medio (`area / elapsed`,
+  `charts/entities.ts:243,251`, `monitor/derived.ts:131-132`) y el motor lo
+  publica (`AVE.CONT`, `report.rs:264`), pero la tarjeta no lo muestra: es la
+  métrica que acompaña naturalmente a la curva.
+- [media] Posible "+1" fantasma: el motor tiene el indicador de `LINK`; la
+  primera transacción que llega a una cadena con el indicador apagado pasa al
+  destino y **no** entra en la cadena, y las entradas sólo se incrementan para
+  las que entran (`sim.rs:1705-1722`, `:1730-1735`). El replay cuenta una
+  entrada en cada `enter` de un bloque `Link` (`monitor/replay.ts:683-690`), y
+  la traza registra el `enter` antes de decidir (`sim.rs:1166-1169`). Si el
+  bloque `Link` tiene salida conectada
+  (`crates/genmsi-core/src/program.rs:815-821`), contenido, máximo y entradas
+  quedarían +1 desde ese instante. **No verificado en ejecución**; ningún
+  modelo de las fixtures tiene `LINK` con destino
+  (`fixtures/outputs/TP7__Clase_7_1_Link_Unlink.gpss.txt:3`), por lo que el
+  test de fidelidad nunca lo ejercita.
+- [baja] El rótulo "Máximo / la cadena más larga" (`ChainSeries.tsx:82-84`) no
+  describe lo que muestra: es el tamaño máximo de *esta* cadena
+  (`monitor/stats.ts:367`).
+- [baja] "Entradas / enlaces hechos en la corrida" (`ChainSeries.tsx:88-90`) es
+  acumulado hasta el reloj, no de la corrida completa; el pie debería decirlo.
+- [baja] El color de las cuatro cifras depende de `live` = "el replay ya conoce
+  esta cadena" (`entities.ts:252`). La cadena existe en el reporte desde el
+  inicio (`entities.ts:126-133`), así que antes del primer `LINK` la tarjeta
+  muestra ceros en pizarra (el color reservado para lo publicado) cuando en
+  realidad son ceros del instante.
+- [baja] El estado vacío "El modelo no tiene cadenas" (`ChainSeries.tsx:36-42`)
+  es inalcanzable: la tarjeta sólo se monta con `chains.length > 0`
+  (`MonitorCharts.tsx:189`).
+- [baja] La tarjeta muestra una sola cadena por vez con color fijo
+  (`ChainSeries.tsx:69`) y duplica el marcado de los botones
+  (`ChainSeries.tsx:50-68`) en vez de usar `EntityPicker` y `palette.colorOf`
+  como hace `QueueSeries.tsx:46-51`; con cuatro cadenas hay que pulsarlas una
+  por una.
+
+**Tests.** La aritmética de las cadenas sí está cubierta:
+`tests/stats.test.ts:139-174` (entrar/salir, salida múltiple),
+`tests/derived.test.ts:75-78` (tamaño medio), `tests/replay.test.ts:238-252`
+(`chainPoints`) y `tests/replay.test.ts:398-425` (los miembros que salen se
+leen de la traza). No están cubiertos `chainsOf` (`tests/entities.test.ts:10-15`
+sólo importa colas, facilities y almacenes) ni el componente. Y aunque la
+fidelidad compara las cadenas con el reporte (`monitor/replay.ts:1462-1479`),
+el modelo del test no tiene cadenas (`tests/replay.test.ts:31`).
+
+**3. ¿Otra forma.** Multi-serie como *Colas*: `EntityPicker` + `colorOf` y
+todas las cadenas superpuestas con su línea de tamaño medio punteada; y
+sustituir "Tiempo medio" por "Tamaño medio" (`area/tiempo`), que sí es una
+métrica del motor, dejando el tiempo total como cifra leída.
+
+**Veredicto.** KEEP WITH CHANGES
+**Riesgo de equivocarse.** El lector cree que hay una transacción más
+encadenada de la que hay, compara un "tiempo medio" que no es el `AVE.TIME` del
+reporte con el número del reporte, y toma el máximo de una cadena por el de la
+más larga.
+
+### Histograma de la tabla
+
+**Qué muestra.** El histograma de **una** tabla o qtable del modelo, elegible
+con botones (`charts/TableHistogram.tsx:47-60, 90-107`): las barras son las
+frecuencias de los intervalos, la curva naranja es el acumulado en %, la banda
+violeta es media ± desviación (`TableHistogram.tsx:139-142, 160-162, 166-171`).
+Los datos salen de las **figuras vivas del replay**
+(`TableHistogram.tsx:68-74` → `monitor/stats.ts:107-110, 394-412`), y la
+geometría de los intervalos sale del reporte (`first`, `width`, `intervals`:
+`crates/genmsi-core/src/stat.rs:463-495`,
+`crates/genmsi-app/src/types/generated/Table.ts:12-22`). La media y la
+desviación las calcula la app con `tableDerived`
+(`monitor/derived.ts:160-176`), con la misma fórmula del motor
+(`crates/genmsi-core/src/stat.rs:558-573`).
+
+**1. ¿Tiene sentido?** Sí. La forma de la distribución de una magnitud tabulada
+(tiempos de servicio, esperas) es información que las tablas de indicadores no
+dan; no es redundante con *Las tablas del modelo*, que sólo publica escalares
+(`charts/TablesList.tsx:60-100`). Sí repite, en cambio, media, desviación y
+desbordes de esa tabla (`TableHistogram.tsx:110-112` vs `TablesList.tsx:74-90`).
+
+**2. ¿Se muestra correctamente.** El cálculo es correcto (frecuencias, clase de
+desborde y fórmulas coinciden con el motor: `monitor/replay.ts:721-736`,
+`monitor/stats.ts:394-412`, `crates/genmsi-core/src/stat.rs:517-535`), pero las
+etiquetas y el rotulado no.
+
+- [alta] El badge dice "reporte del motor" y el propio comentario del
+  componente dice que las barras son "the **published frequencies**"
+  (`MonitorCharts.tsx:203`, `TableHistogram.tsx:4-6`), pero las barras son las
+  cifras **del instante** (`TableHistogram.tsx:68-69`); contradice la regla "el
+  reloj manda" y la leyenda de la sección ("Las cifras en violeta son las del
+  instante… las demás son las que el motor publicó", `MonitorCharts.tsx:239`).
+  El lector compara un histograma parcial con el reporte de la corrida
+  completa y cree que difieren.
+- [alta] **La agrupación de las tablas con más de 200 intervalos ya no
+  existe**, aunque es una decisión del usuario (S9: "Agrupar con aviso
+  visible", `odd/tasks/genmsi-fase4c-monitor.md:37-39, 98, 173`) y la
+  documentación la promete (`docs/app.md:377-378`). No hay código de agrupación
+  en `crates/genmsi-app/src`: se dibuja una barra por intervalo
+  (`TableHistogram.tsx:75-76`) con `barSize = max(4, round(620/n)-8)`, o sea
+  4 px por barra con eje numérico (`TableHistogram.tsx:118-124, 149`): con 400
+  clases las barras se pisan y el histograma es un muro. Ningún modelo del repo
+  llega a 200 intervalos (`docs/BLOCK-INVENTORY.md:340, 442`), así que el caso
+  está sin ejercitar. *Verificado: la búsqueda de "agrup"/"cubre cada" en
+  `crates/genmsi-app/src` no encuentra la agrupación.*
+- [media] La **media y la desviación no están marcadas como derivadas** (sin
+  asterisco ni fórmula: `TableHistogram.tsx:110-112`), al revés que la tabla
+  gemela, que sí marca `derived: true` (`TablesList.tsx:74-79` →
+  `StatTable.tsx:5-6, 46`) y que el pie de la tarjeta explica
+  (`MonitorCharts.tsx:149-151`). El motor publica MEDIA y DESVIACION ESTANDAR
+  en el reporte de texto (`crates/genmsi-core/src/report.rs:456-462`); el JSON
+  no las trae, así que la app las recalcula y debe decirlo.
+- [media] La **primera clase está mal rotulada** cuando `first > 0`: la app
+  escribe "0 – first" (`monitor/series.ts:216-217`, fijado por
+  `tests/series.test.ts:138`), pero la clase 0 del motor es "todo valor ≤
+  `first`" (`crates/genmsi-core/src/stat.rs:522-524`) y el reporte la imprime
+  como "first – first" (`crates/genmsi-core/src/report.rs:486-491`). La barra
+  se ancla en `x = first/2` (`series.ts:220`), que sí cae dentro de la clase 0,
+  pero el rótulo promete un límite inferior que la clase no tiene.
+- [baja] La clase de desborde: la app la detecta por ser la última fila
+  (`monitor/series.ts:219`) y la pinta de naranja
+  (`TableHistogram.tsx:153-156`) ✓, pero el número de "desbordes"
+  (`TableHistogram.tsx:73`) es **la misma cifra** que la barra naranja
+  (`monitor/stats.ts:405-410`); y no se dice que esa clase no tiene límite
+  superior, como sí lo dice el reporte ("> a 80", `report.rs:477-492`).
+- [baja] Estado vacío no contemplado: antes del primer valor, `frequencies` es
+  `[]` (`TableHistogram.tsx:69`) y se dibuja un gráfico vacío con "0 valores ·
+  media 0.00 · desviación 0.00" (`TableHistogram.tsx:80-86, 110-112`); el
+  tooltip muestra el punto medio de la clase como "valor X"
+  (`TableHistogram.tsx:137`) y descarta el rango que la fila ya trae
+  (`monitor/series.ts:221`).
+- [baja] La fidelidad **no verifica** de dónde salen la media, la σ y los
+  desbordes: el control compara `samples`, `max_value` y `frequencies`, pero no
+  `sum`, `sum_squares` ni `overflow`
+  (`monitor/replay.ts:1491-1494, 1507-1510`).
+
+**Campos del motor que la app ignora:** `overflow_sum` y `overflow_sum_squares`
+(`types/generated/Table.ts:53, 57`), que el reporte publica como MEDIA OVERFLOW
+/ DESVIACION ESTANDAR OVERFLOW (`crates/genmsi-core/src/report.rs:525-540`); y
+el atajo del propio motor para cortar la cola vacía ("Las frecuencias
+restantes (N) son todas cero", `report.rs:512-518`).
+
+**3. ¿Otra forma.** Dos ajustes, sin perder información: (a) aplicar la regla
+del reporte al histograma —recortar las clases vacías del final y, si son
+muchas, agrupar con el aviso "cada barra cubre N intervalos" (S9)—, y (b) usar
+el `label` de la fila en el tooltip (`monitor/series.ts:221`) y marcar media/σ
+con asterisco y pie "media = suma/muestras · σ = √(suma²/n − media²)". Si
+además se fundiera el histograma dentro de *Las tablas del modelo* (una fila
+selecciona la tabla), se eliminaría la duplicación de media/σ/desbordes y los
+botones.
+
+**Veredicto.** KEEP WITH CHANGES
+**Riesgo de equivocarse.** El badge hace pasar cifras del instante por
+publicadas: el lector cree que el histograma del reloj es el de la corrida y
+desconfía del reporte (o al revés). Y con una tabla de muchas clases, las
+barras superpuestas dan una forma que el modelo no tiene.
 
 ### Las tablas del modelo
 
@@ -927,103 +1208,6 @@ reporte, y (cuando el reloj está al final) como definitivas, atribuirá al
 modelo un volumen de trabajo que el motor no publica, y creerá que el bloque
 más cargado es donde se acumula el trabajo cuando puede ser el generador.
 
-### Histograma de la tabla
-
-**Qué muestra.** El histograma de **una** tabla o qtable del modelo, elegible
-con botones (`charts/TableHistogram.tsx:47-60, 90-107`): las barras son las
-frecuencias de los intervalos, la curva naranja es el acumulado en %, la banda
-violeta es media ± desviación (`TableHistogram.tsx:139-142, 160-162, 166-171`).
-Los datos salen de las **figuras vivas del replay**
-(`TableHistogram.tsx:68-74` → `monitor/stats.ts:107-110, 394-412`), y la
-geometría de los intervalos sale del reporte (`first`, `width`, `intervals`:
-`crates/genmsi-core/src/stat.rs:463-495`,
-`crates/genmsi-app/src/types/generated/Table.ts:12-22`). La media y la
-desviación las calcula la app con `tableDerived`
-(`monitor/derived.ts:160-176`), con la misma fórmula del motor
-(`crates/genmsi-core/src/stat.rs:558-573`).
-
-**1. ¿Tiene sentido?** Sí. La forma de la distribución de una magnitud tabulada
-(tiempos de servicio, esperas) es información que las tablas de indicadores no
-dan; no es redundante con *Las tablas del modelo*, que sólo publica escalares
-(`charts/TablesList.tsx:60-100`). Sí repite, en cambio, media, desviación y
-desbordes de esa tabla (`TableHistogram.tsx:110-112` vs `TablesList.tsx:74-90`).
-
-**2. ¿Se muestra correctamente.** El cálculo es correcto (frecuencias, clase de
-desborde y fórmulas coinciden con el motor: `monitor/replay.ts:721-736`,
-`monitor/stats.ts:394-412`, `crates/genmsi-core/src/stat.rs:517-535`), pero las
-etiquetas y el rotulado no.
-
-- [alta] El badge dice "reporte del motor" y el propio comentario del
-  componente dice que las barras son "the **published frequencies**"
-  (`MonitorCharts.tsx:203`, `TableHistogram.tsx:4-6`), pero las barras son las
-  cifras **del instante** (`TableHistogram.tsx:68-69`); contradice la regla "el
-  reloj manda" y la leyenda de la sección ("Las cifras en violeta son las del
-  instante… las demás son las que el motor publicó", `MonitorCharts.tsx:239`).
-  El lector compara un histograma parcial con el reporte de la corrida
-  completa y cree que difieren.
-- [alta] **La agrupación de las tablas con más de 200 intervalos ya no
-  existe**, aunque es una decisión del usuario (S9: "Agrupar con aviso
-  visible", `odd/tasks/genmsi-fase4c-monitor.md:37-39, 98, 173`) y la
-  documentación la promete (`docs/app.md:377-378`). No hay código de agrupación
-  en `crates/genmsi-app/src`: se dibuja una barra por intervalo
-  (`TableHistogram.tsx:75-76`) con `barSize = max(4, round(620/n)-8)`, o sea
-  4 px por barra con eje numérico (`TableHistogram.tsx:118-124, 149`): con 400
-  clases las barras se pisan y el histograma es un muro. Ningún modelo del repo
-  llega a 200 intervalos (`docs/BLOCK-INVENTORY.md:340, 442`), así que el caso
-  está sin ejercitar. *Verificado: la búsqueda de "agrup"/"cubre cada" en
-  `crates/genmsi-app/src` no encuentra la agrupación.*
-- [media] La **media y la desviación no están marcadas como derivadas** (sin
-  asterisco ni fórmula: `TableHistogram.tsx:110-112`), al revés que la tabla
-  gemela, que sí marca `derived: true` (`TablesList.tsx:74-79` →
-  `StatTable.tsx:5-6, 46`) y que el pie de la tarjeta explica
-  (`MonitorCharts.tsx:149-151`). El motor publica MEDIA y DESVIACION ESTANDAR
-  en el reporte de texto (`crates/genmsi-core/src/report.rs:456-462`); el JSON
-  no las trae, así que la app las recalcula y debe decirlo.
-- [media] La **primera clase está mal rotulada** cuando `first > 0`: la app
-  escribe "0 – first" (`monitor/series.ts:216-217`, fijado por
-  `tests/series.test.ts:138`), pero la clase 0 del motor es "todo valor ≤
-  `first`" (`crates/genmsi-core/src/stat.rs:522-524`) y el reporte la imprime
-  como "first – first" (`crates/genmsi-core/src/report.rs:486-491`). La barra
-  se ancla en `x = first/2` (`series.ts:220`), que sí cae dentro de la clase 0,
-  pero el rótulo promete un下限 que la clase no tiene.
-- [baja] La clase de desborde: la app la detecta por ser la última fila
-  (`monitor/series.ts:219`) y la pinta de naranja
-  (`TableHistogram.tsx:153-156`) ✓, pero el número de "desbordes"
-  (`TableHistogram.tsx:73`) es **la misma cifra** que la barra naranja
-  (`monitor/stats.ts:405-410`); y no se dice que esa clase no tiene límite
-  superior, como sí lo dice el reporte ("> a 80", `report.rs:477-492`).
-- [baja] Estado vacío no contemplado: antes del primer valor, `frequencies` es
-  `[]` (`TableHistogram.tsx:69`) y se dibuja un gráfico vacío con "0 valores ·
-  media 0.00 · desviación 0.00" (`TableHistogram.tsx:80-86, 110-112`); el
-  tooltip muestra el punto medio de la clase como "valor X"
-  (`TableHistogram.tsx:137`) y descarta el rango que la fila ya trae
-  (`monitor/series.ts:221`).
-- [baja] La fidelidad **no verifica** de dónde salen la media, la σ y los
-  desbordes: el control compara `samples`, `max_value` y `frequencies`, pero no
-  `sum`, `sum_squares` ni `overflow`
-  (`monitor/replay.ts:1491-1494, 1507-1510`).
-
-**Campos del motor que la app ignora:** `overflow_sum` y `overflow_sum_squares`
-(`types/generated/Table.ts:53, 57`), que el reporte publica como MEDIA OVERFLOW
-/ DESVIACION ESTANDAR OVERFLOW (`crates/genmsi-core/src/report.rs:525-540`); y
-el atajo del propio motor para cortar la cola vacía ("Las frecuencias
-restantes (N) son todas cero", `report.rs:512-518`).
-
-**3. ¿Otra forma.** Dos ajustes, sin perder información: (a) aplicar la regla
-del reporte al histograma —recortar las clases vacías del final y, si son
-muchas, agrupar con el aviso "cada barra cubre N intervalos" (S9)—, y (b) usar
-el `label` de la fila en el tooltip (`monitor/series.ts:221`) y marcar media/σ
-con asterisco y pie "media = suma/muestras · σ = √(suma²/n − media²)". Si
-además se fundiera el histograma dentro de *Las tablas del modelo* (una fila
-selecciona la tabla), se eliminaría la duplicación de media/σ/desbordes y los
-botones.
-
-**Veredicto.** KEEP WITH CHANGES
-**Riesgo de equivocarse.** El badge hace pasar cifras del instante por
-publicadas: el lector cree que el histograma del reloj es el de la corrida y
-desconfía del reporte (o al revés). Y con una tabla de muchas clases, las
-barras superpuestas dan una forma que el modelo no tiene.
-
 ### Reintentos por bloque — la contención
 
 **Qué muestra.** Ranking de los bloques del modelo (hasta 8,
@@ -1114,109 +1298,6 @@ del instante, y una contención de facility/almacén que el motor nunca cuenta
 como reintento aparece en la tarjeta como si el motor la hubiera medido; además
 el ranking compara absolutos sin tráfico y puede señalar el bloque más
 transitado como el cuello de botella.
-
-### La corrida en números
-
-**Qué muestra.** Seis tarjetas (`StatCard`) con las cifras globales de la
-corrida: **Transacciones** (en vivo, `generateTimes` contados hasta el reloj; en
-publicado, `report.transactions`), **Eventos** (`report.events`), **Reloj**
-(reloj del replay en vivo / `end_time - start_time` en publicado), **Fin**
-(`end_reason` traducido), **Caudal** (ratio transacciones/segundo) y
-**Población** (suma de `state.blocks` en vivo / suma de `block.current` en
-publicado) — `charts/RunSummary.tsx:66-107`, armado en
-`MonitorCharts.tsx:106-119` con `generated={countAt(monitor.generateTimes, clock)}`
-(`MonitorCharts.tsx:117`). Fuentes del motor: `transactions` = `next_xact`
-(`crates/genmsi-core/src/sim.rs:863`), `events` = contador de eventos del motor
-(`sim.rs:757`), publicado en `crates/genmsi-core/src/report.rs:1469-1480` /
-`crates/genmsi-app/src/types/generated/JsonReport.ts:17-43`. Las cifras vivas
-van en violeta y las publicadas en pizarra (`charts/StatCard.tsx:33-35`), y el
-pie de la sección lo explica (`MonitorCharts.tsx:234-239`).
-
-**1. ¿Tiene sentido.** Sí: es la orientación mínima de la corrida (cuánto pasó,
-cuánto duró, cómo terminó, cuánto quedó vivo) y no repite ninguna otra
-tarjeta de la sección. Es parcialmente redundante con otras pantallas: "Fin",
-"Transacciones" y "Eventos" ya están en la cabecera del panel Reporte
-(`components/ReportView.tsx:167-175`) y el reloj ya está en la consola del
-replay (`components/RunConsole.tsx:215`).
-
-**2. ¿Se muestra correctamente.** Hay tres desvíos y dos detalles de forma.
-
-- [media] **"Transacciones" mide dos cosas distintas según el modo.** La cifra
-  viva cuenta eventos `generate` de la traza
-  (`monitor/replay.ts:753-765`), o sea solo nacimientos de generadores; la
-  publicada es `next_xact`, el total de identificadores de transacción creados,
-  que **incluye las copias de `SPLIT`** (`crates/genmsi-core/src/sim.rs:1071-1073`,
-  `:1817-1819`), y las copias no dejan evento `generate` (sólo `enter`). En un
-  modelo con `SPLIT` (p. ej. `fixtures/outputs/TP5__burgerShop.report.txt:14`)
-  el panel de Reporte y esta tarjeta dan dos totales distintos para la misma
-  corrida, con la misma etiqueta. **No verificado en ejecución: deducido del
-  código.**
-- [media] **"Población" publicada y viva no coinciden ni al final de la
-  corrida.** La publicada suma `block.current` de todas las filas, y el motor
-  da `current = 1` al generador mientras tenga una llegada pendiente
-  (`crates/genmsi-core/src/sim.rs:625`, y sólo lo pone en 0 al agotar su
-  límite, `sim.rs:993`, `:1037`; evidencia en los reportes:
-  `fixtures/outputs/Problema_1__semaforo-1.report.txt:17,19,47` frente a `:8`).
-  El replay, en cambio, nunca cuenta el generador como bloque con transacción
-  (`monitor/replay.ts:753-765`) y su propia verificación de fidelidad lo
-  excluye explícitamente (`monitor/replay.ts:1383-1388`). La población viva
-  queda así un número menor por cada generador vivo.
-- [media] **La cabecera de la sección miente sobre dos de las seis tarjetas.**
-  Dice "Los números del instante, con el reloj de la reproducción"
-  (`MonitorCharts.tsx:108-111`), pero **Eventos** y **Fin** son siempre cifras
-  publicadas (`RunSummary.tsx:72-87`) y **Fin** es el final de una corrida que
-  todavía no terminó en el reloj.
-- [media] **"Caudal" es una métrica derivada sin marcar.** Es un ratio
-  calculado por la app (`RunSummary.tsx:88-101`), pero no lleva asterisco ni
-  dice la fórmula, como sí hacen las demás de la sección
-  (`MonitorCharts.tsx:127` footnote de "Utilización = …",
-  `charts/QueueTable.tsx:36-56`). La regla 2 del contrato pide exactamente esa
-  marca.
-- [media] **La rama "publicada" de la tarjeta es código muerto.** `state` es
-  `null` sólo cuando `monitor` es `null` (`MonitorView.tsx:94-97`) y
-  `MonitorCharts` sólo se monta con `monitor !== null`
-  (`MonitorView.tsx:581-592`), luego `live` es siempre `true` en la app: las
-  cinco variantes publicadas (incluida `publishedPopulation`,
-  `RunSummary.tsx:37-42`) nunca se ven. El mismo contrato se respeta bien en el
-  reparto del tiempo: el caudal vivo divide por `clock - start_time` y el
-  publicado por `end_time - start_time` (`RunSummary.tsx:91-97`,
-  `monitor/entities.ts:28-42`).
-- [baja] La tarjeta no tiene badge ni pie propios (no es un `ChartCard`), así
-  que no dice de dónde sale cada número ni que dos de ellos son publicados.
-- [baja] `RunSummary.tsx:16-22` redefine un `decimals` propio con 2 decimales,
-  duplicando `format.ts:29-34` (que usa 1 decimal y por defecto
-  `places = 1`).
-- [baja] "Reloj" en vivo muestra el reloj del replay con fracciones
-  (`format.ts:12-21` escribe 3 decimales con coma), mientras la consola lo
-  muestra como `h:mm:ss`: dos lecturas del mismo número.
-
-**Cobertura de tests.** La tarjeta **no está cubierta**: no hay ningún test que
-la importe (`crates/genmsi-app/tests/` no la menciona). Sí están cubiertos sus
-insumos: `countAt` (`tests/series.test.ts:111-113`), `generateTimes`
-(`tests/replay.test.ts:200-211`) y `entities.ts` (`tests/entities.test.ts`). Las
-dos funciones de población son privadas dentro del `.tsx`, así que ni siquiera
-son alcanzables desde un test.
-
-**Lo que el motor publica y la sección ignora.** `report.diagnostics`
-(`crates/genmsi-core/src/report.rs:1434`, `JsonReport.ts:48`) lleva el detalle
-del corte por el guard de eventos con los bloques más calientes
-(`sim.rs:945-973`); el panel Reporte tampoco lo muestra, y en una corrida
-cortada por `event_limit` el "Fin" de esta tarjeta
-(`engine/reasons.ts:89-91`) no dice ni dónde se cortó.
-
-**3. ¿Otra forma.** Mantener las seis cifras pero en una sola tarjeta por
-métrica con **el número vivo y, en la nota, el total publicado** ("1.234 de
-2.345 en la corrida"), de modo que las dos cifras sean comparables por
-construcción —en vez de dos tarjetas que no se pueden contrastar—; y añadir a
-"Caudal" el asterisco con su fórmula, como el resto de la sección. Añadir una
-línea "generadores pendientes" o quitar el `current` del generador de la
-población publicada.
-
-**Veredicto.** KEEP WITH CHANGES
-**Riesgo de equivocarse.** Que el lector tome la tarjeta por el resumen de la
-corrida y la compare con el panel Reporte: verá dos "Transacciones" distintas
-(nacimientos vs. identificadores creados) y dos "Poblaciones" distintas (con y
-sin el generador), y creerá que una de las dos está mal.
 
 ## Las piezas compartidas
 
@@ -1429,88 +1510,3 @@ transacción programada). Requiere campo nuevo en el motor.
   eso es diseño, no olvido.
 - Cobertura: los tests fijan `derived/series/entities/replay`, pero ninguna
   tarjeta tiene test propio.
-
-### Distribución de las esperas
-
-**Qué muestra.** El histograma de las esperas de **una cola**, con una barra por
-intervalo y la curva acumulada; el selector de pestañas elige la cola. Las
-muestras salen de la **traza**: el replay recuerda la entrada de cada
-transacción en la cola (`monitor/replay.ts:548`) y anota una muestra por salida,
-con la espera = instante de salida − instante de entrada
-(`monitor/replay.ts:561-574`); la tarjeta las filtra por el reloj
-(`charts/WaitDistribution.tsx:67`), las mete en intervalos con `histogram()`
-(`monitor/series.ts:134-152`) y calcula la acumulada con `cumulative()`
-(`series.ts:159-175`). La media y el ancho de los intervalos los calcula la app
-(`WaitDistribution.tsx:76-79`). Badge: "derivado de la traza"
-(`MonitorCharts.tsx:140-147`).
-
-**1. ¿Tiene sentido?** Sí, y no es redundante: es la única tarjeta que muestra
-la **forma** de las esperas; *Indicadores por cola* sólo da media, máximo y
-proporción de espera cero (`QueueTable.tsx:33-59`). Excepción: si el modelo
-declara un `QTable` de esa cola, el motor ya tabula sus tiempos de espera
-(`crates/genmsi-core/src/sim.rs:3080-3100`, `report.rs:315-340`) y *Histograma
-de la tabla* lo dibuja con las frecuencias publicadas
-(`TableHistogram.tsx:47-49`) → la misma distribución aparece dos veces, con
-anchos de intervalo distintos.
-
-**2. ¿Se muestra correctamente.** Parcialmente: el origen de los datos es
-correcto y el corte por el reloj se respeta, pero las cifras y los rótulos no.
-
-- [media] La **media que muestra no es la del motor** y no va marcada: es la
-  media de las *salidas* (`WaitDistribution.tsx:79`), sin asterisco ni fórmula
-  en el pie (la tarjeta no pasa `footnote`, `MonitorCharts.tsx:140-147`),
-  mientras la tabla hermana muestra "Espera media \*" = `totalTime/entradas`
-  (`QueueTable.tsx:40-43`, `monitor/derived.ts:59`). Son dos medias distintas
-  para la misma cola, y contradice el diseño
-  (`odd/tasks/genmsi-graficos-estadisticas.md:175`).
-- [media] Las cifras **vivas van en gris** (`WaitDistribution.tsx:123,131-133`,
-  `text-slate-500`), sin el violeta que la sección reserva para "el instante que
-  marca el reloj" (`MonitorCharts.tsx:238-241`, `StatTable.tsx:62-63`): el
-  lector puede leerlas como publicadas.
-- [media] El **tooltip muestra el centro del intervalo**, no el intervalo: usa
-  el `x` = `low + width/2` (`WaitDistribution.tsx:82,171`), y el campo `label`
-  con el intervalo real (`:83`) no se usa en ninguna parte → "espera 0,05 s" por
-  un intervalo [0; 0,1).
-- [media] El **ancho de los intervalos depende del reloj**: `widthOf()` elige el
-  paso según el mayor valor observado hasta ese instante
-  (`WaitDistribution.tsx:39-47,75-76`), así que el histograma se re-binea y el
-  eje se estira mientras corre (`:147`). Dos instantes no son comparables y el
-  ancho no es una cifra del motor.
-- [media] La **truncatura de la traza no se refleja**: si la traza se cortó,
-  faltan las salidas posteriores y "N salidas" (`WaitDistribution.tsx:131`)
-  subestima la corrida; hay aviso global (`MonitorView.tsx:438-442`) y el
-  límite es 200.000 registros (`src/state/store.ts:66`), pero la tarjeta no lo
-  dice.
-- [baja] La línea de la media está **duplicada**
-  (`WaitDistribution.tsx:173-177` y `:186-190`) y sin rótulo que diga qué es.
-- [baja] La acumulada con `stepAfter` sobre los centros de los intervalos
-  (`:191-199`) salta a mitad de intervalo: la CDF queda corrida medio intervalo.
-- [baja] `barSize` se calcula sobre 620 px fijos (`:80`) dentro de un
-  `ResponsiveContainer` al 100 % en una grilla de dos columnas
-  (`MonitorCharts.tsx:131`): el ancho de barra no sigue al ancho real (no
-  verificado en pantalla).
-- [baja] `Math.max(...samples)` (`:75`) con hasta 200.000 registros de traza.
-- [baja] Las pestañas salen de toda la traza (`:58`): desde el segundo cero ya
-  listan colas que no han salido, en orden de primera salida y no alfabético
-  (`charts/entities.ts:129-134` ordena); una cola que nunca tuvo salidas no
-  aparece.
-
-**Cobertura.** **Nada** de la tarjeta se prueba. Hay soporte indirecto:
-`histogram`/`cumulative` (`tests/series.test.ts:86-108`) y el mapa de esperas
-(`tests/replay.test.ts:193-198`, un solo ejemplo). `widthOf` no se exporta y no
-se prueba; tampoco el filtro por reloj, el caso vacío ni la truncatura.
-
-**3. ¿Otra forma.** Mantener el histograma, pero: (a) ancho de intervalo
-**estable** (elegido una vez por cola, no por reloj) o los intervalos del
-`QTable` del motor cuando exista; (b) partir el primer bin con la proporción de
-**espera cero**, que el motor ya cuenta
-(`crates/genmsi-core/src/stat.rs:197-199`) y la app tiene vivo
-(`monitor/stats.ts:287-288`); (c) un solo cuadro de texto en violeta con
-`salidas N · espera media (motor) = tiempo total/entradas *` y pie con la
-fórmula; (d) rótulo del intervalo en el tooltip. Todo con los mismos datos.
-
-**Veredicto.** KEEP WITH CHANGES
-**Riesgo de equivocarse.** Que el lector tome la distribución por la de la
-corrida completa (es sólo lo que salió hasta el reloj, y puede estar recortada
-por la traza) y que confunda la "media de las salidas" con la "espera media" de
-la cola, que divide por las entradas e incluye a las que siguen esperando.

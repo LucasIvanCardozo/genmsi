@@ -33,7 +33,7 @@ Standard output belongs to the protocol: the server writes nothing else there.
 A failure that stops the server goes to standard error and the process exits
 with `1`.
 
-## The eight tools
+## The nine tools
 
 | Tool | What it does | Returns |
 |---|---|---|
@@ -45,6 +45,7 @@ with `1`.
 | `save_model` | Writes a model the agent built to a file, after checking that it compiles. | `genmsi.lint/1` |
 | `apply_edit` | Adds, edits and connects the blocks of a model: a batch of the engine's own editing commands. | `genmsi.edit/1` |
 | `open_model` | Says which model the desktop app has open: the file it has open and the process that has it. | `genmsi.openmodel/1` |
+| `app_state` | Says what the desktop app is showing right now: the model it has open, whether the reader has unsaved changes on it, what it found and the last run it made. | `genmsi.live/1` |
 
 Every tool but `catalogue` and `open_model` takes the model in one of two ways:
 
@@ -218,6 +219,10 @@ is **atomic**: the text goes to a temporary file next to the target and that
 file is renamed over it, so a reader that watches the model (the desktop
 application does) never sees half of one.
 
+**A model the reader is editing is not written**: when the desktop app has
+unsaved changes on it, the tool writes nothing and answers `model_locked`
+(see `app_state`).
+
 The tool writes the **whole document**, not a patch: read the model with
 `explain_model`, change the text and hand the complete document back.
 
@@ -272,6 +277,14 @@ is **not** written, and the failure is the one of the format or of the
 compiler —the same classes the other tools give— with the block and its
 position. The file the agent named keeps the model it had.
 
+**A model the reader is editing is not written.** When the desktop app has
+**unsaved changes** on the model the call named, the tool writes **nothing**
+and answers `model_locked`: the app does not reload a model that changes under
+it while the reader has changes that are not saved, so the work would stay
+invisible on the canvas and the reader's save would overwrite it. Ask
+`app_state` before writing, tell the reader, and send the same batch again
+once the model is saved.
+
 **Where the blocks go.** `layout: "auto"` (the default) puts every block an
 `addBlock` adds in the free spot of its container, the same place the desktop
 application gives a block that is dropped; `layout: "explicit"` uses the `x`
@@ -312,6 +325,37 @@ Returns the `genmsi.edit/1` document:
 A model given as text (`model`) has no file to write to: the text of the
 result travels back in `source`, and that text is the only place the edit
 lives. A model given by `path` is written, and the file is the state.
+
+### `app_state`
+
+The tool takes no arguments.
+
+It returns the `genmsi.live/1` document: **what the reader is looking at
+right now**.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema` | string | `genmsi.live/1` |
+| `path` | string or null | The **absolute path** of the model the app has open; null when there is none. |
+| `pid` | number or null | The pid of the app that has it open; null when the app is not running. |
+| `dirty` | boolean | Whether the reader has changes that are **not saved**. |
+| `diagnostics` | array | What the app found in the model. |
+| `model` | object or null | The model **as it is in memory**, when it differs from the disk. Null when the model of the disk is the model of the app: the agent reads that one from the file. |
+| `run` | object or null | The last run the app made: `seed`, `until`, `start` and `report` (the `genmsi.report/1` document). |
+
+**The answer is never a failure.** When the app is not running, the answer is
+the same document with `path` and `pid` null: the question has an answer
+either way. A document left behind by an app that is gone says nothing: the
+pid says whether the process is alive.
+
+**Why the agent asks for it.** The app does not reload a model that changes
+under it while the reader has changes that are not saved —the reader's work is
+not thrown away by a change somebody else made— so the work of an agent that
+wrote anyway would stay invisible on the canvas, and the reader's save would
+overwrite it. The agent asks first, tells the reader, and sends the same edit
+again once the model is saved. `apply_edit` and `save_model` **refuse** that
+write on their own (see `model_locked` below): the refusal is mechanical, not
+a rule the agent has to remember.
 
 ### `open_model`
 
@@ -408,6 +452,7 @@ The classes:
 | `invalid_command` | A command of the batch could not be applied. The batch is atomic, so no command is applied: the failure names the command that failed (its index in `command` and its `op` in `op`), and the model stays as it was. |
 | `class_not_found` | The class named in `catalogue` is not one of the classes the catalogue lists. The `class` field carries the name that was asked for. |
 | `model_not_found` | The file named by `path` does not exist. (`apply_edit` is the exception: it creates the model, see above.) |
+| `model_locked` | The desktop app has **unsaved changes** on the model the call named, so nothing was written. The `path` field carries the model. The reader has to save it (or discard it) and the agent sends the same edit again: the batch is replayable, because the commands are the source of truth and not the text. |
 | `model_unreadable` | Reserved for a file the tool cannot read outside the model load path; a model the server loads goes through the same `parse_file` call the CLI uses, so its read failures are `invalid_model` (a missing file is still `model_not_found`). |
 | `model_unwritable` | The file could not be written: the permissions, the disk, or the path. A model that does not compile is never written at all, so this class means the write itself failed. |
 | `invalid_xml` | The document is not well-formed XML. The line and the column are known, the block is not. |

@@ -181,3 +181,25 @@ L11 (2026-10-31, T5 y T6 — la guía y la documentación, commit `21a035d` y
 `d4ef724`): el procedimiento en la guía (mirar antes de escribir, avisar,
 reenviar el lote), D22 con el porqué, y `docs/mcp.md` y `docs/app.md` con la
 herramienta, el documento y el freno.
+
+L12 (2026-10-31, T2 — la app, worker): la app publica `live.json` con el
+escritor atómico del núcleo, **sólo cuando el estado cambia** (compara el
+texto con el último publicado), y lo borra al cerrar (commit `908b406`). La
+sesión guarda la última corrida y arma el cuerpo del documento.
+
+L13 (2026-10-31, cierre): `cargo test --workspace` → **637 tests verdes**;
+el shell de Tauri (fuera del workspace) → **17 verdes**; `tsc --noEmit`
+limpio y los **381** tests del frontend verdes; clippy del workspace limpio.
+La verificación diferencial contra `main` (18 casos de las siete herramientas
+viejas) dio **0 diferencias**: el documento nuevo, la herramienta nueva y el
+freno son aditivos y no cambian el cuerpo que el agente lee de las demás.
+
+Dos límites que quedan, y son límites del diseño, no defectos:
+
+- el `live.json` **no se publica en el arranque**: hasta la primera acción
+  del lector no hay petición que lo disponga (y no hay modelo abierto que
+  publicar);
+- la corrida se recuerda en la sesión que hay cuando termina: si el lector
+  abrió otro modelo mientras la corrida estaba en vuelo, la corrida queda
+  atribuida al modelo nuevo (el caso límite de una corrida que va fuera del
+  hilo de la ventana).

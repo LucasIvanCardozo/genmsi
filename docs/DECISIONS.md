@@ -177,7 +177,7 @@ properties by name, every edge naming the two ends of a connection — lives in
 document the desktop app already reads. The procedure — how a model is
 written, which entities it declares, what the expression language is, what
 the engine does with a class — lives in the agent's guide,
-`skills/genmsi-modeling/SKILL.md`, which the installer puts where the harness
+`skill/genmsi-modeling/SKILL.md`, which the installer puts where the harness
 of an agent finds it.
 
 The alternative was to publish more in the tools: a table of the compiled

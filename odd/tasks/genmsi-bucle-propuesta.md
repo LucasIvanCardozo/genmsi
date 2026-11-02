@@ -356,3 +356,49 @@ de 60 a 45: de 61 a 86 entradas). La parte más valiosa fue la blunt:
   dio 3358 líneas para un modelo de 39 bloques, sin ningún filtro; y el
   `dirty` de `app_state` vive en `live.json` mientras que el `path` por
   defecto vive en `open-model.json`: dos archivos, una app.
+
+L25 (2026-11-02, cierre, T6): todo verde.
+
+| Comprobación | Resultado |
+|---|---|
+| `cargo test --workspace` | verde |
+| `cargo clippy --workspace --all-targets -- -D warnings` | limpio |
+| `cargo test` del shell (el crate fuera del workspace) + clippy | 22 verdes, limpio |
+| `bun run test` (el frente) | 398 verdes |
+| `bun run typecheck` | limpio |
+| Verificación diferencial (L23) | la única diferencia es la que S1 pide |
+| Medición con agente en frío (L24) | el archivo de la persona intacto |
+
+La evaluación de riesgo del diff (origin/main..HEAD) dio **medium**, con una
+señal de `process_boundary` sobre `odd/tasks/medida4/call.py`: el script de
+la medición, que lanza el servidor del repo para registrar las llamadas (el
+mismo patrón que la medición anterior, `odd/tasks/medida3/mcp.py`, ya tiene
+en el repo). La revisión nativa **no** corre: la revisión por recibos está
+apagada, así que la autoverificación del writer queda y no hay verificador
+aparte.
+
+**Lo que no se comprobó en esta sesión**: el bucle con la app de escritorio
+**real** en pantalla. La app instalada es la 0.4.0 (sin esta feature), y
+reconstruirla y manejar el lienzo bajo un display virtual (la regla del
+proyecto: nunca el escritorio de la persona) es un trabajo aparte. Lo que sí
+está comprobado es el camino que la UI usa: el motor, el shell (sus
+operaciones reales, con archivos reales) y el frente (398 tests, y una
+comprobación manual del worker contra el motor real de las cuatro
+operaciones). Queda pendiente, para cuando la app se reconstruya: el mismo
+bucle con el lienzo delante de la persona.
+
+### Lo que queda para la siguiente feature
+
+1. **La semántica de las primitivas** (el frente B): el catálogo dice qué
+   es cada clase, nunca qué le hace a la simulación. Es el costo más caro de
+   la sesión `chat` y no lo resuelve esta feature.
+2. **Filtros en `get_trace`** y un modo resumen: el agente tuvo que volcar
+   1000+ eventos y filtrarlos en el cliente.
+3. **`dry_run`** en `apply_edit` y errores que nombren clase, propiedad y
+   nombre lógico en vez de ids.
+4. **Nombrar cadenas** (`setPortLabel`): el `Unlink` es, desde el MCP, una
+   clase inutilizable.
+5. **El `explain` del modelo abierto en una llamada**, y el mapa
+   statement↔bloque para que la traza sea legible.
+6. **Un solo archivo para el estado de la app**: el `dirty` de `app_state` y
+   el `path` por defecto viven en dos archivos distintos.

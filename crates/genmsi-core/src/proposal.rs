@@ -30,6 +30,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use crate::documents::to_pretty_json;
+use crate::live::same_file;
 use crate::open_model::{AppDataError, app_data_dir};
 
 /// The schema of the proposal document.
@@ -253,6 +254,35 @@ pub fn oldest_pending_in(directory: &Path) -> Option<ProposalDocument> {
     read_proposals_in(directory)
         .into_iter()
         .find(|document| document.state.is_pending())
+}
+
+/// The oldest proposal that waits **for a model**.
+///
+/// A proposal names the model it is about, and it waits for that one: a
+/// proposal about another file is not the business of the app that has this
+/// one open, and it does not hold the queue in front of the proposals that
+/// are about it.
+///
+/// A proposal that names no model waits for whatever the app has open, and
+/// a proposal that names one waits for nothing when the app has no model
+/// open: there is no model to propose a change to.
+pub fn oldest_pending_for_in(directory: &Path, open: Option<&Path>) -> Option<ProposalDocument> {
+    read_proposals_in(directory)
+        .into_iter()
+        .find(|document| document.state.is_pending() && is_about(document, open))
+}
+
+/// Whether a proposal is about a model.
+fn is_about(document: &ProposalDocument, open: Option<&Path>) -> bool {
+    let Some(target) = document.target.as_deref() else {
+        // The proposal names no model: it is about whatever the app has.
+        return true;
+    };
+    let Some(open) = open else {
+        // It names a model and the app has none open: it waits for one.
+        return false;
+    };
+    same_file(Path::new(target), open)
 }
 
 /// The document of a proposal, resolved: the person accepted it or discarded

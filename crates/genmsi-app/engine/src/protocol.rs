@@ -61,6 +61,31 @@ pub enum SessionRequest {
     Redo,
     /// The state of the session, without changing it.
     State,
+    /// The proposal that waits for the person, if there is one.
+    ///
+    /// The answer carries the document of the proposal —the
+    /// `genmsi.proposal/1` document of the core— or nothing at all when
+    /// there is no proposal waiting.
+    PendingProposal,
+    /// Adopt the proposal that waits for the person.
+    ///
+    /// The model of the proposal enters the session dirty and undoable:
+    /// the file the app has open does not move. A session with changes that
+    /// are not saved refuses the adoption.
+    AdoptProposal,
+    /// Accept the proposal the session holds.
+    ///
+    /// The model in memory is written to the file the app has open —the
+    /// normal save of the app— and the proposal becomes `accepted`.
+    AcceptProposal,
+    /// Discard the proposal the session holds.
+    ///
+    /// The model that was there comes back to the canvas, and the proposal
+    /// becomes `rejected`, with the note the person wrote.
+    DiscardProposal {
+        /// What the person answered.
+        note: Option<String>,
+    },
     /// Save the model; without a path it goes to the one it was opened from.
     Save {
         /// Where to write the model.
@@ -239,13 +264,49 @@ impl SessionResponse {
             bytes: None,
         }
     }
+
+    /// The answer of a request that has nothing to say.
+    ///
+    /// The request that asks for the proposal that waits answers this way
+    /// when there is no proposal: there is nothing to decide, and that is
+    /// not a failure.
+    pub fn ok() -> Self {
+        Self {
+            ok: true,
+            error: None,
+            state: None,
+            document: None,
+            documents: None,
+            path: None,
+            bytes: None,
+        }
+    }
 }
 
 /// Answer one request.
 ///
 /// The editing operations need an open model; the read-only ones work
 /// without one, because they answer about a file on disk.
+///
+/// The proposals live in the data directory of the app: the requests that
+/// ask for one, that adopt one or that resolve one need to know where they
+/// are. The directory the core resolves is the one the desktop shell
+/// resolves too.
 pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> SessionResponse {
+    let directory = genmsi_core::app_data_dir();
+    answer_in(session, request, directory.as_deref())
+}
+
+/// Answer one request, with the data directory of the app.
+///
+/// The directory is where the proposals live. `None` when the machine does
+/// not say where the data of the app lives: the requests that need it say
+/// so, instead of looking for the proposals in the wrong place.
+pub fn answer_in(
+    session: &mut Option<Session>,
+    request: SessionRequest,
+    directory: Option<&Path>,
+) -> SessionResponse {
     match request {
         SessionRequest::Open { path } => match Session::open(Path::new(&path), &path) {
             Ok(opened) => {
@@ -271,6 +332,57 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
         SessionRequest::Undo => with_session(session, |session| session.undo()),
         SessionRequest::Redo => with_session(session, |session| session.redo()),
         SessionRequest::State => with_session(session, |session| Ok(session.state())),
+        SessionRequest::PendingProposal => {
+            let Some(directory) = directory else {
+                return SessionResponse::error(AppError::Usage(no_data_dir()));
+            };
+            // The proposal that waits is the one about the model the app
+            // has open: a proposal about another file is not this app's
+            // business, and it does not hold the queue.
+            let open = session.as_ref().and_then(|session| session.path());
+            match crate::proposal::pending_document_for(directory, open) {
+                Some(document) => SessionResponse::document(document),
+                // There is no proposal waiting: there is nothing to decide,
+                // and that is not a failure.
+                None => SessionResponse::ok(),
+            }
+        }
+        SessionRequest::AdoptProposal => match session.as_mut() {
+            Some(session) => {
+                let Some(directory) = directory else {
+                    return SessionResponse::error(AppError::Usage(no_data_dir()));
+                };
+                match crate::proposal::adopt_in(session, directory) {
+                    Ok(state) => SessionResponse::state(state),
+                    Err(error) => SessionResponse::error(error),
+                }
+            }
+            None => SessionResponse::error(AppError::Usage("no model is open".to_string())),
+        },
+        SessionRequest::AcceptProposal => match session.as_mut() {
+            Some(session) => {
+                let Some(directory) = directory else {
+                    return SessionResponse::error(AppError::Usage(no_data_dir()));
+                };
+                match crate::proposal::accept_in(session, directory) {
+                    Ok((state, outcome)) => SessionResponse::saved(outcome, state),
+                    Err(error) => SessionResponse::error(error),
+                }
+            }
+            None => SessionResponse::error(AppError::Usage("no model is open".to_string())),
+        },
+        SessionRequest::DiscardProposal { note } => match session.as_mut() {
+            Some(session) => {
+                let Some(directory) = directory else {
+                    return SessionResponse::error(AppError::Usage(no_data_dir()));
+                };
+                match crate::proposal::discard_in(session, directory, note.as_deref()) {
+                    Ok(state) => SessionResponse::state(state),
+                    Err(error) => SessionResponse::error(error),
+                }
+            }
+            None => SessionResponse::error(AppError::Usage("no model is open".to_string())),
+        },
         SessionRequest::Save { path } => match session.as_mut() {
             Some(session) => match session.save(path.as_deref().map(Path::new)) {
                 Ok(outcome) => SessionResponse::saved(outcome, session.state()),
@@ -367,6 +479,15 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
         }
         SessionRequest::Catalogue => SessionResponse::document(catalogue_document_bytes()),
     }
+}
+
+/// The message of a request that needs the data directory of the app and
+/// the machine does not say where it lives.
+///
+/// The proposals live there: without the directory the app cannot look for
+/// them, and it says so instead of looking in the wrong place.
+fn no_data_dir() -> String {
+    "the app does not know where its data lives: the proposals cannot be read".to_string()
 }
 
 /// The `START` of a run, or the default when the request does not name one.

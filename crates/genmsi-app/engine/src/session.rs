@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 
 use genmsi_core::documents::{lint_document, model_document, ModelDocument};
 use genmsi_core::live::{LiveBody, LiveRun, model_value, report_value};
+use genmsi_core::proposal::{ProposalBody, ProposalDocument, ProposalState};
 use genmsi_format::edit::{EditCommand, EditSession};
 use genmsi_format::model::{Block, ContainerHeader, GmdlModel, SectionKind};
 
@@ -62,6 +63,10 @@ pub struct SessionState {
     pub can_undo: bool,
     /// Whether an operation can be redone.
     pub can_redo: bool,
+    /// The proposal the person has to decide, or the one they decided.
+    ///
+    /// `None` when there is no proposal on the table.
+    pub proposal: Option<ProposalBody>,
 }
 
 /// The last run of the session: the parameters it ran with and the documents
@@ -94,6 +99,19 @@ pub struct SaveOutcome {
     pub bytes: usize,
 }
 
+/// An editor the session left behind, and what left it there.
+///
+/// A reload and the adoption of a proposal both leave an editor behind:
+/// undoing them brings it back. The session knows which one was the
+/// adoption, because the proposal is no longer on the canvas when the
+/// adoption comes undone.
+struct Previous {
+    /// The editor that was there.
+    editor: EditSession,
+    /// Whether a proposal left it there.
+    proposal: bool,
+}
+
 /// An editing session: one model in memory and its undo stack.
 pub struct Session {
     /// The model and its undo stack.
@@ -103,13 +121,24 @@ pub struct Session {
     /// A reload is an operation of the session, like an edit: undoing it
     /// brings the session back, with the undo stack it had. The reader's
     /// work is therefore not lost when the model of the disk arrives.
-    previous: Vec<EditSession>,
+    previous: Vec<Previous>,
     /// Where the model was opened from, as the caller named it.
     name: Option<String>,
     /// Where the model is written when it is saved.
     path: Option<PathBuf>,
     /// The last run the session made.
     last_run: Option<LastRun>,
+    /// The proposal the session is holding: the one on the canvas, or the
+    /// one the person already decided.
+    ///
+    /// The session keeps it until another proposal arrives: the verdict
+    /// travels in the live state, and the agent has to be able to read it.
+    proposal: Option<ProposalBody>,
+    /// Whether the model of the proposal is the one on the canvas.
+    ///
+    /// It stops being there when the adoption comes undone or when the
+    /// model of the disk is reloaded over it.
+    adopted: bool,
 }
 
 impl Session {
@@ -125,6 +154,8 @@ impl Session {
             name: Some(name.to_string()),
             path: Some(path.to_path_buf()),
             last_run: None,
+            proposal: None,
+            adopted: false,
         })
     }
 
@@ -170,6 +201,8 @@ impl Session {
             name: None,
             path: None,
             last_run: None,
+            proposal: None,
+            adopted: false,
         }
     }
 
@@ -186,15 +219,141 @@ impl Session {
         let model = genmsi_format::load(path).map_err(|error| model_error(path, error))?;
         genmsi_core::compile_model(&model).map_err(|error| model_error(path, error))?;
         let editor = std::mem::replace(&mut self.editor, EditSession::new(model));
-        self.previous.push(editor);
+        self.previous.push(Previous {
+            editor,
+            proposal: false,
+        });
+        // The model of the disk is on the canvas: the proposal, if there
+        // was one, is no longer there.
+        self.adopted = false;
         self.name = Some(path.display().to_string());
         self.path = Some(path.to_path_buf());
         Ok(self.state())
     }
 
+    /// Adopt the model of a proposal: it enters the session **dirty** and
+    /// **undoable**.
+    ///
+    /// The model of the proposal is read and **compiled** before it
+    /// replaces the one in memory: a model that does not compile leaves the
+    /// session as it was, like a reload does.
+    ///
+    /// The file the app has open does not move: a proposal does not change
+    /// the model of the app, it offers another one. The editor that was
+    /// there goes to the history of the session, and undoing the adoption
+    /// brings it back with the undo stack it had.
+    ///
+    /// A session with changes that are not saved refuses the adoption: the
+    /// work of the person is not stepped on, and the proposal stays
+    /// `pending` until the model is saved. It is the rule of the brake,
+    /// from the other side.
+    ///
+    /// The proposal is adopted only when it is about the model the app has
+    /// open: the model of a proposal is the version of **that** file, and
+    /// accepting a proposal about another one would put an unrelated model
+    /// where the reader is working. A proposal about another file stays
+    /// `pending`, and the app says why.
+    pub fn adopt_proposal(&mut self, document: &ProposalDocument) -> Result<SessionState, AppError> {
+        if self.editor.dirty() {
+            return Err(AppError::Usage(
+                "the model has changes that are not saved: the proposal waits until they are saved"
+                    .to_string(),
+            ));
+        }
+        if let Some(target) = document.target.as_deref() {
+            let Some(path) = self.path.as_deref() else {
+                return Err(AppError::Usage(
+                    "the app has no model open: the proposal stays pending".to_string(),
+                ));
+            };
+            if !genmsi_core::same_file(Path::new(target), path) {
+                return Err(AppError::Usage(
+                    "the proposal is about another model: it stays pending".to_string(),
+                ));
+            }
+        }
+        let path = Path::new(&document.model);
+        let model = genmsi_format::load(path).map_err(|error| model_error(path, error))?;
+        genmsi_core::compile_model(&model).map_err(|error| model_error(path, error))?;
+        // The model that was there is the checkpoint of the one that
+        // arrives: the session is dirty, and the adoption is one step of
+        // the history.
+        let adopted = EditSession::adopted(model, self.editor.model());
+        let previous = std::mem::replace(&mut self.editor, adopted);
+        self.previous.push(Previous {
+            editor: previous,
+            proposal: true,
+        });
+        self.adopted = true;
+        // The session remembers the proposal: the person decides about it,
+        // and the live state carries the verdict.
+        self.proposal = Some(ProposalBody::from(document));
+        Ok(self.state())
+    }
+
+    /// The proposal the session is holding.
+    ///
+    /// `None` when there is no proposal on the table.
+    pub fn proposal(&self) -> Option<&ProposalBody> {
+        self.proposal.as_ref()
+    }
+
+    /// Whether the model of the proposal is the one on the canvas.
+    ///
+    /// It stops being there when the adoption comes undone, when the model
+    /// of the disk is reloaded over it and when the person decides.
+    pub fn adopted(&self) -> bool {
+        self.adopted
+    }
+
+    /// Go back to the model that was there before the adoption.
+    ///
+    /// Everything the person did after the adoption goes undone, and the
+    /// editor that was there comes back with the undo stack it had: the
+    /// model of the disk is on the canvas again, and the session is clean.
+    pub fn discard_proposal(&mut self) -> Result<SessionState, AppError> {
+        if !self.adopted {
+            // The proposal is not on the canvas: there is nothing to go
+            // back to.
+            return Ok(self.state());
+        }
+        while self.editor.can_undo() {
+            self.editor.undo().map_err(|error| AppError::Model {
+                path: self.name.clone().unwrap_or_default(),
+                message: error.to_string(),
+            })?;
+        }
+        if let Some(previous) = self.previous.pop() {
+            self.editor = previous.editor;
+        }
+        self.adopted = false;
+        Ok(self.state())
+    }
+
+    /// The verdict the person gave to the proposal the session holds.
+    ///
+    /// The verdict travels in the live state: the agent reads it there and
+    /// does not have to ask again.
+    pub fn resolve_proposal(&mut self, state: ProposalState, note: Option<&str>) {
+        if let Some(proposal) = self.proposal.as_mut() {
+            proposal.state = state;
+            proposal.note = note.map(|note| note.to_string());
+        }
+        // The person decided: the proposal is no longer on the canvas.
+        self.adopted = false;
+    }
+
     /// The model in memory.
     pub fn model(&self) -> &GmdlModel {
         self.editor.model()
+    }
+
+    /// The file the session has open.
+    ///
+    /// `None` when no model is open. It is the model a proposal has to be
+    /// about for the app to adopt it.
+    pub fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
     }
 
     /// The state the app draws.
@@ -207,6 +366,7 @@ impl Session {
             dirty: self.editor.dirty(),
             can_undo: self.can_undo(),
             can_redo: self.editor.can_redo(),
+            proposal: self.proposal.clone(),
         }
     }
 
@@ -267,7 +427,12 @@ impl Session {
         if !self.editor.can_undo()
             && let Some(previous) = self.previous.pop()
         {
-            self.editor = previous;
+            // The adoption of a proposal is one step of the history: when
+            // it comes undone, the proposal is no longer on the canvas.
+            if previous.proposal {
+                self.adopted = false;
+            }
+            self.editor = previous.editor;
             return Ok(self.state());
         }
         self.editor.undo().map_err(|error| AppError::Model {
@@ -387,7 +552,21 @@ impl Session {
     /// that are not saved: when it does not, the file *is* the model and
     /// the agent reads it from there.
     pub fn live_body(&self) -> LiveBody {
+        self.live_body_in(None)
+    }
+
+    /// The live state of the app, with the directory the proposals live in.
+    ///
+    /// The proposal the person is deciding travels in it: the one the
+    /// session holds (with its verdict) or, when there is none, the one that
+    /// waits for the person. An agent that left a proposal always finds out
+    /// what happened to it: it is waiting, or it was accepted, or it was
+    /// discarded with a note.
+    pub fn live_body_in(&self, directory: Option<&Path>) -> LiveBody {
         let state = self.state();
+        let pending = directory
+            .and_then(|directory| crate::proposal::pending_for(directory, self.path()))
+            .map(|document| ProposalBody::from(&document));
         LiveBody {
             path: state.path.as_deref().map(absolute_path),
             pid: Some(std::process::id()),
@@ -400,7 +579,7 @@ impl Session {
                 start: run.start,
                 report: run.report.as_deref().and_then(report_value),
             }),
-            proposal: None,
+            proposal: self.proposal.clone().or(pending),
         }
     }
 }
@@ -469,5 +648,204 @@ pub fn diagnostics_of(model: &GmdlModel) -> Diagnostics {
             blocks: None,
             definitions: None,
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use genmsi_core::proposal::{ProposalDocument, ProposalState};
+
+    /// The reference model of the app's slice.
+    fn reference() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl")
+    }
+
+    /// A directory that cleans itself up.
+    struct TempDir(PathBuf);
+
+    impl TempDir {
+        fn new(tag: &str) -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "genmsi-app-session-{tag}-{}-{:?}",
+                std::process::id(),
+                std::thread::current().id()
+            ));
+            let _ = std::fs::remove_dir_all(&path);
+            std::fs::create_dir_all(&path).expect("the temporary directory is created");
+            Self(path)
+        }
+
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// The model the app has open: a copy of the reference, in a directory
+    /// of its own, so the tests never write in the repository.
+    fn open_model(directory: &Path) -> PathBuf {
+        let text = std::fs::read_to_string(reference()).expect("the reference model is there");
+        let path = directory.join("open.gmdl");
+        std::fs::write(&path, text).expect("the model is written");
+        path
+    }
+
+    /// The model an agent proposes: the same model, with another caption.
+    fn proposed_model(directory: &Path) -> PathBuf {
+        let mut model = genmsi_format::load(reference()).expect("the reference model loads");
+        model.blocks[0].caption = "Modelo propuesto".to_string();
+        let path = directory.join("proposed.gmdl");
+        std::fs::write(&path, genmsi_format::to_string(&model)).expect("the model is written");
+        path
+    }
+
+    /// The caption of the model that is on the canvas.
+    fn caption(session: &Session) -> String {
+        session.model().blocks[0].caption.clone()
+    }
+
+    /// A session with the model of the reference open.
+    fn session(directory: &Path) -> Session {
+        let open = open_model(directory);
+        Session::open(&open, &open.display().to_string()).expect("the model opens")
+    }
+
+    #[test]
+    fn adopting_a_proposal_leaves_the_session_dirty_and_the_path_unchanged() {
+        let directory = TempDir::new("adopt");
+        let open = open_model(directory.path());
+        let proposed = proposed_model(directory.path());
+        let mut session = Session::open(&open, &open.display().to_string()).expect("the model opens");
+        let document = ProposalDocument::pending("1700000000000-ab", &proposed, Some(&open))
+            .with_summary(Some("the bus loop"));
+
+        let state = session.adopt_proposal(&document).expect("the proposal is adopted");
+        // The model of the proposal is on the canvas.
+        assert_eq!(caption(&session), "Modelo propuesto");
+        // The session is dirty: the model differs from the disk.
+        assert!(state.dirty, "the session is not dirty: {state:?}");
+        // The file the app has open does not move: a proposal does not
+        // change the model of the app.
+        assert_eq!(state.path.as_deref(), Some(open.display().to_string().as_str()));
+        // The session remembers the proposal.
+        let proposal = session.proposal().expect("the session holds the proposal");
+        assert_eq!(proposal.id, "1700000000000-ab");
+        assert_eq!(proposal.summary.as_deref(), Some("the bus loop"));
+        assert_eq!(proposal.state, ProposalState::Pending);
+    }
+
+    #[test]
+    fn undoing_the_adoption_brings_the_model_that_was_there_back() {
+        let directory = TempDir::new("undo");
+        let open = open_model(directory.path());
+        let proposed = proposed_model(directory.path());
+        let mut session = Session::open(&open, &open.display().to_string()).expect("the model opens");
+        let document = ProposalDocument::pending("1700000000000-ab", &proposed, Some(&open));
+        session.adopt_proposal(&document).expect("the proposal is adopted");
+
+        let state = session.undo().expect("the adoption is undone");
+        assert_eq!(caption(&session), "Modelo", "the model that was there is not back");
+        assert!(!state.dirty, "the session is still dirty: {state:?}");
+    }
+
+    #[test]
+    fn a_proposal_about_another_model_is_not_adopted() {
+        let directory = TempDir::new("other-target");
+        let open = open_model(directory.path());
+        let other = proposed_model(directory.path());
+        let mut session = Session::open(&open, &open.display().to_string()).expect("the model opens");
+        // The proposal is about another file: the model it carries is the
+        // version of that file, not of the one the app has open.
+        let document = ProposalDocument::pending("1700000000000-ab", &other, Some(&other));
+
+        let error = session
+            .adopt_proposal(&document)
+            .expect_err("the adoption is refused");
+        assert!(
+            error.to_string().contains("about another model"),
+            "the message does not say why: {error}"
+        );
+        // The canvas did not move.
+        assert_eq!(caption(&session), "Modelo");
+        assert!(session.proposal().is_none(), "the session holds a proposal");
+    }
+
+    #[test]
+    fn a_proposal_without_a_target_is_adopted() {
+        let directory = TempDir::new("no-target");
+        let open = open_model(directory.path());
+        let proposed = proposed_model(directory.path());
+        let mut session = Session::open(&open, &open.display().to_string()).expect("the model opens");
+        // A proposal without a target does not constrain the adoption.
+        let document = ProposalDocument::pending("1700000000000-ab", &proposed, None);
+
+        let state = session.adopt_proposal(&document).expect("the proposal is adopted");
+        assert!(state.dirty, "the session is not dirty: {state:?}");
+        assert_eq!(caption(&session), "Modelo propuesto");
+    }
+
+    #[test]
+    fn a_dirty_session_refuses_the_adoption() {
+        let directory = TempDir::new("dirty");
+        let open = open_model(directory.path());
+        let proposed = proposed_model(directory.path());
+        let mut session = Session::open(&open, &open.display().to_string()).expect("the model opens");
+        session
+            .apply(EditCommand::SetCaption {
+                id: 0,
+                caption: "otro".to_string(),
+            })
+            .expect("the caption changes");
+
+        let document = ProposalDocument::pending("1700000000000-ab", &proposed, Some(&open));
+        let error = session
+            .adopt_proposal(&document)
+            .expect_err("the adoption is refused");
+        assert!(
+            error.to_string().contains("changes that are not saved"),
+            "the message does not say why: {error}"
+        );
+        // The model of the person is untouched.
+        assert_eq!(caption(&session), "otro");
+        assert!(session.proposal().is_none(), "the session holds a proposal");
+    }
+
+    #[test]
+    fn the_live_body_carries_the_proposal_and_its_verdict() {
+        let directory = TempDir::new("live");
+        let open = open_model(directory.path());
+        let proposed = proposed_model(directory.path());
+        let mut session = Session::open(&open, &open.display().to_string()).expect("the model opens");
+        let document = ProposalDocument::pending("1700000000000-ab", &proposed, Some(&open))
+            .with_summary(Some("the bus loop"));
+        session.adopt_proposal(&document).expect("the proposal is adopted");
+
+        let body = session.live_body();
+        let proposal = body.proposal.expect("the proposal travels");
+        assert_eq!(proposal.id, "1700000000000-ab");
+        assert_eq!(proposal.state, ProposalState::Pending);
+        assert_eq!(proposal.summary.as_deref(), Some("the bus loop"));
+
+        // The verdict travels too.
+        session.resolve_proposal(ProposalState::Rejected, Some("not yet"));
+        let body = session.live_body();
+        let proposal = body.proposal.expect("the verdict travels");
+        assert_eq!(proposal.state, ProposalState::Rejected);
+        assert_eq!(proposal.note.as_deref(), Some("not yet"));
+    }
+
+    #[test]
+    fn a_session_without_a_proposal_publishes_none() {
+        let directory = TempDir::new("no-proposal");
+        let session = session(directory.path());
+        assert!(session.live_body().proposal.is_none());
+        assert!(session.state().proposal.is_none());
     }
 }

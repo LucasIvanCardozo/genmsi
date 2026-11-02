@@ -1,11 +1,12 @@
 # genmsi MCP server
 
 `genmsi-mcp` is the MCP server of the GenMSI engine (ROADMAP Phase 3): it serves
-the engine to an AI agent over stdio with the seven tools of decision D7 —
+the engine to an AI agent over stdio with the eight tools of decision D7 —
 `simulate`, `lint`, `get_trace` and `explain_model`, plus `save_model`, which
-writes a model the agent built, `catalogue`, which tells the agent which
-block classes exist and what the XML of a block of each one looks like, and
-`open_model`, which tells the agent which model the desktop app has open. The
+writes a model the agent built, `apply_edit`, which builds and changes one
+block by block, `catalogue`, which tells the agent which block classes exist
+and what the XML of a block of each one looks like, and `open_model`, which
+tells the agent which model the desktop app has open. The
 binary is a thin layer over `genmsi-core` and `genmsi-format`; it carries no
 simulation logic (decision D2), and the documents it returns are the ones the
 CLI publishes (decision D13).
@@ -32,7 +33,7 @@ Standard output belongs to the protocol: the server writes nothing else there.
 A failure that stops the server goes to standard error and the process exits
 with `1`.
 
-## The seven tools
+## The eight tools
 
 | Tool | What it does | Returns |
 |---|---|---|
@@ -42,6 +43,7 @@ with `1`.
 | `get_trace` | Runs the model with the event trace enabled and returns the records. | `genmsi.trace/1` |
 | `explain_model` | Describes the model: its blocks, its operands and what each statement does. | `genmsi.explain/1` |
 | `save_model` | Writes a model the agent built to a file, after checking that it compiles. | `genmsi.lint/1` |
+| `apply_edit` | Adds, edits and connects the blocks of a model: a batch of the engine's own editing commands. | `genmsi.edit/1` |
 | `open_model` | Says which model the desktop app has open: the file it has open and the process that has it. | `genmsi.openmodel/1` |
 
 Every tool but `catalogue` and `open_model` takes the model in one of two ways:
@@ -229,6 +231,71 @@ The composition is **not a finding**: the lint document of a model that
 compiles is `ok`, with no findings, whether the engine composed the model or
 not. `genmsi layout` is the command that says what the composition placed.
 
+### `apply_edit`
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `path` | string or null | — | Path of the `.gmdl` model file. |
+| `model` | string or null | — | The `.gmdl` document as text. |
+| `commands` | array | — | The batch of editing commands, in order. |
+| `layout` | string | `"auto"` | Where the blocks the batch adds go: `"auto"` or `"explicit"`. |
+
+**The commands are the engine's own.** They are the same `EditCommand` values
+the desktop application speaks over its own protocol
+(`apply(command: EditCommand)`), and the schema the tool publishes is
+**derived from that type**: the vocabulary of the commands is written in one
+place, and the agent, the application and the engine speak the same one.
+
+| Command | Fields | What it does |
+|---|---|---|
+| `addBlock` | `class`, `container`, `x`, `y` | Creates a block of a catalogue class inside a container. |
+| `connect` | `from`, `fromIoid`, `to`, `toIoid` | Wires an output port to an input port. |
+| `disconnect` | `container`, `from`, `fromIoid` | Removes the link that starts at a port of a container's child. |
+| `setProperty` | `id`, `property`, `value` | Sets a declared property. |
+| `setCaption` | `id`, `caption` | Names a block. |
+| `moveBlock` | `id`, `x`, `y` | Moves a block, keeping its size. |
+| `removeBlock` | `id` | Removes a block, its descendants and the links that touch them. |
+| `removeBlocks` | `ids` | Removes several blocks as ONE operation. |
+| `setLayouts` | `placements` | Places many things at once. |
+| `movePort` | `block`, `ioid`, `input`, `x`, `y` | Moves a door of a container. |
+| `removePort` | `block`, `ioid`, `input` | Removes a door of a container. |
+| `paste` | `ids`, `dx`, `dy` | Copies blocks with fresh ids and remapped links. |
+
+**The batch is atomic.** The commands are applied in order; if one fails, the
+ones that were applied are undone and the model stays exactly as it was. The
+failure is an `invalid_command` that names the command that failed —its index
+and its `op`— so the agent corrects that command and sends the batch again.
+The batch is replayable: the commands are the source of truth, not the text.
+
+**The model is checked before it is written.** A model that does not compile
+is **not** written, and the failure is the compiler's, with the block and its
+position. The file the agent named keeps the model it had.
+
+**Where the blocks go.** `layout: "auto"` (the default) puts every block the
+batch adds in the free spot of its container, the same place the desktop
+application gives a block that is dropped; `layout: "explicit"` uses the `x`
+and the `y` of the command.
+
+Returns the `genmsi.edit/1` document:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema` | string | `genmsi.edit/1` |
+| `path` | string | The model path (`<memory>` for an inline document). |
+| `applied` | number | How many commands were applied. |
+| `written` | boolean | Whether the model was written to the file. |
+| `status` | string | `ok` or `diagnostics`, as in `genmsi.lint/1`. |
+| `title` | string | The model title. |
+| `blocks` | number | Executable statements the model compiles to. |
+| `definitions` | object | The definitions the model declares, as in `genmsi.lint/1`. |
+| `diagnostics` | array | The findings, as in `genmsi.lint/1`. |
+| `created` | array | The ids of the blocks the batch created. |
+| `source` | string | The model as text, when there was no file to write it to. |
+
+A model given as text (`model`) has no file to write to: the text of the
+result travels back in `source`, and that text is the only place the edit
+lives. A model given by `path` is written, and the file is the state.
+
 ### `open_model`
 
 The tool takes no arguments.
@@ -294,6 +361,8 @@ empty report and no prose message an agent has to parse.
 | `column` | number | 1-based column of the offending block in the `.gmdl` source. |
 | `node` | number | `moduleid` of the offending block. |
 | `class` | string | GPSS class of the offending block. |
+| `command` | number | Index of the command that failed, when the failure is a command. |
+| `op` | string | The `op` of the command that failed. |
 
 The fields that do not apply are absent — never `null`, never `0`. **The line
 and the column point at the opening tag of the offending element of the
@@ -319,6 +388,7 @@ The classes:
 | Class | When |
 |---|---|
 | `invalid_arguments` | The call itself is wrong: no model, or both `path` and `model`. |
+| `invalid_command` | A command of the batch could not be applied. The batch is atomic, so no command is applied: the failure names the command that failed (its index in `command` and its `op` in `op`), and the model stays as it was. |
 | `class_not_found` | The class named in `catalogue` is not one of the classes the catalogue lists. The `class` field carries the name that was asked for. |
 | `model_not_found` | The file named by `path` does not exist. |
 | `model_unreadable` | Reserved for a file the tool cannot read outside the model load path; a model the server loads goes through the same `parse_file` call the CLI uses, so its read failures are `invalid_model` (a missing file is still `model_not_found`). |
@@ -370,15 +440,29 @@ The `open_model` tool has no CLI counterpart either, for the same reason: the
 file that says which model the app has open belongs to the app, not to the
 engine. It publishes one document of its own, `genmsi.openmodel/1`.
 
-## Not in this phase
+## The verb: `apply_edit`
 
-Decision D7 says `genmsi mcp` runs the server. This phase delivers the server
-as its own binary, `genmsi-mcp`, because the Phase 3 assignment limits the
-edit paths to `crates/genmsi-mcp/`, `crates/genmsi-core/`,
-`crates/genmsi-format/`, `docs/` and `odd/tasks/`, and D2 forbids the CLI from
-depending on a second client crate. Wiring the server as a `genmsi mcp`
-subcommand is a coordinator decision that needs the CLI path and a reading of
-D2.
+Decision D21 records why the tool exists and why it speaks the engine's own
+vocabulary. In short:
+
+- the commands are `EditCommand`, the type the desktop application already
+  speaks, and the schema of the tool is derived from it;
+- the batch is atomic, and the failure names the command that failed;
+- the model is checked before it is written, and it is written;
+- the canvas belongs to the engine: the blocks the batch adds land in the free
+  spot of their container.
+
+The document it publishes, `genmsi.edit/1`, carries the lint of the model it
+edited (the same fields and the same meanings as `genmsi.lint/1`) and what the
+edit did: the commands applied, whether the model was written, the blocks the
+batch created, and the text of the model when there was no file to write it
+to.
+
+## The entry point
+
+The server runs as its own binary, `genmsi-mcp`, and as the subcommand
+`genmsi mcp` (decision D15): both speak the same protocol over the same
+stdio, and the CLI's subcommand is the one the installer registers.
 
 ## See also
 

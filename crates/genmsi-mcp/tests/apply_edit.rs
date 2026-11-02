@@ -9,8 +9,12 @@
 //! The test below talks the protocol an agent talks: the server runs in
 //! process over a duplex transport and the test calls `tools/call` for real.
 
-use std::path::PathBuf;
+use std::io::{BufRead, BufReader, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
+use genmsi_core::open_model::APP_IDENTIFIER;
+use genmsi_core::{LiveBody, write_live};
 use genmsi_mcp::GenmsiServer;
 use rmcp::model::{CallToolRequestParams, ContentBlock};
 use rmcp::ServiceExt;
@@ -606,5 +610,294 @@ async fn an_inline_model_comes_back_as_text() {
         model.block(0).expect("the root").links.len(),
         1,
         "the two blocks are connected: {source}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The brake: the verb refuses to write on a model the app has open with
+// changes that are not saved.
+// ---------------------------------------------------------------------------
+
+/// A server that runs as a process of its own, with a data directory of its
+/// own.
+///
+/// The brake reads the state of the app from the data directory of the app,
+/// and that directory comes from the environment: a server of its own is the
+/// way to give it one without touching the data of the machine.
+struct Server {
+    process: Child,
+    stdin: ChildStdin,
+    stdout: BufReader<ChildStdout>,
+    next_id: u64,
+}
+
+impl Server {
+    /// Start the server with the data directory of the test.
+    fn start(data_home: &Path) -> Self {
+        let mut process = Command::new(env!("CARGO_BIN_EXE_genmsi-mcp"))
+            .env("XDG_DATA_HOME", data_home)
+            .env("HOME", data_home)
+            .env("APPDATA", data_home)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("the server starts");
+        let stdin = process.stdin.take().expect("the server reads");
+        let stdout = BufReader::new(process.stdout.take().expect("the server writes"));
+        let mut server = Self {
+            process,
+            stdin,
+            stdout,
+            next_id: 0,
+        };
+        server.request(
+            "initialize",
+            json!({
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": { "name": "genmsi-test", "version": "1" },
+            }),
+        );
+        server.notify("notifications/initialized");
+        server
+    }
+
+    /// Send a request and wait for its answer.
+    fn request(&mut self, method: &str, params: Value) -> Value {
+        self.next_id += 1;
+        let message = json!({
+            "jsonrpc": "2.0",
+            "id": self.next_id,
+            "method": method,
+            "params": params,
+        });
+        self.send(&message);
+        loop {
+            let answer = self.read();
+            if answer.get("id").and_then(Value::as_u64) == Some(self.next_id) {
+                return answer;
+            }
+        }
+    }
+
+    /// Send a notification: the server does not answer it.
+    fn notify(&mut self, method: &str) {
+        let message = json!({ "jsonrpc": "2.0", "method": method });
+        self.send(&message);
+    }
+
+    /// Call a tool and return the document it answered with, and whether the
+    /// tool failed.
+    ///
+    /// The brake answers with a failure, so the test needs to know it.
+    fn call(&mut self, tool: &str, arguments: Value) -> (Value, bool) {
+        let answer = self.request("tools/call", json!({ "name": tool, "arguments": arguments }));
+        let result = answer
+            .get("result")
+            .unwrap_or_else(|| panic!("the call failed: {answer}"));
+        let failed = result.get("isError").and_then(Value::as_bool).unwrap_or(false);
+        let text = result["content"][0]["text"]
+            .as_str()
+            .unwrap_or_else(|| panic!("the tool answered with no text: {result}"));
+        let document =
+            serde_json::from_str(text).unwrap_or_else(|error| panic!("the document parses: {error}"));
+        (document, failed)
+    }
+
+    /// Write one message to the server.
+    fn send(&mut self, message: &Value) {
+        let line = serde_json::to_string(message).expect("the message serializes");
+        self.stdin.write_all(line.as_bytes()).expect("the server reads");
+        self.stdin.write_all(b"\n").expect("the server reads");
+        self.stdin.flush().expect("the server reads");
+    }
+
+    /// Read one message from the server.
+    fn read(&mut self) -> Value {
+        let mut line = String::new();
+        self.stdout.read_line(&mut line).expect("the server writes");
+        assert!(!line.is_empty(), "the server closed the connection");
+        serde_json::from_str(&line).unwrap_or_else(|error| panic!("the message parses: {error}"))
+    }
+}
+
+impl Drop for Server {
+    fn drop(&mut self) {
+        let _ = self.process.kill();
+        let _ = self.process.wait();
+    }
+}
+
+/// The directory the app's data lives in, for the data home of the test.
+///
+/// The rule is the platform's, written down again on purpose: a test that
+/// repeats the rule of the code is the one that checks it.
+fn data_dir(data_home: &Path) -> PathBuf {
+    #[cfg(target_os = "macos")]
+    {
+        data_home
+            .join("Library")
+            .join("Application Support")
+            .join(APP_IDENTIFIER)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        data_home.join(APP_IDENTIFIER)
+    }
+}
+
+/// The state of an app that has a model open.
+///
+/// The pid is the pid of the test: the process is alive, so the document
+/// says that the app is running.
+fn app_state(model: &Path, dirty: bool) -> LiveBody {
+    LiveBody {
+        path: Some(model.display().to_string()),
+        pid: Some(std::process::id()),
+        dirty,
+        diagnostics: Vec::new(),
+        model: None,
+        run: None,
+    }
+}
+
+/// The batch that renames a block of the model.
+fn rename_batch(path: &Path) -> Value {
+    json!({
+        "path": path.to_string_lossy(),
+        "commands": [
+            { "op": "setCaption", "id": 1, "caption": "Entrada" }
+        ]
+    })
+}
+
+/// The brake: a model the app has open with changes that are not saved is
+/// not written.
+///
+/// The work of the agent would stay invisible on the canvas —the app does
+/// not reload a model the reader is editing— and the work of the reader
+/// would overwrite it when she saves. So the verb refuses, and says which
+/// model it is talking about.
+#[test]
+fn a_model_the_app_has_open_with_changes_is_not_written() {
+    let home = TempDir::new("edit-locked");
+    let dir = TempDir::new("edit-locked-model");
+    let path = dir.file("modelo.gmdl");
+    std::fs::write(&path, WORKING_MODEL).expect("the model is on the disk");
+    let before = std::fs::read(&path).expect("the model is readable");
+
+    // The app is alive and has this model open with changes that are not
+    // saved.
+    write_live(&data_dir(&home.0), &app_state(&path, true)).expect("the state is written");
+
+    let mut server = Server::start(&home.0);
+    let (answer, failed) = server.call("apply_edit", rename_batch(&path));
+
+    assert!(failed, "the verb refused: {answer}");
+    assert_eq!(answer["error"], "model_locked", "{answer}");
+    let message = answer["message"].as_str().expect("a message");
+    assert!(
+        message.contains("unsaved changes"),
+        "the message says what happened: {message}"
+    );
+    assert!(
+        message.contains(path.to_str().unwrap()),
+        "the message names the model: {message}"
+    );
+    assert_eq!(
+        answer["path"].as_str(),
+        Some(path.to_str().unwrap()),
+        "{answer}"
+    );
+
+    // The file is byte for byte the file that was there.
+    let after = std::fs::read(&path).expect("the model is readable");
+    assert!(after == before, "the refused batch changed the file");
+}
+
+/// Without changes that are not saved the verb writes, as it always did.
+#[test]
+fn a_model_the_app_has_open_without_changes_is_written() {
+    let home = TempDir::new("edit-clean");
+    let dir = TempDir::new("edit-clean-model");
+    let path = dir.file("modelo.gmdl");
+    std::fs::write(&path, WORKING_MODEL).expect("the model is on the disk");
+    let before = std::fs::read(&path).expect("the model is readable");
+
+    // The app has the model open, but the reader has saved everything.
+    write_live(&data_dir(&home.0), &app_state(&path, false)).expect("the state is written");
+
+    let mut server = Server::start(&home.0);
+    let (answer, failed) = server.call("apply_edit", rename_batch(&path));
+
+    assert!(!failed, "the verb wrote: {answer}");
+    assert_eq!(answer["schema"], "genmsi.edit/1", "{answer}");
+    assert_eq!(answer["written"], true, "{answer}");
+
+    let after = std::fs::read(&path).expect("the model is readable");
+    assert!(after != before, "the model was written");
+    let model = genmsi_format::parse_str(std::str::from_utf8(&after).expect("the model is text"))
+        .expect("the model that was written parses");
+    assert_eq!(
+        model.block(1).expect("the generator").caption,
+        "Entrada",
+        "the batch was applied"
+    );
+}
+
+/// The brake is about the model the app has open: another model is written
+/// as it always was.
+#[test]
+fn another_model_is_written_even_while_the_app_has_one_open() {
+    let home = TempDir::new("edit-other");
+    let dir = TempDir::new("edit-other-model");
+    let path = dir.file("modelo.gmdl");
+    let other = dir.file("otro.gmdl");
+    std::fs::write(&path, WORKING_MODEL).expect("the model is on the disk");
+    std::fs::write(&other, WORKING_MODEL).expect("the other model is on the disk");
+    let before = std::fs::read(&path).expect("the model is readable");
+
+    // The app has *another* model open with changes that are not saved.
+    write_live(&data_dir(&home.0), &app_state(&other, true)).expect("the state is written");
+
+    let mut server = Server::start(&home.0);
+    let (answer, failed) = server.call("apply_edit", rename_batch(&path));
+
+    assert!(!failed, "the verb wrote: {answer}");
+    assert_eq!(answer["written"], true, "{answer}");
+    let after = std::fs::read(&path).expect("the model is readable");
+    assert!(after != before, "the model was written");
+}
+
+/// A model of text has no file the app could have open: the brake does not
+/// apply to it.
+#[test]
+fn a_model_of_text_is_not_locked() {
+    let home = TempDir::new("edit-inline");
+    let dir = TempDir::new("edit-inline-model");
+    let open = dir.file("modelo.gmdl");
+    std::fs::write(&open, WORKING_MODEL).expect("the model is on the disk");
+
+    // The app has a model open with changes that are not saved.
+    write_live(&data_dir(&home.0), &app_state(&open, true)).expect("the state is written");
+
+    let mut server = Server::start(&home.0);
+    let (answer, failed) = server.call(
+        "apply_edit",
+        json!({
+            "model": WORKING_MODEL,
+            "commands": [
+                { "op": "setCaption", "id": 1, "caption": "Entrada" }
+            ]
+        }),
+    );
+
+    assert!(!failed, "the verb wrote: {answer}");
+    assert_eq!(answer["schema"], "genmsi.edit/1", "{answer}");
+    assert_eq!(answer["written"], false, "a model of text is not written: {answer}");
+    assert!(
+        answer["source"].as_str().is_some(),
+        "the text of the model comes back: {answer}"
     );
 }

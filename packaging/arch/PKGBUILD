@@ -33,7 +33,7 @@ depends=('gtk3' 'webkit2gtk-4.1')
 # cada una las pide al compilar, no sólo al correr).
 makedepends=('rust' 'cargo' 'bun' 'patchelf' 'make' 'pkgconf' 'gtk3' 'webkit2gtk-4.1')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/LucasIvanCardozo/genmsi/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('f154af9c3a91201995785ffa6d10442ae864831b3917430796cd2528fae8522f')
+sha256sums=('b591c067ac05bc7d3ffa76b498db91a1ef6b43402b353c1c6a63dc21b1d471a9')
 
 build() {
   cd "$srcdir/$pkgname-$pkgver/crates/genmsi-app"

@@ -242,3 +242,83 @@ muestra por `StatusLine`; las operaciones de la sesión viajan por un solo
 comando Tauri (`session`) con un protocolo de ops (`engine/src/protocol.rs`);
 y `Session::reload` cambia la ruta del modelo, así que adoptar una
 propuesta necesita un método nuevo que **no** la cambie.
+
+L13 (2026-11-02, T1 — el núcleo, commit `39c0293`): el documento
+`genmsi.proposal/1` y el directorio de destino viven en
+`crates/genmsi-core/src/proposal.rs`; `LiveBody` gana `proposal`;
+`EditSession::adopted(model, checkpoint)` hace que un modelo que llega de
+afuera entre **sucio** y con la pila vacía. El motor de la app compila con
+`proposal: None` hasta que T3 lo llene.
+
+L14 (2026-11-02, decisión del orquestador, corte de slice): T1 son 728
+líneas cambiadas (el módulo nuevo con sus tests, más el documento de la
+feature, que viaja con el código). Es más que los ~400 de la slice: el
+módulo nuevo no se puede partir sin partir el formato. Los slices que
+siguen van aparte: T2 (MCP) y T3+T4 (app) son dos commits más.
+
+L15 (2026-11-02, decisión del orquestador, la ley del freno): la propuesta
+**no** esquiva el freno. Adoptarla deja la sesión sucia, así que un
+`model_locked` posterior sigue mirando lo que mira: un modelo con cambios
+sin guardar no se escribe, esté o no haya una propuesta en la mesa.
+
+L16 (2026-11-02, T2 — el MCP, commit `ffc3f23`): el `path` por defecto, la
+clase `no_open_model` (el conjunto de clases pasa de 14 a 15), el `target` de
+las dos herramientas que escriben y el campo `proposal` de `genmsi.edit/1`.
+Nueve tests nuevos en `crates/genmsi-mcp/tests/proposal.rs`, con el servidor
+en un proceso aparte y su propio directorio de datos (el servidor en proceso
+comparte el entorno del proceso de test, y en esta máquina la app puede
+estar abierta: un test en proceso que dependa del directorio de datos del
+equipo no es determinista).
+
+L17 (2026-11-02, corrección del orquestador, el `target` de la propuesta):
+el worker puso el modelo abierto como `target` de la propuesta **siempre**,
+aunque el agente hubiera nombrado otro archivo. Eso hace que la propuesta
+mienta: el modelo que espera es el de ese otro archivo, y aceptarla
+reemplazaría el modelo que el lector está mirando por uno ajeno. El
+`target` es ahora el modelo sobre el que el agente trabajó —el archivo que
+nombró, o el que la app tiene abierto cuando no nombró ninguno— y la app
+adopta una propuesta **sólo** cuando ese `target` es el archivo que ella
+tiene abierto (con `genmsi_core::same_file`). Un test nuevo lo fija.
+
+L18 (2026-11-02, corrección del orquestador, el test que quedó rojo):
+`tests/tools.rs::a_call_without_a_model_is_an_argument_error` fijaba el
+comportamiento viejo, que S1 cambia a propósito. Se reescribió como testigo
+de lo que sí es cierto en cualquier máquina (el error **no** es
+`invalid_arguments`); el comportamiento determinista —el modelo que la app
+tiene abierto, y `no_open_model` cuando no hay app— lo cubren los tests de
+`proposal.rs`, que corren con su propio directorio de datos. El testigo de
+las nueve herramientas quedó intacto.
+
+L19 (2026-11-02, decisión del orquestador, corte de slice): la feature
+entrega **cuatro commits** —el núcleo (`39c0293`), el MCP (`ffc3f23`), la app
+(T3+T4) y la documentación (T5)— y ninguno pasa de ~1000 líneas. El total
+del rama (1839 al cierre de T2) supera el corte de ~400, así que la revisión
+se toma **por commit**, nunca sobre el rama acumulado: cada commit es una
+unidad revisable por sí mismo (D21, D13).
+
+L20 (2026-11-02, T3 — la app, worker): el motor de la app gana
+`crates/genmsi-app/engine/src/proposal.rs` (el flujo de la propuesta) y la
+sesión gana `adopt_proposal` (carga y compila el modelo, se niega si hay
+cambios sin guardar, deja la sesión **sucia** con `EditSession::adopted` y
+empuja el editor anterior a `previous`, así que la adopción es un paso de la
+historia), `discard_proposal` y `resolve_proposal`. El shell resuelve el
+directorio de datos y lo pasa a la fachada. Cuatro operaciones nuevas en el
+protocolo: `pendingProposal`, `adoptProposal`, `acceptProposal` y
+`discardProposal`. Los tests del motor y del shell cubren la adopción, el
+deshacer, el veredicto y el rechazo con la nota.
+
+L21 (2026-11-02, corrección del orquestador, la cola): el worker avisó que
+una propuesta **sobre otro archivo** retenía la cola: la app tomaba la más
+antigua, se negaba por el `target` y no miraba la siguiente. Ahora la app
+adopta la propuesta más antigua **sobre el modelo que tiene abierto**
+(`genmsi_core::oldest_pending_for_in`), y una propuesta sobre otro archivo
+espera sin tapar a las que sí son de este modelo. El mensaje del rechazo
+sigue diciendo por qué ("the proposal is about another model: it stays
+pending").
+
+L22 (2026-11-02, corrección del orquestador, el agente nunca queda sin
+respuesta): con el filtro anterior, una propuesta sobre otro modelo era
+invisible para el agente: la app callaba y él esperaba un veredicto que no
+llegaba. El documento vivo publica ahora la propuesta que **espera**
+(`Session::live_body_in`): el agente lee en `app_state` que su propuesta está
+`pending`, y después `accepted` o `rejected` con la nota.

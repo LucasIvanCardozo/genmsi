@@ -244,6 +244,116 @@ async fn a_path_that_does_not_exist_is_a_model_the_batch_creates() {
     assert_eq!(simulated["end_reason"], "terminated", "{simulated}");
 }
 
+/// A model whose blocks carry no geometry is composed by the engine — and the
+/// places the commands carry survive that composition.
+///
+/// The composition is the engine's business (D18), but it must not rewrite
+/// the place of a block that a command placed: `layout: "explicit"` promises
+/// the coordinates of the command, and the promise holds whether the model it
+/// edits carried a geometry or not.
+#[tokio::test]
+async fn the_places_of_the_commands_survive_the_composition() {
+    let (client, _server) = pair().await;
+    let dir = TempDir::new("edit-compose");
+    let path = dir.file("modelo.gmdl");
+    // Two blocks, no geometry and no link between them: the engine has to
+    // compose this canvas, and the block the batch adds lands in the grid
+    // the composition draws beside the flow.
+    let without_geometry = WORKING_MODEL
+        .replace(" width=\"120\" height=\"48\" x=\"0\" y=\"0\"", "")
+        .replace(" width=\"120\" height=\"48\" x=\"180\" y=\"0\"", "")
+        .replace(
+            "<links><link frommoduleid=\"1\" fromioid=\"1\" tomoduleid=\"2\" toioid=\"1\"/></links>",
+            "<links/>",
+        );
+    std::fs::write(&path, &without_geometry).expect("the model is on the disk");
+
+    let edited = call(
+        &client,
+        "apply_edit",
+        json!({
+            "path": path.to_string_lossy(),
+            "layout": "explicit",
+            "commands": [
+                { "op": "addBlock", "class": "Queue", "container": 0, "x": 321, "y": 654 }
+            ]
+        }),
+    )
+    .await;
+    assert_eq!(edited["written"], true, "{edited}");
+
+    let written = std::fs::read_to_string(&path).expect("the model is readable");
+    let model = genmsi_format::parse_str(&written).expect("the model that was written parses");
+    assert_eq!(
+        place_of(&model, 3),
+        (321, 654),
+        "the block the command placed keeps its place: {written}"
+    );
+    // The blocks that had no geometry are drawn: the engine composed them.
+    for block in model.blocks.iter().filter(|block| !block.is_root()) {
+        assert!(
+            block.layout.is_some(),
+            "the block {} is not on the canvas: {written}",
+            block.id
+        );
+    }
+}
+
+/// The schema the server publishes is the one of the engine's type.
+///
+/// The vocabulary of the commands is written once, in the engine: the schema
+/// the tool publishes comes from that type, so the agent reads the same
+/// names the engine speaks —and a new operation of the engine arrives at the
+/// protocol without anybody copying it.
+#[tokio::test]
+async fn the_published_schema_is_the_one_of_the_engine() {
+    let (client, _server) = pair().await;
+    let listed = client.list_tools(None).await.expect("the tools are listed");
+    let tool = listed
+        .tools
+        .iter()
+        .find(|tool| tool.name == "apply_edit")
+        .expect("the verb is one of the tools");
+    let definitions = tool
+        .input_schema
+        .get("$defs")
+        .expect("the schema has the definitions of the engine's types");
+    let command = definitions
+        .get("EditCommand")
+        .expect("the command is one of them");
+    let variants = command
+        .get("oneOf")
+        .and_then(|variants| variants.as_array())
+        .expect("the command has its variants");
+    let mut ops: Vec<&str> = variants
+        .iter()
+        .map(|variant| {
+            variant["properties"]["op"]["const"]
+                .as_str()
+                .expect("every variant names its operation")
+        })
+        .collect();
+    ops.sort_unstable();
+    assert_eq!(
+        ops,
+        [
+            "addBlock",
+            "connect",
+            "disconnect",
+            "moveBlock",
+            "movePort",
+            "paste",
+            "removeBlock",
+            "removeBlocks",
+            "removePort",
+            "setCaption",
+            "setLayouts",
+            "setProperty",
+        ],
+        "the schema publishes the twelve operations of the engine"
+    );
+}
+
 /// A command that fails undoes the batch: nothing of it stays.
 ///
 /// The failure says which command failed, so the agent can correct it and

@@ -268,13 +268,20 @@ and its `op`— so the agent corrects that command and sends the batch again.
 The batch is replayable: the commands are the source of truth, not the text.
 
 **The model is checked before it is written.** A model that does not compile
-is **not** written, and the failure is the compiler's, with the block and its
+is **not** written, and the failure is the one of the format or of the
+compiler —the same classes the other tools give— with the block and its
 position. The file the agent named keeps the model it had.
 
-**Where the blocks go.** `layout: "auto"` (the default) puts every block the
-batch adds in the free spot of its container, the same place the desktop
+**Where the blocks go.** `layout: "auto"` (the default) puts every block an
+`addBlock` adds in the free spot of its container, the same place the desktop
 application gives a block that is dropped; `layout: "explicit"` uses the `x`
-and the `y` of the command.
+and the `y` of the command. A `paste` keeps the place of its source plus the
+offset of the command, in both modes.
+
+**The places of the commands survive the composition.** When the model the
+batch edits carries no geometry, the engine composes its canvas —and it does
+it **before** the batch, so the blocks the batch places keep the place they
+were given.
 
 **The ids are predictable.** The blocks a batch creates take the next free
 ids, in the order of the commands: a model that starts from the skeleton
@@ -292,7 +299,7 @@ Returns the `genmsi.edit/1` document:
 |---|---|---|
 | `schema` | string | `genmsi.edit/1` |
 | `path` | string | The model path (`<memory>` for an inline document). |
-| `applied` | number | How many commands were applied. |
+| `applied` | number | How many commands the batch had. The batch is atomic: they are all applied, or none is. |
 | `written` | boolean | Whether the model was written to the file. |
 | `status` | string | `ok` or `diagnostics`, as in `genmsi.lint/1`. |
 | `title` | string | The model title. |
@@ -300,7 +307,7 @@ Returns the `genmsi.edit/1` document:
 | `definitions` | object | The definitions the model declares, as in `genmsi.lint/1`. |
 | `diagnostics` | array | The findings, as in `genmsi.lint/1`. |
 | `created` | array | The ids of the blocks the batch created. |
-| `source` | string | The model as text, when there was no file to write it to. |
+| `source` | string | The model as text, when there was no file to write it to. The field is absent when the model was written. |
 
 A model given as text (`model`) has no file to write to: the text of the
 result travels back in `source`, and that text is the only place the edit
@@ -400,7 +407,7 @@ The classes:
 | `invalid_arguments` | The call itself is wrong: no model, or both `path` and `model`. |
 | `invalid_command` | A command of the batch could not be applied. The batch is atomic, so no command is applied: the failure names the command that failed (its index in `command` and its `op` in `op`), and the model stays as it was. |
 | `class_not_found` | The class named in `catalogue` is not one of the classes the catalogue lists. The `class` field carries the name that was asked for. |
-| `model_not_found` | The file named by `path` does not exist. |
+| `model_not_found` | The file named by `path` does not exist. (`apply_edit` is the exception: it creates the model, see above.) |
 | `model_unreadable` | Reserved for a file the tool cannot read outside the model load path; a model the server loads goes through the same `parse_file` call the CLI uses, so its read failures are `invalid_model` (a missing file is still `model_not_found`). |
 | `model_unwritable` | The file could not be written: the permissions, the disk, or the path. A model that does not compile is never written at all, so this class means the write itself failed. |
 | `invalid_xml` | The document is not well-formed XML. The line and the column are known, the block is not. |

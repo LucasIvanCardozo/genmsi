@@ -113,14 +113,14 @@ leer el repositorio y sin escribir XML a mano.
 
 | ID | Task | Specs | Route | Commit |
 |---|---|---|---|---|
-| T1 | `genmsi-format`: `EditCommand`, `PlacedId` y `Placement` derivan `JsonSchema` detrás de la feature `schemars` | S3a | inline | 1 |
-| T2 | `genmsi-mcp`: la herramienta `apply_edit` (entrada, colocación `auto`/`explicit`, rollback atómico, check-before-write) y el documento `genmsi.edit/1` | S2, S3, S4, S6, S7 | inline | 1 |
-| T3 | `genmsi-mcp`: la clase de error `invalid_command` con el índice y el `op` del comando que falló | S3b, S5 | inline | 1 |
-| T4 | tests: unitarios (rollback, colocación, no-escribe, inline) y de protocolo (el agente construye un modelo de punta a punta) | S2, S3 | inline | 1 y 2 |
-| T5 | `docs/mcp.md`: la herramienta, el documento, la clase de error, la regla de colocación; se saca la sección "Not in this phase" (ya vencida por D15) | S2, S5 | inline | 2 |
-| T6 | `docs/DECISIONS.md`: D21 (el verbo del MCP: un lote, una gramática, atómico, escribe) | S3 | inline | 2 |
-| T7 | close: `cargo test --workspace` verde, `clippy --workspace --all-targets -D warnings` limpio | — | inline | 2 |
-| T8 | medición: agente en frío por MCP, con el criterio de salida de S8 | S8 | subagente (background) | 3 |
+| T1 | `genmsi-format`: `EditCommand`, `PlacedId` y `Placement` derivan `JsonSchema` detrás de la feature `schemars` | S3a | inline | `f534b7a` |
+| T2 | `genmsi-mcp`: la herramienta `apply_edit` (entrada, colocación `auto`/`explicit`, rollback atómico, check-before-write) y el documento `genmsi.edit/1` | S2, S3, S4, S6, S7 | inline | `f534b7a` (el documento), `228cdaf` (la herramienta) |
+| T3 | `genmsi-mcp`: la clase de error `invalid_command` con el índice y el `op` del comando que falló | S3b, S5 | inline | `228cdaf` |
+| T4 | tests: unitarios (rollback, colocación, no-escribe, inline) y de protocolo (el agente construye un modelo de punta a punta) | S2, S3 | subagente (worker) | `5344fa5` |
+| T5 | `docs/mcp.md`: la herramienta, el documento, la clase de error, la regla de colocación; se saca la sección "Not in this phase" (ya vencida por D15) | S2, S5 | inline | `7ad9493` |
+| T6 | `docs/DECISIONS.md`: D21 (el verbo del MCP: un lote, una gramática, atómico, escribe) | S3 | inline | `7ad9493` |
+| T7 | close: `cargo test --workspace` verde, `clippy --workspace --all-targets -D warnings` limpio | — | inline | el árbol |
+| T8 | medición: agente en frío por MCP, con el criterio de salida de S8 | S8 | subagente (worker) | — |
 
 ## Log
 
@@ -170,3 +170,62 @@ L9 (2026-10-31, análisis, decisión del orquestador): la feature es **aditiva**
 El conjunto de clases de error publicadas crece con `invalid_command`; ninguna
 cambia. `model_unreadable` (nunca emitida) se deja como está: retirarla sería un
 cambio de contrato y no es el trabajo de esta feature.
+
+L10 (2026-10-31, verificación del escritor, por spec):
+
+- **S2**: la herramienta existe (`crates/genmsi-mcp/src/server.rs`, `apply_edit`)
+  y el servidor publica **ocho** herramientas (el test que lo fija:
+  `tests/tools.rs`, `the_server_offers_the_eight_tools`). Comprobado a mano por
+  el protocolo: un lote que agrega dos bloques, los conecta y pone una
+  propiedad deja el archivo escrito con el enlace dentro.
+- **S3a**: el esquema que publica el servidor sale del tipo del motor: el
+  `tools/list` trae `$defs/EditCommand` con las doce variantes (cada una con su
+  `op` como `const`), y `PlacedId` y `Placement` al lado. No hay una copia del
+  vocabulario en el MCP.
+- **S3b**: un lote con un `connect` desde un bloque inexistente devuelve
+  `invalid_command` con `command: 4` y `op: "connect"`, y el archivo queda byte
+  a byte como estaba. El test del worker lo fija y además comprueba que el
+  lote siguiente no ve el bloque del lote fallido.
+- **S3c**: un lote que deja el modelo sin `Terminate` devuelve el error del
+  motor (`invalid_model`, "no TERMINATE block with operand A") y no escribe.
+- **S7**: con `auto`, el bloque nuevo cae en el lugar libre de su contenedor
+  (80,80 y luego 80,183: la misma columna, más abajo); con `explicit`, cae en
+  las coordenadas del comando.
+
+L11 (2026-10-31, cierre técnico): `cargo test --workspace` → **615 tests
+verdes, 0 fallos**; `cargo clippy --workspace --all-targets -- -D warnings` →
+limpio.
+
+L12 (2026-10-31, defecto preexisting, no de esta feature): el clippy del
+workspace no estaba limpio en `main`: `crates/genmsi-core/examples/repro_app_model.rs`
+(un `mut` de sobra) y `crates/genmsi-core/examples/repro_bypass.rs` (un import
+sin usar), ambos del commit `563db27`. Arreglados aparte (`ea99a3a`), porque
+bloqueaban la puerta de verificación.
+
+L13 (2026-10-31, corte de la entrega): la feature se entrega en **cinco
+commits** sobre `feature/mcp-apply-edit` (base `main`), cada uno revisable:
+`ea99a3a` (los dos lints preexistentes), `f534b7a` (el esquema y el
+documento), `228cdaf` (la herramienta), `5344fa5` (los tests), `7ad9493` (la
+documentación). El corte de la entrega está en el commit de la
+documentación; la medición (T8) cierra la feature.
+
+L14 (2026-10-31, `ToolError` y el tamaño del `Result`): el cuerpo del error
+creció (los campos `command` y `op`) y pasó los 128 bytes que clippy tolera en
+un `Result`. La respuesta: `Box<ToolError>` en los `Result` del crate
+(`errors::Failure`). El **cuerpo publicado no cambia**: el JSON que el agente
+lee es el mismo.
+
+L15 (2026-10-31, verificación diferencial): el `ToolError` es código
+compartido por las siete herramientas que ya existían, así que se corrió la
+comparación contra el código de antes: el mismo servidor, la misma llamada,
+la base (`main`, worktree `genmsi-base`) y la rama, **18 casos** (las siete
+herramientas con entradas que fallan, entradas ambiguas, clases que no
+existen, archivos que no están, un modelo que no compila): **0 diferencias**.
+Los cuerpos de error de las herramientas viejas son byte a byte los mismos:
+los campos nuevos se omiten cuando no aplican, como los demás.
+
+L16 (2026-10-31, los otros clientes): el tipo TypeScript del documento nuevo
+se regeneró (`crates/genmsi-app/scripts/generate-types.sh`: un archivo nuevo,
+`EditDocument.ts`, sin ruido en los demás), `tsc --noEmit` limpio y los 381
+tests de la app verdes. La CLI no cambió de comportamiento: sus subcomandos
+usan el mismo núcleo y el mismo formato.

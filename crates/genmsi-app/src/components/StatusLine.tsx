@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { Diagnostics } from "../types";
 import { adviceFor } from "../engine/reasons";
+import type { ProposalBand } from "../state/proposal";
 
 /**
  * The status line of the app: the one band that says what is going on.
  *
  * Everything the app has to say —what the model compiles to, that a run
- * failed, that the model was saved, that the engine refuses to save it— is
- * said **here**, at the foot of the window, and nowhere else. There is no
- * band of messages at the top: the top belongs to the header and to the
- * toolbar, and a message that arrives while the reader is looking at the
- * graph belongs where the graph ends.
+ * failed, that the model was saved, that the engine refuses to save it,
+ * that the agent proposed something— is said **here**, at the foot of the
+ * window, and nowhere else. There is no band of messages at the top: the
+ * top belongs to the header and to the toolbar, and a message that
+ * arrives while the reader is looking at the graph belongs where the graph
+ * ends.
  *
  * The band that needs the eye says so with a halo: its light pulses three
  * times, because the reader may be looking at the graph and not at the foot
@@ -23,6 +25,10 @@ export default function StatusLine({
   pendingSave,
   onConfirmSave,
   onDismissSave,
+  proposal,
+  onAcceptProposal,
+  onDiscardProposal,
+  onAdoptProposal,
   onClearFailure,
 }: {
   /** What the model in memory compiles to. */
@@ -37,6 +43,14 @@ export default function StatusLine({
   onConfirmSave: () => void;
   /** Answer the confirmation of a save with no. */
   onDismissSave: () => void;
+  /** The proposal of the agent, and what the reader can do about it. */
+  proposal: ProposalBand;
+  /** Accept the proposal: the model in memory goes to the file. */
+  onAcceptProposal: () => void;
+  /** Discard the proposal: the model that was there comes back. */
+  onDiscardProposal: (note: string) => void;
+  /** Put the proposal back on the canvas, after the reader undid it. */
+  onAdoptProposal: () => void;
   /** Clear the failure or notice banner. */
   onClearFailure?: () => void;
 }) {
@@ -44,7 +58,8 @@ export default function StatusLine({
   // arrives, and when the same thing comes back.
   const [flash, setFlash] = useState(0);
   const last = useRef<string | null>(null);
-  const urgent = pendingSave ?? failure?.message ?? null;
+  const proposalText = proposal.kind === "none" ? null : proposal.text;
+  const urgent = pendingSave ?? failure?.message ?? proposalText ?? null;
   useEffect(() => {
     if (urgent === null) {
       last.current = null;
@@ -56,8 +71,17 @@ export default function StatusLine({
     }
   }, [urgent]);
 
-  // The question of the engine comes first: it is the only band that waits
-  // for an answer.
+  // The note the reader writes when they discard the proposal: it travels
+  // with the rejection, and the agent reads it. It starts empty with every
+  // proposal, because the note of one proposal is not the note of another.
+  const [note, setNote] = useState("");
+  const proposalId = proposal.kind === "none" ? null : proposal.id;
+  useEffect(() => {
+    setNote("");
+  }, [proposalId]);
+
+  // The question of the engine comes first: it is the band that blocks
+  // the save, and the app waits for an answer.
   if (pendingSave !== null) {
     return (
       <div
@@ -121,6 +145,58 @@ export default function StatusLine({
             </button>
           )}
         </div>
+      </div>
+    );
+  }
+
+  // The proposal of the agent: it waits for the person too, and it says
+  // what the agent did before it asks anything.
+  if (proposal.kind !== "none") {
+    const onCanvas = proposal.kind === "onCanvas";
+    const waiting = proposal.kind === "waiting";
+    return (
+      <div
+        key={flash}
+        role="alert"
+        style={{ "--alert-ring": "rgba(217, 119, 6, 0.3)" } as CSSProperties}
+        className="alert-flash flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+      >
+        <p className="flex-1">{proposal.text}</p>
+        {onCanvas && (
+          <>
+            <input
+              type="text"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="¿Por qué lo descartás? (opcional)"
+              aria-label="Por qué se descarta la propuesta"
+              className="w-48 rounded-md border border-amber-300 bg-white px-2 py-1 text-xs text-amber-900 placeholder:text-amber-600"
+            />
+            <button
+              type="button"
+              className="rounded-md bg-amber-600 px-2 py-1 font-medium text-white hover:bg-amber-500"
+              onClick={onAcceptProposal}
+            >
+              Aceptar
+            </button>
+            <button
+              type="button"
+              className="px-1 text-amber-800"
+              onClick={() => onDiscardProposal(note)}
+            >
+              Descartar
+            </button>
+          </>
+        )}
+        {!onCanvas && !waiting && (
+          <button
+            type="button"
+            className="rounded-md bg-amber-600 px-2 py-1 font-medium text-white hover:bg-amber-500"
+            onClick={onAdoptProposal}
+          >
+            Volver a adoptarla
+          </button>
+        )}
       </div>
     );
   }

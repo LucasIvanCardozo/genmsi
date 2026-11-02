@@ -32,6 +32,9 @@ export type { Chain } from "./generated/Chain";
 export type { Table } from "./generated/Table";
 export type {
   Diagnostics,
+  ProposalBody,
+  ProposalDocument,
+  ProposalState,
   SessionAnswer,
   SessionState,
 } from "./protocol";

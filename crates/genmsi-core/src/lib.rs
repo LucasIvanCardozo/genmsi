@@ -33,6 +33,7 @@ pub mod oracle;
 pub mod gpss;
 pub mod open_model;
 pub mod program;
+pub mod proposal;
 pub mod report;
 pub mod replication;
 pub mod rng;
@@ -44,10 +45,11 @@ pub use documents::{
     CATALOGUE_SCHEMA, CLASSES_SCHEMA, CLASSLIST_SCHEMA, CLASS_SCHEMA, CatalogueClass,
     CatalogueDocument, CatalogueEntity, CataloguePort, CatalogueProperty, ClassDocument,
     ClassesDocument, ClassListDocument, ClassListEntry, DefinitionCounts, EDIT_SCHEMA,
-    EXPLAIN_SCHEMA, Envelope, EditDocument, LINT_SCHEMA, LintDocument, MODEL_SCHEMA, ModelBlock,
-    ModelDocument, ModelEdge, ModelPort, ModelProperty, ModelRect, OPEN_MODEL_SCHEMA, REPORT_SCHEMA,
-    TRACE_SCHEMA, TraceDocument, catalogue_document, class_document, class_list_document,
-    edit_document, lint_diagnostics, lint_document, model_document, to_pretty_json, trace_document,
+    EXPLAIN_SCHEMA, Envelope, EditDocument, EditProposal, LINT_SCHEMA, LintDocument, MODEL_SCHEMA,
+    ModelBlock, ModelDocument, ModelEdge, ModelPort, ModelProperty, ModelRect, OPEN_MODEL_SCHEMA,
+    REPORT_SCHEMA, TRACE_SCHEMA, TraceDocument, catalogue_document, class_document,
+    class_list_document, edit_document, lint_diagnostics, lint_document, model_document,
+    to_pretty_json, trace_document,
 };
 pub use error::EngineError;
 pub use live::{
@@ -60,6 +62,12 @@ pub use open_model::{
     current_open_model, open_model_document, process_is_running, read_open_model, write_open_model,
 };
 pub use program::{Program, compile, known_classes};
+pub use proposal::{
+    DOCUMENT_EXTENSION, MODEL_EXTENSION, PROPOSAL_SCHEMA, ProposalBody, ProposalDocument,
+    ProposalState, STAGING_DIR, document_file_in, model_file_in, new_id, oldest_pending_for_in,
+    oldest_pending_in, proposal_document, read_proposal_in, read_proposals_in, resolve_proposal_in,
+    staging_dir, staging_dir_in, write_proposal, write_proposal_model,
+};
 pub use report::{json_report, program_json, render, to_csv, to_json};
 pub use replication::{
     MetricSummary, ReplicationConfig, ReplicationResult, render_summary, replicate,

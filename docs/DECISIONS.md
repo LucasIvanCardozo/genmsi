@@ -424,3 +424,53 @@ the app and the MCP stay thin layers (D2), and the write path of the verb is
 the same one it was — a model that does not compile is not written, and a
 batch is atomic. The refusal adds one more case in which nothing is written,
 and it is the only case in which the *reader* is the reason.
+
+## D23 — The proposal: the agent offers a model, the person decides
+
+D22 closed the app→agent direction (the app publishes what it shows; the
+verb refuses to overwrite what is being read). The agent→person direction was
+still one road wide: **overwrite the file**. And that road closes exactly
+when the person is working — which is when the person most needs to see what
+the agent did.
+
+The session of the 2nd of November showed the price. An agent spent two
+hours building a 517-block model in `/tmp`, with the desktop app open
+showing a five-block test model. The person saw nothing, and the model
+finished unreviewed. The tools were not at fault: the agent had permission
+to write the open file, and chose a scratch path out of caution. The loop
+had no shape for "let me show you what I made".
+
+The rules that stay:
+
+- **the agent proposes instead of imposing**: `apply_edit` and `save_model`
+  take a `target`. `"file"` (the default) is what they always did. `"proposal"`
+  writes the model in the staging directory of the app and describes it in a
+  `genmsi.proposal/1` document. Nothing reaches the disk;
+- **the app adopts the proposal in memory**: the model is loaded into the
+  session — **dirty** (it differs from the disk) and **undoable** (one step of
+  the session) — so the person sees it on the canvas and the monitor runs it.
+  The file on the disk still holds the old model until the person accepts;
+- **the person decides**: the proposal waits in the band the app already uses
+  for the questions it asks (the same one that asks whether to save a model
+  the engine refuses). *Aceptar* is the app's normal save. *Descartar* undoes
+  the adoption and leaves a note the agent reads;
+- **the verdict travels**: `genmsi.live/1` carries the proposal (its
+  identity, its state and the note), so `app_state` tells the agent what
+  happened without the agent having to ask again;
+- **the brake is not bypassed**: a proposal is a way to *show* a model, not a
+  way around the brake. Adopting it leaves the session dirty, so a
+  `model_locked` afterwards is exactly as it was;
+- **the person's work comes first**: the app does not adopt a proposal while
+  the reader has changes that are not saved. The proposal waits. It is the
+  rule of the brake, seen from the other side;
+- **the `path` of the tools defaults to the model the app has open**: an agent
+  that does not name a file works on what the person is looking at, instead
+  of guessing a destination. With no app and no file, the tool says so
+  (`no_open_model`) instead of failing vaguely;
+- **no new tool**: the surface of the MCP stays at nine tools. What was added
+  are optional fields, which is what D13 allows inside a major version.
+
+What this does not change: the engine keeps owning the formats (D19), the
+app and the MCP stay thin layers (D2), the batch stays atomic and the model
+is still checked before it is written (D21), and the refusal to overwrite
+what is being read stays where it was (D22).

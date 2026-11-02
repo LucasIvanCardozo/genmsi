@@ -169,6 +169,29 @@ pub struct EditDocument<'a> {
     /// only place the edit lives, so it travels back with the answer.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
+    /// The proposal the edit left for the person, when the edit went to the
+    /// staging area of the app instead of to the disk.
+    ///
+    /// `None` when the model went to the disk, as it always did: a proposal
+    /// is only there when the agent asked for one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proposal: Option<EditProposal>,
+}
+
+/// The proposal an edit left for the person.
+///
+/// The `genmsi.edit/1` document carries it when the edit went to the
+/// staging area of the app: the identity of the proposal —the agent names it
+/// to ask about it— and the path of the model the proposal carries, which is
+/// where the person sees the work before deciding.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct EditProposal {
+    /// The identity of the proposal.
+    pub id: String,
+    /// The absolute path of the model the proposal carries.
+    pub model: String,
 }
 
 /// Build the `genmsi.edit/1` body from the lint of the model it edited.
@@ -182,6 +205,7 @@ pub fn edit_document<'a>(
     written: bool,
     created: Vec<u32>,
     source: Option<String>,
+    proposal: Option<EditProposal>,
 ) -> EditDocument<'a> {
     EditDocument {
         path: lint.path.clone(),
@@ -194,6 +218,7 @@ pub fn edit_document<'a>(
         diagnostics: lint.diagnostics.clone(),
         created,
         source,
+        proposal,
     }
 }
 

@@ -16,11 +16,29 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 /// The protocol the app's backends speak with the facade.
 pub mod protocol;
+/// The loop of the proposal: what an agent proposes and what the person
+/// decides.
+pub mod proposal;
 /// The editing session: the model in memory, its undo stack and its save.
 pub mod session;
 
-pub use protocol::{SessionRequest, SessionResponse, answer};
+pub use protocol::{SessionRequest, SessionResponse, answer, answer_in};
 pub use session::{Diagnostics, LastRun, SaveOutcome, Session, SessionState, empty_live_body};
+
+// The document of a proposal: what an agent offers to the person.
+//
+// The core owns the format: the MCP server creates the proposal and the
+// app resolves it, and both go through these functions, so the two sides
+// cannot write different bytes.
+pub use genmsi_core::proposal::{
+    PROPOSAL_SCHEMA, ProposalBody, ProposalDocument, ProposalState, document_file_in,
+    model_file_in, proposal_document, read_proposal_in, read_proposals_in, resolve_proposal_in,
+    staging_dir_in, write_proposal, write_proposal_model,
+};
+
+// The editing commands of the format: the protocol of the session carries
+// them, so the backends that speak it name them.
+pub use genmsi_format::edit::EditCommand;
 
 // The document that says which model the desktop application has open.
 //

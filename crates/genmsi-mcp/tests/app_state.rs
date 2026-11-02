@@ -169,6 +169,7 @@ fn alive_state(model: &Path) -> LiveBody {
         diagnostics: vec!["el modelo usa una entidad que no declara".to_string()],
         model: None,
         run: None,
+        proposal: None,
     }
 }
 

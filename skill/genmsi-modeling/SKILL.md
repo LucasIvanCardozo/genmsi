@@ -14,11 +14,11 @@ It is the only sanctioned place to learn the format: the catalogue holds the fac
    - `catalogue()` with no argument returns the list of every class and the skeleton of a model.
    - `catalogue({ class: "Generate" })` returns one class.
 2. **Design before writing.** Decide the flow of the transactions, the entities the model needs and the class of every block. The catalogue tells you what a class does; the design is yours.
-3. **Build the model with `apply_edit`.** One call, one batch of the engine's editing commands: an `addBlock` per block, a `connect` per link, a `setProperty` per operand. The engine gives every new block a place on the canvas, checks that the model compiles and writes it. The batch is **atomic**: if a command fails, no command is applied and the error names the command that failed. See *The verb* below.
+3. **Build the model with `apply_edit`.** One call, one batch of the engine's editing commands: an `addBlock` per block, a `connect` per link, a `setProperty` per operand. The engine gives every new block a place on the canvas, checks that the model compiles and writes it. The batch is **atomic**: if a command fails, no command is applied and the error names the command that failed. See *The verb* below. You do not have to name a file: when you name neither a `path` nor a `model`, the batch works on **the model the app has open**.
 4. **`lint({ path })`** — the model as it is now on disk. It loads, validates and compiles the model and reports what it found. A model that does not compile is a tool error, not an empty report. The lint also names the **property a block carries that its class does not declare** (`Tamano` for `Tamaño`, with the name it probably meant): a typo is silent in the engine, so the lint is where it shows up — as a finding of a model that compiles, because a missing *operand* is a refusal and never reaches the findings.
 5. **`explain_model({ path })`** — the model as the document writes it: every block with its class, its properties **by name** and its ports, and the `edges` that wire the blocks. It is the cheapest way to see that the model is the model you meant. (It compiles the model first, so read it after `lint`.)
 6. **`simulate({ path, seed })`** — the GPSS report. Read its `blocks` (the statements the model compiles to, with their counts) and its `entities` (the queues, facilities and storages it used).
-7. **`open_model()`** — the file the desktop app has open (`path` and `pid`; both null when the app is not running). **`app_state()`** — what the reader is seeing right now (see *The person reading* below): whether that file has changes that are not saved.
+7. **`open_model()`** — the file the desktop app has open (`path` and `pid`; both null when the app is not running). **`app_state()`** — what the reader is seeing right now (see *The person reading* below): whether that file has changes that are not saved, and the **proposal** on the table, if you left one.
 8. **`save_model({ path, model })`** — only for a document you wrote by hand: it takes the **whole** document as text. To change a model that is already on disk, use `apply_edit` on its `path`, not `save_model`.
 
 The order matters: `lint` before `simulate` (a model that does not compile is a tool error, not an empty report), and `simulate` before you are done (never keep a model you have not run).
@@ -69,23 +69,39 @@ The order matters: `lint` before `simulate` (a model that does not compile is a 
 - **The canvas is the engine's business.** Every block the batch adds lands in
   the free spot of its container, like a drop in the application. With
   `"layout": "explicit"` the `x` and the `y` of the command are used instead.
+- **`target` says where the result goes.** `"file"` (the default) writes the
+  model to the file the batch edited. `"proposal"` leaves it in the staging
+  area of the app, **without touching the disk**, and the reader sees it on
+  their canvas and decides — see *The person reading* below. A `summary` of
+  what you did travels with the proposal.
 
 ## The person reading
 
-The desktop application and the MCP are two ends of the same loop: you write
-the model it has open, it reloads it and runs it again, and the reader sees
-your work on the canvas within half a second.
+The desktop application and the MCP are two ends of the same loop. Two roads
+connect them, and both of them end with the reader seeing your work on the
+canvas.
+
+**Where you work.** The tools do not need a path: when you ask for a model
+and name neither a file nor a document, they work on **the model the app has
+open** — the one the reader is looking at. That is what you mean, unless you
+say otherwise. With no app running, or with no model open, the tools that
+take a model answer `no_open_model` and tell you to name a file: there is no
+destination to guess. (`open_model` and `app_state` never fail: they answer
+with their document and `path: null` when there is no app — a `null` path is
+what "nobody has a model open" looks like.)
 
 **`app_state()`** says what the reader is seeing right now: the model the
 application has open, whether they have changes that are **not saved**, what
-it found in the model, and the last run it made (the report and the seed it
-ran with). Without the application running it answers with `path: null`.
+it found in the model, the last run it made (the report and the seed it ran
+with), and **the proposal on the table**. Without the application running it
+answers with `path: null`.
 
 **Look before you write.** If the model you are about to change is the one
 the application has open, ask `app_state()` first:
 
-- the reader has **no** changes pending → write; the application picks the
-  change up on its own;
+- the reader has **no** changes pending → write it (the default target,
+  `"file"`): the application picks the change up on its own, within half a
+  second, and the reader sees it on the canvas;
 - the reader **has** changes pending → **do not write**. Say so and wait:
   *"the application has unsaved changes on `modelo.gmdl`; shall I wait for you
   to save it?"* Their work is not on the disk, and writing over the file would
@@ -94,9 +110,26 @@ the application has open, ask `app_state()` first:
 **`apply_edit` and `save_model` refuse that write for you.** When the
 application has unsaved changes on the model you named, they answer
 `model_locked` and **write nothing**. That error is not a failure of the
-model: it is the application saying "this one is being edited". Save it (the
-reader does it) and send the **same batch again**: the commands are the
-source of truth, not the text, so the batch replays over the saved model.
+model: it is the application saying "this one is being edited".
+
+**The proposal: the road that stays open.** Leave a **proposal** when the
+reader is busy, or when you want the work reviewed before it lands: the same
+call with `target: "proposal"` and a `summary` of what you did. The model
+does **not** touch the disk. It waits in the staging area of the app, and the
+app puts it on the reader's canvas — dirty, and undoable — so they see
+exactly what you built and decide: *Aceptar* writes it to the file,
+*Descartar* throws it away. The note they leave when they discard it comes
+back to you.
+
+The proposal waits too, while the reader has changes that are not saved: the
+app does not put a proposal on the canvas over the work of the reader. It is
+adopted when they save, and until then `app_state()` says `pending`.
+
+**The verdict comes back in `app_state()`.** The `proposal` field carries the
+identity of the proposal, its `state` (`pending`, `accepted` or `rejected`)
+and the `note`. A proposal that is still `pending` means the reader has not
+decided yet: wait for it, and do not send the same batch again — the
+proposal is the batch, replayed on the reader's canvas.
 
 And if the reader asks you what you did, `app_state()` also tells you whether
 your change actually landed on their canvas.

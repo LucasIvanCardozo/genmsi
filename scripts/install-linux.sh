@@ -115,7 +115,7 @@ if [[ $with_mcp -eq 1 ]]; then
   # La guía del agente: el archivo que enseña a construir un modelo con el
   # MCP sin leer el código del motor. Viaja con el producto, en el
   # directorio de skills del usuario.
-  skill_src="${repo}/skills/genmsi-modeling"
+  skill_src="${repo}/skill/genmsi-modeling"
   if [[ -d "${skill_src}" ]]; then
     skill_dir="${HOME}/.agents/skills/genmsi-modeling"
     mkdir -p "${skill_dir}"

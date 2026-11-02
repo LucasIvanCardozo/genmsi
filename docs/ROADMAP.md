@@ -50,7 +50,7 @@ Goal: agents create, validate, simulate and inspect models.
 - The catalogue answers for a list of classes, the class document says which
   entities the class declares and which it uses, and the explain document
   publishes the structure of the model; the procedure lives in the agent's
-  guide (`skills/genmsi-modeling/`), installed with the product.
+  guide (`skill/genmsi-modeling/`), installed with the product.
 - The engine composes the canvas of a model that carries no geometry, and
   `save_model` writes the model composed: a model an agent builds is a model
   the editor can draw.

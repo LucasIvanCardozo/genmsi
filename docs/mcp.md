@@ -17,7 +17,7 @@ The tools carry the facts of a class (`catalogue`) and the structure of a
 model (`explain_model`); the procedure — how a model is written, which
 entities it has to declare, what the expression language is and what the
 engine does with them — lives in the agent's guide:
-[`skills/genmsi-modeling/SKILL.md`](../skills/genmsi-modeling/SKILL.md).
+[`skill/genmsi-modeling/SKILL.md`](../skill/genmsi-modeling/SKILL.md).
 
 The guide travels with the product: `scripts/install-linux.sh --with-mcp`
 installs it in `~/.agents/skills/genmsi-modeling`, where the harness of an

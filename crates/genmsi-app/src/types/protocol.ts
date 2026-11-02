@@ -23,6 +23,51 @@ export interface Diagnostics {
   definitions: DefinitionCounts | null;
 }
 
+/** What happened to a proposal. */
+export type ProposalState = "pending" | "accepted" | "rejected";
+
+/**
+ * The proposal the session holds: the one the person has to decide, or the
+ * one they already decided.
+ *
+ * It is the body of the `genmsi.proposal/1` document, without the paths:
+ * the verdict travels in it, and the agent reads it in the live state.
+ */
+export interface ProposalBody {
+  /** The identity of the proposal. */
+  id: string;
+  /** What happened to it. */
+  state: ProposalState;
+  /** What the agent said it did. */
+  summary: string | null;
+  /** What the person answered when they discarded it. */
+  note: string | null;
+}
+
+/**
+ * The `genmsi.proposal/1` document: the proposal that waits in the staging
+ * area of the app.
+ *
+ * The document is the one of the core: the app reads it and never writes
+ * it (the MCP creates it, the app resolves it).
+ */
+export interface ProposalDocument {
+  /** The schema of the document. */
+  schema: string;
+  /** The identity of the proposal. */
+  id: string;
+  /** The absolute path of the model the proposal carries. */
+  model: string;
+  /** The model the proposal proposes to change. */
+  target: string | null;
+  /** What the agent said it did, in one line. */
+  summary: string | null;
+  /** What happened to the proposal. */
+  state: ProposalState;
+  /** What the person answered when they discarded it. */
+  note: string | null;
+}
+
 /** The state of the editing session: what the app draws. */
 export interface SessionState {
   /** Path of the model, as it was opened; empty for a new model. */
@@ -37,6 +82,20 @@ export interface SessionState {
   canUndo: boolean;
   /** Whether an operation can be redone. */
   canRedo: boolean;
+  /**
+   * The proposal the person has to decide, or the one they decided.
+   *
+   * `null` when there is no proposal on the table.
+   */
+  proposal: ProposalBody | null;
+  /**
+   * Whether the proposal is **on the canvas**.
+   *
+   * A proposal that was undone is still the proposal of the session, but
+   * it is not on the canvas: there is nothing to accept or to discard
+   * until it is adopted again.
+   */
+  proposalOnCanvas: boolean;
 }
 
 /**

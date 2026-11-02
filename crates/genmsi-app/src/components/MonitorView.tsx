@@ -8,6 +8,7 @@ import { countsOf, countsWithContainers, crossingsEvents, crossingsUntil } from 
 import { figureBlockOf, figuresOf } from "../monitor/figures";
 import { useLive, type LiveBall, type LiveCounts } from "../monitor/live";
 import { populationOf, type Figures } from "../monitor/stats.ts";
+import { proposalBand } from "../state/proposal";
 import ClassList from "./ClassList";
 import ModelTree from "./ModelTree";
 import StatusLine from "./StatusLine";
@@ -96,6 +97,12 @@ export default function MonitorView({
     pendingSave,
     confirmSave,
     dismissSave,
+    proposal,
+    proposalOnCanvas,
+    pendingProposal,
+    acceptProposal,
+    discardProposal,
+    adoptProposal,
     addBlock,
     setPlayhead,
     setPlaying,
@@ -710,6 +717,10 @@ export default function MonitorView({
         pendingSave={pendingSave}
         onConfirmSave={() => void confirmSave()}
         onDismissSave={dismissSave}
+        proposal={proposalBand({ proposal, onCanvas: proposalOnCanvas, pending: pendingProposal })}
+        onAcceptProposal={() => void acceptProposal()}
+        onDiscardProposal={(note) => void discardProposal(note)}
+        onAdoptProposal={() => void adoptProposal()}
         onClearFailure={() => {
           if (error !== null) useApp.getState().clearError();
           if (notice !== null) useApp.getState().clearNotice();

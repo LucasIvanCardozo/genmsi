@@ -3,6 +3,7 @@ import type {
   CatalogueDocument,
   LintDocument,
   ModelDocument,
+  ProposalDocument,
   ReportDocument,
   SessionAnswer,
   SessionState,
@@ -108,6 +109,30 @@ export const tauri: EngineAdapter = {
   relayout: async (scope: number) => stateOf(await session({ op: "relayout", scope })),
   undo: async () => stateOf(await session({ op: "undo" })),
   redo: async () => stateOf(await session({ op: "redo" })),
+  /**
+   * The proposal that waits for the person.
+   *
+   * The answer of the engine carries no document when there is nothing to
+   * decide: that is not a failure, and the app does not treat it as one.
+   */
+  pendingProposal: async () => {
+    const answer = await session({ op: "pendingProposal" });
+    if (answer.document === undefined) {
+      return null;
+    }
+    return parsed<ProposalDocument>(answer.document);
+  },
+  adoptProposal: async () => stateOf(await session({ op: "adoptProposal" })),
+  acceptProposal: async () => {
+    const answer = await session({ op: "acceptProposal" });
+    return {
+      state: stateOf(answer),
+      path: answer.path ?? "",
+      bytes: answer.bytes ?? 0,
+    };
+  },
+  discardProposal: async (note: string | null) =>
+    stateOf(await session({ op: "discardProposal", note })),
   save: async (path?: string): Promise<SaveResult> => {
     const answer = await session({ op: "save", path: path ?? null });
     return {

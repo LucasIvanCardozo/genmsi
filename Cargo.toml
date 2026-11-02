@@ -26,6 +26,11 @@ thiserror = "2"
 clap = { version = "4", features = ["derive"] }
 tracing = "0.1"
 roxmltree = "0.20"
+# The JSON schema of the editing commands: the MCP derives the schema of its
+# tools from the engine's own types, so the vocabulary of the commands is
+# defined in one place. The version is the one rmcp uses, so the derive and
+# the trait are the same one.
+schemars = "1"
 
 [profile.release]
 lto = "thin"

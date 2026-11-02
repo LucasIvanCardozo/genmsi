@@ -82,6 +82,7 @@ pub struct PortPosition {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts", ts(export))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum PlacedId {
     /// A block of the model.
     Block(u32),
@@ -105,6 +106,7 @@ pub enum PlacedId {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts", ts(export))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Placement {
     /// What is placed.
     pub id: PlacedId,
@@ -125,6 +127,7 @@ pub struct Placement {
 #[serde(tag = "op", rename_all = "camelCase")]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[cfg_attr(feature = "ts", ts(export))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum EditCommand {
     /// Create a block of a catalogue class inside a container.
     AddBlock {

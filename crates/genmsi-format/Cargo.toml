@@ -18,9 +18,15 @@ roxmltree.workspace = true
 # the same way genmsi-core publishes its documents. The feature is optional so
 # the default build does not carry the generator.
 ts-rs = { version = "12", optional = true }
+# The JSON schema of the editing commands. The MCP derives the schema of the
+# tool that applies them from these very types, so the vocabulary of the
+# commands is written once. The feature is optional so the default build does
+# not carry the generator.
+schemars = { workspace = true, optional = true }
 
 [features]
 ts = ["dep:ts-rs"]
+schemars = ["dep:schemars"]
 
 [dev-dependencies]
 serde_json.workspace = true

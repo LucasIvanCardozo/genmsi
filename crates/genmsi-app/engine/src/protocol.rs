@@ -13,8 +13,7 @@ use genmsi_format::edit::EditCommand;
 use crate::session::{SaveOutcome, Session, SessionState};
 use crate::{
     AppError, RunDocuments, catalogue_document_bytes, lint_document_bytes, model_document_bytes,
-    models_document_bytes, run_model_documents_bytes, simulate_document_bytes, trace_document_bytes,
-    trace_model_bytes,
+    models_document_bytes, simulate_document_bytes, trace_document_bytes, trace_model_bytes,
 };
 
 /// One request of the protocol.
@@ -280,18 +279,10 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
             None => SessionResponse::error(AppError::Usage("no model is open".to_string())),
         },
         SessionRequest::SimulateCurrent { seed, until, start } => match session.as_mut() {
-            Some(session) => {
-                match crate::simulate_model_bytes(
-                    session.model(),
-                    seed.unwrap_or(1),
-                    until,
-                    start_of(start),
-                    None,
-                ) {
-                    Ok(document) => SessionResponse::document(document),
-                    Err(error) => SessionResponse::error(error),
-                }
-            }
+            Some(session) => match session.simulate(seed.unwrap_or(1), until, start_of(start)) {
+                Ok(document) => SessionResponse::document(document),
+                Err(error) => SessionResponse::error(error),
+            },
             None => SessionResponse::error(AppError::Usage("no model is open".to_string())),
         },
         SessionRequest::Lint { path } => match lint_document_bytes(Path::new(&path)) {
@@ -352,13 +343,11 @@ pub fn answer(session: &mut Option<Session>, request: SessionRequest) -> Session
             start,
             limit,
         } => match session.as_mut() {
-            Some(session) => match run_model_documents_bytes(
-                session.model(),
+            Some(session) => match session.run(
                 seed.unwrap_or(1),
                 until,
                 start_of(start),
                 limit.unwrap_or(100),
-                None,
             ) {
                 Ok(documents) => SessionResponse::documents(documents),
                 Err(error) => SessionResponse::error(error),

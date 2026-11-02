@@ -20,7 +20,7 @@ pub mod protocol;
 pub mod session;
 
 pub use protocol::{SessionRequest, SessionResponse, answer};
-pub use session::{Diagnostics, SaveOutcome, Session, SessionState};
+pub use session::{Diagnostics, LastRun, SaveOutcome, Session, SessionState, empty_live_body};
 
 // The document that says which model the desktop application has open.
 //
@@ -30,6 +30,15 @@ pub use session::{Diagnostics, SaveOutcome, Session, SessionState};
 pub use genmsi_core::documents::OPEN_MODEL_SCHEMA;
 pub use genmsi_core::open_model::{
     APP_IDENTIFIER, OPEN_MODEL_FILE, OpenModelDocument, app_data_dir, write_open_model,
+};
+
+// The document that says what the desktop application is showing.
+//
+// The core owns this one too: the shell writes the file with these
+// functions and the MCP server reads it with the same ones, so the app
+// does not invent the shape of the state it publishes.
+pub use genmsi_core::live::{
+    LIVE_FILE, LiveBody, LiveRun, live_document, model_value, report_value, write_live,
 };
 
 /// How many runs the facade has made.

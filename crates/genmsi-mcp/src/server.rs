@@ -7,7 +7,7 @@
 //! script read the same thing (decision D13).
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 use genmsi_format::EditCommand;
 
-use crate::engine::{self, Layout, ModelSource};
+use crate::engine::{self, Destination, Layout, ModelSource};
 use crate::errors::{Failure, ToolError};
 use crate::glossary;
 
@@ -131,16 +131,44 @@ impl TraceInput {
     }
 }
 
+/// Where a model goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Target {
+    /// The model goes to the file it was named by.
+    #[default]
+    File,
+    /// The model goes to the staging area of the app: it does not touch the
+    /// disk, and the person decides.
+    Proposal,
+}
+
 /// Where a model goes and what goes there.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct SaveInput {
     /// Path of the `.gmdl` file to write.
-    pub path: String,
+    ///
+    /// Without it the model the app has open is the one that is written.
+    #[serde(default)]
+    pub path: Option<String>,
     /// The whole `.gmdl` document as text.
     ///
     /// The tool writes the whole document, not a patch: the agent reads the
     /// model, changes it and hands the complete text back.
-    pub model: String,
+    #[serde(default)]
+    pub model: Option<String>,
+    /// Where the model goes.
+    ///
+    /// `file` (the default) writes the model to the file it was named by;
+    /// `proposal` leaves it in the staging area of the app, without touching
+    /// the disk, and the person decides.
+    #[serde(default)]
+    pub target: Target,
+    /// What the agent did, in one line.
+    ///
+    /// It travels with the proposal, so the person reads it before deciding.
+    #[serde(default)]
+    pub summary: Option<String>,
 }
 
 /// The batch of editing commands an agent applies to a model.
@@ -165,6 +193,18 @@ pub struct EditInput {
     /// the `y` of the command.
     #[serde(default)]
     pub layout: Layout,
+    /// Where the result goes.
+    ///
+    /// `file` (the default) writes the model to the file the batch edited;
+    /// `proposal` leaves it in the staging area of the app, without touching
+    /// the disk, and the person decides.
+    #[serde(default)]
+    pub target: Target,
+    /// What the agent did, in one line.
+    ///
+    /// It travels with the proposal, so the person reads it before deciding.
+    #[serde(default)]
+    pub summary: Option<String>,
 }
 
 impl EditInput {
@@ -192,6 +232,9 @@ pub struct CatalogueInput {
 }
 
 /// The model the agent asked for: a file on disk or the document itself.
+///
+/// When the agent names neither, the model the app has open is the one it
+/// means: the agent works on what the reader is looking at.
 fn source_of(path: &Option<String>, model: &Option<String>) -> Result<ModelSource, Failure> {
     match (path, model) {
         (Some(path), None) => Ok(ModelSource::File(PathBuf::from(path))),
@@ -199,10 +242,71 @@ fn source_of(path: &Option<String>, model: &Option<String>) -> Result<ModelSourc
         (Some(_), Some(_)) => Err(Box::new(ToolError::arguments(
             "give `path` or `model`, not both: one names the file, the other carries the document",
         ))),
-        (None, None) => Err(Box::new(ToolError::arguments(
-            "give `path` of a model file or `model` with the `.gmdl` document",
+        (None, None) => Ok(ModelSource::File(open_model_path()?)),
+    }
+}
+
+/// The path of the model the app has open.
+///
+/// The app publishes the model it has open, and the pid of the process that
+/// has it: an app that is not running any more says nothing, so the model it
+/// left behind is not the destination of anybody.
+///
+/// Without a model open there is no destination to guess: the failure is its
+/// own class, and it says what to do.
+fn open_model_path() -> Result<PathBuf, Failure> {
+    match genmsi_core::current_open_model().and_then(|document| document.path) {
+        Some(path) => Ok(PathBuf::from(path)),
+        None => Err(Box::new(ToolError::no_open_model())),
+    }
+}
+
+/// The file a model goes to: the one the agent named, or the one the app has
+/// open.
+fn destination_path(path: &Option<String>) -> Result<PathBuf, Failure> {
+    match path {
+        Some(path) => Ok(PathBuf::from(path)),
+        None => open_model_path(),
+    }
+}
+
+/// The text of a model, as the agent sent it.
+fn model_text(input: &SaveInput) -> Result<&str, Failure> {
+    match input.model.as_deref() {
+        Some(text) => Ok(text),
+        None => Err(Box::new(ToolError::arguments(
+            "give `model` with the whole .gmdl document to write",
         ))),
     }
+}
+
+/// A proposal left in the staging area of the app.
+struct Staged {
+    /// The identity of the proposal.
+    id: String,
+    /// The model the proposal carries.
+    model: PathBuf,
+}
+
+/// Leave a model in the staging area of the app.
+///
+/// The model does not touch the disk: it waits in the staging directory of
+/// the app for the app to adopt it, and the person decides. The proposal
+/// document describes it: what it is, what it proposes to change and what the
+/// agent says it did.
+fn stage(text: &str, target: &Path, summary: Option<&str>) -> Result<Staged, Failure> {
+    let directory = genmsi_core::app_data_dir().ok_or_else(|| {
+        Box::new(ToolError::cannot_stage(
+            "the machine does not say where the data of the app lives",
+        )) as Failure
+    })?;
+    let id = genmsi_core::new_id();
+    let model = genmsi_core::write_proposal_model(&directory, &id, text)
+        .map_err(ToolError::cannot_stage)?;
+    let document = genmsi_core::ProposalDocument::pending(&id, &model, Some(target))
+        .with_summary(summary);
+    genmsi_core::write_proposal(&directory, &document).map_err(ToolError::cannot_stage)?;
+    Ok(Staged { id, model })
 }
 
 /// The default seed of a run: one drawn at random, as the CLI does.
@@ -335,7 +439,7 @@ impl GenmsiServer {
     /// geometry keeps the disposition its author left.
     #[tool(
         name = "save_model",
-        description = "Write a GPSS model to a .gmdl file. The model is checked before it is written: one that does not load, does not validate or does not compile is NOT written, and the error names the block that caused it. A model that carries no canvas geometry is composed before it is written, so the editor can draw it; a model that already carries its geometry keeps the disposition its author left. Takes `path` (the file to write) and `model` (the whole .gmdl document as text, not a patch) and returns the genmsi.lint/1 document of what was written. Use it to create or to change a model: read it first with explain_model, change the text and hand the complete document back."
+        description = "Write a GPSS model to a .gmdl file. The model is checked before it is written: one that does not load, does not validate or does not compile is NOT written, and the error names the block that caused it. A model that carries no canvas geometry is composed before it is written, so the editor can draw it; a model that already carries its geometry keeps the disposition its author left. Takes `model` (the whole .gmdl document as text, not a patch) and `path` (the file to write): `path` may be left out, and then the model the app has open is the one that is written. `target` says where the model goes: `file` (the default) writes it to that file, and `proposal` leaves the model in the staging area of the app, without touching the disk (the `path` is not written to), where the person sees it and decides to accept it or to discard it — the verdict comes back in `app_state`. `summary` is one line about what the agent did; it travels with the proposal. Returns the genmsi.lint/1 document of what was written. Use it to create or to change a model: read it first with explain_model, change the text and hand the complete document back."
     )]
     pub fn save_model(&self, Parameters(input): Parameters<SaveInput>) -> CallToolResult {
         finish(save_document(&input))
@@ -347,7 +451,7 @@ impl GenmsiServer {
     /// The batch is atomic: a command that fails leaves the model as it was.
     #[tool(
         name = "apply_edit",
-        description = "Add, edit and connect the blocks of a GenMSI model. The commands are the engine's own editing commands, the same ones the desktop application speaks: `addBlock` {class, container, x, y} creates a block of a catalogue class (call `catalogue` first: it gives the class names, their ports (ioid) and their properties), `connect` {from, fromIoid, to, toIoid} wires an output port to an input port, `setProperty` {id, property, value} sets a declared property, `setCaption` {id, caption} names a block, `moveBlock` {id, x, y} moves one, `removeBlock` {id} takes one away and `removeBlocks` {ids} takes several away as ONE operation; the schema of the tool carries the whole vocabulary. The commands are applied in order and the batch is ATOMIC: if one fails, none is applied and the failure names the command that failed. `layout` says where the blocks the batch adds go: `auto` (the default) puts every block an `addBlock` adds where there is room in its container, like a drop in the application; `explicit` uses the `x` and the `y` of the command. The model is checked before it is written: one that does not compile is NOT written, and the error names the block that caused it. The blocks the batch creates take the next free ids, in the order of the commands. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text): a `path` that is not on the disk yet is a model the batch CREATES, and the file is written when the model compiles. Returns the genmsi.edit/1 document."
+        description = "Add, edit and connect the blocks of a GenMSI model. The commands are the engine's own editing commands, the same ones the desktop application speaks: `addBlock` {class, container, x, y} creates a block of a catalogue class (call `catalogue` first: it gives the class names, their ports (ioid) and their properties), `connect` {from, fromIoid, to, toIoid} wires an output port to an input port, `setProperty` {id, property, value} sets a declared property, `setCaption` {id, caption} names a block, `moveBlock` {id, x, y} moves one, `removeBlock` {id} takes one away and `removeBlocks` {ids} takes several away as ONE operation; the schema of the tool carries the whole vocabulary. The commands are applied in order and the batch is ATOMIC: if one fails, none is applied and the failure names the command that failed. `layout` says where the blocks the batch adds go: `auto` (the default) puts every block an `addBlock` adds where there is room in its container, like a drop in the application; `explicit` uses the `x` and the `y` of the command. The model is checked before it is written: one that does not compile is NOT written, and the error names the block that caused it. The blocks the batch creates take the next free ids, in the order of the commands. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text): `path` may be left out, and then the model the app has open is the one the batch edits; a `path` that is not on the disk yet is a model the batch CREATES, and the file is written when the model compiles. `target` says where the result goes: `file` (the default) writes it to the file the batch edited, and `proposal` leaves the model in the staging area of the app, without touching the disk, where the person sees it and decides to accept it or to discard it — the verdict comes back in `app_state`. `summary` is one line about what the batch did; it travels with the proposal. Returns the genmsi.edit/1 document."
     )]
     pub fn apply_edit(&self, Parameters(input): Parameters<EditInput>) -> CallToolResult {
         finish(edit_document(&input))
@@ -446,14 +550,41 @@ fn app_state_document() -> String {
 /// The document of an edit.
 fn edit_document(input: &EditInput) -> Result<String, Failure> {
     let source = input.source()?;
-    let edited = engine::apply_edits(&source, &input.commands, input.layout)?;
+    let destination = match input.target {
+        Target::File => Destination::File,
+        Target::Proposal => Destination::Staging,
+    };
+    // The proposal is about the model the agent worked on: the file it
+    // named, or the model the app has open when it named none. It is
+    // resolved before the batch runs, so a proposal that has nowhere to go
+    // fails without touching anything.
+    let target = match destination {
+        Destination::File => None,
+        Destination::Staging => Some(destination_path(&input.path)?),
+    };
+    let edited = engine::apply_edits(&source, &input.commands, input.layout, destination)?;
     let lint = genmsi_core::lint_document(&edited.program, &edited.model, &edited.name);
+    let proposal = match target {
+        // The model went to the disk: there is no proposal.
+        None => None,
+        Some(target) => {
+            let text = edited.text.as_deref().ok_or_else(|| {
+                Box::new(ToolError::arguments("the batch produced no model to stage")) as Failure
+            })?;
+            let staged = stage(text, &target, input.summary.as_deref())?;
+            Some(genmsi_core::documents::EditProposal {
+                id: staged.id,
+                model: staged.model.display().to_string(),
+            })
+        }
+    };
     let document = genmsi_core::edit_document(
         &lint,
         input.commands.len(),
         edited.written,
         edited.created,
         edited.source,
+        proposal,
     );
     Ok(genmsi_core::to_pretty_json(
         genmsi_core::EDIT_SCHEMA,
@@ -463,22 +594,54 @@ fn edit_document(input: &EditInput) -> Result<String, Failure> {
 
 /// The lint document of a model that was written.
 fn save_document(input: &SaveInput) -> Result<String, Failure> {
-    let path = PathBuf::from(&input.path);
-    let saved = engine::save_model(&path, &input.model)?;
-    // The composition is not a finding of the compiler: it is what the engine
-    // did to the model before writing it, and it does not belong in the list
-    // of findings (a model with no finding is `ok`, and a model the engine
-    // composed has none). The tool's own description says the composition
-    // happens, and `genmsi layout` says what it composed.
-    let document = genmsi_core::lint_document(
-        &saved.program,
-        &saved.model,
-        &saved.path.display().to_string(),
-    );
-    Ok(genmsi_core::to_pretty_json(
-        genmsi_core::LINT_SCHEMA,
-        &document,
-    ))
+    match input.target {
+        Target::File => {
+            // The destination comes first: without a path the model the app
+            // has open is the one that is written, and there is none when
+            // the app has no model open.
+            let path = destination_path(&input.path)?;
+            let text = model_text(input)?;
+            let saved = engine::save_model(&path, text)?;
+            // The composition is not a finding of the compiler: it is what the engine
+            // did to the model before writing it, and it does not belong in the list
+            // of findings (a model with no finding is `ok`, and a model the engine
+            // composed has none). The tool's own description says the composition
+            // happens, and `genmsi layout` says what it composed.
+            let document = genmsi_core::lint_document(
+                &saved.program,
+                &saved.model,
+                &saved.path.display().to_string(),
+            );
+            Ok(genmsi_core::to_pretty_json(
+                genmsi_core::LINT_SCHEMA,
+                &document,
+            ))
+        }
+        Target::Proposal => {
+            // The proposal is about the model the agent worked on: the file
+            // it named, or the model the app has open when it named none.
+            let target = destination_path(&input.path)?;
+            let text = model_text(input)?;
+            // The model is prepared exactly like a model that goes to the
+            // disk: it is checked and its canvas is composed, so the person
+            // sees the same model in both cases.
+            let prepared = engine::prepare_save(text, "<proposal>")?;
+            let staged = stage(
+                &genmsi_format::to_string(&prepared.model),
+                &target,
+                input.summary.as_deref(),
+            )?;
+            let document = genmsi_core::lint_document(
+                &prepared.program,
+                &prepared.model,
+                &staged.model.display().to_string(),
+            );
+            Ok(genmsi_core::to_pretty_json(
+                genmsi_core::LINT_SCHEMA,
+                &document,
+            ))
+        }
+    }
 }
 
 /// What the lint document says when the engine composed the model.
@@ -535,7 +698,13 @@ impl ServerHandler for GenmsiServer {
              its events and `explain_model` to describe it: its `program` is the \
              compiled GPSS and its `model` is the document itself, with every block, \
              its properties by name and the links that wire the blocks. Give the model \
-             either as `path` (a .gmdl file) or as `model` (the .gmdl document as text). \
+             either as `path` (a .gmdl file) or as `model` (the .gmdl document as text); \
+             when you give neither, the model the desktop app has open is the one the tool \
+             works on: the same model the reader is looking at. \
+             `apply_edit` and `save_model` take a `target`: `file` (the default) writes \
+             the model to the file, and `proposal` leaves it in the staging area of the \
+             app, where the reader sees it and decides; the verdict comes back in \
+             `app_state`. \
              Two blocks are connected by a link inside the `<links>` of their container: \
              `<link frommoduleid=\"1\" fromioid=\"1\" tomoduleid=\"2\" toioid=\"1\"/>`, \
              where the ioids are the ports the catalogue publishes for the class. \
@@ -631,11 +800,17 @@ mod tests {
     }
 
     #[test]
-    fn a_model_without_a_path_is_an_argument_error() {
+    fn a_model_without_a_path_is_the_model_the_app_has_open() {
+        // The machine the test runs on may have the app open with a model:
+        // then the tool lints that model. Otherwise there is no destination
+        // to guess, and the failure is its own class.
         let result = GenmsiServer::new().lint(Parameters(ModelInput::default()));
-        assert_eq!(result.is_error, Some(true));
         let text = text_of(&result);
-        assert!(text.contains("\"error\": \"invalid_arguments\""), "{text}");
+        if result.is_error == Some(true) {
+            assert!(text.contains("\"error\": \"no_open_model\""), "{text}");
+        } else {
+            assert!(text.contains("\"schema\": \"genmsi.lint/1\""), "{text}");
+        }
     }
 
     #[test]
@@ -678,8 +853,44 @@ mod tests {
     }
 
     #[test]
-    fn no_source_is_an_argument_error() {
-        let error = ModelInput::default().source().expect_err("must fail");
-        assert_eq!(error.error, "invalid_arguments");
+    fn no_source_is_the_model_the_app_has_open() {
+        // The machine the test runs on may have the app open with a model:
+        // then that model is the source. Otherwise there is no destination
+        // to guess, and the failure is its own class and says what to do.
+        match ModelInput::default().source() {
+            Ok(ModelSource::File(path)) => {
+                let open = genmsi_core::current_open_model()
+                    .and_then(|document| document.path)
+                    .expect("the app has a model open");
+                assert_eq!(path, PathBuf::from(open));
+            }
+            Ok(ModelSource::Inline(_)) => {
+                panic!("a model with no source is the model the app has open")
+            }
+            Err(error) => {
+                assert_eq!(error.error, "no_open_model");
+                let message = error.message;
+                assert!(
+                    message.contains("give `path`") && message.contains("open a model in the app"),
+                    "the message says what to do: {message}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_target_is_spell_in_lower_case() {
+        let input: SaveInput = serde_json::from_str(
+            r#"{"model":"<gmodel/>","target":"proposal","summary":"the bus loop"}"#,
+        )
+        .expect("the input parses");
+        assert_eq!(input.target, Target::Proposal);
+        assert!(input.path.is_none(), "the path may be left out");
+        assert_eq!(input.summary.as_deref(), Some("the bus loop"));
+
+        let default: SaveInput =
+            serde_json::from_str(r#"{"model":"<gmodel/>","path":"model.gmdl"}"#)
+                .expect("the input parses");
+        assert_eq!(default.target, Target::File, "the file is the default");
     }
 }

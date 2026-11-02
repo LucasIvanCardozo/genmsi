@@ -388,10 +388,19 @@ async fn a_refused_model_points_at_the_block_to_fix() {
 }
 
 #[tokio::test]
-async fn a_call_without_a_model_is_an_argument_error() {
+async fn a_call_without_a_model_works_on_the_model_the_app_has_open() {
+    // The default of the tools is the model the app has open: the test that
+    // says it runs in a server process of its own, with its own data
+    // directory, because the server in process shares the environment of
+    // the test process — and the machine may have the app open.
+    // That test lives in `proposal.rs`; here the witness is only that the
+    // failure is not the old `invalid_arguments` any more.
     let (client, _server) = pair().await;
     let result = call(&client, "lint", json!({})).await;
-    assert_eq!(result["error"], "invalid_arguments");
+    assert_ne!(
+        result["error"], "invalid_arguments",
+        "the tools do not ask for a path any more: {result}"
+    );
 }
 
 /// A temporary directory that cleans itself up.

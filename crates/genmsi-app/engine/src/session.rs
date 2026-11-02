@@ -12,10 +12,11 @@
 use std::path::{Path, PathBuf};
 
 use genmsi_core::documents::{lint_document, model_document, ModelDocument};
+use genmsi_core::live::{LiveBody, LiveRun, model_value, report_value};
 use genmsi_format::edit::{EditCommand, EditSession};
 use genmsi_format::model::{Block, ContainerHeader, GmdlModel, SectionKind};
 
-use crate::{AppError, model_error};
+use crate::{AppError, RunDocuments, model_error, run_model_documents_bytes, simulate_model_bytes};
 
 /// The version code the original editor wrote in a new model.
 const NEW_MODEL_VERSION: &str = "1.00.2008.03.23";
@@ -63,6 +64,26 @@ pub struct SessionState {
     pub can_redo: bool,
 }
 
+/// The last run of the session: the parameters it ran with and the documents
+/// it gave.
+///
+/// The run stays with the session, because the app publishes it: an agent
+/// that talks to the engine through the MCP has to see the run the reader
+/// is looking at, with the parameters that produced it.
+#[derive(Debug, Clone)]
+pub struct LastRun {
+    /// The seed of the run: the same seed reproduces the same run.
+    pub seed: u64,
+    /// The horizon of the run.
+    pub until: Option<f64>,
+    /// The `START` of the run: how many terminations end it.
+    pub start: u64,
+    /// The report of the run, byte for byte.
+    pub report: Option<String>,
+    /// The trace of the run, byte for byte.
+    pub trace: Option<String>,
+}
+
 /// The outcome of a save.
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -87,6 +108,8 @@ pub struct Session {
     name: Option<String>,
     /// Where the model is written when it is saved.
     path: Option<PathBuf>,
+    /// The last run the session made.
+    last_run: Option<LastRun>,
 }
 
 impl Session {
@@ -101,6 +124,7 @@ impl Session {
             previous: Vec::new(),
             name: Some(name.to_string()),
             path: Some(path.to_path_buf()),
+            last_run: None,
         })
     }
 
@@ -145,6 +169,7 @@ impl Session {
             previous: Vec::new(),
             name: None,
             path: None,
+            last_run: None,
         }
     }
 
@@ -289,6 +314,119 @@ impl Session {
             bytes,
         })
     }
+
+    /// The last run the session made.
+    ///
+    /// `None` when the session did not run the model yet.
+    pub fn last_run(&self) -> Option<&LastRun> {
+        self.last_run.as_ref()
+    }
+
+    /// Keep the documents of a run and the parameters it ran with.
+    ///
+    /// The run may have happened off the thread of the window: the app
+    /// keeps the model in memory free while the engine works, and the
+    /// documents of the run come back when it is done. The session keeps
+    /// them, so the app can publish what the reader is seeing.
+    pub fn remember_run(
+        &mut self,
+        seed: u64,
+        until: Option<f64>,
+        start: u64,
+        report: Option<String>,
+        trace: Option<String>,
+    ) {
+        self.last_run = Some(LastRun {
+            seed,
+            until,
+            start,
+            report,
+            trace,
+        });
+    }
+
+    /// Run the model in memory and keep the documents of the run.
+    ///
+    /// The report and the trace come from **one** run, with the trace on:
+    /// the engine is deterministic, so the two documents are the ones two
+    /// separate runs would have given.
+    pub fn run(
+        &mut self,
+        seed: u64,
+        until: Option<f64>,
+        start: u64,
+        limit: usize,
+    ) -> Result<RunDocuments, AppError> {
+        let documents =
+            run_model_documents_bytes(self.editor.model(), seed, until, start, limit, None)?;
+        self.remember_run(
+            seed,
+            until,
+            start,
+            Some(documents.report.clone()),
+            Some(documents.trace.clone()),
+        );
+        Ok(documents)
+    }
+
+    /// Run the model in memory for its report and keep it.
+    pub fn simulate(
+        &mut self,
+        seed: u64,
+        until: Option<f64>,
+        start: u64,
+    ) -> Result<String, AppError> {
+        let document = simulate_model_bytes(self.editor.model(), seed, until, start, None)?;
+        self.remember_run(seed, until, start, Some(document.clone()), None);
+        Ok(document)
+    }
+
+    /// The live state of the app, as the core publishes it.
+    ///
+    /// The model in memory travels **only** when the reader has changes
+    /// that are not saved: when it does not, the file *is* the model and
+    /// the agent reads it from there.
+    pub fn live_body(&self) -> LiveBody {
+        let state = self.state();
+        LiveBody {
+            path: state.path.as_deref().map(absolute_path),
+            pid: Some(std::process::id()),
+            dirty: state.dirty,
+            diagnostics: state.diagnostics.diagnostics.clone(),
+            model: state.dirty.then(|| model_value(&state.model)),
+            run: self.last_run.as_ref().map(|run| LiveRun {
+                seed: run.seed,
+                until: run.until,
+                start: run.start,
+                report: run.report.as_deref().and_then(report_value),
+            }),
+        }
+    }
+}
+
+/// The live state of an app that has no model open.
+///
+/// The app is running: the document says so, with the pid of the process,
+/// and it says that no model is open.
+pub fn empty_live_body() -> LiveBody {
+    LiveBody {
+        path: None,
+        pid: Some(std::process::id()),
+        dirty: false,
+        diagnostics: Vec::new(),
+        model: None,
+        run: None,
+    }
+}
+
+/// The absolute path of a model, as the machine sees it.
+///
+/// The agent that reads the live state has to be able to find the model
+/// without knowing where the app was started from.
+fn absolute_path(path: &str) -> String {
+    std::path::absolute(path)
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|_| path.to_string())
 }
 
 /// What the model compiles to.

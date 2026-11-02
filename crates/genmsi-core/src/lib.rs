@@ -28,6 +28,7 @@ pub mod documents;
 pub mod error;
 pub mod expr;
 pub mod glossary;
+pub mod live;
 pub mod oracle;
 pub mod gpss;
 pub mod open_model;
@@ -42,15 +43,20 @@ pub mod xact;
 pub use documents::{
     CATALOGUE_SCHEMA, CLASSES_SCHEMA, CLASSLIST_SCHEMA, CLASS_SCHEMA, CatalogueClass,
     CatalogueDocument, CatalogueEntity, CataloguePort, CatalogueProperty, ClassDocument,
-    ClassesDocument, ClassListDocument, ClassListEntry, DefinitionCounts, EXPLAIN_SCHEMA, Envelope,
-    LINT_SCHEMA, LintDocument, MODEL_SCHEMA, ModelBlock, ModelDocument, ModelEdge, ModelPort,
-    ModelProperty, ModelRect, OPEN_MODEL_SCHEMA, REPORT_SCHEMA, TRACE_SCHEMA, TraceDocument,
-    catalogue_document, class_document, class_list_document, lint_diagnostics, lint_document,
-    model_document, to_pretty_json, trace_document,
+    ClassesDocument, ClassListDocument, ClassListEntry, DefinitionCounts, EDIT_SCHEMA,
+    EXPLAIN_SCHEMA, Envelope, EditDocument, LINT_SCHEMA, LintDocument, MODEL_SCHEMA, ModelBlock,
+    ModelDocument, ModelEdge, ModelPort, ModelProperty, ModelRect, OPEN_MODEL_SCHEMA, REPORT_SCHEMA,
+    TRACE_SCHEMA, TraceDocument, catalogue_document, class_document, class_list_document,
+    edit_document, lint_diagnostics, lint_document, model_document, to_pretty_json, trace_document,
 };
 pub use error::EngineError;
+pub use live::{
+    LIVE_FILE, LIVE_SCHEMA, LiveBody, LiveRun, current_live, current_live_in, live_document,
+    live_file, model_value, read_live_in, report_value, same_file, unsaved_changes_in,
+    unsaved_changes_on, write_live,
+};
 pub use open_model::{
-    APP_IDENTIFIER, OPEN_MODEL_FILE, OpenModelDocument, OpenModelError, app_data_dir,
+    APP_IDENTIFIER, OPEN_MODEL_FILE, AppDataError, OpenModelDocument, app_data_dir,
     current_open_model, open_model_document, process_is_running, read_open_model, write_open_model,
 };
 pub use program::{Program, compile, known_classes};

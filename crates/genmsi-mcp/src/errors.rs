@@ -65,6 +65,7 @@ impl ToolError {
         "model_not_found",
         "model_unreadable",
         "model_unwritable",
+        "no_open_model",
         "runtime_error",
         "unsupported_block",
     ];
@@ -155,9 +156,51 @@ impl ToolError {
             error: "model_locked",
             message: format!(
                 "the app has unsaved changes on this model; nothing was written: {path}. \
-                 Ask the reader to save the model and send the edit again."
+                 Ask the reader to save the model and send the edit again, or leave a \
+                 proposal instead (target: \"proposal\") and let the reader decide."
             ),
             path: Some(path),
+            line: None,
+            column: None,
+            node: None,
+            class: None,
+            command: None,
+            op: None,
+        }
+    }
+
+    /// The app has no model open.
+    ///
+    /// The agent asked for a model and named neither a file nor a document:
+    /// the model the app has open is the destination, and there is none.
+    /// The failure says what to do, because there is always something to do:
+    /// name a file, or open a model in the app.
+    pub fn no_open_model() -> Self {
+        Self {
+            error: "no_open_model",
+            message: "there is no model open in the app: give `path` of a model \
+                      file, or open a model in the app"
+                .to_string(),
+            path: None,
+            line: None,
+            column: None,
+            node: None,
+            class: None,
+            command: None,
+            op: None,
+        }
+    }
+
+    /// The proposal could not be staged.
+    ///
+    /// The staging area of the app is where a model waits for the person,
+    /// and it lives in the data directory of the app: a machine that does
+    /// not say where that data lives has no place to leave a proposal.
+    pub fn cannot_stage(reason: impl fmt::Display) -> Self {
+        Self {
+            error: "model_unwritable",
+            message: format!("cannot stage the proposal: {reason}"),
+            path: None,
             line: None,
             column: None,
             node: None,

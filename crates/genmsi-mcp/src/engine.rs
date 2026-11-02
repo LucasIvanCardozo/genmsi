@@ -85,6 +85,19 @@ pub fn load(source: &ModelSource) -> Result<Loaded, Failure> {
     })
 }
 
+/// Where a model goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Destination {
+    /// The model is written to the file it was named by.
+    #[default]
+    File,
+    /// The model is not written: it is staged for the app to show.
+    ///
+    /// The staging area is the way the agent offers its work to the person
+    /// without touching the disk.
+    Staging,
+}
+
 /// A model that was written to a file.
 #[derive(Debug)]
 pub struct Saved {
@@ -113,6 +126,12 @@ pub struct Edited {
     pub created: Vec<u32>,
     /// The model as text, when there was no file to write it to.
     pub source: Option<String>,
+    /// The model as text, when it was not written to a file.
+    ///
+    /// `source` keeps its own meaning —the model came as text—; this one is
+    /// the text of the result, wherever the result went: to the disk, to the
+    /// answer of the tool, or to the staging area of the app.
+    pub text: Option<String>,
 }
 
 /// Where the blocks a batch adds go.
@@ -150,13 +169,19 @@ pub fn apply_edits(
     source: &ModelSource,
     commands: &[EditCommand],
     layout: Layout,
+    destination: Destination,
 ) -> Result<Edited, Failure> {
     let name = source.name();
     // The brake comes first: a model the app has open with changes that are
     // not saved is not written, whatever the batch says. A model given as
     // text has no file the app could have open, so the brake does not
-    // apply to it.
-    if let ModelSource::File(path) = source {
+    // apply to it. A batch that goes to the staging area writes nothing, so
+    // the brake does not apply to it either: the model on the disk is not
+    // touched, and the app refuses to adopt the proposal while the reader
+    // has changes that are not saved.
+    if destination == Destination::File
+        && let ModelSource::File(path) = source
+    {
         refuse_locked(path)?;
     }
     // The model is parsed, but neither validated nor compiled: the commands
@@ -235,12 +260,22 @@ pub fn apply_edits(
         .map_err(|error| ToolError::from_format(&error, Some(&name), Some(&model)))?;
     let program = genmsi_core::compile_model(&model)
         .map_err(|error| ToolError::from_engine(&error, &model, &name))?;
-    let (written, text) = match source {
-        ModelSource::File(path) => {
+    let (written, source_text, text) = match (source, destination) {
+        (ModelSource::File(path), Destination::File) => {
             write_atomically(&model, path)?;
-            (true, None)
+            (true, None, None)
         }
-        ModelSource::Inline(_) => (false, Some(genmsi_format::to_string(&model))),
+        // The staging area: the model is not written anywhere, it is offered
+        // to the person. The text travels with the answer so the caller can
+        // stage it.
+        (ModelSource::File(_), Destination::Staging) => {
+            let text = genmsi_format::to_string(&model);
+            (false, None, Some(text))
+        }
+        (ModelSource::Inline(_), _) => {
+            let text = genmsi_format::to_string(&model);
+            (false, Some(text.clone()), Some(text))
+        }
     };
     Ok(Edited {
         program,
@@ -248,7 +283,8 @@ pub fn apply_edits(
         name,
         written,
         created,
-        source: text,
+        source: source_text,
+        text,
     })
 }
 
@@ -304,6 +340,43 @@ fn op_of(command: &EditCommand) -> String {
         .unwrap_or_else(|| "command".to_string())
 }
 
+/// A model that is ready to be written.
+#[derive(Debug)]
+pub struct Prepared {
+    /// The compiled program: the model compiles, that is why it is written.
+    pub program: Program,
+    /// The model as it will be written, with its canvas composed.
+    pub model: GmdlModel,
+}
+
+/// Prepare a model to be written.
+///
+/// The model is checked **before** it is written: a model that does not
+/// load, does not validate or does not compile is **not** written, and the
+/// failure names the block that caused it, exactly like the other tools.
+///
+/// A model that carries no canvas geometry is **composed** before it is
+/// written: the geometry is the engine's business, and a model the editor
+/// cannot draw is of no use to the reader. A model that already carries its
+/// geometry keeps the disposition its author left.
+///
+/// The preparation is apart from the write so that a model that goes to the
+/// staging area of the app is composed exactly like a model that goes to the
+/// disk: the person sees the same model in both cases.
+pub fn prepare_save(text: &str, name: &str) -> Result<Prepared, Failure> {
+    let mut model = genmsi_format::parse_str(text)
+        .map_err(|error| ToolError::from_format(&error, Some(name), None))?;
+    genmsi_format::validate(&model)
+        .map_err(|error| ToolError::from_format(&error, Some(name), Some(&model)))?;
+    let program = genmsi_core::compile_model(&model)
+        .map_err(|error| ToolError::from_engine(&error, &model, name))?;
+    // The composition: the model that is about to be written is composed
+    // only when its geometry is incomplete, so a model its author placed
+    // keeps the disposition it was given.
+    genmsi_format::compose_incomplete(&mut model);
+    Ok(Prepared { program, model })
+}
+
 /// Save a model to a file.
 ///
 /// The model is checked **before** it is written: a model that does not
@@ -324,20 +397,11 @@ pub fn save_model(path: &Path, text: &str) -> Result<Saved, Failure> {
     // edit: nothing is written on a model the app has open with changes
     // that are not saved.
     refuse_locked(path)?;
-    let mut model = genmsi_format::parse_str(text)
-        .map_err(|error| ToolError::from_format(&error, Some(&name), None))?;
-    genmsi_format::validate(&model)
-        .map_err(|error| ToolError::from_format(&error, Some(&name), Some(&model)))?;
-    let program = genmsi_core::compile_model(&model)
-        .map_err(|error| ToolError::from_engine(&error, &model, &name))?;
-    // The composition: the model that is about to be written is composed
-    // only when its geometry is incomplete, so a model its author placed
-    // keeps the disposition it was given.
-    genmsi_format::compose_incomplete(&mut model);
-    let bytes = write_atomically(&model, path)?;
+    let prepared = prepare_save(text, &name)?;
+    let bytes = write_atomically(&prepared.model, path)?;
     Ok(Saved {
-        program,
-        model,
+        program: prepared.program,
+        model: prepared.model,
         path: path.to_path_buf(),
         bytes,
     })

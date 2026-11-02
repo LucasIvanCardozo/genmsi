@@ -29,7 +29,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use genmsi_app_engine::{
-    LIVE_FILE, LiveBody, ModelFile, Session, SessionRequest, SessionResponse, answer,
+    LIVE_FILE, LiveBody, ModelFile, Session, SessionRequest, SessionResponse, answer_in,
     empty_live_body, lint_document_bytes, list_models as list_model_files, live_document,
     model_document_bytes, run_model_documents_bytes, simulate_document_bytes, simulate_model_bytes,
     trace_document_bytes, trace_model_bytes, write_live,
@@ -310,7 +310,11 @@ pub async fn session(app: tauri::AppHandle, request: String) -> Result<String, S
     log(&format!("session: {}", describe(&request)));
     let changes = changes_the_open_model(&request);
     let run = run_parameters(&request);
-    let answered = answer_request(request).await?;
+    // The proposals live in the data directory of the app: the shell
+    // resolves it with the resolver of the platform, and the core
+    // resolves the same one.
+    let directory = app.path().app_data_dir().ok();
+    let answered = answer_request(request, directory.clone()).await?;
     // The run happened off the thread of the window: the session keeps its
     // documents, so the live state can say what the reader is seeing.
     if let Some(run) = run {
@@ -417,6 +421,10 @@ fn describe(request: &SessionRequest) -> String {
         SessionRequest::Undo => "undo".to_string(),
         SessionRequest::Redo => "redo".to_string(),
         SessionRequest::State => "state".to_string(),
+        SessionRequest::PendingProposal => "pending_proposal".to_string(),
+        SessionRequest::AdoptProposal => "adopt_proposal".to_string(),
+        SessionRequest::AcceptProposal => "accept_proposal".to_string(),
+        SessionRequest::DiscardProposal { .. } => "discard_proposal".to_string(),
         SessionRequest::Save { path } => match path {
             Some(path) => format!("save {path}"),
             None => "save".to_string(),
@@ -437,7 +445,8 @@ fn describe(request: &SessionRequest) -> String {
 ///
 /// Only the requests that open, reload, create or save a model change it:
 /// the others leave the session as it was, and the file the app publishes
-/// is not touched.
+/// is not touched. Accepting a proposal writes the file the app has open,
+/// so it changes it too.
 fn changes_the_open_model(request: &SessionRequest) -> bool {
     matches!(
         request,
@@ -445,6 +454,7 @@ fn changes_the_open_model(request: &SessionRequest) -> bool {
             | SessionRequest::New
             | SessionRequest::Reload { .. }
             | SessionRequest::Save { .. }
+            | SessionRequest::AcceptProposal
     )
 }
 
@@ -503,7 +513,7 @@ fn publish_open_model(directory: &Path, answer: &str) {
 /// The file is written only when the state changes: the app does not
 /// rewrite it on every heartbeat.
 fn publish_live(directory: &Path) -> bool {
-    let body = live_body_of_the_app();
+    let body = live_body_of_the_app(directory);
     let text = live_document(&body);
     if published_live(directory).as_deref() == Some(text.as_str()) {
         // The state did not change: the file is not written again.
@@ -523,13 +533,16 @@ fn publish_live(directory: &Path) -> bool {
 }
 
 /// The live state of the app, from the session it keeps open.
-fn live_body_of_the_app() -> LiveBody {
+fn live_body_of_the_app(directory: &Path) -> LiveBody {
     let guard = match SESSION.lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
     };
     match guard.as_ref() {
-        Some(session) => session.live_body(),
+        // The directory travels with it: a proposal that waits for the
+        // person is published too, so an agent that left one finds out
+        // that it is waiting.
+        Some(session) => session.live_body_in(Some(directory)),
         None => empty_live_body(),
     }
 }
@@ -592,9 +605,15 @@ pub fn forget_open_model_in(directory: &Path) {
 /// A request that runs the model is answered off the thread of the window;
 /// the rest is answered right away: they touch the session and the disk, and
 /// they are quick.
-async fn answer_request(request: SessionRequest) -> Result<String, String> {
+///
+/// The directory is where the proposals live: the requests that ask for one,
+/// that adopt one or that resolve one need to know where they are.
+async fn answer_request(
+    request: SessionRequest,
+    directory: Option<PathBuf>,
+) -> Result<String, String> {
     let Some(run) = RunRequest::of(&request) else {
-        return answer_now(request);
+        return answer_now(request, directory);
     };
     // The model is copied out of the session: the run works on the copy, so
     // the session is free while the engine works and the reader can keep
@@ -607,7 +626,7 @@ async fn answer_request(request: SessionRequest) -> Result<String, String> {
     };
     let Some(model) = model else {
         // No model is open: the protocol says so, and it says it right away.
-        return answer_now(request);
+        return answer_now(request, directory);
     };
     run_off_thread(move |control| {
         // The reader may have stopped the run before the work began: there
@@ -654,11 +673,11 @@ async fn answer_request(request: SessionRequest) -> Result<String, String> {
 }
 
 /// Answer one request of the protocol that does not run the model.
-fn answer_now(request: SessionRequest) -> Result<String, String> {
+fn answer_now(request: SessionRequest, directory: Option<PathBuf>) -> Result<String, String> {
     let mut guard = SESSION
         .lock()
         .map_err(|_| "la sesión del modelo está ocupada".to_string())?;
-    let response = answer(&mut guard, request);
+    let response = answer_in(&mut guard, request, directory.as_deref());
     serde_json::to_string(&response).map_err(|error| error.to_string())
 }
 
@@ -926,6 +945,47 @@ mod tests {
         dir
     }
 
+    /// The model the app has open: a copy of the reference, in a directory
+    /// of its own, so the tests never write in the repository.
+    fn open_model(directory: &Path) -> PathBuf {
+        let text = std::fs::read_to_string(reference()).expect("the reference model is there");
+        let path = directory.join("open.gmdl");
+        std::fs::write(&path, text).expect("the model is written");
+        path
+    }
+
+    /// A proposal of an agent: a model that is not the one on the disk.
+    ///
+    /// The document of the proposal is written by the core: the app and the
+    /// MCP server cannot write different bytes for the same proposal.
+    fn proposal(directory: &Path, open: &Path, id: &str) {
+        proposal_about(directory, open, id);
+    }
+
+    /// A proposal of an agent about the file named by `target`.
+    ///
+    /// The model it carries is the version of that file.
+    fn proposal_about(directory: &Path, target: &Path, id: &str) {
+        let text = std::fs::read_to_string(reference()).expect("the reference model is there");
+        let text = text.replace("caption=\"Modelo\"", "caption=\"Modelo propuesto\"");
+        let model = genmsi_app_engine::write_proposal_model(directory, id, &text)
+            .expect("the model of the proposal is written");
+        let document = genmsi_app_engine::ProposalDocument::pending(id, &model, Some(target))
+            .with_summary(Some("the bus loop"));
+        genmsi_app_engine::write_proposal(directory, &document).expect("the proposal is written");
+    }
+
+    /// The answer of the shell, parsed.
+    fn answer_of(answered: &str) -> serde_json::Value {
+        serde_json::from_str(answered).expect("the answer is JSON")
+    }
+
+    /// The live state the app published, parsed.
+    fn published(directory: &Path) -> serde_json::Value {
+        let text = std::fs::read_to_string(directory.join(LIVE_FILE)).expect("the file is there");
+        serde_json::from_str(&text).expect("the document is JSON")
+    }
+
     /// The command of the version answers the version of the shell.
     ///
     /// The version that travels in the bundle is the one of the shell's
@@ -1089,7 +1149,7 @@ mod tests {
         };
         let parameters = run_parameters(&request).expect("the request asks for a run");
         let answered =
-            tauri::async_runtime::block_on(answer_request(request)).expect("the run answers");
+            tauri::async_runtime::block_on(answer_request(request, None)).expect("the run answers");
         remember_run(&parameters, &answered);
         assert!(publish_live(&dir), "the file was not written");
 
@@ -1106,8 +1166,7 @@ mod tests {
 
     /// The live state goes away with the app.
     #[test]
-    fn the_live_file_goes_away_with_the_app() {
-        let _globals = globals();
+    fn the_live_file_goes_away_with_the_app() {        let _globals = globals();
         let dir = scratch("live-close");
         let path = reference();
         {
@@ -1259,11 +1318,11 @@ mod tests {
         // What the protocol answers, in the session process of the dev
         // bridge: the bytes the frontend knows.
         let mut session = Some(Session::open(&path, &reference_name()).expect("the model opens"));
-        let expected = serde_json::to_string(&answer(&mut session, run_request()))
+        let expected = serde_json::to_string(&genmsi_app_engine::answer(&mut session, run_request()))
             .expect("the answer serializes");
         // What the shell answers, with the run off the thread of the window.
         let answered =
-            tauri::async_runtime::block_on(answer_request(run_request())).expect("the run answers");
+            tauri::async_runtime::block_on(answer_request(run_request(), None)).expect("the run answers");
         assert_eq!(
             answered, expected,
             "the run off the thread gave other documents"
@@ -1402,6 +1461,266 @@ mod tests {
             STOPPED_MESSAGE,
             "the shell did not say the run was stopped"
         );
+
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
+    }
+
+    /// The shell says which proposal waits for the person.
+    #[test]
+    fn the_shell_says_which_proposal_waits() {
+        let _globals = globals();
+        let dir = scratch("pending-proposal");
+        let open = open_model(&dir);
+        proposal(&dir, &open, "1700000000000-ab");
+        // The proposal waits for the model the app has open: the session
+        // has to have it open for the app to take it.
+        {
+            let mut guard = SESSION.lock().expect("the session is free");
+            *guard = Some(
+                Session::open(&open, &open.display().to_string()).expect("the model opens"),
+            );
+        }
+        let answered = tauri::async_runtime::block_on(answer_request(
+            SessionRequest::PendingProposal,
+            Some(dir.clone()),
+        ))
+        .expect("the shell answers");
+        let answer = answer_of(&answered);
+        assert_eq!(answer["ok"], true, "{answer}");
+        // The document of the proposal travels: the bytes the core writes.
+        let document: serde_json::Value =
+            serde_json::from_str(answer["document"].as_str().expect("the document travels"))
+                .expect("the document is JSON");
+        assert_eq!(document["schema"], "genmsi.proposal/1");
+        assert_eq!(document["id"], "1700000000000-ab");
+        assert_eq!(document["state"], "pending");
+        assert_eq!(document["summary"], "the bus loop");
+
+        // Without a proposal there is nothing to say, and it is not a
+        // failure.
+        let empty = scratch("pending-proposal-empty");
+        let answered = tauri::async_runtime::block_on(answer_request(
+            SessionRequest::PendingProposal,
+            Some(empty.clone()),
+        ))
+        .expect("the shell answers");
+        let answer = answer_of(&answered);
+        assert_eq!(answer["ok"], true, "{answer}");
+        assert!(answer["document"].is_null(), "there is a proposal: {answer}");
+
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
+        std::fs::remove_dir_all(&empty).expect("the scratch directory is removed");
+    }
+
+    /// The shell adopts a proposal and the verdict travels.
+    #[test]
+    fn the_shell_adopts_a_proposal_and_publishes_the_verdict() {
+        let _globals = globals();
+        let dir = scratch("adopt-proposal");
+        let open = open_model(&dir);
+        proposal(&dir, &open, "1700000000000-ab");
+        {
+            let mut guard = SESSION.lock().expect("the session is free");
+            *guard = Some(
+                Session::open(&open, &open.display().to_string()).expect("the model opens"),
+            );
+        }
+
+        // The proposal is adopted: the session is dirty and the file the
+        // app has open does not move.
+        let answered = tauri::async_runtime::block_on(answer_request(
+            SessionRequest::AdoptProposal,
+            Some(dir.clone()),
+        ))
+        .expect("the shell answers");
+        let answer = answer_of(&answered);
+        assert_eq!(answer["ok"], true, "{answer}");
+        assert_eq!(answer["state"]["dirty"], true, "{answer}");
+        assert_eq!(
+            answer["state"]["path"].as_str(),
+            Some(open.display().to_string().as_str()),
+            "{answer}"
+        );
+        assert_eq!(answer["state"]["proposal"]["id"], "1700000000000-ab");
+
+        // The live state carries the proposal that waits for the person.
+        assert!(publish_live(&dir), "the live state was not published");
+        let document = published(&dir);
+        assert_eq!(document["proposal"]["id"], "1700000000000-ab");
+        assert_eq!(document["proposal"]["state"], "pending");
+        assert_eq!(document["proposal"]["summary"], "the bus loop");
+
+        // The person accepts: the file the app has open holds the model of
+        // the proposal, and the verdict travels.
+        let answered = tauri::async_runtime::block_on(answer_request(
+            SessionRequest::AcceptProposal,
+            Some(dir.clone()),
+        ))
+        .expect("the shell answers");
+        let answer = answer_of(&answered);
+        assert_eq!(answer["ok"], true, "{answer}");
+        let written = std::fs::read_to_string(&open).expect("the file is there");
+        assert!(
+            written.contains("Modelo propuesto"),
+            "the file does not hold the model of the proposal: {written}"
+        );
+        // The verdict is a change of the live state: the file is written
+        // again.
+        assert!(publish_live(&dir), "the live state was not published again");
+        let document = published(&dir);
+        assert_eq!(document["proposal"]["state"], "accepted");
+
+        // The document of the proposal is resolved by the core.
+        let resolved = genmsi_app_engine::read_proposal_in(&dir, "1700000000000-ab")
+            .expect("the proposal is there");
+        assert_eq!(
+            resolved.state,
+            genmsi_app_engine::ProposalState::Accepted
+        );
+
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
+    }
+
+    /// A session with changes that are not saved refuses the adoption.
+    #[test]
+    fn a_dirty_session_refuses_the_adoption() {
+        let _globals = globals();
+        let dir = scratch("dirty-proposal");
+        let open = open_model(&dir);
+        proposal(&dir, &open, "1700000000000-ab");
+        {
+            let mut guard = SESSION.lock().expect("the session is free");
+            *guard = Some(
+                Session::open(&open, &open.display().to_string()).expect("the model opens"),
+            );
+        }
+
+        // The reader changes the model and does not save it.
+        let answered = tauri::async_runtime::block_on(answer_request(
+            SessionRequest::Apply {
+                command: genmsi_app_engine::EditCommand::SetCaption {
+                    id: 0,
+                    caption: "otro".to_string(),
+                },
+            },
+            Some(dir.clone()),
+        ))
+        .expect("the shell answers");
+        assert_eq!(answer_of(&answered)["ok"], true);
+
+        // The proposal waits: the adoption is refused and the answer says
+        // why.
+        let answered = tauri::async_runtime::block_on(answer_request(
+            SessionRequest::AdoptProposal,
+            Some(dir.clone()),
+        ))
+        .expect("the shell answers");
+        let answer = answer_of(&answered);
+        assert_eq!(answer["ok"], false, "{answer}");
+        let message = answer["error"].as_str().expect("the answer says why");
+        assert!(
+            message.contains("changes that are not saved"),
+            "the message does not say why: {message}"
+        );
+        // The proposal is still pending: nobody touched it.
+        let pending = genmsi_app_engine::read_proposal_in(&dir, "1700000000000-ab")
+            .expect("the proposal is there");
+        assert_eq!(
+            pending.state,
+            genmsi_app_engine::ProposalState::Pending
+        );
+
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
+    }
+
+    /// A proposal about another model is not adopted: it stays pending.
+    #[test]
+    fn a_proposal_about_another_model_is_not_adopted() {
+        let _globals = globals();
+        let dir = scratch("other-target");
+        let open = open_model(&dir);
+        // The proposal is about another file: the app does not have it
+        // open.
+        let other = dir.join("other.gmdl");
+        std::fs::copy(reference(), &other).expect("the model is copied");
+        proposal_about(&dir, &other, "1700000000000-ab");
+        {
+            let mut guard = SESSION.lock().expect("the session is free");
+            *guard = Some(
+                Session::open(&open, &open.display().to_string()).expect("the model opens"),
+            );
+        }
+
+        let answered = tauri::async_runtime::block_on(answer_request(
+            SessionRequest::AdoptProposal,
+            Some(dir.clone()),
+        ))
+        .expect("the shell answers");
+        let answer = answer_of(&answered);
+        assert_eq!(answer["ok"], false, "{answer}");
+        let message = answer["error"].as_str().expect("the answer says why");
+        assert!(
+            message.contains("about another model"),
+            "the message does not say why: {message}"
+        );
+        // The proposal stays pending: nobody touched it.
+        let pending = genmsi_app_engine::read_proposal_in(&dir, "1700000000000-ab")
+            .expect("the proposal is there");
+        assert_eq!(
+            pending.state,
+            genmsi_app_engine::ProposalState::Pending
+        );
+
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
+    }
+
+    /// The person discards the proposal: the model that was there comes
+    /// back and the proposal is rejected with the note.
+    #[test]
+    fn the_shell_discards_a_proposal_with_the_note() {
+        let _globals = globals();
+        let dir = scratch("discard-proposal");
+        let open = open_model(&dir);
+        proposal(&dir, &open, "1700000000000-ab");
+        {
+            let mut guard = SESSION.lock().expect("the session is free");
+            *guard = Some(
+                Session::open(&open, &open.display().to_string()).expect("the model opens"),
+            );
+        }
+
+        let answered = tauri::async_runtime::block_on(answer_request(
+            SessionRequest::AdoptProposal,
+            Some(dir.clone()),
+        ))
+        .expect("the shell answers");
+        assert_eq!(answer_of(&answered)["ok"], true);
+
+        let answered = tauri::async_runtime::block_on(answer_request(
+            SessionRequest::DiscardProposal {
+                note: Some("the bus is not right".to_string()),
+            },
+            Some(dir.clone()),
+        ))
+        .expect("the shell answers");
+        let answer = answer_of(&answered);
+        assert_eq!(answer["ok"], true, "{answer}");
+        // The model that was there is on the canvas again.
+        assert_eq!(answer["state"]["dirty"], false, "{answer}");
+
+        assert!(publish_live(&dir), "the live state was not published");
+        let document = published(&dir);
+        assert_eq!(document["proposal"]["state"], "rejected");
+        assert_eq!(document["proposal"]["note"], "the bus is not right");
+
+        // The document of the proposal is resolved by the core.
+        let resolved = genmsi_app_engine::read_proposal_in(&dir, "1700000000000-ab")
+            .expect("the proposal is there");
+        assert_eq!(
+            resolved.state,
+            genmsi_app_engine::ProposalState::Rejected
+        );
+        assert_eq!(resolved.note.as_deref(), Some("the bus is not right"));
 
         std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
     }

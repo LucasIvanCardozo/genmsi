@@ -22,6 +22,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::open_model::{AppDataError, app_data_dir, process_is_running};
+use crate::proposal::ProposalBody;
 
 /// The schema of the live document.
 pub const LIVE_SCHEMA: &str = "genmsi.live/1";
@@ -47,6 +48,10 @@ pub struct LiveBody {
     pub model: Option<Value>,
     /// The last run the app made.
     pub run: Option<LiveRun>,
+    /// The proposal the person has to decide, or the one they decided.
+    ///
+    /// `None` when there is no proposal on the table.
+    pub proposal: Option<ProposalBody>,
 }
 
 /// The last run of the app.
@@ -72,6 +77,7 @@ impl LiveBody {
             diagnostics: Vec::new(),
             model: None,
             run: None,
+            proposal: None,
         }
     }
 }
@@ -249,6 +255,7 @@ mod tests {
             diagnostics: vec!["el modelo usa una entidad que no declara".to_string()],
             model: None,
             run: None,
+            proposal: None,
         }
     }
 

@@ -9,7 +9,7 @@ use std::path::Path;
 use genmsi_mcp::errors::ToolError;
 
 /// Every class `docs/mcp.md` documents, in full.
-const DOCUMENTED: [&str; 13] = [
+const DOCUMENTED: [&str; 14] = [
     "class_not_found",
     "invalid_arguments",
     "invalid_block",
@@ -18,6 +18,7 @@ const DOCUMENTED: [&str; 13] = [
     "invalid_graph",
     "invalid_model",
     "invalid_xml",
+    "model_locked",
     "model_not_found",
     "model_unreadable",
     "model_unwritable",

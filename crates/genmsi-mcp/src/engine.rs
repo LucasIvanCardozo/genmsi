@@ -5,7 +5,7 @@
 //! engine already produces. The CLI does exactly the same through the same
 //! API, so both clients show the same numbers.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use genmsi_core::{Program, RunResult, SimConfig, Simulation};
 use genmsi_format::{EditCommand, EditSession, GmdlModel};
@@ -152,6 +152,13 @@ pub fn apply_edits(
     layout: Layout,
 ) -> Result<Edited, Failure> {
     let name = source.name();
+    // The brake comes first: a model the app has open with changes that are
+    // not saved is not written, whatever the batch says. A model given as
+    // text has no file the app could have open, so the brake does not
+    // apply to it.
+    if let ModelSource::File(path) = source {
+        refuse_locked(path)?;
+    }
     // The model is parsed, but neither validated nor compiled: the commands
     // of the batch may be what makes it valid.
     let mut model = match source {
@@ -311,8 +318,12 @@ fn op_of(command: &EditCommand) -> String {
 /// The write is atomic: the text goes to a temporary file next to the target
 /// and that file is renamed over it. A reader that watches the model (the
 /// desktop application does) never sees half a model.
-pub fn save_model(path: &std::path::Path, text: &str) -> Result<Saved, Failure> {
+pub fn save_model(path: &Path, text: &str) -> Result<Saved, Failure> {
     let name = path.display().to_string();
+    // The brake comes first, for the same reason it comes first in the
+    // edit: nothing is written on a model the app has open with changes
+    // that are not saved.
+    refuse_locked(path)?;
     let mut model = genmsi_format::parse_str(text)
         .map_err(|error| ToolError::from_format(&error, Some(&name), None))?;
     genmsi_format::validate(&model)
@@ -330,6 +341,26 @@ pub fn save_model(path: &std::path::Path, text: &str) -> Result<Saved, Failure> 
         path: path.to_path_buf(),
         bytes,
     })
+}
+
+/// The refusal of the verb when the app has the model open with changes that
+/// are not saved.
+///
+/// The app owns the model it has open: it does not reload a file that
+/// changes under it while the reader has changes that are not saved, so the
+/// work of the agent would stay invisible on the canvas and the work of the
+/// reader would overwrite it when she saves.
+///
+/// The brake is **mechanical**: the verb asks the core what the app is
+/// showing and the answer is the answer. A rule that depends on the agent
+/// remembering to ask is a rule an agent skips.
+fn refuse_locked(path: &Path) -> Result<(), Failure> {
+    if genmsi_core::unsaved_changes_on(path) {
+        return Err(Box::new(ToolError::model_locked(
+            path.display().to_string(),
+        )));
+    }
+    Ok(())
 }
 
 /// Write the model to a temporary file next to the target, then rename it.

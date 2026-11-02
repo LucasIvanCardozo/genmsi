@@ -61,6 +61,7 @@ impl ToolError {
         "invalid_graph",
         "invalid_model",
         "invalid_xml",
+        "model_locked",
         "model_not_found",
         "model_unreadable",
         "model_unwritable",
@@ -131,6 +132,31 @@ impl ToolError {
         Self {
             error: "model_unreadable",
             message: format!("cannot read model: {reason}"),
+            path: Some(path),
+            line: None,
+            column: None,
+            node: None,
+            class: None,
+            command: None,
+            op: None,
+        }
+    }
+
+    /// The app has the model open with changes that are not saved.
+    ///
+    /// The verb refuses to write: the app does not reload a model the reader
+    /// is editing, so the work of the agent would stay invisible on the
+    /// canvas, and the work of the reader would overwrite it when she saves.
+    /// The failure names the model, so the agent knows which one it is
+    /// talking about.
+    pub fn model_locked(path: impl Into<String>) -> Self {
+        let path = path.into();
+        Self {
+            error: "model_locked",
+            message: format!(
+                "the app has unsaved changes on this model; nothing was written: {path}. \
+                 Ask the reader to save the model and send the edit again."
+            ),
             path: Some(path),
             line: None,
             column: None,

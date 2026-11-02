@@ -311,6 +311,19 @@ impl GenmsiServer {
         finish(Ok(genmsi_core::open_model_document()))
     }
 
+    /// Say what the app is showing right now.
+    ///
+    /// Returns the `genmsi.live/1` document: the model the app has open,
+    /// whether the reader has changes that are not saved on it, what the app
+    /// found in it and the last run it made.
+    #[tool(
+        name = "app_state",
+        description = "See what the GenMSI desktop app is showing right now: the model it has open (`path`), whether the reader has changes that are not saved on it (`dirty`), what the app found in that model (`diagnostics`) and the last run the app made (`run`). It returns the genmsi.live/1 document, the one the app publishes; when the app is not running the document has `path: null` —that is an answer, not a failure. Ask it BEFORE you write on the model the app has open: `apply_edit` and `save_model` refuse with `model_locked` while the app has unsaved changes on that model, so tell the reader to save it and send the same edit again."
+    )]
+    pub fn app_state(&self) -> CallToolResult {
+        finish(Ok(app_state_document()))
+    }
+
     /// Write a model to a file.
     ///
     /// The model is checked first: a model that does not load, does not
@@ -415,6 +428,21 @@ fn lint_document(input: &ModelInput) -> Result<String, Failure> {
     ))
 }
 
+/// The live state of the app, as the core publishes it.
+///
+/// The core owns the shape of the document (D19): the app writes it in its
+/// data directory and the MCP reads it there, so neither of them invents
+/// the state of the other. Without an app the answer is the empty document,
+/// with no path: an answer is never a failure (the same rule `open_model`
+/// follows).
+fn app_state_document() -> String {
+    match genmsi_core::current_live() {
+        Some(document) => serde_json::to_string_pretty(&document)
+            .expect("the live document of the app always serializes"),
+        None => genmsi_core::live_document(&genmsi_core::LiveBody::empty()),
+    }
+}
+
 /// The document of an edit.
 fn edit_document(input: &EditInput) -> Result<String, Failure> {
     let source = input.source()?;
@@ -513,6 +541,12 @@ impl ServerHandler for GenmsiServer {
              where the ioids are the ports the catalogue publishes for the class. \
              Call `open_model` to learn which file the desktop app has open: write \
              the model there and the app reloads it and runs it again. \
+             Call `app_state` to see what the reader is looking at right now (the \
+             model the app has open, whether it has changes that are not saved, \
+             what it found and the last run it made): ask it before you write on \
+             the model the app has open, because `apply_edit` and `save_model` \
+             refuse with `model_locked` while the reader has unsaved changes on \
+             that model. \
              The `genmsi-modeling` skill carries the rules of the format and the \
              procedure to follow.",
         )

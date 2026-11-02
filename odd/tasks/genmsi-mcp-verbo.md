@@ -229,3 +229,33 @@ se regeneró (`crates/genmsi-app/scripts/generate-types.sh`: un archivo nuevo,
 `EditDocument.ts`, sin ruido en los demás), `tsc --noEmit` limpio y los 381
 tests de la app verdes. La CLI no cambió de comportamiento: sus subcomandos
 usan el mismo núcleo y el mismo formato.
+
+L17 (2026-10-31, T8 — la medición, `odd/tasks/medida3/`): un agente en frío
+construyó el modelo del comedor (35 bloques, 25 enlaces, 64 propiedades)
+**íntegramente con el verbo**, sin escribir XML a mano: **12 llamadas al
+MCP contra las 24** de la corrida anterior, con **0 sondas** contra 9. El
+modelo se verificó con los mismos números (seed 42): 953 transacciones,
+`end_time` 54000, `terminated`, y los agregados del comedor idénticos a los
+de `medida2` (cola 476/47, horno 12/12/475/85479, savevalues 475/469, tabla
+476/1200/10). La única diferencia es el número de eventos (14045 contra
+13967): un recorrido levemente distinto en un punto del flujo, sin efecto
+sobre las magnitudes.
+
+L18 (2026-10-31, lo que encontró la medición): seis cosas. **D1** era un
+defecto del verbo —no había forma sancionada de crear un modelo nuevo: una
+ruta que no existe daba `model_not_found` y `save_model` rechaza el
+esqueleto vacío— y está **arreglada** (`5473298`): una ruta que no está en
+el disco es un modelo que el lote crea, partiendo del esqueleto. **D2** y
+**D3** eran la guía: no decía la forma de cada comando (`setCaption` usa
+`caption`, no `value`) ni la regla de los ids (los bloques de un lote toman
+los ids libres siguientes, en el orden de los comandos); las dos están en la
+guía y en la descripción de la herramienta. **D5** (la promesa del lint
+sobre `Tamano`/`Tamaño`) quedó **verificada** en esta sesión: el lint lo
+dice, con el nombre que probablemente se quiso ("did you mean 'Tamaño'?").
+
+L19 (2026-10-31, T9 — la revisión): el assess con el ítem 1 escalado (la
+herramienta escribe en disco) devolvió `risk: high` y un plan de dos
+piezas: auto-verificación del escritor (hecha, L10 y L15) y verificador
+independiente (en curso al cierre de este corte). La verificación
+diferencial contra `main` (18 casos de las siete herramientas viejas) dio
+**0 diferencias**.

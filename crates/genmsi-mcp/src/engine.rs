@@ -5,12 +5,15 @@
 //! engine already produces. The CLI does exactly the same through the same
 //! API, so both clients show the same numbers.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use genmsi_core::{Program, RunResult, SimConfig, Simulation};
-use genmsi_format::GmdlModel;
+use genmsi_format::{EditCommand, EditSession, GmdlModel};
+use rmcp::schemars;
+use rmcp::schemars::JsonSchema;
+use serde::Deserialize;
 
-use crate::errors::ToolError;
+use crate::errors::{Failure, ToolError};
 
 /// The name a model gets when it never touched the disk.
 pub const MEMORY: &str = "<memory>";
@@ -50,7 +53,7 @@ pub struct Loaded {
 /// A model that does not load, does not validate or does not compile fails
 /// with the block that caused it, never with a panic and never with an empty
 /// document.
-pub fn load(source: &ModelSource) -> Result<Loaded, ToolError> {
+pub fn load(source: &ModelSource) -> Result<Loaded, Failure> {
     let name = source.name();
     let model = match source {
         ModelSource::File(path) => {
@@ -95,6 +98,212 @@ pub struct Saved {
     pub bytes: u64,
 }
 
+/// A model an edit changed.
+#[derive(Debug)]
+pub struct Edited {
+    /// The compiled program: the model compiles, that is why it was written.
+    pub program: Program,
+    /// The model as it was edited.
+    pub model: GmdlModel,
+    /// The name the agent used for the model.
+    pub name: String,
+    /// Whether the model was written to the file it was named by.
+    pub written: bool,
+    /// The ids of the blocks the batch created.
+    pub created: Vec<u32>,
+    /// The model as text, when there was no file to write it to.
+    pub source: Option<String>,
+}
+
+/// Where the blocks a batch adds go.
+///
+/// The canvas belongs to the engine (decision D18): the place of a block that
+/// an agent adds is the free spot of its container, the same place the desktop
+/// app gives a block that is dropped. An agent that wants a block somewhere
+/// particular says so with [`Layout::Explicit`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Layout {
+    /// The engine places the block where there is room (the default).
+    #[default]
+    Auto,
+    /// The coordinates of the command are used, as they were sent.
+    Explicit,
+}
+
+/// Apply a batch of editing commands to a model.
+///
+/// The batch is **atomic**: a command that fails leaves the model exactly as it
+/// was —the commands that were applied are undone— and the failure says which
+/// command failed and why.
+///
+/// The model is checked before it is written: one that does not load, does not
+/// validate or does not compile is **not** written, and the failure names the
+/// block that caused it, exactly like the other tools. A model that carries no
+/// canvas geometry is **composed** before it is written, so the editor can
+/// draw it.
+///
+/// A model given as text has no file to write to: the text of the result
+/// travels back with the answer, and that text is the only place the edit
+/// lives.
+pub fn apply_edits(
+    source: &ModelSource,
+    commands: &[EditCommand],
+    layout: Layout,
+) -> Result<Edited, Failure> {
+    let name = source.name();
+    // The brake comes first: a model the app has open with changes that are
+    // not saved is not written, whatever the batch says. A model given as
+    // text has no file the app could have open, so the brake does not
+    // apply to it.
+    if let ModelSource::File(path) = source {
+        refuse_locked(path)?;
+    }
+    // The model is parsed, but neither validated nor compiled: the commands
+    // of the batch may be what makes it valid.
+    let mut model = match source {
+        ModelSource::File(path) => match genmsi_format::parse_file(path) {
+            Ok(model) => model,
+            // A model that is not on the disk yet is a model the batch
+            // creates: it starts from the skeleton, the same one the
+            // catalogue publishes. `save_model` writes a path that is not
+            // there yet too; the verb creates it the same way, and the
+            // agent does not have to build the model in memory and write it
+            // somewhere else.
+            Err(error) if error.is_missing_file() => genmsi_format::parse_str(
+                genmsi_format::SKELETON_MODEL,
+            )
+            .map_err(|error| ToolError::from_format(&error, Some(&name), None))?,
+            Err(error) => {
+                return Err(Box::new(ToolError::from_format(
+                    &error,
+                    Some(&name),
+                    None,
+                )));
+            }
+        },
+        ModelSource::Inline(text) => genmsi_format::parse_str(text)
+            .map_err(|error| ToolError::from_format(&error, Some(&name), None))?,
+    };
+    // The canvas of the model that is there is the engine's business (D18):
+    // it is composed **before** the batch, so the blocks the batch adds land
+    // on a drawable canvas and the places the commands carry are the last
+    // word. Composing it after would rewrite the positions of every block —
+    // including the ones a command just placed — and `layout: "explicit"`
+    // would be a promise the file does not keep.
+    //
+    // A model that already carries its geometry keeps the disposition its
+    // author left: the composition is only for the models the editor could
+    // not draw.
+    genmsi_format::compose_incomplete(&mut model);
+    let mut session = EditSession::new(model);
+    let mut created: Vec<u32> = Vec::new();
+    for (index, command) in commands.iter().enumerate() {
+        let op = op_of(command);
+        let command = prepared(command, session.model(), layout);
+        match session.apply(command) {
+            Ok(ids) => created.extend(ids),
+            Err(error) => {
+                // The failure is built before the rollback, so the position it
+                // carries is the one of the model that failed.
+                let failure = ToolError::command_failed(
+                    index,
+                    &op,
+                    &error,
+                    Some(&name),
+                    Some(session.model()),
+                );
+                // The batch is atomic: the commands that were applied go back.
+                // The failure is built before the rollback, so the position it
+                // carries is the one of the model that failed; the rollback
+                // leaves the session with the model it started with, so a
+                // half-applied batch can never travel anywhere. The undo of
+                // a step the session pushed cannot fail, and the session is
+                // discarded right after: its error would say nothing the
+                // failure of the command does not already say.
+                for _ in 0..index {
+                    let _ = session.undo();
+                }
+                return Err(Box::new(failure));
+            }
+        }
+    }
+    let model = session.model().clone();
+    // The canvas was composed before the batch: the geometry of the model is
+    // complete, and the places the commands carried survived it.
+    genmsi_format::validate(&model)
+        .map_err(|error| ToolError::from_format(&error, Some(&name), Some(&model)))?;
+    let program = genmsi_core::compile_model(&model)
+        .map_err(|error| ToolError::from_engine(&error, &model, &name))?;
+    let (written, text) = match source {
+        ModelSource::File(path) => {
+            write_atomically(&model, path)?;
+            (true, None)
+        }
+        ModelSource::Inline(_) => (false, Some(genmsi_format::to_string(&model))),
+    };
+    Ok(Edited {
+        program,
+        model,
+        name,
+        written,
+        created,
+        source: text,
+    })
+}
+
+/// The command to apply, with the place of the block it adds.
+///
+/// With [`Layout::Auto`] the block lands in the free spot of its container:
+/// the same place the desktop app gives a block that is dropped, computed
+/// with the engine's own primitive. With [`Layout::Explicit`] the coordinates
+/// of the command are used as they were sent.
+fn prepared(command: &EditCommand, model: &GmdlModel, layout: Layout) -> EditCommand {
+    match (layout, command) {
+        (Layout::Auto, EditCommand::AddBlock { class, container, .. }) => {
+            let (x, y) = free_spot(model, *container);
+            EditCommand::AddBlock {
+                class: class.clone(),
+                container: *container,
+                x,
+                y,
+            }
+        }
+        _ => command.clone(),
+    }
+}
+
+/// The free spot of a container: where a block dropped there would land.
+///
+/// The primitive is the engine's own, and it is the twin of the one the
+/// desktop app uses (`freeSpotOf`): the left of the blocks of the container
+/// and below the lowest of them.
+fn free_spot(model: &GmdlModel, container: u32) -> (i32, i32) {
+    let children: Vec<u32> = model
+        .blocks
+        .iter()
+        .filter(|block| block.owner == container && !block.is_root())
+        .map(|block| block.id)
+        .collect();
+    genmsi_format::layout::free_spot_of_scope(model, &children)
+}
+
+/// The name of the operation of a command, as the wire spells it.
+///
+/// The name is read from the command itself, so it cannot drift away from the
+/// `op` the tool receives.
+fn op_of(command: &EditCommand) -> String {
+    serde_json::to_value(command)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("op")
+                .and_then(|op| op.as_str())
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| "command".to_string())
+}
+
 /// Save a model to a file.
 ///
 /// The model is checked **before** it is written: a model that does not
@@ -109,8 +318,12 @@ pub struct Saved {
 /// The write is atomic: the text goes to a temporary file next to the target
 /// and that file is renamed over it. A reader that watches the model (the
 /// desktop application does) never sees half a model.
-pub fn save_model(path: &std::path::Path, text: &str) -> Result<Saved, ToolError> {
+pub fn save_model(path: &Path, text: &str) -> Result<Saved, Failure> {
     let name = path.display().to_string();
+    // The brake comes first, for the same reason it comes first in the
+    // edit: nothing is written on a model the app has open with changes
+    // that are not saved.
+    refuse_locked(path)?;
     let mut model = genmsi_format::parse_str(text)
         .map_err(|error| ToolError::from_format(&error, Some(&name), None))?;
     genmsi_format::validate(&model)
@@ -130,11 +343,31 @@ pub fn save_model(path: &std::path::Path, text: &str) -> Result<Saved, ToolError
     })
 }
 
+/// The refusal of the verb when the app has the model open with changes that
+/// are not saved.
+///
+/// The app owns the model it has open: it does not reload a file that
+/// changes under it while the reader has changes that are not saved, so the
+/// work of the agent would stay invisible on the canvas and the work of the
+/// reader would overwrite it when she saves.
+///
+/// The brake is **mechanical**: the verb asks the core what the app is
+/// showing and the answer is the answer. A rule that depends on the agent
+/// remembering to ask is a rule an agent skips.
+fn refuse_locked(path: &Path) -> Result<(), Failure> {
+    if genmsi_core::unsaved_changes_on(path) {
+        return Err(Box::new(ToolError::model_locked(
+            path.display().to_string(),
+        )));
+    }
+    Ok(())
+}
+
 /// Write the model to a temporary file next to the target, then rename it.
 ///
 /// The temporary file is in the same directory, so the rename is atomic: the
 /// target is either the old model or the new one, never a half-written one.
-fn write_atomically(model: &GmdlModel, path: &std::path::Path) -> Result<u64, ToolError> {
+fn write_atomically(model: &GmdlModel, path: &std::path::Path) -> Result<u64, Failure> {
     let name = path.display().to_string();
     let file_name = path
         .file_name()
@@ -146,12 +379,12 @@ fn write_atomically(model: &GmdlModel, path: &std::path::Path) -> Result<u64, To
     // directory must not find a half-written model in it.
     if let Err(error) = genmsi_format::save(model, &temporary) {
         let _ = std::fs::remove_file(&temporary);
-        return Err(ToolError::cannot_write(&name, format!("{error}")));
+        return Err(Box::new(ToolError::cannot_write(&name, format!("{error}"))));
     }
     let bytes = std::fs::metadata(&temporary).map(|meta| meta.len()).unwrap_or(0);
     if let Err(error) = std::fs::rename(&temporary, path) {
         let _ = std::fs::remove_file(&temporary);
-        return Err(ToolError::cannot_write(&name, error));
+        return Err(Box::new(ToolError::cannot_write(&name, error)));
     }
     Ok(bytes)
 }
@@ -179,10 +412,10 @@ pub fn config(
 }
 
 /// Run a compiled model.
-pub fn run(loaded: &Loaded, config: SimConfig) -> Result<RunResult, ToolError> {
-    Simulation::new(&loaded.program, config)
+pub fn run(loaded: &Loaded, config: SimConfig) -> Result<RunResult, Failure> {
+    Ok(Simulation::new(&loaded.program, config)
         .run()
-        .map_err(|error| ToolError::from_engine(&error, &loaded.model, &loaded.name))
+        .map_err(|error| ToolError::from_engine(&error, &loaded.model, &loaded.name))?)
 }
 
 #[cfg(test)]

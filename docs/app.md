@@ -143,6 +143,36 @@ one the engine's core computes for the platform:
 | macOS | `$HOME/Library/Application Support/org.gensmi.desktop` |
 | Windows | `%APPDATA%\org.gensmi.desktop` |
 
+### The app publishes what it is showing
+
+Knowing **which file** is open is not enough: an agent that writes on it
+while the reader has changes that are not saved produces work that never
+reaches the canvas (the app does not reload a model that changes under it
+while the reader is editing) and that the reader's save overwrites. So the
+app publishes what it is showing, in a file of its own data directory:
+`live.json`, beside `open-model.json` and `recent-models.json`. The file
+carries the `genmsi.live/1` document:
+
+| Field | Meaning |
+|---|---|
+| `path` | The **absolute path** of the model the app has open. |
+| `pid` | The pid of the process that has it open. |
+| `dirty` | Whether the reader has changes that are **not saved**. |
+| `diagnostics` | What the app found in the model. |
+| `model` | The model **as it is in memory**, when it differs from the disk; nothing when it does not (then the file *is* the model). |
+| `run` | The last run the app made: the `seed`, the horizon, the `start` and the report (`genmsi.report/1`). |
+
+The document is built by the **core** (`genmsi-core`: the engine publishes,
+the app invents nothing) and the write is atomic, like every other write of
+the app. The app writes it **when its state changes** and not on every tick:
+a document that did not change is not written again. When the app closes, the
+file is removed, like `open-model.json`.
+
+The MCP server reads that file and publishes it as the `app_state` tool, and
+it **refuses** to write on a model the app has open with unsaved changes
+(`model_locked`): the refusal is mechanical, in the tool, because a rule that
+depends on the agent remembering to ask is a rule some agent skips.
+
 ### The commands
 
 The commands are the editing API of `genmsi-format`, and their types are

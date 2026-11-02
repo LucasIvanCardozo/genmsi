@@ -177,7 +177,7 @@ properties by name, every edge naming the two ends of a connection — lives in
 document the desktop app already reads. The procedure — how a model is
 written, which entities it declares, what the expression language is, what
 the engine does with a class — lives in the agent's guide,
-`skills/genmsi-modeling/SKILL.md`, which the installer puts where the harness
+`skill/genmsi-modeling/SKILL.md`, which the installer puts where the harness
 of an agent finds it.
 
 The alternative was to publish more in the tools: a table of the compiled
@@ -322,3 +322,105 @@ header and the toolbar, `odd/tasks/genmsi-chrome-cabecera.md`): the design
 was approved after the fact — "por ahora déjalo porque me gustó" — and that
 one is closed. From here on, the approval comes **before** the
 implementation.
+
+## D21 — The MCP's verb: one batch, one vocabulary, atomic, and it writes
+
+The MCP server could read a model and could write one, but it could not
+**build** one: seven tools, five of them reading, and the only one that wrote
+asked for the whole `.gmdl` document as text. An agent that wanted to add a
+block had to write the XML by hand and hand the entire document back. In a
+real session an agent **escaped the MCP** to do it: two Python scripts that
+generated and patched a `.gmdl` by hand.
+
+The breach was not a missing feature of the engine: the editing API was
+already there (`genmsi_format::EditCommand`, twelve verbs, sixty tests), the
+desktop application was already using it in production, and it was already
+speaking it over the wire to the frontend (`apply(command: EditCommand)`).
+The MCP was the only client that could not mutate.
+
+The rules that stay:
+
+- **one vocabulary**: the commands of the tool are the engine's own
+  `EditCommand`, the same type the app speaks. The MCP does not publish
+  `add_block`/`connect`/`set_property`: a second dialect over the same model
+  would break D19 (one zone of truth) and would need a translation layer that
+  can drift. The JSON schema of the tool is **derived from that type**, so
+  the vocabulary is written once;
+- **one batch**: the tool takes a list of commands and applies them in order.
+  A model of nine blocks is one call, not twenty;
+- **atomic**: a command that fails leaves the model exactly as it was —the
+  commands that were applied are undone— and the failure says **which**
+  command failed (its index and its `op`). The batch is replayable: the
+  commands are the source of truth, not the text;
+- **it writes**: the tool writes the model it edited, and the model is
+  checked before it is written (the same rule `save_model` follows): one that
+  does not compile is not written, and the failure names the block that
+  caused it;
+- **the canvas belongs to the engine** (D18): the place of a block that the
+  batch adds is the free spot of its container, the same place the app gives
+  a block that is dropped. `layout: "explicit"` is there for the agent that
+  wants a block somewhere particular.
+
+Why: the MCP was not incomplete, it was **mute**. A protocol that can only
+read forces the agent to speak a second language (XML by hand) outside the
+protocol it was given, and that language has no error class, no position and
+no rollback. The engine already had the verb; the protocol was what was
+missing.
+
+What this does not change: the tool is a thin adapter over the engine's API
+(D2), the document it publishes is built by the core (D13, D19), and the
+simulation logic stays in the engine. The new tool is **additive**: a new
+tool, a new document (`genmsi.edit/1`) and a new error class
+(`invalid_command`); nothing that exists changes.
+
+## D22 — The live state of the app: the app publishes it, the agent reads it, and the verb refuses to overwrite what is being read
+
+The app and the MCP already spoke in one direction: the agent wrote the file
+the app had open, the app noticed the change (a fingerprint of mtime and
+size, every 500 ms), reloaded it, compiled it and ran it again, and the reader
+saw the work on the canvas — undoable with Ctrl+Z, because the reload is an
+operation of the session.
+
+The other direction did not exist, and it had a price. The agent could not
+see what the app was doing: only the file. And it could write over a model
+the reader had open **with changes that were not saved**: the app does not
+reload in that case (the reader's work is not thrown away by a change
+somebody else made), so the agent's work stayed invisible on the canvas, and
+when the reader saved, their save overwrote it. The agent could not even know:
+the `dirty` flag was in the app's memory.
+
+The rules that stay:
+
+- **the app publishes what it is showing**: a `genmsi.live/1` document, built
+  by the core (D19), in the app's data directory, beside the file that
+  already said which model was open. It carries the model the app has open,
+  whether the reader has changes that are not saved, what it found in the
+  model, and the last run it made — the report and the parameters it ran
+  with;
+- **the agent reads it**: a new `app_state` tool answers with that document,
+  and with `path: null` when no app is running — an answer, never a failure
+  (the rule `open_model` already follows);
+- **the verb refuses to overwrite what is being read**: `apply_edit` and
+  `save_model` check the state before writing, and when the app has unsaved
+  changes on that model they write **nothing** and answer `model_locked`;
+- **the brake is mechanical, not a rule the agent has to remember**: a rule
+  that depends on the agent's diligence is a rule that some agent will skip.
+  The refusal is in the tool, so it holds whoever calls it;
+- **the agent tells the reader**: the procedure is in the guide — look before
+  you write, say so and wait, and when the reader saves, send the same batch
+  again (the batch is replayable: the commands are the source of truth, not
+  the text);
+- **the app does not say who changed the file**: no trail, no attribution. The
+  reader knows an agent is working because the agent says so, and the app has
+  no channel to know it (it only sees that the file changed).
+
+What travels in the document is on purpose: the model **in memory** travels
+only when it differs from the disk (otherwise the file *is* the model, and the
+agent reads it from there), and the trace of the last run does not travel at
+all (it is enormous, and the agent asks for it when it wants it).
+
+What this does not change: the engine keeps owning the documents (D13, D19),
+the app and the MCP stay thin layers (D2), and the write path of the verb is
+the same one it was — a model that does not compile is not written, and a
+batch is atomic. The refusal adds one more case in which nothing is written,
+and it is the only case in which the *reader* is the reason.

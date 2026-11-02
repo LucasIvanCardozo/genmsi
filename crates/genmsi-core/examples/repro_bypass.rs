@@ -1,7 +1,7 @@
 // ¿En qué forma del contenedor la instancia ATRAVIESA y sale por la salida?
 use genmsi_core::program::compile;
 use genmsi_core::sim::{SimConfig, Simulation};
-use genmsi_format::{GmdlModel, parse_str};
+use genmsi_format::parse_str;
 
 fn base(container_ports: &str) -> String {
     format!(r#"<gmodel versioncode="1"><gclasses/><modules>

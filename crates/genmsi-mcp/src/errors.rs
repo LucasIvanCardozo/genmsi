@@ -11,6 +11,14 @@ use genmsi_core::EngineError;
 use genmsi_format::{FormatError, GmdlModel};
 use serde::Serialize;
 
+/// The failure a tool returns, boxed.
+///
+/// The body of a failure is rich: its class, its message, the position of the
+/// block and the command that failed. Boxing it keeps the `Result` of every
+/// tool small, and it does not change the body the agent reads: the JSON is
+/// the contract, not the size of the Rust type.
+pub type Failure = Box<ToolError>;
+
 /// A failure a tool returns to the agent.
 #[derive(Debug, Clone, Serialize)]
 pub struct ToolError {
@@ -33,6 +41,12 @@ pub struct ToolError {
     /// GPSS class of the offending block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub class: Option<String>,
+    /// Index of the command that failed, when the failure is a command.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub command: Option<usize>,
+    /// The `op` of the command that failed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub op: Option<String>,
 }
 
 impl ToolError {
@@ -42,10 +56,12 @@ impl ToolError {
         "class_not_found",
         "invalid_arguments",
         "invalid_block",
+        "invalid_command",
         "invalid_expression",
         "invalid_graph",
         "invalid_model",
         "invalid_xml",
+        "model_locked",
         "model_not_found",
         "model_unreadable",
         "model_unwritable",
@@ -63,6 +79,8 @@ impl ToolError {
             column: None,
             node: None,
             class: None,
+            command: None,
+            op: None,
         }
     }
 
@@ -77,6 +95,8 @@ impl ToolError {
             column: None,
             node: None,
             class: None,
+            command: None,
+            op: None,
         }
     }
 
@@ -95,6 +115,8 @@ impl ToolError {
             column: None,
             node: None,
             class: Some(class),
+            command: None,
+            op: None,
         }
     }
 
@@ -115,6 +137,33 @@ impl ToolError {
             column: None,
             node: None,
             class: None,
+            command: None,
+            op: None,
+        }
+    }
+
+    /// The app has the model open with changes that are not saved.
+    ///
+    /// The verb refuses to write: the app does not reload a model the reader
+    /// is editing, so the work of the agent would stay invisible on the
+    /// canvas, and the work of the reader would overwrite it when she saves.
+    /// The failure names the model, so the agent knows which one it is
+    /// talking about.
+    pub fn model_locked(path: impl Into<String>) -> Self {
+        let path = path.into();
+        Self {
+            error: "model_locked",
+            message: format!(
+                "the app has unsaved changes on this model; nothing was written: {path}. \
+                 Ask the reader to save the model and send the edit again."
+            ),
+            path: Some(path),
+            line: None,
+            column: None,
+            node: None,
+            class: None,
+            command: None,
+            op: None,
         }
     }
 
@@ -129,6 +178,39 @@ impl ToolError {
             column: None,
             node: None,
             class: None,
+            command: None,
+            op: None,
+        }
+    }
+
+    /// A command of the batch could not be applied.
+    ///
+    /// The batch is atomic: when a command fails, the model stays as it was.
+    /// The failure says **which** command failed (its index and its `op`) and
+    /// why, so the agent can correct that command and send the batch again.
+    pub fn command_failed(
+        index: usize,
+        op: &str,
+        error: &FormatError,
+        path: Option<&str>,
+        model: Option<&GmdlModel>,
+    ) -> Self {
+        let (_, message) = Self::classify(error);
+        let location = error.location();
+        let failure = Self {
+            error: "invalid_command",
+            message: format!("command {index} ({op}) failed: {message}"),
+            path: path.map(str::to_string),
+            line: location.line.map(|line| line as u32),
+            column: location.column.map(|column| column as u32),
+            node: location.node,
+            class: None,
+            command: Some(index),
+            op: Some(op.to_string()),
+        };
+        match model {
+            Some(model) => failure.locate(model),
+            None => failure,
         }
     }
 
@@ -141,16 +223,7 @@ impl ToolError {
         path: Option<&str>,
         model: Option<&GmdlModel>,
     ) -> Self {
-        let (class, message) = match error {
-            FormatError::Xml { message, .. } => ("invalid_xml", format!("invalid XML: {message}")),
-            FormatError::Read { message, .. } => {
-                // The load path reads exactly like the CLI, so a file it
-                // opens but cannot decode is the model failure the CLI
-                // prints as "cannot read model: ...".
-                ("invalid_model", format!("cannot read model: {message}"))
-            }
-            FormatError::Structural { message, .. } => ("invalid_model", message.clone()),
-        };
+        let (class, message) = Self::classify(error);
         let location = error.location();
         let failure = Self {
             error: class,
@@ -160,6 +233,8 @@ impl ToolError {
             column: location.column.map(|column| column as u32),
             node: location.node,
             class: None,
+            command: None,
+            op: None,
         };
         match model {
             Some(model) => failure.locate(model),
@@ -178,6 +253,8 @@ impl ToolError {
                 column: None,
                 node: Some(*node),
                 class: Some(class.clone()),
+                command: None,
+                op: None,
             },
             EngineError::InvalidBlock { node, class, message } => Self {
                 error: "invalid_block",
@@ -187,6 +264,8 @@ impl ToolError {
                 column: None,
                 node: Some(*node),
                 class: Some(class.clone()),
+                command: None,
+                op: None,
             },
             EngineError::Expression { text, message } => Self {
                 error: "invalid_expression",
@@ -196,6 +275,8 @@ impl ToolError {
                 column: None,
                 node: None,
                 class: None,
+                command: None,
+                op: None,
             },
             EngineError::Format(format) => Self::from_format(format, Some(path), Some(model)),
             EngineError::Graph { message } => Self {
@@ -206,6 +287,8 @@ impl ToolError {
                 column: None,
                 node: None,
                 class: None,
+                command: None,
+                op: None,
             },
             EngineError::Runtime(message) => Self {
                 error: "runtime_error",
@@ -215,10 +298,26 @@ impl ToolError {
                 column: None,
                 node: None,
                 class: None,
+                command: None,
+                op: None,
             },
         };
         failure = failure.locate(model);
         failure
+    }
+
+    /// The class and the message a failure of the format carries.
+    fn classify(error: &FormatError) -> (&'static str, String) {
+        match error {
+            FormatError::Xml { message, .. } => ("invalid_xml", format!("invalid XML: {message}")),
+            FormatError::Read { message, .. } => {
+                // The load path reads exactly like the CLI, so a file it
+                // opens but cannot decode is the model failure the CLI
+                // prints as "cannot read model: ...".
+                ("invalid_model", format!("cannot read model: {message}"))
+            }
+            FormatError::Structural { message, .. } => ("invalid_model", message.clone()),
+        }
     }
 
     /// Fill the position and the class of the offending block from the model.

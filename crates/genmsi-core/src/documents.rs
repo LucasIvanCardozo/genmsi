@@ -22,6 +22,9 @@ pub const REPORT_SCHEMA: &str = "genmsi.report/1";
 pub const TRACE_SCHEMA: &str = "genmsi.trace/1";
 /// Schema id of the `explain` document.
 pub const EXPLAIN_SCHEMA: &str = "genmsi.explain/1";
+
+/// The schema of the document an edit publishes.
+pub const EDIT_SCHEMA: &str = "genmsi.edit/1";
 /// Schema id of the model document.
 pub const MODEL_SCHEMA: &str = "genmsi.model/1";
 /// Schema id of the catalogue document.
@@ -126,6 +129,71 @@ pub fn lint_document<'a>(program: &'a Program, model: &GmdlModel, path: &str) ->
             qtables: definitions.qtables.len(),
         },
         diagnostics,
+    }
+}
+
+/// Body of the `genmsi.edit/1` document: what an edit did.
+///
+/// The document carries the lint of the model it edited —the same fields, with
+/// the same meanings, as `genmsi.lint/1`— and what the edit itself did: how
+/// many commands were applied, whether the model was written, and the blocks
+/// the batch created.
+#[derive(Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[cfg_attr(feature = "ts", ts(export))]
+pub struct EditDocument<'a> {
+    /// Model path, as the user wrote it.
+    pub path: String,
+    /// How many commands were applied.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
+    pub applied: usize,
+    /// Whether the model was written to the file it was named by.
+    pub written: bool,
+    /// `ok` when the compiler was silent, `diagnostics` otherwise.
+    pub status: &'static str,
+    /// Program title (the model root's name).
+    pub title: &'a str,
+    /// Executable statements the model compiles to.
+    #[cfg_attr(feature = "ts", ts(as = "f64"))]
+    pub blocks: usize,
+    /// Definitions the model declares.
+    pub definitions: DefinitionCounts,
+    /// Non-fatal findings: the compiler's observations and the format's
+    /// warnings.
+    pub diagnostics: Vec<String>,
+    /// The ids of the blocks the batch created.
+    pub created: Vec<u32>,
+    /// The model as text, when there was no file to write it to.
+    ///
+    /// A model given as text is never written: the text of the result is the
+    /// only place the edit lives, so it travels back with the answer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+}
+
+/// Build the `genmsi.edit/1` body from the lint of the model it edited.
+///
+/// The lint is the source of the fields the two documents share, so an agent
+/// reads `blocks`, `definitions` and `diagnostics` in both of them the same
+/// way.
+pub fn edit_document<'a>(
+    lint: &LintDocument<'a>,
+    applied: usize,
+    written: bool,
+    created: Vec<u32>,
+    source: Option<String>,
+) -> EditDocument<'a> {
+    EditDocument {
+        path: lint.path.clone(),
+        applied,
+        written,
+        status: lint.status,
+        title: lint.title,
+        blocks: lint.blocks,
+        definitions: lint.definitions.clone(),
+        diagnostics: lint.diagnostics.clone(),
+        created,
+        source,
     }
 }
 

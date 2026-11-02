@@ -67,6 +67,12 @@ pub struct SessionState {
     ///
     /// `None` when there is no proposal on the table.
     pub proposal: Option<ProposalBody>,
+    /// Whether the proposal is **on the canvas**.
+    ///
+    /// A proposal that was undone is still the proposal of the session, but
+    /// it is not on the canvas: there is nothing to accept or to discard
+    /// until it is adopted again.
+    pub proposal_on_canvas: bool,
 }
 
 /// The last run of the session: the parameters it ran with and the documents
@@ -367,6 +373,7 @@ impl Session {
             can_undo: self.can_undo(),
             can_redo: self.editor.can_redo(),
             proposal: self.proposal.clone(),
+            proposal_on_canvas: self.adopted,
         }
     }
 

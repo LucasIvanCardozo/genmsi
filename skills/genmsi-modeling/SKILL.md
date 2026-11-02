@@ -14,16 +14,59 @@ It is the only sanctioned place to learn the format: the catalogue holds the fac
    - `catalogue()` with no argument returns the list of every class and the skeleton of a model.
    - `catalogue({ class: "Generate" })` returns one class.
 2. **Design before writing.** Decide the flow of the transactions, the entities the model needs and the class of every block. The catalogue tells you what a class does; the design is yours.
-3. **Draft the document.** Start from the skeleton the catalogue returns, drop one `<module>` per block into its `<modules>`, and give every block its own `moduleid` (the template of a class carries `moduleid="0"`: renumber it, and keep `owner="0"`, the model root holds it). The template already carries the ports and the properties with their defaults.
-4. **`lint({ model })`** — the document as text, no file yet. It loads, validates and compiles the model and reports what it found. A model that does not compile is a tool error, not an empty report. The lint also names the **property a block carries that its class does not declare** (`Tamano` for `Tamaño`) and the property it probably meant: a typo is silent in the engine, so the lint is where it shows up.
-5. **`explain_model({ model })`** — the model as the document writes it: every block with its class, its properties **by name** and its ports, and the `edges` that wire the blocks. It is the cheapest way to see that the model is the model you meant. (It compiles the model first, so read it after `lint`.)
-6. **`simulate({ model, seed })`** — the GPSS report. Read its `blocks` (the statements the model compiles to, with their counts) and its `entities` (the queues, facilities and storages it used).
+3. **Build the model with `apply_edit`.** One call, one batch of the engine's editing commands: an `addBlock` per block, a `connect` per link, a `setProperty` per operand. The engine gives every new block a place on the canvas, checks that the model compiles and writes it. The batch is **atomic**: if a command fails, no command is applied and the error names the command that failed. See *The verb* below.
+4. **`lint({ path })`** — the model as it is now on disk. It loads, validates and compiles the model and reports what it found. A model that does not compile is a tool error, not an empty report. The lint also names the **property a block carries that its class does not declare** (`Tamano` for `Tamaño`) and the property it probably meant: a typo is silent in the engine, so the lint is where it shows up.
+5. **`explain_model({ path })`** — the model as the document writes it: every block with its class, its properties **by name** and its ports, and the `edges` that wire the blocks. It is the cheapest way to see that the model is the model you meant. (It compiles the model first, so read it after `lint`.)
+6. **`simulate({ path, seed })`** — the GPSS report. Read its `blocks` (the statements the model compiles to, with their counts) and its `entities` (the queues, facilities and storages it used).
 7. **`open_model()`** — the file the desktop app has open (`path` and `pid`; both null when the app is not running).
-8. **`save_model({ path, model })`** — the whole document, to the path `open_model` returned. The app watches that file, reloads the model and runs it again.
+8. **`save_model({ path, model })`** — only for a document you wrote by hand: it takes the **whole** document as text. To change a model that is already on disk, use `apply_edit` on its `path`, not `save_model`.
 
-The order matters: `lint` before `simulate` (a model that does not compile is a tool error, not an empty report), and `simulate` before `save_model` (never write a model you have not run).
+The order matters: `lint` before `simulate` (a model that does not compile is a tool error, not an empty report), and `simulate` before you are done (never keep a model you have not run).
 
-`save_model` writes the **whole** document, not a patch. To change a model that is already on disk, read it with `explain_model({ path })`, change the text and hand back the complete document.
+## The verb
+
+`apply_edit` is the tool that changes a model. It takes the model (`path` or
+`model`) and a **batch** of commands, and applies them in order:
+
+```json
+{
+  "path": "/tmp/modelo.gmdl",
+  "commands": [
+    { "op": "addBlock", "class": "Generate", "container": 0, "x": 0, "y": 0 },
+    { "op": "addBlock", "class": "Terminate", "container": 0, "x": 0, "y": 0 },
+    { "op": "connect", "from": 1, "fromIoid": 1, "to": 2, "toIoid": 1 },
+    { "op": "setProperty", "id": 1, "property": "Media", "value": "60" }
+  ]
+}
+```
+
+- **The commands are the engine's own**, and the schema the tool publishes is
+  the one of that type: `addBlock`, `connect`, `disconnect`, `setProperty`,
+  `setCaption`, `moveBlock`, `removeBlock`, `removeBlocks`, `setLayouts`,
+  `movePort`, `removePort`, `paste`.
+- **The batch is atomic.** A command that fails undoes the ones that were
+  applied: the model stays as it was, and the error (`invalid_command`) says
+  which command failed — its index and its `op`. Correct that command and
+  send the batch again: the commands are the source of truth, not the text.
+- **The ids come back.** The answer carries `created`: the ids of the blocks
+  the batch created. Use them in the next batch (`setProperty`, `moveBlock`,
+  `connect`).
+- **The canvas is the engine's business.** Every block the batch adds lands in
+  the free spot of its container, like a drop in the application. With
+  `"layout": "explicit"` the `x` and the `y` of the command are used instead.
+- **The model is checked before it is written.** One that does not compile is
+  **not** written, and the failure is the compiler's, with the block and its
+  position. The file keeps the model it had.
+- The answer is the `genmsi.edit/1` document: the lint of the model it edited
+  (the same fields as `genmsi.lint/1`), the commands applied, whether the
+  model was written, and the blocks the batch created. With `model` (no
+  file) the text of the result comes back in `source`.
+
+`apply_edit` and `save_model` are two ways to write, and they do not overlap:
+`apply_edit` changes a model **block by block**, `save_model` writes a
+document **you wrote**. Prefer `apply_edit`: it carries the class names, the
+ports and the properties of the engine, it checks what it writes, and it never
+leaves a half-built model behind.
 
 ## The document
 
@@ -184,7 +227,7 @@ Do not mix the two percentage forms: in an expression `70%` is 700, but in `Tran
 
 A class whose semantics you have not seen is worth one probe, not twenty.
 
-1. Build a model of two or three blocks: a `Clock`, the class itself and a `Terminate`.
+1. Build a model of two or three blocks: a `Clock`, the class itself and a `Terminate`. Use `apply_edit` with the skeleton the catalogue returned: `{ "op": "addBlock", ... }` for each block, `{ "op": "connect", ... }` for each link. The answer carries the text of the model in `source`.
 2. `lint({ model })` — it must compile.
 3. `simulate({ model, seed: 42 })` and read the `blocks` of the report: the rows are the statements the class compiles to, with their operands and their counts.
 4. `get_trace({ model, seed: 42, limit: 40 })` — the events in order, with the time, the block and the detail (`-> 13` is the block the transaction goes to).
@@ -197,7 +240,7 @@ Probe the classes whose behaviour you are not sure of, not the ones the catalogu
 - **A link that starts at a port the block does not have.** The engine refuses the model (`link starts at missing output port 1`). The `ioid` of a port is the one the catalogue publishes for that class.
 - **An entity used and never declared.** `lint` says so as a finding; `simulate` refuses the run. Declare a storage with `StorageDef`, a function with `Function`/`FunctionDist`/`FunctionExpon`, a table with `Table`.
 - **The time unit.** The clock is whole units and the delays are truncated: a model whose numbers are in seconds and whose clock is in minutes is a model whose numbers are wrong.
-- **`save_model` writes the WHOLE document.** It is not a patch. Read the model with `explain_model` first and hand back the complete text.
+- **`save_model` writes the WHOLE document.** It is not a patch. To change a model that is on disk, use `apply_edit` on its `path`; to write a document you wrote by hand, read the model with `explain_model` first and hand back the complete text.
 - **`start` is a parameter of the run, not of the model.** `simulate({ start: 2 })` runs the model until two units of termination.
 - **`%` means two different things.** In an expression `70%` is 700; in `Transfer.Prob` `85%` is 0.85 and a bare `100` is 10%.
 - **`#` is multiplication**, not division: `160+(P:Tipo-1)#30` is a price.
@@ -206,7 +249,7 @@ Probe the classes whose behaviour you are not sure of, not the ones the catalogu
 - **The report has one row per statement, not per block.** The `FacilityUse` block is five rows and the `Clock` is two: do not read the row count as the block count. `lint`'s `blocks` counts the same statements, not the modules of the document.
 - **The trace numbers the statements, not the modules.** The block of an event is the line of the compiled program, and the `-> N` of a detail is the statement the transaction goes to; neither is the `moduleid` of the document.
 - **`save_model` writes the engine's form of the document.** The writer normalises the whitespace and fills the empty attributes (`hint=""`, `genprefer`): the file it writes is not the text you sent, and the next agent that reads it sees the engine's bytes.
-- **The canvas geometry is the engine's, not yours.** A model you build carries no `x`, `y`, `width` or `height`, and it does not need them: `save_model` composes the model before writing it, so the desktop app draws it. Do not place the blocks by hand — the engine's composition is the one the app expects, and a model you place yourself is a model the reader sees in pieces.
+- **The canvas geometry is the engine's, not yours.** A model you build carries no `x`, `y`, `width` or `height`, and it does not need them: `apply_edit` and `save_model` compose the model before writing it, so the desktop app draws it. Do not place the blocks by hand — the engine's composition is the one the app expects, and a model you place yourself is a model the reader sees in pieces.
 - **A block without an output port is not a source.** The `Clock`, the definitions and the notes have no outputs and never appear in a link.
 
 ## If the MCP does not tell you something

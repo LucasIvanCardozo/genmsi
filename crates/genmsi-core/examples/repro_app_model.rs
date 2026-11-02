@@ -5,7 +5,7 @@ use genmsi_format::{EditCommand, EditSession, SKELETON_MODEL, parse_str};
 
 fn main() {
     let mut s = EditSession::new(parse_str(SKELETON_MODEL).expect("skeleton"));
-    let mut add = |s: &mut EditSession, class: &str, c: u32| -> u32 {
+    let add = |s: &mut EditSession, class: &str, c: u32| -> u32 {
         s.apply(EditCommand::AddBlock { class: class.into(), container: c, x: 0, y: 0 })
             .expect("adds")[0]
     };
@@ -15,7 +15,7 @@ fn main() {
     let term = add(&mut s, "Terminate", 0);
     let inner = add(&mut s, "Advance", cont);
 
-    let mut conn = |s: &mut EditSession, f: u32, fi: u32, t: u32, ti: u32| {
+    let conn = |s: &mut EditSession, f: u32, fi: u32, t: u32, ti: u32| {
         if let Err(e) = s.apply(EditCommand::Connect { from: f, from_ioid: fi, to: t, to_ioid: ti }) {
             println!("  link {f}:{fi} -> {t}:{ti}  ERR {e}");
         }

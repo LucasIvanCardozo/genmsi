@@ -18,7 +18,7 @@ It is the only sanctioned place to learn the format: the catalogue holds the fac
 4. **`lint({ path })`** — the model as it is now on disk. It loads, validates and compiles the model and reports what it found. A model that does not compile is a tool error, not an empty report. The lint also names the **property a block carries that its class does not declare** (`Tamano` for `Tamaño`, with the name it probably meant): a typo is silent in the engine, so the lint is where it shows up — as a finding of a model that compiles, because a missing *operand* is a refusal and never reaches the findings.
 5. **`explain_model({ path })`** — the model as the document writes it: every block with its class, its properties **by name** and its ports, and the `edges` that wire the blocks. It is the cheapest way to see that the model is the model you meant. (It compiles the model first, so read it after `lint`.)
 6. **`simulate({ path, seed })`** — the GPSS report. Read its `blocks` (the statements the model compiles to, with their counts) and its `entities` (the queues, facilities and storages it used).
-7. **`open_model()`** — the file the desktop app has open (`path` and `pid`; both null when the app is not running).
+7. **`open_model()`** — the file the desktop app has open (`path` and `pid`; both null when the app is not running). **`app_state()`** — what the reader is seeing right now (see *The person reading* below): whether that file has changes that are not saved.
 8. **`save_model({ path, model })`** — only for a document you wrote by hand: it takes the **whole** document as text. To change a model that is already on disk, use `apply_edit` on its `path`, not `save_model`.
 
 The order matters: `lint` before `simulate` (a model that does not compile is a tool error, not an empty report), and `simulate` before you are done (never keep a model you have not run).
@@ -69,6 +69,37 @@ The order matters: `lint` before `simulate` (a model that does not compile is a 
 - **The canvas is the engine's business.** Every block the batch adds lands in
   the free spot of its container, like a drop in the application. With
   `"layout": "explicit"` the `x` and the `y` of the command are used instead.
+
+## The person reading
+
+The desktop application and the MCP are two ends of the same loop: you write
+the model it has open, it reloads it and runs it again, and the reader sees
+your work on the canvas within half a second.
+
+**`app_state()`** says what the reader is seeing right now: the model the
+application has open, whether they have changes that are **not saved**, what
+it found in the model, and the last run it made (the report and the seed it
+ran with). Without the application running it answers with `path: null`.
+
+**Look before you write.** If the model you are about to change is the one
+the application has open, ask `app_state()` first:
+
+- the reader has **no** changes pending → write; the application picks the
+  change up on its own;
+- the reader **has** changes pending → **do not write**. Say so and wait:
+  *"the application has unsaved changes on `modelo.gmdl`; shall I wait for you
+  to save it?"* Their work is not on the disk, and writing over the file would
+  leave your work invisible on the canvas and theirs overwritten.
+
+**`apply_edit` and `save_model` refuse that write for you.** When the
+application has unsaved changes on the model you named, they answer
+`model_locked` and **write nothing**. That error is not a failure of the
+model: it is the application saying "this one is being edited". Save it (the
+reader does it) and send the **same batch again**: the commands are the
+source of truth, not the text, so the batch replays over the saved model.
+
+And if the reader asks you what you did, `app_state()` also tells you whether
+your change actually landed on their canvas.
 - **The model is checked before it is written.** One that does not compile is
   **not** written, and the failure is the compiler's, with the block and its
   position. The file keeps the model it had.
@@ -252,6 +283,7 @@ Probe the classes whose behaviour you are not sure of, not the ones the catalogu
 
 ## Traps
 
+- **A model the reader is editing.** `apply_edit` and `save_model` answer `model_locked` when the desktop app has unsaved changes on the model you named, and they write nothing. That is not a broken model: it is the reader's work. Save it and send the same batch again.
 - **A link that starts at a port the block does not have.** The engine refuses the model (`link starts at missing output port 1`). The `ioid` of a port is the one the catalogue publishes for that class.
 - **An entity used and never declared.** `lint` says so as a finding; `simulate` refuses the run. Declare a storage with `StorageDef`, a function with `Function`/`FunctionDist`/`FunctionExpon`, a table with `Table`.
 - **The time unit.** The clock is whole units and the delays are truncated: a model whose numbers are in seconds and whose clock is in minutes is a model whose numbers are wrong.

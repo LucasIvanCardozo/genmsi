@@ -1,0 +1,6898 @@
+
+===== CALL #app_state at 2026-11-02T20:30:36 =====
+tool: app_state
+arguments: {}
+----- answer -----
+{
+  "diagnostics": [],
+  "dirty": false,
+  "model": null,
+  "path": "/home/lucas/Documentos/Workspace/IA/chat/prueba.gmdl",
+  "pid": 2024,
+  "run": null,
+  "schema": "genmsi.live/1"
+}
+
+===== CALL #open_model at 2026-11-02T20:30:53 =====
+tool: open_model
+arguments: {}
+----- answer -----
+{
+  "schema": "genmsi.openmodel/1",
+  "path": "/home/lucas/Documentos/Workspace/IA/chat/prueba.gmdl",
+  "pid": 2024
+}
+
+===== CALL #open_model at 2026-11-02T20:30:54 =====
+tool: open_model
+arguments: {}
+----- answer -----
+{
+  "schema": "genmsi.openmodel/1",
+  "path": "/home/lucas/Documentos/Workspace/IA/chat/prueba.gmdl",
+  "pid": 2024
+}
+
+===== CALL #open_model at 2026-11-02T20:30:58 =====
+tool: open_model
+arguments: {}
+----- answer -----
+{
+  "schema": "genmsi.openmodel/1",
+  "path": null,
+  "pid": null
+}
+
+===== CALL #open_model at 2026-11-02T20:30:58 =====
+tool: open_model
+arguments: {}
+----- answer -----
+{
+  "schema": "genmsi.openmodel/1",
+  "path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl",
+  "pid": 169026
+}
+
+===== CALL #app_state at 2026-11-02T20:31:03 =====
+tool: app_state
+arguments: {}
+----- answer -----
+{
+  "schema": "genmsi.live/1",
+  "path": null,
+  "pid": null,
+  "dirty": false,
+  "diagnostics": [],
+  "model": null,
+  "run": null,
+  "proposal": null
+}
+
+===== CALL #app_state at 2026-11-02T20:31:20 =====
+tool: app_state
+arguments: {}
+----- answer -----
+{
+  "diagnostics": [],
+  "dirty": true,
+  "model": null,
+  "path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl",
+  "pid": 169026,
+  "run": null,
+  "schema": "genmsi.live/1"
+}
+
+===== CALL #explain_model at 2026-11-02T20:31:27 =====
+tool: explain_model
+arguments: {"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl"}
+----- answer -----
+{
+  "schema": "genmsi.explain/1",
+  "program": {
+    "blocks": [
+      {
+        "class": "Generate",
+        "label": null,
+        "node": 1,
+        "operands": "60,30,,,",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Terminate",
+        "label": "A_Terminate",
+        "node": 2,
+        "operands": "",
+        "ports": []
+      },
+      {
+        "class": "Generate",
+        "label": null,
+        "node": 3,
+        "operands": "3600,,,,",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Terminate",
+        "label": null,
+        "node": 3,
+        "operands": "1",
+        "ports": []
+      },
+      {
+        "class": "Queue",
+        "label": "A_Queue",
+        "node": 4,
+        "operands": "centro",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Depart",
+        "label": "A_Depart",
+        "node": 5,
+        "operands": "centro",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Advance",
+        "label": "A_Advance",
+        "node": 8,
+        "operands": "10,5",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Enter",
+        "label": "A_Enter",
+        "node": 10,
+        "operands": "SalaEspera,1",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Leave",
+        "label": "A_Leave",
+        "node": 11,
+        "operands": "SalaEspera,1",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Queue",
+        "label": "StorageUse2",
+        "node": 14,
+        "operands": "Cola_vacunacion",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Enter",
+        "label": null,
+        "node": 14,
+        "operands": "Vacunacion",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Depart",
+        "label": null,
+        "node": 14,
+        "operands": "Cola_vacunacion",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Advance",
+        "label": null,
+        "node": 14,
+        "operands": "300,180",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Leave",
+        "label": null,
+        "node": 14,
+        "operands": "Vacunacion",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Advance",
+        "label": "A_Advance2",
+        "node": 15,
+        "operands": "1320,120",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Priority",
+        "label": "A_Priority1",
+        "node": 16,
+        "operands": "0",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Queue",
+        "label": "A_FacilityUse",
+        "node": 18,
+        "operands": "Cola_recepcion",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Seize",
+        "label": null,
+        "node": 18,
+        "operands": "Recepcion",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Depart",
+        "label": null,
+        "node": 18,
+        "operands": "Cola_recepcion",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Advance",
+        "label": null,
+        "node": 18,
+        "operands": "25,8",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Release",
+        "label": null,
+        "node": 18,
+        "operands": "Recepcion",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Transfer",
+        "label": "Entrada1",
+        "node": 19,
+        "operands": "850,A_Advance1,A_Advance12",
+        "ports": [
+          "Salida1",
+          "Salida2"
+        ]
+      },
+      {
+        "class": "Advance",
+        "label": "A_Advance1",
+        "node": 20,
+        "operands": "20,5",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Advance",
+        "label": "A_Advance12",
+        "node": 21,
+        "operands": "18,8",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Queue",
+        "label": "StorageUse1",
+        "node": 23,
+        "operands": "Cola_acreditacion",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Enter",
+        "label": null,
+        "node": 23,
+        "operands": "Acreditacion",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Depart",
+        "label": null,
+        "node": 23,
+        "operands": "Cola_acreditacion",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Advance",
+        "label": null,
+        "node": 23,
+        "operands": "300,120",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Leave",
+        "label": null,
+        "node": 23,
+        "operands": "Acreditacion",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Transfer",
+        "label": "Entrada11",
+        "node": 25,
+        "operands": "950,A_Advance111,A_Advance1111",
+        "ports": [
+          "Salida1",
+          "Salida2"
+        ]
+      },
+      {
+        "class": "Advance",
+        "label": "A_Advance111",
+        "node": 26,
+        "operands": "25,10",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Priority",
+        "label": "A_Priority",
+        "node": 27,
+        "operands": "1",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Transfer",
+        "label": "Entrada12",
+        "node": 28,
+        "operands": "970,A_Priority,A_Enter",
+        "ports": [
+          "Salida1",
+          "Salida2"
+        ]
+      },
+      {
+        "class": "Advance",
+        "label": "A_Advance1111",
+        "node": 29,
+        "operands": "15,8",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Queue",
+        "label": "A_FacilityUse1",
+        "node": 31,
+        "operands": "Cola_E_carnet",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Seize",
+        "label": null,
+        "node": 31,
+        "operands": "E_carnet",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Depart",
+        "label": null,
+        "node": 31,
+        "operands": "Cola_E_carnet",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Advance",
+        "label": null,
+        "node": 31,
+        "operands": "180,120",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Release",
+        "label": null,
+        "node": 31,
+        "operands": "E_carnet",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Advance",
+        "label": "A_Advance11",
+        "node": 32,
+        "operands": "14,8",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Generate",
+        "label": null,
+        "node": 34,
+        "operands": "1800,900,,,",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Terminate",
+        "label": "A_Terminate11",
+        "node": 35,
+        "operands": "",
+        "ports": []
+      },
+      {
+        "class": "Queue",
+        "label": "A_FacilityInt1",
+        "node": 36,
+        "operands": "ColaInt",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Preempt",
+        "label": null,
+        "node": 36,
+        "operands": "E_carnet,PR,,Remanente",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Depart",
+        "label": null,
+        "node": 36,
+        "operands": "ColaInt",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Advance",
+        "label": null,
+        "node": 36,
+        "operands": "240,180",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Return",
+        "label": null,
+        "node": 36,
+        "operands": "E_carnet",
+        "ports": [
+          "SalidaAlt",
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Queue",
+        "label": "StorageUse",
+        "node": 38,
+        "operands": "Cola_exit",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Enter",
+        "label": null,
+        "node": 38,
+        "operands": "Exit",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Depart",
+        "label": null,
+        "node": 38,
+        "operands": "Cola_exit",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Advance",
+        "label": null,
+        "node": 38,
+        "operands": "3,1",
+        "ports": [
+          "Salida1"
+        ]
+      },
+      {
+        "class": "Leave",
+        "label": null,
+        "node": 38,
+        "operands": "Exit",
+        "ports": [
+          "Salida1"
+        ]
+      }
+    ],
+    "diagnostics": [],
+    "functions": [],
+    "qtables": [
+      "QTabla"
+    ],
+    "random_variables": [],
+    "start_counter": 1.0,
+    "storages": {
+      "Acreditacion": 5,
+      "Exit": 3,
+      "SalaEspera": 44,
+      "Vacunacion": 4
+    },
+    "tables": [],
+    "title": "Modelo1",
+    "variables": []
+  },
+  "model": {
+    "path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl",
+    "title": "Modelo1",
+    "blocks": [
+      {
+        "id": 0,
+        "class": "main",
+        "kind": "C",
+        "name": "Modelo1",
+        "caption": "Modelo",
+        "label": null,
+        "container": 0,
+        "layout": null,
+        "properties": [],
+        "inputs": [],
+        "outputs": []
+      },
+      {
+        "id": 1,
+        "class": "Generate",
+        "kind": "A",
+        "name": "Generate",
+        "caption": "Generate",
+        "label": null,
+        "container": 0,
+        "layout": {
+          "x": 330,
+          "y": 39,
+          "width": 120,
+          "height": 63
+        },
+        "properties": [
+          {
+            "name": "Cantidad",
+            "value": "",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Cantidad de Transacciones a generar",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Media",
+            "value": "60",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Frecuencia media de arribos",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "30",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o modificador",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "OffSet",
+            "value": "",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo de espera",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Prioridad",
+            "value": "",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Prioridad de la transaccion generada",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [],
+        "outputs": [
+          {
+            "ioid": 1,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_Queue",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "class": "Terminate",
+        "kind": "A",
+        "name": "Terminate",
+        "caption": "Terminate",
+        "label": "A_Terminate",
+        "container": 0,
+        "layout": {
+          "x": 315,
+          "y": 377,
+          "width": 84,
+          "height": 64
+        },
+        "properties": [
+          {
+            "name": "Unidades",
+            "value": "",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Cantidad de unidades a decrementar del START, por cada transacción que llega al módulo",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso",
+            "label": "A_Terminate",
+            "layout": null
+          }
+        ],
+        "outputs": []
+      },
+      {
+        "id": 3,
+        "class": "Clock",
+        "kind": "A",
+        "name": "Clock",
+        "caption": "Clock",
+        "label": null,
+        "container": 0,
+        "layout": {
+          "x": 565,
+          "y": 56,
+          "width": 50,
+          "height": 50
+        },
+        "properties": [
+          {
+            "name": "Frecuencia",
+            "value": "3600",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "frecuencia, en unidad de tiempo, con la que se descuenta 1 unidad del START",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [],
+        "outputs": []
+      },
+      {
+        "id": 4,
+        "class": "Queue",
+        "kind": "A",
+        "name": "Queue",
+        "caption": "Queue",
+        "label": "A_Queue",
+        "container": 0,
+        "layout": {
+          "x": 315,
+          "y": 120,
+          "width": 97,
+          "height": 32
+        },
+        "properties": [
+          {
+            "name": "Cantidad",
+            "value": "",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Cantidad de ingresos en la cola",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Queue",
+            "value": "centro",
+            "ty": "EntityUse",
+            "subtype": "Queue",
+            "hint": "Queue en la que ingresa la transacción",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso",
+            "label": "A_Queue",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_Advance",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "class": "Depart",
+        "kind": "A",
+        "name": "Depart",
+        "caption": "Depart",
+        "label": "A_Depart",
+        "container": 0,
+        "layout": {
+          "x": 318,
+          "y": 299,
+          "width": 97,
+          "height": 32
+        },
+        "properties": [
+          {
+            "name": "Cantidad",
+            "value": "",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Cantidad de egresos",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Queue",
+            "value": "centro",
+            "ty": "EntityUse",
+            "subtype": "Queue",
+            "hint": "Queue de la cual se egresa",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso",
+            "label": "A_Depart",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_Terminate",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "class": "QTable",
+        "kind": "A",
+        "name": "QTable",
+        "caption": "QTable",
+        "label": null,
+        "container": 0,
+        "layout": {
+          "x": 99,
+          "y": 205,
+          "width": 144,
+          "height": 70
+        },
+        "properties": [
+          {
+            "name": "Cantidad",
+            "value": "8",
+            "ty": "PosInteger",
+            "subtype": "",
+            "hint": "cantidad de clases de frecuencia",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "NombreTabla",
+            "value": "QTabla",
+            "ty": "EntityDef",
+            "subtype": "QTable",
+            "hint": "Nombre de la tabla a definir",
+            "unique": true,
+            "visible": true
+          },
+          {
+            "name": "PrimerIntervalo",
+            "value": "0",
+            "ty": "PosInteger",
+            "subtype": "",
+            "hint": "Limite superior de la primer frecuencia",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Queue",
+            "value": "centro",
+            "ty": "EntityDef",
+            "subtype": "Queue",
+            "hint": "Queue de Entrada1 a la tabla",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "TamFrecuencia",
+            "value": "600",
+            "ty": "PosInteger",
+            "subtype": "",
+            "hint": "Limite superior de la primer frecuencia",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [],
+        "outputs": []
+      },
+      {
+        "id": 7,
+        "class": "",
+        "kind": "C",
+        "name": "Centro de vacunacion",
+        "caption": "Centro de vacunacion",
+        "label": "A_Advance",
+        "container": 0,
+        "layout": {
+          "x": 303,
+          "y": 208,
+          "width": 130,
+          "height": 65
+        },
+        "properties": [
+          {
+            "name": "media",
+            "value": "10",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de espera",
+            "unique": false,
+            "visible": false
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 2,
+            "name": "Entrada 1",
+            "caption": "",
+            "label": "A_Advance",
+            "layout": {
+              "x": 239,
+              "y": 54,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 1,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_Depart",
+            "layout": {
+              "x": 217,
+              "y": 444,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "class": "Advance",
+        "kind": "A",
+        "name": "Advance",
+        "caption": "Advance",
+        "label": "A_Advance",
+        "container": 7,
+        "layout": {
+          "x": 236,
+          "y": 104,
+          "width": 80,
+          "height": 32
+        },
+        "properties": [
+          {
+            "name": "Media",
+            "value": "10",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de espera",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "5",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o Modificador",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingresa",
+            "label": "A_Advance",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_FacilityUse",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "class": "",
+        "kind": "C",
+        "name": "zonaVacunacion",
+        "caption": "zonaVacunacion",
+        "label": "A_Enter",
+        "container": 7,
+        "layout": {
+          "x": 438,
+          "y": 300,
+          "width": 183,
+          "height": 35
+        },
+        "properties": [],
+        "inputs": [
+          {
+            "ioid": 3,
+            "name": "Entrada 1",
+            "caption": "",
+            "label": "A_Enter",
+            "layout": {
+              "x": 254,
+              "y": 87,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 1,
+            "name": "Salida 1",
+            "caption": "",
+            "label": "StorageUse",
+            "layout": {
+              "x": 243,
+              "y": 537,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "class": "Enter",
+        "kind": "A",
+        "name": "Enter",
+        "caption": "Enter",
+        "label": "A_Enter",
+        "container": 9,
+        "layout": {
+          "x": 269,
+          "y": 159,
+          "width": 96,
+          "height": 32
+        },
+        "properties": [
+          {
+            "name": "Cantidad",
+            "value": "1",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Cantidad de ingresos",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Storage",
+            "value": "SalaEspera",
+            "ty": "EntityUse",
+            "subtype": "Storage",
+            "hint": "Storage al cual ingresa la transacción",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso",
+            "label": "A_Enter",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "StorageUse2",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "class": "Leave",
+        "kind": "A",
+        "name": "Leave",
+        "caption": "Leave",
+        "label": "A_Leave",
+        "container": 9,
+        "layout": {
+          "x": 265,
+          "y": 383,
+          "width": 96,
+          "height": 32
+        },
+        "properties": [
+          {
+            "name": "Cantidad",
+            "value": "1",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Cantidad de egresos",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Storage",
+            "value": "SalaEspera",
+            "ty": "EntityUse",
+            "subtype": "Storage",
+            "hint": "Storage del cual egresa la transacción",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Entrada1",
+            "label": "A_Leave",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_Priority1",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "class": "StorageDef",
+        "kind": "A",
+        "name": "StorageDef11",
+        "caption": "StorageDef",
+        "label": null,
+        "container": 9,
+        "layout": {
+          "x": 435,
+          "y": 296,
+          "width": 114,
+          "height": 30
+        },
+        "properties": [
+          {
+            "name": "Storage",
+            "value": "SalaEspera",
+            "ty": "EntityDef",
+            "subtype": "Storage",
+            "hint": "Storage a Declarar",
+            "unique": true,
+            "visible": true
+          },
+          {
+            "name": "Tamaño",
+            "value": "44",
+            "ty": "PosInteger",
+            "subtype": "",
+            "hint": "Capacidad del Storage",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [],
+        "outputs": []
+      },
+      {
+        "id": 13,
+        "class": "StorageDef",
+        "kind": "A",
+        "name": "StorageDef111",
+        "caption": "StorageDef",
+        "label": null,
+        "container": 9,
+        "layout": {
+          "x": 133,
+          "y": 226,
+          "width": 114,
+          "height": 30
+        },
+        "properties": [
+          {
+            "name": "Storage",
+            "value": "Vacunacion",
+            "ty": "EntityDef",
+            "subtype": "Storage",
+            "hint": "Storage a Declarar",
+            "unique": true,
+            "visible": true
+          },
+          {
+            "name": "Tamaño",
+            "value": "4",
+            "ty": "PosInteger",
+            "subtype": "",
+            "hint": "Capacidad del Storage",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [],
+        "outputs": []
+      },
+      {
+        "id": 14,
+        "class": "StorageUse",
+        "kind": "A",
+        "name": "StorageUse2",
+        "caption": "StorageUse",
+        "label": "StorageUse2",
+        "container": 9,
+        "layout": {
+          "x": 255,
+          "y": 228,
+          "width": 118,
+          "height": 42
+        },
+        "properties": [
+          {
+            "name": "Cantidad",
+            "value": "",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Cantidad de ingresos/Egresos del storage",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Media",
+            "value": "300",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de uso del storage",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "180",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o  modificador de la media",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Queue",
+            "value": "Cola_vacunacion",
+            "ty": "EntityUse",
+            "subtype": "Queue",
+            "hint": "",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Storage",
+            "value": "Vacunacion",
+            "ty": "EntityUse",
+            "subtype": "Storage",
+            "hint": "Storage a utilizar por un tiempo",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso",
+            "label": "StorageUse2",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_Advance2",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "class": "Advance",
+        "kind": "A",
+        "name": "Advance2",
+        "caption": "Advance2",
+        "label": "A_Advance2",
+        "container": 9,
+        "layout": {
+          "x": 255,
+          "y": 303,
+          "width": 80,
+          "height": 32
+        },
+        "properties": [
+          {
+            "name": "Media",
+            "value": "1320",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de espera",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "120",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o Modificador",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingresa",
+            "label": "A_Advance2",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_Leave",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 16,
+        "class": "Priority",
+        "kind": "A",
+        "name": "Priority1",
+        "caption": "Priority1",
+        "label": "A_Priority1",
+        "container": 9,
+        "layout": {
+          "x": 249,
+          "y": 456,
+          "width": 88,
+          "height": 52
+        },
+        "properties": [
+          {
+            "name": "Prioridad",
+            "value": "0",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Nº prioridad de la transacción. Cuanto mas grande sea el nº, mayor es la prioridad.",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso",
+            "label": "A_Priority1",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "StorageUse",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 17,
+        "class": "",
+        "kind": "C",
+        "name": "Recepcion",
+        "caption": "Recepcion",
+        "label": "A_FacilityUse",
+        "container": 7,
+        "layout": {
+          "x": 237,
+          "y": 161,
+          "width": 130,
+          "height": 24
+        },
+        "properties": [
+          {
+            "name": "media",
+            "value": "",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de uso del recurso",
+            "unique": false,
+            "visible": false
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 3,
+            "name": "Entrada 1",
+            "caption": "",
+            "label": "A_FacilityUse",
+            "layout": {
+              "x": 200,
+              "y": 56,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 1,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_FacilityUse1",
+            "layout": {
+              "x": 60,
+              "y": 345,
+              "width": 35,
+              "height": 35
+            }
+          },
+          {
+            "ioid": 2,
+            "name": "Salida2",
+            "caption": "",
+            "label": "StorageUse1",
+            "layout": {
+              "x": 346,
+              "y": 353,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ]
+      },
+      {
+        "id": 18,
+        "class": "FacilityUse",
+        "kind": "A",
+        "name": "FacilityUse",
+        "caption": "FacilityUse",
+        "label": "A_FacilityUse",
+        "container": 17,
+        "layout": {
+          "x": 196,
+          "y": 137,
+          "width": 174,
+          "height": 40
+        },
+        "properties": [
+          {
+            "name": "Facility",
+            "value": "Recepcion",
+            "ty": "EntityUse",
+            "subtype": "Facility",
+            "hint": "Recurso utilizado",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Media",
+            "value": "25",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de uso del recurso",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "8",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o Modificador de la media",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Queue",
+            "value": "Cola_recepcion",
+            "ty": "EntityUse",
+            "subtype": "Queue",
+            "hint": "cola del recurso utilizado",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso al recurso",
+            "label": "A_FacilityUse",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "Entrada1",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 19,
+        "class": "Transfer",
+        "kind": "A",
+        "name": "Transfer",
+        "caption": "Transfer",
+        "label": "Entrada1",
+        "container": 17,
+        "layout": {
+          "x": 197,
+          "y": 213,
+          "width": 64,
+          "height": 64
+        },
+        "properties": [
+          {
+            "name": "Prob",
+            "value": "85%",
+            "ty": "",
+            "subtype": "MultiType",
+            "hint": "Probabilidad de continuar por la Salida1 1",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso",
+            "label": "Entrada1",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "85%",
+            "label": "A_Advance12",
+            "layout": null
+          },
+          {
+            "ioid": 3,
+            "name": "Salida2",
+            "caption": "resto",
+            "label": "A_Advance1",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 20,
+        "class": "Advance",
+        "kind": "A",
+        "name": "Advance1",
+        "caption": "Advance",
+        "label": "A_Advance1",
+        "container": 17,
+        "layout": {
+          "x": 67,
+          "y": 263,
+          "width": 80,
+          "height": 32
+        },
+        "properties": [
+          {
+            "name": "Media",
+            "value": "20",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de espera",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "5",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o Modificador",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingresa",
+            "label": "A_Advance1",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_FacilityUse1",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 21,
+        "class": "Advance",
+        "kind": "A",
+        "name": "Advance12",
+        "caption": "Advance",
+        "label": "A_Advance12",
+        "container": 17,
+        "layout": {
+          "x": 347,
+          "y": 268,
+          "width": 80,
+          "height": 32
+        },
+        "properties": [
+          {
+            "name": "Media",
+            "value": "18",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de espera",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "8",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o Modificador",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingresa",
+            "label": "A_Advance12",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "StorageUse1",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 22,
+        "class": "",
+        "kind": "C",
+        "name": "Acreditacion",
+        "caption": "Acreditacion",
+        "label": "StorageUse1",
+        "container": 7,
+        "layout": {
+          "x": 342,
+          "y": 213,
+          "width": 130,
+          "height": 31
+        },
+        "properties": [],
+        "inputs": [
+          {
+            "ioid": 4,
+            "name": "Entrada 1",
+            "caption": "",
+            "label": "StorageUse1",
+            "layout": {
+              "x": 269,
+              "y": 97,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 1,
+            "name": "Salida1",
+            "caption": "",
+            "label": "StorageUse",
+            "layout": {
+              "x": 160,
+              "y": 408,
+              "width": 35,
+              "height": 35
+            }
+          },
+          {
+            "ioid": 2,
+            "name": "Salida2",
+            "caption": "",
+            "label": "A_Enter",
+            "layout": {
+              "x": 317,
+              "y": 410,
+              "width": 35,
+              "height": 35
+            }
+          },
+          {
+            "ioid": 3,
+            "name": "Salida3",
+            "caption": "",
+            "label": "A_Enter",
+            "layout": {
+              "x": 481,
+              "y": 410,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ]
+      },
+      {
+        "id": 23,
+        "class": "StorageUse",
+        "kind": "A",
+        "name": "StorageUse1",
+        "caption": "StorageUse",
+        "label": "StorageUse1",
+        "container": 22,
+        "layout": {
+          "x": 269,
+          "y": 165,
+          "width": 118,
+          "height": 42
+        },
+        "properties": [
+          {
+            "name": "Cantidad",
+            "value": "",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Cantidad de ingresos/Egresos del storage",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Media",
+            "value": "300",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de uso del storage",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "120",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o  modificador de la media",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Queue",
+            "value": "Cola_acreditacion",
+            "ty": "EntityUse",
+            "subtype": "Queue",
+            "hint": "",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Storage",
+            "value": "Acreditacion",
+            "ty": "EntityUse",
+            "subtype": "Storage",
+            "hint": "Storage a utilizar por un tiempo",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso",
+            "label": "StorageUse1",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "Entrada11",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 24,
+        "class": "StorageDef",
+        "kind": "A",
+        "name": "StorageDef1",
+        "caption": "StorageDef",
+        "label": null,
+        "container": 22,
+        "layout": {
+          "x": 133,
+          "y": 163,
+          "width": 114,
+          "height": 30
+        },
+        "properties": [
+          {
+            "name": "Storage",
+            "value": "Acreditacion",
+            "ty": "EntityDef",
+            "subtype": "Storage",
+            "hint": "Storage a Declarar",
+            "unique": true,
+            "visible": true
+          },
+          {
+            "name": "Tamaño",
+            "value": "5",
+            "ty": "PosInteger",
+            "subtype": "",
+            "hint": "Capacidad del Storage",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [],
+        "outputs": []
+      },
+      {
+        "id": 25,
+        "class": "Transfer",
+        "kind": "A",
+        "name": "Transfer1",
+        "caption": "Transfer",
+        "label": "Entrada11",
+        "container": 22,
+        "layout": {
+          "x": 271,
+          "y": 242,
+          "width": 64,
+          "height": 64
+        },
+        "properties": [
+          {
+            "name": "Prob",
+            "value": "95%",
+            "ty": "",
+            "subtype": "MultiType",
+            "hint": "Probabilidad de continuar por la Salida1 1",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso",
+            "label": "Entrada11",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "95%",
+            "label": "A_Advance1111",
+            "layout": null
+          },
+          {
+            "ioid": 3,
+            "name": "Salida2",
+            "caption": "resto",
+            "label": "A_Advance111",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 26,
+        "class": "Advance",
+        "kind": "A",
+        "name": "Advance111",
+        "caption": "Advance",
+        "label": "A_Advance111",
+        "container": 22,
+        "layout": {
+          "x": 162,
+          "y": 266,
+          "width": 80,
+          "height": 32
+        },
+        "properties": [
+          {
+            "name": "Media",
+            "value": "25",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de espera",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "10",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o Modificador",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingresa",
+            "label": "A_Advance111",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "StorageUse",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 27,
+        "class": "Priority",
+        "kind": "A",
+        "name": "Priority",
+        "caption": "Priority",
+        "label": "A_Priority",
+        "container": 22,
+        "layout": {
+          "x": 318,
+          "y": 323,
+          "width": 88,
+          "height": 52
+        },
+        "properties": [
+          {
+            "name": "Prioridad",
+            "value": "1",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Nº prioridad de la transacción. Cuanto mas grande sea el nº, mayor es la prioridad.",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso",
+            "label": "A_Priority",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_Enter",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 28,
+        "class": "Transfer",
+        "kind": "A",
+        "name": "Transfer11",
+        "caption": "Transfer",
+        "label": "Entrada12",
+        "container": 22,
+        "layout": {
+          "x": 423,
+          "y": 274,
+          "width": 115,
+          "height": 64
+        },
+        "properties": [
+          {
+            "name": "Prob",
+            "value": "97%",
+            "ty": "",
+            "subtype": "MultiType",
+            "hint": "Probabilidad de continuar por la Salida1 1",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso",
+            "label": "Entrada12",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "97%",
+            "label": "A_Enter",
+            "layout": null
+          },
+          {
+            "ioid": 3,
+            "name": "Salida2",
+            "caption": "resto",
+            "label": "A_Priority",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 29,
+        "class": "Advance",
+        "kind": "A",
+        "name": "Advance1111",
+        "caption": "Advance",
+        "label": "A_Advance1111",
+        "container": 22,
+        "layout": {
+          "x": 427,
+          "y": 203,
+          "width": 80,
+          "height": 32
+        },
+        "properties": [
+          {
+            "name": "Media",
+            "value": "15",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de espera",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "8",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o Modificador",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingresa",
+            "label": "A_Advance1111",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "Entrada12",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 30,
+        "class": "",
+        "kind": "C",
+        "name": "Entrega de carnets",
+        "caption": "Entrega de carnets",
+        "label": "A_FacilityUse1",
+        "container": 7,
+        "layout": {
+          "x": 118,
+          "y": 239,
+          "width": 156,
+          "height": 28
+        },
+        "properties": [],
+        "inputs": [
+          {
+            "ioid": 2,
+            "name": "Entrada 1",
+            "caption": "",
+            "label": "A_FacilityUse1",
+            "layout": {
+              "x": 107,
+              "y": 93,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 1,
+            "name": "Salida1",
+            "caption": "",
+            "label": "StorageUse",
+            "layout": {
+              "x": 106,
+              "y": 339,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ]
+      },
+      {
+        "id": 31,
+        "class": "FacilityUse",
+        "kind": "A",
+        "name": "FacilityUse1",
+        "caption": "FacilityUse",
+        "label": "A_FacilityUse1",
+        "container": 30,
+        "layout": {
+          "x": 107,
+          "y": 180,
+          "width": 174,
+          "height": 40
+        },
+        "properties": [
+          {
+            "name": "Facility",
+            "value": "E_carnet",
+            "ty": "EntityUse",
+            "subtype": "Facility",
+            "hint": "Recurso utilizado",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Media",
+            "value": "180",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de uso del recurso",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "120",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o Modificador de la media",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Queue",
+            "value": "Cola_E_carnet",
+            "ty": "EntityUse",
+            "subtype": "Queue",
+            "hint": "cola del recurso utilizado",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso al recurso",
+            "label": "A_FacilityUse1",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_Advance11",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 32,
+        "class": "Advance",
+        "kind": "A",
+        "name": "Advance11",
+        "caption": "Advance",
+        "label": "A_Advance11",
+        "container": 30,
+        "layout": {
+          "x": 108,
+          "y": 258,
+          "width": 80,
+          "height": 32
+        },
+        "properties": [
+          {
+            "name": "Media",
+            "value": "14",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de espera",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "8",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o Modificador",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingresa",
+            "label": "A_Advance11",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "StorageUse",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 33,
+        "class": "",
+        "kind": "C",
+        "name": "Telefono",
+        "caption": "Telefono",
+        "label": null,
+        "container": 30,
+        "layout": {
+          "x": 290,
+          "y": 142,
+          "width": 90,
+          "height": 31
+        },
+        "properties": [],
+        "inputs": [],
+        "outputs": []
+      },
+      {
+        "id": 34,
+        "class": "Generate",
+        "kind": "A",
+        "name": "Generate11",
+        "caption": "Generate1",
+        "label": null,
+        "container": 33,
+        "layout": {
+          "x": 101,
+          "y": 57,
+          "width": 186,
+          "height": 63
+        },
+        "properties": [
+          {
+            "name": "Cantidad",
+            "value": "",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Cantidad de Transacciones a generar",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Media",
+            "value": "1800",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Frecuencia media de arribos",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "900",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o modificador",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "OffSet",
+            "value": "",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo de espera",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Prioridad",
+            "value": "",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Prioridad de la transaccion generada",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [],
+        "outputs": [
+          {
+            "ioid": 1,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_FacilityInt1",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 35,
+        "class": "Terminate",
+        "kind": "A",
+        "name": "Terminate11",
+        "caption": "Terminate1",
+        "label": "A_Terminate11",
+        "container": 33,
+        "layout": {
+          "x": 87,
+          "y": 233,
+          "width": 84,
+          "height": 64
+        },
+        "properties": [
+          {
+            "name": "Unidades",
+            "value": "",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Cantidad de unidades a decrementar del START, por cada transacción que llega al módulo",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso",
+            "label": "A_Terminate11",
+            "layout": null
+          }
+        ],
+        "outputs": []
+      },
+      {
+        "id": 36,
+        "class": "FacilityInt",
+        "kind": "A",
+        "name": "FacilityInt1",
+        "caption": "FacilityInt",
+        "label": "A_FacilityInt1",
+        "container": 33,
+        "layout": {
+          "x": 90,
+          "y": 143,
+          "width": 164,
+          "height": 40
+        },
+        "properties": [
+          {
+            "name": "Facility",
+            "value": "E_carnet",
+            "ty": "EntityUse",
+            "subtype": "Facility",
+            "hint": "Facility a interrumpir por la transacción activa.",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Media",
+            "value": "240",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de uso del recurso",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "180",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o Modificador de la media",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "ModoArrebato",
+            "value": "NoRemover",
+            "ty": "Listed",
+            "subtype": "RemoveMode",
+            "hint": "Modo de arrebato temporal o permanete.",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "ModoInterrupcion",
+            "value": "Prioridad",
+            "ty": "Listed",
+            "subtype": "PriorityMode",
+            "hint": "Modo de interrupción o por prioridad",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Queue",
+            "value": "ColaInt",
+            "ty": "EntityUse",
+            "subtype": "Queue",
+            "hint": "cola del recurso interrumpido",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Remanente",
+            "value": "Remanente",
+            "ty": "EntityUse",
+            "subtype": "Parameter",
+            "hint": "Parámetro de la transacción propietaria donde se guarda el remanete",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso al recurso",
+            "label": "A_FacilityInt1",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "SalidaAlt",
+            "caption": "Propietaria",
+            "label": null,
+            "layout": null
+          },
+          {
+            "ioid": 3,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_Terminate11",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 37,
+        "class": "",
+        "kind": "C",
+        "name": "Exit",
+        "caption": "Exit",
+        "label": "StorageUse",
+        "container": 7,
+        "layout": {
+          "x": 222,
+          "y": 384,
+          "width": 130,
+          "height": 32
+        },
+        "properties": [],
+        "inputs": [
+          {
+            "ioid": 2,
+            "name": "Entrada 1",
+            "caption": "",
+            "label": "StorageUse",
+            "layout": {
+              "x": 210,
+              "y": 112,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 1,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_Depart",
+            "layout": {
+              "x": 207,
+              "y": 290,
+              "width": 35,
+              "height": 35
+            }
+          }
+        ]
+      },
+      {
+        "id": 38,
+        "class": "StorageUse",
+        "kind": "A",
+        "name": "StorageUse",
+        "caption": "StorageUse",
+        "label": "StorageUse",
+        "container": 37,
+        "layout": {
+          "x": 207,
+          "y": 196,
+          "width": 100,
+          "height": 42
+        },
+        "properties": [
+          {
+            "name": "Cantidad",
+            "value": "",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Cantidad de ingresos/Egresos del storage",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Media",
+            "value": "3",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Tiempo Medio de uso del storage",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Modificador",
+            "value": "1",
+            "ty": "TSNA",
+            "subtype": "SNA",
+            "hint": "Desvio o  modificador de la media",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Queue",
+            "value": "Cola_exit",
+            "ty": "EntityUse",
+            "subtype": "Queue",
+            "hint": "",
+            "unique": false,
+            "visible": true
+          },
+          {
+            "name": "Storage",
+            "value": "Exit",
+            "ty": "EntityUse",
+            "subtype": "Storage",
+            "hint": "Storage a utilizar por un tiempo",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [
+          {
+            "ioid": 1,
+            "name": "Entrada1",
+            "caption": "Ingreso",
+            "label": "StorageUse",
+            "layout": null
+          }
+        ],
+        "outputs": [
+          {
+            "ioid": 2,
+            "name": "Salida1",
+            "caption": "",
+            "label": "A_Depart",
+            "layout": null
+          }
+        ]
+      },
+      {
+        "id": 39,
+        "class": "StorageDef",
+        "kind": "A",
+        "name": "StorageDef",
+        "caption": "StorageDef",
+        "label": null,
+        "container": 37,
+        "layout": {
+          "x": 88,
+          "y": 192,
+          "width": 100,
+          "height": 30
+        },
+        "properties": [
+          {
+            "name": "Storage",
+            "value": "Exit",
+            "ty": "EntityDef",
+            "subtype": "Storage",
+            "hint": "Storage a Declarar",
+            "unique": true,
+            "visible": true
+          },
+          {
+            "name": "Tamaño",
+            "value": "3",
+            "ty": "PosInteger",
+            "subtype": "",
+            "hint": "Capacidad del Storage",
+            "unique": false,
+            "visible": true
+          }
+        ],
+        "inputs": [],
+        "outputs": []
+      }
+    ],
+    "edges": [
+      {
+        "id": "0:1:1->4:1",
+        "container": 0,
+        "from_module": 1,
+        "from_ioid": 1,
+        "from_port": "Salida1",
+        "to_module": 4,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Queue",
+        "hops": [
+          [
+            1,
+            4
+          ]
+        ]
+      },
+      {
+        "id": "0:4:2->7:2",
+        "container": 0,
+        "from_module": 4,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 7,
+        "to_ioid": 2,
+        "to_port": "Entrada 1",
+        "label": "A_Advance",
+        "hops": [
+          [
+            4,
+            8
+          ]
+        ]
+      },
+      {
+        "id": "0:5:2->2:1",
+        "container": 0,
+        "from_module": 5,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 2,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Terminate",
+        "hops": [
+          [
+            5,
+            2
+          ]
+        ]
+      },
+      {
+        "id": "0:7:1->5:1",
+        "container": 0,
+        "from_module": 7,
+        "from_ioid": 1,
+        "from_port": "Salida1",
+        "to_module": 5,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Depart",
+        "hops": [
+          [
+            38,
+            5
+          ]
+        ]
+      },
+      {
+        "id": "7:7:2->8:1",
+        "container": 7,
+        "from_module": 7,
+        "from_ioid": 2,
+        "from_port": "",
+        "to_module": 8,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Advance",
+        "hops": [
+          [
+            4,
+            8
+          ]
+        ]
+      },
+      {
+        "id": "7:8:2->17:3",
+        "container": 7,
+        "from_module": 8,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 17,
+        "to_ioid": 3,
+        "to_port": "Entrada 1",
+        "label": "A_FacilityUse",
+        "hops": [
+          [
+            8,
+            18
+          ]
+        ]
+      },
+      {
+        "id": "7:9:1->37:2",
+        "container": 7,
+        "from_module": 9,
+        "from_ioid": 1,
+        "from_port": "Salida 1",
+        "to_module": 37,
+        "to_ioid": 2,
+        "to_port": "Entrada 1",
+        "label": "StorageUse",
+        "hops": [
+          [
+            16,
+            38
+          ]
+        ]
+      },
+      {
+        "id": "7:17:1->30:2",
+        "container": 7,
+        "from_module": 17,
+        "from_ioid": 1,
+        "from_port": "Salida1",
+        "to_module": 30,
+        "to_ioid": 2,
+        "to_port": "Entrada 1",
+        "label": "A_FacilityUse1",
+        "hops": [
+          [
+            20,
+            31
+          ]
+        ]
+      },
+      {
+        "id": "7:17:2->22:4",
+        "container": 7,
+        "from_module": 17,
+        "from_ioid": 2,
+        "from_port": "Salida2",
+        "to_module": 22,
+        "to_ioid": 4,
+        "to_port": "Entrada 1",
+        "label": "StorageUse1",
+        "hops": [
+          [
+            21,
+            23
+          ]
+        ]
+      },
+      {
+        "id": "7:22:1->37:2",
+        "container": 7,
+        "from_module": 22,
+        "from_ioid": 1,
+        "from_port": "Salida1",
+        "to_module": 37,
+        "to_ioid": 2,
+        "to_port": "Entrada 1",
+        "label": "StorageUse",
+        "hops": [
+          [
+            26,
+            38
+          ]
+        ]
+      },
+      {
+        "id": "7:22:2->9:3",
+        "container": 7,
+        "from_module": 22,
+        "from_ioid": 2,
+        "from_port": "Salida2",
+        "to_module": 9,
+        "to_ioid": 3,
+        "to_port": "Entrada 1",
+        "label": "A_Enter",
+        "hops": [
+          [
+            27,
+            10
+          ]
+        ]
+      },
+      {
+        "id": "7:22:3->9:3",
+        "container": 7,
+        "from_module": 22,
+        "from_ioid": 3,
+        "from_port": "Salida3",
+        "to_module": 9,
+        "to_ioid": 3,
+        "to_port": "Entrada 1",
+        "label": "A_Enter",
+        "hops": [
+          [
+            28,
+            10
+          ]
+        ]
+      },
+      {
+        "id": "7:30:1->37:2",
+        "container": 7,
+        "from_module": 30,
+        "from_ioid": 1,
+        "from_port": "Salida1",
+        "to_module": 37,
+        "to_ioid": 2,
+        "to_port": "Entrada 1",
+        "label": "StorageUse",
+        "hops": [
+          [
+            32,
+            38
+          ]
+        ]
+      },
+      {
+        "id": "7:37:1->7:1",
+        "container": 7,
+        "from_module": 37,
+        "from_ioid": 1,
+        "from_port": "Salida1",
+        "to_module": 7,
+        "to_ioid": 1,
+        "to_port": "",
+        "label": "A_Depart",
+        "hops": [
+          [
+            38,
+            5
+          ]
+        ]
+      },
+      {
+        "id": "9:9:3->10:1",
+        "container": 9,
+        "from_module": 9,
+        "from_ioid": 3,
+        "from_port": "",
+        "to_module": 10,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Enter",
+        "hops": [
+          [
+            27,
+            10
+          ],
+          [
+            28,
+            10
+          ]
+        ]
+      },
+      {
+        "id": "9:10:2->14:1",
+        "container": 9,
+        "from_module": 10,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 14,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "StorageUse2",
+        "hops": [
+          [
+            10,
+            14
+          ]
+        ]
+      },
+      {
+        "id": "9:11:2->16:1",
+        "container": 9,
+        "from_module": 11,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 16,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Priority1",
+        "hops": [
+          [
+            11,
+            16
+          ]
+        ]
+      },
+      {
+        "id": "9:14:2->15:1",
+        "container": 9,
+        "from_module": 14,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 15,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Advance2",
+        "hops": [
+          [
+            14,
+            15
+          ]
+        ]
+      },
+      {
+        "id": "9:15:2->11:1",
+        "container": 9,
+        "from_module": 15,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 11,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Leave",
+        "hops": [
+          [
+            15,
+            11
+          ]
+        ]
+      },
+      {
+        "id": "9:16:2->9:1",
+        "container": 9,
+        "from_module": 16,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 9,
+        "to_ioid": 1,
+        "to_port": "",
+        "label": "StorageUse",
+        "hops": [
+          [
+            16,
+            38
+          ]
+        ]
+      },
+      {
+        "id": "17:17:3->18:1",
+        "container": 17,
+        "from_module": 17,
+        "from_ioid": 3,
+        "from_port": "",
+        "to_module": 18,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_FacilityUse",
+        "hops": [
+          [
+            8,
+            18
+          ]
+        ]
+      },
+      {
+        "id": "17:18:2->19:1",
+        "container": 17,
+        "from_module": 18,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 19,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "Entrada1",
+        "hops": [
+          [
+            18,
+            19
+          ]
+        ]
+      },
+      {
+        "id": "17:19:2->21:1",
+        "container": 17,
+        "from_module": 19,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 21,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Advance12",
+        "hops": [
+          [
+            19,
+            21
+          ]
+        ]
+      },
+      {
+        "id": "17:19:3->20:1",
+        "container": 17,
+        "from_module": 19,
+        "from_ioid": 3,
+        "from_port": "Salida2",
+        "to_module": 20,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Advance1",
+        "hops": [
+          [
+            19,
+            20
+          ]
+        ]
+      },
+      {
+        "id": "17:20:2->17:1",
+        "container": 17,
+        "from_module": 20,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 17,
+        "to_ioid": 1,
+        "to_port": "",
+        "label": "A_FacilityUse1",
+        "hops": [
+          [
+            20,
+            31
+          ]
+        ]
+      },
+      {
+        "id": "17:21:2->17:2",
+        "container": 17,
+        "from_module": 21,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 17,
+        "to_ioid": 2,
+        "to_port": "",
+        "label": "StorageUse1",
+        "hops": [
+          [
+            21,
+            23
+          ]
+        ]
+      },
+      {
+        "id": "22:22:4->23:1",
+        "container": 22,
+        "from_module": 22,
+        "from_ioid": 4,
+        "from_port": "",
+        "to_module": 23,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "StorageUse1",
+        "hops": [
+          [
+            21,
+            23
+          ]
+        ]
+      },
+      {
+        "id": "22:23:2->25:1",
+        "container": 22,
+        "from_module": 23,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 25,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "Entrada11",
+        "hops": [
+          [
+            23,
+            25
+          ]
+        ]
+      },
+      {
+        "id": "22:25:2->29:1",
+        "container": 22,
+        "from_module": 25,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 29,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Advance1111",
+        "hops": [
+          [
+            25,
+            29
+          ]
+        ]
+      },
+      {
+        "id": "22:25:3->26:1",
+        "container": 22,
+        "from_module": 25,
+        "from_ioid": 3,
+        "from_port": "Salida2",
+        "to_module": 26,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Advance111",
+        "hops": [
+          [
+            25,
+            26
+          ]
+        ]
+      },
+      {
+        "id": "22:26:2->22:1",
+        "container": 22,
+        "from_module": 26,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 22,
+        "to_ioid": 1,
+        "to_port": "",
+        "label": "StorageUse",
+        "hops": [
+          [
+            26,
+            38
+          ]
+        ]
+      },
+      {
+        "id": "22:27:2->22:2",
+        "container": 22,
+        "from_module": 27,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 22,
+        "to_ioid": 2,
+        "to_port": "",
+        "label": "A_Enter",
+        "hops": [
+          [
+            27,
+            10
+          ]
+        ]
+      },
+      {
+        "id": "22:28:2->22:3",
+        "container": 22,
+        "from_module": 28,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 22,
+        "to_ioid": 3,
+        "to_port": "",
+        "label": "A_Enter",
+        "hops": [
+          [
+            28,
+            10
+          ]
+        ]
+      },
+      {
+        "id": "22:28:3->27:1",
+        "container": 22,
+        "from_module": 28,
+        "from_ioid": 3,
+        "from_port": "Salida2",
+        "to_module": 27,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Priority",
+        "hops": [
+          [
+            28,
+            27
+          ]
+        ]
+      },
+      {
+        "id": "22:29:2->28:1",
+        "container": 22,
+        "from_module": 29,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 28,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "Entrada12",
+        "hops": [
+          [
+            29,
+            28
+          ]
+        ]
+      },
+      {
+        "id": "30:30:2->31:1",
+        "container": 30,
+        "from_module": 30,
+        "from_ioid": 2,
+        "from_port": "",
+        "to_module": 31,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_FacilityUse1",
+        "hops": [
+          [
+            20,
+            31
+          ]
+        ]
+      },
+      {
+        "id": "30:31:2->32:1",
+        "container": 30,
+        "from_module": 31,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 32,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Advance11",
+        "hops": [
+          [
+            31,
+            32
+          ]
+        ]
+      },
+      {
+        "id": "30:32:2->30:1",
+        "container": 30,
+        "from_module": 32,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 30,
+        "to_ioid": 1,
+        "to_port": "",
+        "label": "StorageUse",
+        "hops": [
+          [
+            32,
+            38
+          ]
+        ]
+      },
+      {
+        "id": "33:34:1->36:1",
+        "container": 33,
+        "from_module": 34,
+        "from_ioid": 1,
+        "from_port": "Salida1",
+        "to_module": 36,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_FacilityInt1",
+        "hops": [
+          [
+            34,
+            36
+          ]
+        ]
+      },
+      {
+        "id": "33:36:3->35:1",
+        "container": 33,
+        "from_module": 36,
+        "from_ioid": 3,
+        "from_port": "Salida1",
+        "to_module": 35,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "A_Terminate11",
+        "hops": [
+          [
+            36,
+            35
+          ]
+        ]
+      },
+      {
+        "id": "37:37:2->38:1",
+        "container": 37,
+        "from_module": 37,
+        "from_ioid": 2,
+        "from_port": "",
+        "to_module": 38,
+        "to_ioid": 1,
+        "to_port": "Entrada1",
+        "label": "StorageUse",
+        "hops": [
+          [
+            16,
+            38
+          ],
+          [
+            26,
+            38
+          ],
+          [
+            32,
+            38
+          ]
+        ]
+      },
+      {
+        "id": "37:38:2->37:1",
+        "container": 37,
+        "from_module": 38,
+        "from_ioid": 2,
+        "from_port": "Salida1",
+        "to_module": 37,
+        "to_ioid": 1,
+        "to_port": "",
+        "label": "A_Depart",
+        "hops": [
+          [
+            38,
+            5
+          ]
+        ]
+      }
+    ]
+  },
+  "glossary": {
+    "Advance": "Delays the transaction by Media units of simulated time, plus Modificador for the deviation.",
+    "Clock": "Control clock: creates a transaction every Frecuencia time units and ends the run when the counter reaches one.",
+    "Depart": "Removes Cantidad transactions from the queue Queue, without using a facility.",
+    "Enter": "Enters Cantidad units of the storage Storage.",
+    "FacilityInt": "Preempts the facility Facility after Media units of time and waits in the queue Queue until it is free again.",
+    "FacilityUse": "Uses the facility Facility for Media units of time; the transaction waits in the queue Queue while it is busy.",
+    "Generate": "Creates transactions: Media is the mean time between them, Cantidad how many to create (leave it empty to create them forever; a number limits the total, and zero creates none), with the optional Modificador, OffSet and Prioridad.",
+    "Leave": "Releases Cantidad units of the storage Storage.",
+    "Priority": "Sets the priority of the transaction to Prioridad.",
+    "QTable": "Declares a queue table.",
+    "Queue": "The transaction joins the queue Queue; Cantidad units leave it.",
+    "StorageDef": "Declares the capacity of a storage.",
+    "StorageUse": "Takes Cantidad units of the storage Storage for Media units of time; the transaction waits in the queue Queue while the storage is full.",
+    "Terminate": "Ends the run when Unidades transactions reach the statement (zero means the statement never fires).",
+    "Transfer": "Sends the transaction to the next block with the probability Prob; the share goes to the first output."
+  }
+}
+
+===== CALL #catalogue at 2026-11-02T20:31:38 =====
+tool: catalogue
+arguments: {"classes": ["Generate"]}
+----- answer -----
+{
+  "schema": "genmsi.classes/1",
+  "classes": [
+    {
+      "class": "Generate",
+      "title": "Generar",
+      "description": "Creates transactions: Media is the mean time between them, Cantidad how many to create (leave it empty to create them forever; a number limits the total, and zero creates none), with the optional Modificador, OffSet and Prioridad.",
+      "inputs": [],
+      "outputs": [
+        {
+          "ioid": 1,
+          "name": "Salida1",
+          "caption": ""
+        }
+      ],
+      "properties": [
+        {
+          "name": "Cantidad",
+          "hint": "Cantidad de Transacciones a generar",
+          "ty": "TSNA",
+          "subtype": "SNA",
+          "unique": false,
+          "options": []
+        },
+        {
+          "name": "Media",
+          "hint": "Frecuencia media de arribos",
+          "ty": "TSNA",
+          "subtype": "SNA",
+          "unique": false,
+          "options": []
+        },
+        {
+          "name": "Modificador",
+          "hint": "Desvio o modificador",
+          "ty": "TSNA",
+          "subtype": "SNA",
+          "unique": false,
+          "options": []
+        },
+        {
+          "name": "OffSet",
+          "hint": "Tiempo de espera",
+          "ty": "TSNA",
+          "subtype": "SNA",
+          "unique": false,
+          "options": []
+        },
+        {
+          "name": "Prioridad",
+          "hint": "Prioridad de la transaccion generada",
+          "ty": "TSNA",
+          "subtype": "SNA",
+          "unique": false,
+          "options": []
+        }
+      ],
+      "declares": [],
+      "uses": [],
+      "template": "<module moduleid=\"0\" moduleclass=\"Generate\" owner=\"0\" caption=\"Generate\" name=\"Generate\" kind=\"A\"><outputs><output ioid=\"1\" name=\"Salida1\" caption=\"\" mylabel=\"\"/></outputs><props><property name=\"Cantidad\" hint=\"Cantidad%20de%20Transacciones%20a%20generar\" value=\"\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/><property name=\"Media\" hint=\"Frecuencia%20media%20de%20arribos\" value=\"60\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/><property name=\"Modificador\" hint=\"Desvio%20o%20modificador\" value=\"30\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/><property name=\"OffSet\" hint=\"Tiempo%20de%20espera\" value=\"\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/><property name=\"Prioridad\" hint=\"Prioridad%20de%20la%20transaccion%20generada\" value=\"\" type=\"TSNA\" subType=\"SNA\" visible=\"1\" unique=\"0\"/></props></module>"
+    }
+  ]
+}
+
+===== CALL #lint at 2026-11-02T20:31:40 =====
+tool: lint
+arguments: {"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl"}
+----- answer -----
+{
+  "schema": "genmsi.lint/1",
+  "path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl",
+  "status": "ok",
+  "title": "Modelo1",
+  "blocks": 52,
+  "definitions": {
+    "functions": 0,
+    "variables": 0,
+    "random_variables": 0,
+    "storages": 4,
+    "tables": 0,
+    "qtables": 1
+  },
+  "diagnostics": []
+}
+
+===== CALL #apply_edit at 2026-11-02T20:31:42 =====
+tool: apply_edit
+arguments: {"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl", "commands": [{"op": "setCaption", "id": 1, "caption": "LLEGADAS"}, {"op": "setProperty", "id": 1, "property": "Media", "value": "45"}]}
+----- answer -----
+ISERROR {
+  "error": "model_locked",
+  "message": "the app has unsaved changes on this model; nothing was written: /home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl. Ask the reader to save the model and send the edit again.",
+  "path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl"
+}
+
+===== CALL #apply_edit at 2026-11-02T20:31:44 =====
+tool: apply_edit
+arguments: {"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl", "target": "proposal", "summary": "Renombrar el bloque Generate (id 1) a 'LLEGADAS' y cambiar su propiedad Media de 60 a 45 (frecuencia media de arribos).", "commands": [{"op": "setCaption", "id": 1, "caption": "LLEGADAS"}, {"op": "setProperty", "id": 1, "property": "Media", "value": "45"}]}
+----- answer -----
+{
+  "schema": "genmsi.edit/1",
+  "path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl",
+  "applied": 2,
+  "written": false,
+  "status": "ok",
+  "title": "Modelo1",
+  "blocks": 52,
+  "definitions": {
+    "functions": 0,
+    "variables": 0,
+    "random_variables": 0,
+    "storages": 4,
+    "tables": 0,
+    "qtables": 1
+  },
+  "diagnostics": [],
+  "created": [],
+  "proposal": {
+    "id": "1793662304738-2f7b5729b3af3d82",
+    "model": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/home/org.gensmi.desktop/staging/1793662304738-2f7b5729b3af3d82.gmdl"
+  }
+}
+
+===== CALL #app_state at 2026-11-02T20:31:46 =====
+tool: app_state
+arguments: {}
+----- answer -----
+{
+  "diagnostics": [],
+  "dirty": true,
+  "model": null,
+  "path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl",
+  "pid": 169026,
+  "run": null,
+  "schema": "genmsi.live/1"
+}
+
+===== QUERY tools/list =====
+{
+  "tools": [
+    {
+      "description": "See what the GenMSI desktop app is showing right now: the model it has open (`path`), whether the reader has changes that are not saved on it (`dirty`), what the app found in that model (`diagnostics`) and the last run the app made (`run`). It returns the genmsi.live/1 document, the one the app publishes; when the app is not running the document has `path: null` \u2014that is an answer, not a failure. Ask it BEFORE you write on the model the app has open: `apply_edit` and `save_model` refuse with `model_locked` while the app has unsaved changes on that model, so tell the reader to save it and send the same edit again.",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "name": "app_state"
+    },
+    {
+      "description": "Add, edit and connect the blocks of a GenMSI model. The commands are the engine's own editing commands, the same ones the desktop application speaks: `addBlock` {class, container, x, y} creates a block of a catalogue class (call `catalogue` first: it gives the class names, their ports (ioid) and their properties), `connect` {from, fromIoid, to, toIoid} wires an output port to an input port, `setProperty` {id, property, value} sets a declared property, `setCaption` {id, caption} names a block, `moveBlock` {id, x, y} moves one, `removeBlock` {id} takes one away and `removeBlocks` {ids} takes several away as ONE operation; the schema of the tool carries the whole vocabulary. The commands are applied in order and the batch is ATOMIC: if one fails, none is applied and the failure names the command that failed. `layout` says where the blocks the batch adds go: `auto` (the default) puts every block an `addBlock` adds where there is room in its container, like a drop in the application; `explicit` uses the `x` and the `y` of the command. The model is checked before it is written: one that does not compile is NOT written, and the error names the block that caused it. The blocks the batch creates take the next free ids, in the order of the commands. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text): `path` may be left out, and then the model the app has open is the one the batch edits; a `path` that is not on the disk yet is a model the batch CREATES, and the file is written when the model compiles. `target` says where the result goes: `file` (the default) writes it to the file the batch edited, and `proposal` leaves the model in the staging area of the app, without touching the disk, where the person sees it and decides to accept it or to discard it \u2014 the verdict comes back in `app_state`. `summary` is one line about what the batch did; it travels with the proposal. Returns the genmsi.edit/1 document.",
+      "inputSchema": {
+        "$defs": {
+          "EditCommand": {
+            "description": "One editing operation over the model.",
+            "oneOf": [
+              {
+                "description": "Create a block of a catalogue class inside a container.",
+                "properties": {
+                  "class": {
+                    "description": "Catalogue class (`Generate`, `Queue`, ...).",
+                    "type": "string"
+                  },
+                  "container": {
+                    "description": "Owning container id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "addBlock",
+                    "type": "string"
+                  },
+                  "x": {
+                    "description": "Horizontal position.",
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "y": {
+                    "description": "Vertical position.",
+                    "format": "int32",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "op",
+                  "class",
+                  "container",
+                  "x",
+                  "y"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Remove a block, its descendants and every link that touches them.",
+                "properties": {
+                  "id": {
+                    "description": "Block id (the model root is refused).",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "removeBlock",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "id"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Remove several blocks as ONE operation.\n\nThe blocks that one of them owns are removed with it, and a block\nthat is already gone when its turn comes is skipped.",
+                "properties": {
+                  "ids": {
+                    "description": "Block ids.",
+                    "items": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "op": {
+                    "const": "removeBlocks",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "ids"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Move a block, keeping its size.",
+                "properties": {
+                  "id": {
+                    "description": "Block id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "moveBlock",
+                    "type": "string"
+                  },
+                  "x": {
+                    "description": "Horizontal position.",
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "y": {
+                    "description": "Vertical position.",
+                    "format": "int32",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "op",
+                  "id",
+                  "x",
+                  "y"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Set the position of many things as ONE operation (the re-layout).\n\nThe things are the blocks of the scope that was composed and the\ndoors of its container: a door is a block of the picture, and its\nplace is written like the place of any other block.",
+                "properties": {
+                  "op": {
+                    "const": "setLayouts",
+                    "type": "string"
+                  },
+                  "placements": {
+                    "description": "One place per thing that was composed.",
+                    "items": {
+                      "$ref": "#/$defs/Placement"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "op",
+                  "placements"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Move a door of a container.\n\nA door is a block of the picture in its own right: the reader drags it\nwhere he wants it, and its place is kept.",
+                "properties": {
+                  "block": {
+                    "description": "The container that owns the door.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "input": {
+                    "description": "Whether the door is an entry one.",
+                    "type": "boolean"
+                  },
+                  "ioid": {
+                    "description": "The id of the door inside the container.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "movePort",
+                    "type": "string"
+                  },
+                  "x": {
+                    "description": "Horizontal position.",
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "y": {
+                    "description": "Vertical position.",
+                    "format": "int32",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "op",
+                  "block",
+                  "ioid",
+                  "input",
+                  "x",
+                  "y"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Remove a door of a container.\n\nThe links that touch the door go with it: a link that starts at a\ndoor that is gone, or that ends at it, is a link that cannot be.",
+                "properties": {
+                  "block": {
+                    "description": "The container that owns the door.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "input": {
+                    "description": "Whether the door is an entry one.",
+                    "type": "boolean"
+                  },
+                  "ioid": {
+                    "description": "The id of the door inside the container.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "removePort",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "block",
+                  "ioid",
+                  "input"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Connect an output port to an input port of a sibling block.\n\nThe link may also cross the border of a container: the entry port of\na container is the source of the link that brings the flow into it,\nand its exit port is the target of the link that takes the flow out\nof it.",
+                "properties": {
+                  "from": {
+                    "description": "Source block id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "fromIoid": {
+                    "description": "Source output port id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "connect",
+                    "type": "string"
+                  },
+                  "to": {
+                    "description": "Target block id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "toIoid": {
+                    "description": "Target input port id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "op",
+                  "from",
+                  "fromIoid",
+                  "to",
+                  "toIoid"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Remove the link that starts at a port of a container's child.",
+                "properties": {
+                  "container": {
+                    "description": "Owning container id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "from": {
+                    "description": "Source block id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "fromIoid": {
+                    "description": "Source output port id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "disconnect",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "container",
+                  "from",
+                  "fromIoid"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Set the value of a declared property.",
+                "properties": {
+                  "id": {
+                    "description": "Block id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "setProperty",
+                    "type": "string"
+                  },
+                  "property": {
+                    "description": "Property name.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "description": "Decoded value; the file's encoding convention is kept.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "id",
+                  "property",
+                  "value"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Set the block's caption.",
+                "properties": {
+                  "caption": {
+                    "description": "New caption.",
+                    "type": "string"
+                  },
+                  "id": {
+                    "description": "Block id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "setCaption",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "id",
+                  "caption"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Copy blocks with fresh ids, remapped links and fresh labels.",
+                "properties": {
+                  "dx": {
+                    "description": "Horizontal offset for the copies.",
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "dy": {
+                    "description": "Vertical offset for the copies.",
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "ids": {
+                    "description": "Ids of the blocks to copy, in request order.",
+                    "items": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "op": {
+                    "const": "paste",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "ids",
+                  "dx",
+                  "dy"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "Layout": {
+            "description": "Where the blocks a batch adds go.\n\nThe canvas belongs to the engine (decision D18): the place of a block that\nan agent adds is the free spot of its container, the same place the desktop\napp gives a block that is dropped. An agent that wants a block somewhere\nparticular says so with [`Layout::Explicit`].",
+            "oneOf": [
+              {
+                "const": "auto",
+                "description": "The engine places the block where there is room (the default).",
+                "type": "string"
+              },
+              {
+                "const": "explicit",
+                "description": "The coordinates of the command are used, as they were sent.",
+                "type": "string"
+              }
+            ]
+          },
+          "PlacedId": {
+            "description": "What a placement is: a block of the model, or a door of a container.\n\nA door is a block of the picture in its own right, and it is placed like\none: the composition gives it a place and the model keeps it. The\nidentity says which of the two a placement is.",
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "description": "A block of the model.",
+                "properties": {
+                  "Block": {
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "Block"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "description": "A door of a container.",
+                "properties": {
+                  "Door": {
+                    "properties": {
+                      "container": {
+                        "description": "The container that owns the door.",
+                        "format": "uint32",
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "input": {
+                        "description": "Whether the door is an entry one.",
+                        "type": "boolean"
+                      },
+                      "ioid": {
+                        "description": "The id of the door inside the container.",
+                        "format": "uint32",
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "container",
+                      "ioid",
+                      "input"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "Door"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "Placement": {
+            "description": "One thing placed on the canvas: a block of the model, or a door of a\ncontainer.\n\nThe two are the same kind of thing for the composition: a place on the\ncanvas. The identity says which one it is, and the applier writes the\nplace where it belongs.",
+            "properties": {
+              "height": {
+                "default": null,
+                "description": "The new height, when the thing changes its size.",
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "id": {
+                "$ref": "#/$defs/PlacedId",
+                "description": "What is placed."
+              },
+              "width": {
+                "default": null,
+                "description": "The new width, when the thing changes its size.",
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "x": {
+                "description": "Horizontal position.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "y": {
+                "description": "Vertical position.",
+                "format": "int32",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "x",
+              "y"
+            ],
+            "type": "object"
+          },
+          "Target": {
+            "description": "Where a model goes.",
+            "oneOf": [
+              {
+                "const": "file",
+                "description": "The model goes to the file it was named by.",
+                "type": "string"
+              },
+              {
+                "const": "proposal",
+                "description": "The model goes to the staging area of the app: it does not touch the\ndisk, and the person decides.",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "commands": {
+            "description": "The commands to apply, in order.\n\nThe commands are the engine's own editing commands: the same ones the\ndesktop application speaks. The schema the tool publishes is the one of\nthose types, so the vocabulary is the same everywhere.",
+            "items": {
+              "$ref": "#/$defs/EditCommand"
+            },
+            "type": "array"
+          },
+          "layout": {
+            "$ref": "#/$defs/Layout",
+            "description": "Where the blocks the commands add go.\n\n`auto` (the default) puts every new block where there is room in its\ncontainer, like a drop in the application; `explicit` uses the `x` and\nthe `y` of the command."
+          },
+          "model": {
+            "default": null,
+            "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "default": null,
+            "description": "Path of the `.gmdl` model file.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "default": null,
+            "description": "What the agent did, in one line.\n\nIt travels with the proposal, so the person reads it before deciding.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "$ref": "#/$defs/Target",
+            "description": "Where the result goes.\n\n`file` (the default) writes the model to the file the batch edited;\n`proposal` leaves it in the staging area of the app, without touching\nthe disk, and the person decides."
+          }
+        },
+        "required": [
+          "commands"
+        ],
+        "type": "object"
+      },
+      "name": "apply_edit"
+    },
+    {
+      "description": "Describe the block classes a GenMSI model is built from. Call it BEFORE writing a model: it tells you which classes exist, what each one does (its description), which ports (ioid) and properties (name, hint, ty, subtype) each class declares, which entities the class declares and which it uses, and the exact XML of a block of that class \u2014with the default value of each property\u2014 so you never have to guess an element name. Without arguments it returns the genmsi.classlist/1 document (every class plus the skeleton of a model). With `class` (for example \"Generate\") it returns the genmsi.class/1 document of that class; with `classes` (a list of names) it returns the genmsi.classes/1 document with every class asked for, so an agent that needs several classes asks for them all in ONE call.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "class": {
+            "default": null,
+            "description": "Name of the class to describe (`Generate`, `Queue`, ...).\n\nWithout it the tool returns the list of the classes and the skeleton\nof a model.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "classes": {
+            "default": null,
+            "description": "Names of several classes to describe, in one call.\n\nAn agent that needs eight classes asks for the eight: one call\ninstead of eight. Give `class` or `classes`, not both.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "catalogue"
+    },
+    {
+      "description": "Describe a GenMSI model: its blocks, operands and ports, plus what each GPSS statement of the model does. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text) and returns the genmsi.explain/1 document.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "model": {
+            "default": null,
+            "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "default": null,
+            "description": "Path of the `.gmdl` model file.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "explain_model"
+    },
+    {
+      "description": "Simulate a GenMSI model and return its event trace. Takes `path` or `model`, plus the optional `seed`, `until`, `start` and `limit`, and returns the genmsi.trace/1 document.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "limit": {
+            "default": 100,
+            "description": "Maximum number of trace records to keep.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "model": {
+            "default": null,
+            "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "default": null,
+            "description": "Path of the `.gmdl` model file.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seed": {
+            "default": 12978461500997110482,
+            "description": "Seed of every random stream; the same seed reproduces the same run.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "start": {
+            "default": 1,
+            "description": "The `START` of the run: how many termination units end it.\n\nThe original has the same field in the panel of its simulator (\"Start:\",\none by default) and the model does not declare it: it is a parameter of\nthe run, like the horizon. It has to be greater than zero.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "until": {
+            "default": null,
+            "description": "Stop once the simulated clock passes this time.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "get_trace"
+    },
+    {
+      "description": "Validate a GenMSI model: it loads, validates and compiles, and reports what it found (the compiler's observations and the warnings of the format, such as an entity the model uses without declaring it). Takes `path` (a .gmdl file) or `model` (the .gmdl document as text) and returns the genmsi.lint/1 document.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "model": {
+            "default": null,
+            "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "default": null,
+            "description": "Path of the `.gmdl` model file.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "lint"
+    },
+    {
+      "description": "Say which model the GenMSI desktop app has open, so you do not have to guess where to write it. It returns the genmsi.openmodel/1 document: `path` is the absolute path of the file the app has open and `pid` is the process that has it open; both are null when the app is not running. Write the model to that path (with save_model) and the app, which watches the file it has open, reloads it and runs it again, so the reader sees the change.",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "name": "open_model"
+    },
+    {
+      "description": "Write a GPSS model to a .gmdl file. The model is checked before it is written: one that does not load, does not validate or does not compile is NOT written, and the error names the block that caused it. A model that carries no canvas geometry is composed before it is written, so the editor can draw it; a model that already carries its geometry keeps the disposition its author left. Takes `model` (the whole .gmdl document as text, not a patch) and `path` (the file to write): `path` may be left out, and then the model the app has open is the one that is written. `target` says where the model goes: `file` (the default) writes it to that file, and `proposal` leaves the model in the staging area of the app, without touching the disk (the `path` is not written to), where the person sees it and decides to accept it or to discard it \u2014 the verdict comes back in `app_state`. `summary` is one line about what the agent did; it travels with the proposal. Returns the genmsi.lint/1 document of what was written. Use it to create or to change a model: read it first with explain_model, change the text and hand the complete document back.",
+      "inputSchema": {
+        "$defs": {
+          "Target": {
+            "description": "Where a model goes.",
+            "oneOf": [
+              {
+                "const": "file",
+                "description": "The model goes to the file it was named by.",
+                "type": "string"
+              },
+              {
+                "const": "proposal",
+                "description": "The model goes to the staging area of the app: it does not touch the\ndisk, and the person decides.",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "model": {
+            "default": null,
+            "description": "The whole `.gmdl` document as text.\n\nThe tool writes the whole document, not a patch: the agent reads the\nmodel, changes it and hands the complete text back.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "default": null,
+            "description": "Path of the `.gmdl` file to write.\n\nWithout it the model the app has open is the one that is written.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "default": null,
+            "description": "What the agent did, in one line.\n\nIt travels with the proposal, so the person reads it before deciding.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "$ref": "#/$defs/Target",
+            "description": "Where the model goes.\n\n`file` (the default) writes the model to the file it was named by;\n`proposal` leaves it in the staging area of the app, without touching\nthe disk, and the person decides."
+          }
+        },
+        "type": "object"
+      },
+      "name": "save_model"
+    },
+    {
+      "description": "Simulate a GenMSI model and return its report. Takes `path` or `model`, plus the optional `seed`, `until` and `start`, and returns the genmsi.report/1 document.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "model": {
+            "default": null,
+            "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "default": null,
+            "description": "Path of the `.gmdl` model file.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seed": {
+            "default": 6324378541515974198,
+            "description": "Seed of every random stream; the same seed reproduces the same run.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "start": {
+            "default": 1,
+            "description": "The `START` of the run: how many termination units end it.\n\nThe original has the same field in the panel of its simulator (\"Start:\",\none by default) and the model does not declare it: it is a parameter of\nthe run, like the horizon. It has to be greater than zero.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "until": {
+            "default": null,
+            "description": "Stop once the simulated clock passes this time.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "simulate"
+    }
+  ]
+}
+
+===== QUERY tools/list =====
+{
+  "tools": [
+    {
+      "description": "See what the GenMSI desktop app is showing right now: the model it has open (`path`), whether the reader has changes that are not saved on it (`dirty`), what the app found in that model (`diagnostics`) and the last run the app made (`run`). It returns the genmsi.live/1 document, the one the app publishes; when the app is not running the document has `path: null` \u2014that is an answer, not a failure. Ask it BEFORE you write on the model the app has open: `apply_edit` and `save_model` refuse with `model_locked` while the app has unsaved changes on that model, so tell the reader to save it and send the same edit again.",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "name": "app_state"
+    },
+    {
+      "description": "Add, edit and connect the blocks of a GenMSI model. The commands are the engine's own editing commands, the same ones the desktop application speaks: `addBlock` {class, container, x, y} creates a block of a catalogue class (call `catalogue` first: it gives the class names, their ports (ioid) and their properties), `connect` {from, fromIoid, to, toIoid} wires an output port to an input port, `setProperty` {id, property, value} sets a declared property, `setCaption` {id, caption} names a block, `moveBlock` {id, x, y} moves one, `removeBlock` {id} takes one away and `removeBlocks` {ids} takes several away as ONE operation; the schema of the tool carries the whole vocabulary. The commands are applied in order and the batch is ATOMIC: if one fails, none is applied and the failure names the command that failed. `layout` says where the blocks the batch adds go: `auto` (the default) puts every block an `addBlock` adds where there is room in its container, like a drop in the application; `explicit` uses the `x` and the `y` of the command. The model is checked before it is written: one that does not compile is NOT written, and the error names the block that caused it. The blocks the batch creates take the next free ids, in the order of the commands. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text): `path` may be left out, and then the model the app has open is the one the batch edits; a `path` that is not on the disk yet is a model the batch CREATES, and the file is written when the model compiles. `target` says where the result goes: `file` (the default) writes it to the file the batch edited, and `proposal` leaves the model in the staging area of the app, without touching the disk, where the person sees it and decides to accept it or to discard it \u2014 the verdict comes back in `app_state`. `summary` is one line about what the batch did; it travels with the proposal. Returns the genmsi.edit/1 document.",
+      "inputSchema": {
+        "$defs": {
+          "EditCommand": {
+            "description": "One editing operation over the model.",
+            "oneOf": [
+              {
+                "description": "Create a block of a catalogue class inside a container.",
+                "properties": {
+                  "class": {
+                    "description": "Catalogue class (`Generate`, `Queue`, ...).",
+                    "type": "string"
+                  },
+                  "container": {
+                    "description": "Owning container id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "addBlock",
+                    "type": "string"
+                  },
+                  "x": {
+                    "description": "Horizontal position.",
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "y": {
+                    "description": "Vertical position.",
+                    "format": "int32",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "op",
+                  "class",
+                  "container",
+                  "x",
+                  "y"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Remove a block, its descendants and every link that touches them.",
+                "properties": {
+                  "id": {
+                    "description": "Block id (the model root is refused).",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "removeBlock",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "id"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Remove several blocks as ONE operation.\n\nThe blocks that one of them owns are removed with it, and a block\nthat is already gone when its turn comes is skipped.",
+                "properties": {
+                  "ids": {
+                    "description": "Block ids.",
+                    "items": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "op": {
+                    "const": "removeBlocks",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "ids"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Move a block, keeping its size.",
+                "properties": {
+                  "id": {
+                    "description": "Block id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "moveBlock",
+                    "type": "string"
+                  },
+                  "x": {
+                    "description": "Horizontal position.",
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "y": {
+                    "description": "Vertical position.",
+                    "format": "int32",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "op",
+                  "id",
+                  "x",
+                  "y"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Set the position of many things as ONE operation (the re-layout).\n\nThe things are the blocks of the scope that was composed and the\ndoors of its container: a door is a block of the picture, and its\nplace is written like the place of any other block.",
+                "properties": {
+                  "op": {
+                    "const": "setLayouts",
+                    "type": "string"
+                  },
+                  "placements": {
+                    "description": "One place per thing that was composed.",
+                    "items": {
+                      "$ref": "#/$defs/Placement"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "op",
+                  "placements"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Move a door of a container.\n\nA door is a block of the picture in its own right: the reader drags it\nwhere he wants it, and its place is kept.",
+                "properties": {
+                  "block": {
+                    "description": "The container that owns the door.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "input": {
+                    "description": "Whether the door is an entry one.",
+                    "type": "boolean"
+                  },
+                  "ioid": {
+                    "description": "The id of the door inside the container.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "movePort",
+                    "type": "string"
+                  },
+                  "x": {
+                    "description": "Horizontal position.",
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "y": {
+                    "description": "Vertical position.",
+                    "format": "int32",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "op",
+                  "block",
+                  "ioid",
+                  "input",
+                  "x",
+                  "y"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Remove a door of a container.\n\nThe links that touch the door go with it: a link that starts at a\ndoor that is gone, or that ends at it, is a link that cannot be.",
+                "properties": {
+                  "block": {
+                    "description": "The container that owns the door.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "input": {
+                    "description": "Whether the door is an entry one.",
+                    "type": "boolean"
+                  },
+                  "ioid": {
+                    "description": "The id of the door inside the container.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "removePort",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "block",
+                  "ioid",
+                  "input"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Connect an output port to an input port of a sibling block.\n\nThe link may also cross the border of a container: the entry port of\na container is the source of the link that brings the flow into it,\nand its exit port is the target of the link that takes the flow out\nof it.",
+                "properties": {
+                  "from": {
+                    "description": "Source block id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "fromIoid": {
+                    "description": "Source output port id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "connect",
+                    "type": "string"
+                  },
+                  "to": {
+                    "description": "Target block id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "toIoid": {
+                    "description": "Target input port id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "op",
+                  "from",
+                  "fromIoid",
+                  "to",
+                  "toIoid"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Remove the link that starts at a port of a container's child.",
+                "properties": {
+                  "container": {
+                    "description": "Owning container id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "from": {
+                    "description": "Source block id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "fromIoid": {
+                    "description": "Source output port id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "disconnect",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "container",
+                  "from",
+                  "fromIoid"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Set the value of a declared property.",
+                "properties": {
+                  "id": {
+                    "description": "Block id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "setProperty",
+                    "type": "string"
+                  },
+                  "property": {
+                    "description": "Property name.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "description": "Decoded value; the file's encoding convention is kept.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "id",
+                  "property",
+                  "value"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Set the block's caption.",
+                "properties": {
+                  "caption": {
+                    "description": "New caption.",
+                    "type": "string"
+                  },
+                  "id": {
+                    "description": "Block id.",
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "const": "setCaption",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "id",
+                  "caption"
+                ],
+                "type": "object"
+              },
+              {
+                "description": "Copy blocks with fresh ids, remapped links and fresh labels.",
+                "properties": {
+                  "dx": {
+                    "description": "Horizontal offset for the copies.",
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "dy": {
+                    "description": "Vertical offset for the copies.",
+                    "format": "int32",
+                    "type": "integer"
+                  },
+                  "ids": {
+                    "description": "Ids of the blocks to copy, in request order.",
+                    "items": {
+                      "format": "uint32",
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "op": {
+                    "const": "paste",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "ids",
+                  "dx",
+                  "dy"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "Layout": {
+            "description": "Where the blocks a batch adds go.\n\nThe canvas belongs to the engine (decision D18): the place of a block that\nan agent adds is the free spot of its container, the same place the desktop\napp gives a block that is dropped. An agent that wants a block somewhere\nparticular says so with [`Layout::Explicit`].",
+            "oneOf": [
+              {
+                "const": "auto",
+                "description": "The engine places the block where there is room (the default).",
+                "type": "string"
+              },
+              {
+                "const": "explicit",
+                "description": "The coordinates of the command are used, as they were sent.",
+                "type": "string"
+              }
+            ]
+          },
+          "PlacedId": {
+            "description": "What a placement is: a block of the model, or a door of a container.\n\nA door is a block of the picture in its own right, and it is placed like\none: the composition gives it a place and the model keeps it. The\nidentity says which of the two a placement is.",
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "description": "A block of the model.",
+                "properties": {
+                  "Block": {
+                    "format": "uint32",
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "Block"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "description": "A door of a container.",
+                "properties": {
+                  "Door": {
+                    "properties": {
+                      "container": {
+                        "description": "The container that owns the door.",
+                        "format": "uint32",
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "input": {
+                        "description": "Whether the door is an entry one.",
+                        "type": "boolean"
+                      },
+                      "ioid": {
+                        "description": "The id of the door inside the container.",
+                        "format": "uint32",
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "container",
+                      "ioid",
+                      "input"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "Door"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "Placement": {
+            "description": "One thing placed on the canvas: a block of the model, or a door of a\ncontainer.\n\nThe two are the same kind of thing for the composition: a place on the\ncanvas. The identity says which one it is, and the applier writes the\nplace where it belongs.",
+            "properties": {
+              "height": {
+                "default": null,
+                "description": "The new height, when the thing changes its size.",
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "id": {
+                "$ref": "#/$defs/PlacedId",
+                "description": "What is placed."
+              },
+              "width": {
+                "default": null,
+                "description": "The new width, when the thing changes its size.",
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "x": {
+                "description": "Horizontal position.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "y": {
+                "description": "Vertical position.",
+                "format": "int32",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "x",
+              "y"
+            ],
+            "type": "object"
+          },
+          "Target": {
+            "description": "Where a model goes.",
+            "oneOf": [
+              {
+                "const": "file",
+                "description": "The model goes to the file it was named by.",
+                "type": "string"
+              },
+              {
+                "const": "proposal",
+                "description": "The model goes to the staging area of the app: it does not touch the\ndisk, and the person decides.",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "commands": {
+            "description": "The commands to apply, in order.\n\nThe commands are the engine's own editing commands: the same ones the\ndesktop application speaks. The schema the tool publishes is the one of\nthose types, so the vocabulary is the same everywhere.",
+            "items": {
+              "$ref": "#/$defs/EditCommand"
+            },
+            "type": "array"
+          },
+          "layout": {
+            "$ref": "#/$defs/Layout",
+            "description": "Where the blocks the commands add go.\n\n`auto` (the default) puts every new block where there is room in its\ncontainer, like a drop in the application; `explicit` uses the `x` and\nthe `y` of the command."
+          },
+          "model": {
+            "default": null,
+            "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "default": null,
+            "description": "Path of the `.gmdl` model file.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "default": null,
+            "description": "What the agent did, in one line.\n\nIt travels with the proposal, so the person reads it before deciding.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "$ref": "#/$defs/Target",
+            "description": "Where the result goes.\n\n`file` (the default) writes the model to the file the batch edited;\n`proposal` leaves it in the staging area of the app, without touching\nthe disk, and the person decides."
+          }
+        },
+        "required": [
+          "commands"
+        ],
+        "type": "object"
+      },
+      "name": "apply_edit"
+    },
+    {
+      "description": "Describe the block classes a GenMSI model is built from. Call it BEFORE writing a model: it tells you which classes exist, what each one does (its description), which ports (ioid) and properties (name, hint, ty, subtype) each class declares, which entities the class declares and which it uses, and the exact XML of a block of that class \u2014with the default value of each property\u2014 so you never have to guess an element name. Without arguments it returns the genmsi.classlist/1 document (every class plus the skeleton of a model). With `class` (for example \"Generate\") it returns the genmsi.class/1 document of that class; with `classes` (a list of names) it returns the genmsi.classes/1 document with every class asked for, so an agent that needs several classes asks for them all in ONE call.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "class": {
+            "default": null,
+            "description": "Name of the class to describe (`Generate`, `Queue`, ...).\n\nWithout it the tool returns the list of the classes and the skeleton\nof a model.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "classes": {
+            "default": null,
+            "description": "Names of several classes to describe, in one call.\n\nAn agent that needs eight classes asks for the eight: one call\ninstead of eight. Give `class` or `classes`, not both.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "catalogue"
+    },
+    {
+      "description": "Describe a GenMSI model: its blocks, operands and ports, plus what each GPSS statement of the model does. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text) and returns the genmsi.explain/1 document.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "model": {
+            "default": null,
+            "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "default": null,
+            "description": "Path of the `.gmdl` model file.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "explain_model"
+    },
+    {
+      "description": "Simulate a GenMSI model and return its event trace. Takes `path` or `model`, plus the optional `seed`, `until`, `start` and `limit`, and returns the genmsi.trace/1 document.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "limit": {
+            "default": 100,
+            "description": "Maximum number of trace records to keep.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "model": {
+            "default": null,
+            "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "default": null,
+            "description": "Path of the `.gmdl` model file.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seed": {
+            "default": 13946306578333056381,
+            "description": "Seed of every random stream; the same seed reproduces the same run.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "start": {
+            "default": 1,
+            "description": "The `START` of the run: how many termination units end it.\n\nThe original has the same field in the panel of its simulator (\"Start:\",\none by default) and the model does not declare it: it is a parameter of\nthe run, like the horizon. It has to be greater than zero.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "until": {
+            "default": null,
+            "description": "Stop once the simulated clock passes this time.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "get_trace"
+    },
+    {
+      "description": "Validate a GenMSI model: it loads, validates and compiles, and reports what it found (the compiler's observations and the warnings of the format, such as an entity the model uses without declaring it). Takes `path` (a .gmdl file) or `model` (the .gmdl document as text) and returns the genmsi.lint/1 document.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "model": {
+            "default": null,
+            "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "default": null,
+            "description": "Path of the `.gmdl` model file.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "lint"
+    },
+    {
+      "description": "Say which model the GenMSI desktop app has open, so you do not have to guess where to write it. It returns the genmsi.openmodel/1 document: `path` is the absolute path of the file the app has open and `pid` is the process that has it open; both are null when the app is not running. Write the model to that path (with save_model) and the app, which watches the file it has open, reloads it and runs it again, so the reader sees the change.",
+      "inputSchema": {
+        "properties": {},
+        "type": "object"
+      },
+      "name": "open_model"
+    },
+    {
+      "description": "Write a GPSS model to a .gmdl file. The model is checked before it is written: one that does not load, does not validate or does not compile is NOT written, and the error names the block that caused it. A model that carries no canvas geometry is composed before it is written, so the editor can draw it; a model that already carries its geometry keeps the disposition its author left. Takes `model` (the whole .gmdl document as text, not a patch) and `path` (the file to write): `path` may be left out, and then the model the app has open is the one that is written. `target` says where the model goes: `file` (the default) writes it to that file, and `proposal` leaves the model in the staging area of the app, without touching the disk (the `path` is not written to), where the person sees it and decides to accept it or to discard it \u2014 the verdict comes back in `app_state`. `summary` is one line about what the agent did; it travels with the proposal. Returns the genmsi.lint/1 document of what was written. Use it to create or to change a model: read it first with explain_model, change the text and hand the complete document back.",
+      "inputSchema": {
+        "$defs": {
+          "Target": {
+            "description": "Where a model goes.",
+            "oneOf": [
+              {
+                "const": "file",
+                "description": "The model goes to the file it was named by.",
+                "type": "string"
+              },
+              {
+                "const": "proposal",
+                "description": "The model goes to the staging area of the app: it does not touch the\ndisk, and the person decides.",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "model": {
+            "default": null,
+            "description": "The whole `.gmdl` document as text.\n\nThe tool writes the whole document, not a patch: the agent reads the\nmodel, changes it and hands the complete text back.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "default": null,
+            "description": "Path of the `.gmdl` file to write.\n\nWithout it the model the app has open is the one that is written.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "default": null,
+            "description": "What the agent did, in one line.\n\nIt travels with the proposal, so the person reads it before deciding.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target": {
+            "$ref": "#/$defs/Target",
+            "description": "Where the model goes.\n\n`file` (the default) writes the model to the file it was named by;\n`proposal` leaves it in the staging area of the app, without touching\nthe disk, and the person decides."
+          }
+        },
+        "type": "object"
+      },
+      "name": "save_model"
+    },
+    {
+      "description": "Simulate a GenMSI model and return its report. Takes `path` or `model`, plus the optional `seed`, `until` and `start`, and returns the genmsi.report/1 document.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "properties": {
+          "model": {
+            "default": null,
+            "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "default": null,
+            "description": "Path of the `.gmdl` model file.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seed": {
+            "default": 9020655389592205943,
+            "description": "Seed of every random stream; the same seed reproduces the same run.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "start": {
+            "default": 1,
+            "description": "The `START` of the run: how many termination units end it.\n\nThe original has the same field in the panel of its simulator (\"Start:\",\none by default) and the model does not declare it: it is a parameter of\nthe run, like the horizon. It has to be greater than zero.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "until": {
+            "default": null,
+            "description": "Stop once the simulated clock passes this time.",
+            "format": "double",
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "simulate"
+    }
+  ]
+}
+
+===== CALL #lint at 2026-11-02T20:32:11 =====
+tool: lint
+arguments: {"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/home/org.gensmi.desktop/staging/1793662304738-2f7b5729b3af3d82.gmdl"}
+----- answer -----
+{
+  "schema": "genmsi.lint/1",
+  "path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/home/org.gensmi.desktop/staging/1793662304738-2f7b5729b3af3d82.gmdl",
+  "status": "ok",
+  "title": "Modelo1",
+  "blocks": 52,
+  "definitions": {
+    "functions": 0,
+    "variables": 0,
+    "random_variables": 0,
+    "storages": 4,
+    "tables": 0,
+    "qtables": 1
+  },
+  "diagnostics": []
+}
+
+===== CALL #simulate at 2026-11-02T20:32:11 =====
+tool: simulate
+arguments: {"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/home/org.gensmi.desktop/staging/1793662304738-2f7b5729b3af3d82.gmdl", "seed": 42}
+----- answer -----
+{
+  "schema": "genmsi.report/1",
+  "title": "Modelo1",
+  "seed": 42,
+  "start_time": 0.0,
+  "end_time": 3600.0,
+  "end_reason": "terminated",
+  "transactions": 87,
+  "events": 2565,
+  "blocks": [
+    {
+      "line": 1,
+      "node": 1,
+      "class": "Generate",
+      "label": null,
+      "operands": "45,30,,,",
+      "entries": 86,
+      "current": 1,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 2,
+      "node": 2,
+      "class": "Terminate",
+      "label": "A_Terminate",
+      "operands": "",
+      "entries": 37,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 3,
+      "node": 3,
+      "class": "Generate",
+      "label": null,
+      "operands": "3600,,,,",
+      "entries": 2,
+      "current": 1,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 4,
+      "node": 3,
+      "class": "Terminate",
+      "label": null,
+      "operands": "1",
+      "entries": 1,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 5,
+      "node": 4,
+      "class": "Queue",
+      "label": "A_Queue",
+      "operands": "centro",
+      "entries": 85,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 6,
+      "node": 5,
+      "class": "Depart",
+      "label": "A_Depart",
+      "operands": "centro",
+      "entries": 37,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 7,
+      "node": 8,
+      "class": "Advance",
+      "label": "A_Advance",
+      "operands": "10,5",
+      "entries": 85,
+      "current": 1,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 8,
+      "node": 10,
+      "class": "Enter",
+      "label": "A_Enter",
+      "operands": "SalaEspera,1",
+      "entries": 48,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 9,
+      "node": 11,
+      "class": "Leave",
+      "label": "A_Leave",
+      "operands": "SalaEspera,1",
+      "entries": 24,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 10,
+      "node": 14,
+      "class": "Queue",
+      "label": "StorageUse2",
+      "operands": "Cola_vacunacion",
+      "entries": 48,
+      "current": 4,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 11,
+      "node": 14,
+      "class": "Enter",
+      "label": null,
+      "operands": "Vacunacion",
+      "entries": 44,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 12,
+      "node": 14,
+      "class": "Depart",
+      "label": null,
+      "operands": "Cola_vacunacion",
+      "entries": 44,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 13,
+      "node": 14,
+      "class": "Advance",
+      "label": null,
+      "operands": "300,180",
+      "entries": 44,
+      "current": 4,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 14,
+      "node": 14,
+      "class": "Leave",
+      "label": null,
+      "operands": "Vacunacion",
+      "entries": 40,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 15,
+      "node": 15,
+      "class": "Advance",
+      "label": "A_Advance2",
+      "operands": "1320,120",
+      "entries": 40,
+      "current": 16,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 16,
+      "node": 16,
+      "class": "Priority",
+      "label": "A_Priority1",
+      "operands": "0",
+      "entries": 24,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 17,
+      "node": 18,
+      "class": "Queue",
+      "label": "A_FacilityUse",
+      "operands": "Cola_recepcion",
+      "entries": 84,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 18,
+      "node": 18,
+      "class": "Seize",
+      "label": null,
+      "operands": "Recepcion",
+      "entries": 84,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 19,
+      "node": 18,
+      "class": "Depart",
+      "label": null,
+      "operands": "Cola_recepcion",
+      "entries": 84,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 20,
+      "node": 18,
+      "class": "Advance",
+      "label": null,
+      "operands": "25,8",
+      "entries": 84,
+      "current": 1,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 21,
+      "node": 18,
+      "class": "Release",
+      "label": null,
+      "operands": "Recepcion",
+      "entries": 83,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 22,
+      "node": 19,
+      "class": "Transfer",
+      "label": "Entrada1",
+      "operands": "850,A_Advance1,A_Advance12",
+      "entries": 83,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 23,
+      "node": 20,
+      "class": "Advance",
+      "label": "A_Advance1",
+      "operands": "20,5",
+      "entries": 11,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 24,
+      "node": 21,
+      "class": "Advance",
+      "label": "A_Advance12",
+      "operands": "18,8",
+      "entries": 72,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 25,
+      "node": 23,
+      "class": "Queue",
+      "label": "StorageUse1",
+      "operands": "Cola_acreditacion",
+      "entries": 72,
+      "current": 17,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 26,
+      "node": 23,
+      "class": "Enter",
+      "label": null,
+      "operands": "Acreditacion",
+      "entries": 55,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 27,
+      "node": 23,
+      "class": "Depart",
+      "label": null,
+      "operands": "Cola_acreditacion",
+      "entries": 55,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 28,
+      "node": 23,
+      "class": "Advance",
+      "label": null,
+      "operands": "300,120",
+      "entries": 55,
+      "current": 5,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 29,
+      "node": 23,
+      "class": "Leave",
+      "label": null,
+      "operands": "Acreditacion",
+      "entries": 50,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 30,
+      "node": 25,
+      "class": "Transfer",
+      "label": "Entrada11",
+      "operands": "950,A_Advance111,A_Advance1111",
+      "entries": 50,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 31,
+      "node": 26,
+      "class": "Advance",
+      "label": "A_Advance111",
+      "operands": "25,10",
+      "entries": 2,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 32,
+      "node": 27,
+      "class": "Priority",
+      "label": "A_Priority",
+      "operands": "1",
+      "entries": 1,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 33,
+      "node": 28,
+      "class": "Transfer",
+      "label": "Entrada12",
+      "operands": "970,A_Priority,A_Enter",
+      "entries": 48,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 34,
+      "node": 29,
+      "class": "Advance",
+      "label": "A_Advance1111",
+      "operands": "15,8",
+      "entries": 48,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 35,
+      "node": 31,
+      "class": "Queue",
+      "label": "A_FacilityUse1",
+      "operands": "Cola_E_carnet",
+      "entries": 11,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 36,
+      "node": 31,
+      "class": "Seize",
+      "label": null,
+      "operands": "E_carnet",
+      "entries": 11,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 37,
+      "node": 31,
+      "class": "Depart",
+      "label": null,
+      "operands": "Cola_E_carnet",
+      "entries": 11,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 38,
+      "node": 31,
+      "class": "Advance",
+      "label": null,
+      "operands": "180,120",
+      "entries": 11,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 39,
+      "node": 31,
+      "class": "Release",
+      "label": null,
+      "operands": "E_carnet",
+      "entries": 11,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 40,
+      "node": 32,
+      "class": "Advance",
+      "label": "A_Advance11",
+      "operands": "14,8",
+      "entries": 11,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 41,
+      "node": 34,
+      "class": "Generate",
+      "label": null,
+      "operands": "1800,900,,,",
+      "entries": 2,
+      "current": 1,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 42,
+      "node": 35,
+      "class": "Terminate",
+      "label": "A_Terminate11",
+      "operands": "",
+      "entries": 1,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 43,
+      "node": 36,
+      "class": "Queue",
+      "label": "A_FacilityInt1",
+      "operands": "ColaInt",
+      "entries": 1,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 44,
+      "node": 36,
+      "class": "Preempt",
+      "label": null,
+      "operands": "E_carnet,PR,,Remanente",
+      "entries": 1,
+      "current": 0,
+      "retries": 1,
+      "counts_block": false
+    },
+    {
+      "line": 45,
+      "node": 36,
+      "class": "Depart",
+      "label": null,
+      "operands": "ColaInt",
+      "entries": 1,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 46,
+      "node": 36,
+      "class": "Advance",
+      "label": null,
+      "operands": "240,180",
+      "entries": 1,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 47,
+      "node": 36,
+      "class": "Return",
+      "label": null,
+      "operands": "E_carnet",
+      "entries": 1,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 48,
+      "node": 38,
+      "class": "Queue",
+      "label": "StorageUse",
+      "operands": "Cola_exit",
+      "entries": 37,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 49,
+      "node": 38,
+      "class": "Enter",
+      "label": null,
+      "operands": "Exit",
+      "entries": 37,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 50,
+      "node": 38,
+      "class": "Depart",
+      "label": null,
+      "operands": "Cola_exit",
+      "entries": 37,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 51,
+      "node": 38,
+      "class": "Advance",
+      "label": null,
+      "operands": "3,1",
+      "entries": 37,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 52,
+      "node": 38,
+      "class": "Leave",
+      "label": null,
+      "operands": "Exit",
+      "entries": 37,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    }
+  ],
+  "entities": {
+    "facilities": {
+      "E_carnet": {
+        "name": "E_carnet",
+        "entries": 12,
+        "busy_time": 2127.0,
+        "busy": false,
+        "available": true,
+        "retry": 0,
+        "inter": 0
+      },
+      "Recepcion": {
+        "name": "Recepcion",
+        "entries": 84,
+        "busy_time": 2116.0,
+        "busy": true,
+        "available": true,
+        "retry": 0,
+        "inter": 0
+      }
+    },
+    "storages": {
+      "Acreditacion": {
+        "name": "Acreditacion",
+        "capacity": 5,
+        "in_use": 5,
+        "area": 16948.0,
+        "min_use": 0,
+        "max_use": 5,
+        "entries": 55,
+        "retry": 0,
+        "delay": 17
+      },
+      "Exit": {
+        "name": "Exit",
+        "capacity": 3,
+        "in_use": 0,
+        "area": 116.0,
+        "min_use": 0,
+        "max_use": 1,
+        "entries": 37,
+        "retry": 0,
+        "delay": 0
+      },
+      "SalaEspera": {
+        "name": "SalaEspera",
+        "capacity": 44,
+        "in_use": 24,
+        "area": 57759.0,
+        "min_use": 0,
+        "max_use": 28,
+        "entries": 48,
+        "retry": 0,
+        "delay": 0
+      },
+      "Vacunacion": {
+        "name": "Vacunacion",
+        "capacity": 4,
+        "in_use": 4,
+        "area": 11989.0,
+        "min_use": 0,
+        "max_use": 4,
+        "entries": 44,
+        "retry": 0,
+        "delay": 4
+      }
+    },
+    "queues": {
+      "ColaInt": {
+        "name": "ColaInt",
+        "content": 0,
+        "max": 1,
+        "entries": 1,
+        "zero_entries": 0,
+        "total_time": 155.0,
+        "area": 155.0,
+        "retry": 0
+      },
+      "Cola_E_carnet": {
+        "name": "Cola_E_carnet",
+        "content": 0,
+        "max": 2,
+        "entries": 11,
+        "zero_entries": 7,
+        "total_time": 716.0,
+        "area": 716.0,
+        "retry": 0
+      },
+      "Cola_acreditacion": {
+        "name": "Cola_acreditacion",
+        "content": 17,
+        "max": 17,
+        "entries": 72,
+        "zero_entries": 8,
+        "total_time": 3034.0,
+        "area": 20530.0,
+        "retry": 0
+      },
+      "Cola_exit": {
+        "name": "Cola_exit",
+        "content": 0,
+        "max": 1,
+        "entries": 37,
+        "zero_entries": 37,
+        "total_time": 0.0,
+        "area": 0.0,
+        "retry": 0
+      },
+      "Cola_recepcion": {
+        "name": "Cola_recepcion",
+        "content": 0,
+        "max": 1,
+        "entries": 84,
+        "zero_entries": 65,
+        "total_time": 158.0,
+        "area": 158.0,
+        "retry": 0
+      },
+      "Cola_vacunacion": {
+        "name": "Cola_vacunacion",
+        "content": 4,
+        "max": 6,
+        "entries": 48,
+        "zero_entries": 12,
+        "total_time": 1782.0,
+        "area": 5180.0,
+        "retry": 0
+      },
+      "centro": {
+        "name": "centro",
+        "content": 48,
+        "max": 49,
+        "entries": 85,
+        "zero_entries": 0,
+        "total_time": 53592.0,
+        "area": 103229.0,
+        "retry": 0
+      }
+    },
+    "chains": {},
+    "logic": {},
+    "savevalues": {},
+    "tables": {},
+    "qtables": {
+      "QTabla": {
+        "name": "QTabla",
+        "first": 0.0,
+        "width": 600.0,
+        "intervals": 8,
+        "samples": 37,
+        "sum": 53592.0,
+        "sum_squares": 104352748.0,
+        "max_value": 2283.0,
+        "frequencies": [
+          0,
+          13,
+          0,
+          0,
+          24,
+          0,
+          0,
+          0
+        ],
+        "overflow": 0,
+        "overflow_sum": 0.0,
+        "overflow_sum_squares": 0.0
+      }
+    }
+  },
+  "diagnostics": []
+}
+
+===== CALL #simulate at 2026-11-02T20:32:13 =====
+tool: simulate
+arguments: {"path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl", "seed": 42}
+----- answer -----
+{
+  "schema": "genmsi.report/1",
+  "title": "Modelo1",
+  "seed": 42,
+  "start_time": 0.0,
+  "end_time": 3600.0,
+  "end_reason": "terminated",
+  "transactions": 62,
+  "events": 2009,
+  "blocks": [
+    {
+      "line": 1,
+      "node": 1,
+      "class": "Generate",
+      "label": null,
+      "operands": "60,30,,,",
+      "entries": 61,
+      "current": 1,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 2,
+      "node": 2,
+      "class": "Terminate",
+      "label": "A_Terminate",
+      "operands": "",
+      "entries": 31,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 3,
+      "node": 3,
+      "class": "Generate",
+      "label": null,
+      "operands": "3600,,,,",
+      "entries": 2,
+      "current": 1,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 4,
+      "node": 3,
+      "class": "Terminate",
+      "label": null,
+      "operands": "1",
+      "entries": 1,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 5,
+      "node": 4,
+      "class": "Queue",
+      "label": "A_Queue",
+      "operands": "centro",
+      "entries": 60,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 6,
+      "node": 5,
+      "class": "Depart",
+      "label": "A_Depart",
+      "operands": "centro",
+      "entries": 31,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 7,
+      "node": 8,
+      "class": "Advance",
+      "label": "A_Advance",
+      "operands": "10,5",
+      "entries": 60,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 8,
+      "node": 10,
+      "class": "Enter",
+      "label": "A_Enter",
+      "operands": "SalaEspera,1",
+      "entries": 43,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 9,
+      "node": 11,
+      "class": "Leave",
+      "label": "A_Leave",
+      "operands": "SalaEspera,1",
+      "entries": 20,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 10,
+      "node": 14,
+      "class": "Queue",
+      "label": "StorageUse2",
+      "operands": "Cola_vacunacion",
+      "entries": 43,
+      "current": 1,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 11,
+      "node": 14,
+      "class": "Enter",
+      "label": null,
+      "operands": "Vacunacion",
+      "entries": 42,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 12,
+      "node": 14,
+      "class": "Depart",
+      "label": null,
+      "operands": "Cola_vacunacion",
+      "entries": 42,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 13,
+      "node": 14,
+      "class": "Advance",
+      "label": null,
+      "operands": "300,180",
+      "entries": 42,
+      "current": 4,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 14,
+      "node": 14,
+      "class": "Leave",
+      "label": null,
+      "operands": "Vacunacion",
+      "entries": 38,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 15,
+      "node": 15,
+      "class": "Advance",
+      "label": "A_Advance2",
+      "operands": "1320,120",
+      "entries": 38,
+      "current": 18,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 16,
+      "node": 16,
+      "class": "Priority",
+      "label": "A_Priority1",
+      "operands": "0",
+      "entries": 20,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 17,
+      "node": 18,
+      "class": "Queue",
+      "label": "A_FacilityUse",
+      "operands": "Cola_recepcion",
+      "entries": 60,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 18,
+      "node": 18,
+      "class": "Seize",
+      "label": null,
+      "operands": "Recepcion",
+      "entries": 60,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 19,
+      "node": 18,
+      "class": "Depart",
+      "label": null,
+      "operands": "Cola_recepcion",
+      "entries": 60,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 20,
+      "node": 18,
+      "class": "Advance",
+      "label": null,
+      "operands": "25,8",
+      "entries": 60,
+      "current": 1,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 21,
+      "node": 18,
+      "class": "Release",
+      "label": null,
+      "operands": "Recepcion",
+      "entries": 59,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 22,
+      "node": 19,
+      "class": "Transfer",
+      "label": "Entrada1",
+      "operands": "850,A_Advance1,A_Advance12",
+      "entries": 59,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 23,
+      "node": 20,
+      "class": "Advance",
+      "label": "A_Advance1",
+      "operands": "20,5",
+      "entries": 10,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 24,
+      "node": 21,
+      "class": "Advance",
+      "label": "A_Advance12",
+      "operands": "18,8",
+      "entries": 49,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 25,
+      "node": 23,
+      "class": "Queue",
+      "label": "StorageUse1",
+      "operands": "Cola_acreditacion",
+      "entries": 49,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 26,
+      "node": 23,
+      "class": "Enter",
+      "label": null,
+      "operands": "Acreditacion",
+      "entries": 49,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 27,
+      "node": 23,
+      "class": "Depart",
+      "label": null,
+      "operands": "Cola_acreditacion",
+      "entries": 49,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 28,
+      "node": 23,
+      "class": "Advance",
+      "label": null,
+      "operands": "300,120",
+      "entries": 49,
+      "current": 4,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 29,
+      "node": 23,
+      "class": "Leave",
+      "label": null,
+      "operands": "Acreditacion",
+      "entries": 45,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 30,
+      "node": 25,
+      "class": "Transfer",
+      "label": "Entrada11",
+      "operands": "950,A_Advance111,A_Advance1111",
+      "entries": 45,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 31,
+      "node": 26,
+      "class": "Advance",
+      "label": "A_Advance111",
+      "operands": "25,10",
+      "entries": 2,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 32,
+      "node": 27,
+      "class": "Priority",
+      "label": "A_Priority",
+      "operands": "1",
+      "entries": 1,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 33,
+      "node": 28,
+      "class": "Transfer",
+      "label": "Entrada12",
+      "operands": "970,A_Priority,A_Enter",
+      "entries": 43,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 34,
+      "node": 29,
+      "class": "Advance",
+      "label": "A_Advance1111",
+      "operands": "15,8",
+      "entries": 43,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 35,
+      "node": 31,
+      "class": "Queue",
+      "label": "A_FacilityUse1",
+      "operands": "Cola_E_carnet",
+      "entries": 10,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 36,
+      "node": 31,
+      "class": "Seize",
+      "label": null,
+      "operands": "E_carnet",
+      "entries": 10,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 37,
+      "node": 31,
+      "class": "Depart",
+      "label": null,
+      "operands": "Cola_E_carnet",
+      "entries": 10,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 38,
+      "node": 31,
+      "class": "Advance",
+      "label": null,
+      "operands": "180,120",
+      "entries": 10,
+      "current": 1,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 39,
+      "node": 31,
+      "class": "Release",
+      "label": null,
+      "operands": "E_carnet",
+      "entries": 9,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 40,
+      "node": 32,
+      "class": "Advance",
+      "label": "A_Advance11",
+      "operands": "14,8",
+      "entries": 9,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 41,
+      "node": 34,
+      "class": "Generate",
+      "label": null,
+      "operands": "1800,900,,,",
+      "entries": 2,
+      "current": 1,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 42,
+      "node": 35,
+      "class": "Terminate",
+      "label": "A_Terminate11",
+      "operands": "",
+      "entries": 1,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 43,
+      "node": 36,
+      "class": "Queue",
+      "label": "A_FacilityInt1",
+      "operands": "ColaInt",
+      "entries": 1,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 44,
+      "node": 36,
+      "class": "Preempt",
+      "label": null,
+      "operands": "E_carnet,PR,,Remanente",
+      "entries": 1,
+      "current": 0,
+      "retries": 1,
+      "counts_block": false
+    },
+    {
+      "line": 45,
+      "node": 36,
+      "class": "Depart",
+      "label": null,
+      "operands": "ColaInt",
+      "entries": 1,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 46,
+      "node": 36,
+      "class": "Advance",
+      "label": null,
+      "operands": "240,180",
+      "entries": 1,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 47,
+      "node": 36,
+      "class": "Return",
+      "label": null,
+      "operands": "E_carnet",
+      "entries": 1,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 48,
+      "node": 38,
+      "class": "Queue",
+      "label": "StorageUse",
+      "operands": "Cola_exit",
+      "entries": 31,
+      "current": 0,
+      "retries": 0,
+      "counts_block": true
+    },
+    {
+      "line": 49,
+      "node": 38,
+      "class": "Enter",
+      "label": null,
+      "operands": "Exit",
+      "entries": 31,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 50,
+      "node": 38,
+      "class": "Depart",
+      "label": null,
+      "operands": "Cola_exit",
+      "entries": 31,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 51,
+      "node": 38,
+      "class": "Advance",
+      "label": null,
+      "operands": "3,1",
+      "entries": 31,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    },
+    {
+      "line": 52,
+      "node": 38,
+      "class": "Leave",
+      "label": null,
+      "operands": "Exit",
+      "entries": 31,
+      "current": 0,
+      "retries": 0,
+      "counts_block": false
+    }
+  ],
+  "entities": {
+    "facilities": {
+      "E_carnet": {
+        "name": "E_carnet",
+        "entries": 11,
+        "busy_time": 1979.0,
+        "busy": true,
+        "available": true,
+        "retry": 0,
+        "inter": 0
+      },
+      "Recepcion": {
+        "name": "Recepcion",
+        "entries": 60,
+        "busy_time": 1486.0,
+        "busy": true,
+        "available": true,
+        "retry": 0,
+        "inter": 0
+      }
+    },
+    "storages": {
+      "Acreditacion": {
+        "name": "Acreditacion",
+        "capacity": 5,
+        "in_use": 4,
+        "area": 14835.0,
+        "min_use": 0,
+        "max_use": 5,
+        "entries": 49,
+        "retry": 0,
+        "delay": 0
+      },
+      "Exit": {
+        "name": "Exit",
+        "capacity": 3,
+        "in_use": 0,
+        "area": 97.0,
+        "min_use": 0,
+        "max_use": 2,
+        "entries": 31,
+        "retry": 0,
+        "delay": 0
+      },
+      "SalaEspera": {
+        "name": "SalaEspera",
+        "capacity": 44,
+        "in_use": 23,
+        "area": 50264.0,
+        "min_use": 0,
+        "max_use": 24,
+        "entries": 43,
+        "retry": 0,
+        "delay": 0
+      },
+      "Vacunacion": {
+        "name": "Vacunacion",
+        "capacity": 4,
+        "in_use": 4,
+        "area": 11203.0,
+        "min_use": 0,
+        "max_use": 4,
+        "entries": 42,
+        "retry": 0,
+        "delay": 1
+      }
+    },
+    "queues": {
+      "ColaInt": {
+        "name": "ColaInt",
+        "content": 0,
+        "max": 1,
+        "entries": 1,
+        "zero_entries": 0,
+        "total_time": 95.0,
+        "area": 95.0,
+        "retry": 0
+      },
+      "Cola_E_carnet": {
+        "name": "Cola_E_carnet",
+        "content": 0,
+        "max": 2,
+        "entries": 10,
+        "zero_entries": 6,
+        "total_time": 666.0,
+        "area": 666.0,
+        "retry": 0
+      },
+      "Cola_acreditacion": {
+        "name": "Cola_acreditacion",
+        "content": 0,
+        "max": 2,
+        "entries": 49,
+        "zero_entries": 30,
+        "total_time": 738.0,
+        "area": 738.0,
+        "retry": 0
+      },
+      "Cola_exit": {
+        "name": "Cola_exit",
+        "content": 0,
+        "max": 1,
+        "entries": 31,
+        "zero_entries": 31,
+        "total_time": 0.0,
+        "area": 0.0,
+        "retry": 0
+      },
+      "Cola_recepcion": {
+        "name": "Cola_recepcion",
+        "content": 0,
+        "max": 1,
+        "entries": 60,
+        "zero_entries": 58,
+        "total_time": 9.0,
+        "area": 9.0,
+        "retry": 0
+      },
+      "Cola_vacunacion": {
+        "name": "Cola_vacunacion",
+        "content": 1,
+        "max": 3,
+        "entries": 43,
+        "zero_entries": 21,
+        "total_time": 1347.0,
+        "area": 1428.0,
+        "retry": 0
+      },
+      "centro": {
+        "name": "centro",
+        "content": 29,
+        "max": 29,
+        "entries": 60,
+        "zero_entries": 0,
+        "total_time": 43833.0,
+        "area": 72062.0,
+        "retry": 0
+      }
+    },
+    "chains": {},
+    "logic": {},
+    "savevalues": {},
+    "tables": {},
+    "qtables": {
+      "QTabla": {
+        "name": "QTabla",
+        "first": 0.0,
+        "width": 600.0,
+        "intervals": 8,
+        "samples": 31,
+        "sum": 43833.0,
+        "sum_squares": 82773465.0,
+        "max_value": 2248.0,
+        "frequencies": [
+          0,
+          11,
+          0,
+          1,
+          19,
+          0,
+          0,
+          0
+        ],
+        "overflow": 0,
+        "overflow_sum": 0.0,
+        "overflow_sum_squares": 0.0
+      }
+    }
+  },
+  "diagnostics": []
+}
+
+===== CALL #app_state at 2026-11-02T20:32:17 =====
+tool: app_state
+arguments: {}
+----- answer -----
+{
+  "diagnostics": [],
+  "dirty": true,
+  "model": null,
+  "path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl",
+  "pid": 169026,
+  "proposal": {
+    "id": "TEST-ID-FROM-APP",
+    "note": null,
+    "state": "pending",
+    "summary": "propuesta de prueba"
+  },
+  "run": null,
+  "schema": "genmsi.live/1"
+}
+
+===== CALL #app_state at 2026-11-02T20:32:25 =====
+tool: app_state
+arguments: {}
+----- answer -----
+{
+  "diagnostics": [],
+  "dirty": true,
+  "model": null,
+  "path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl",
+  "pid": 169026,
+  "proposal": {
+    "id": "1793662304738-2f7b5729b3af3d82",
+    "note": "no tocar la frecuencia de arribos",
+    "state": "rejected",
+    "summary": "Renombrar el bloque Generate (id 1) a 'LLEGADAS' y cambiar su propiedad Media de 60 a 45 (frecuencia media de arribos)."
+  },
+  "run": null,
+  "schema": "genmsi.live/1"
+}
+
+===== CALL #app_state at 2026-11-02T20:32:28 =====
+tool: app_state
+arguments: {}
+----- answer -----
+{
+  "diagnostics": [],
+  "dirty": true,
+  "model": null,
+  "path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl",
+  "pid": 169026,
+  "proposal": {
+    "id": "1793662304738-2f7b5729b3af3d82",
+    "note": null,
+    "state": "pending",
+    "summary": "Renombrar el bloque Generate (id 1) a 'LLEGADAS' y cambiar su propiedad Media de 60 a 45 (frecuencia media de arribos)."
+  },
+  "run": null,
+  "schema": "genmsi.live/1"
+}
+
+===== CALL #apply_edit at 2026-11-02T20:33:01 =====
+tool: apply_edit
+arguments: {"commands": [{"op": "setCaption", "id": 1, "caption": "PRUEBA"}]}
+env XDG_DATA_HOME: /tmp/emptyhome
+----- answer -----
+ISERROR {
+  "error": "no_open_model",
+  "message": "there is no model open in the app: give `path` of a model file, or open a model in the app"
+}
+
+===== ANEXO: entorno de cada llamada =====
+Las llamadas 1..13 se hicieron antes de que el wrapper registrara el entorno;
+este es el XDG_DATA_HOME real de cada una. Todas las demás usan
+/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/home (absoluto).
+
+1  app_state    {}                       XDG_DATA_HOME=odd/tasks/medida4/home  (RELATIVO -> cae al app real)
+2  open_model   {}                       XDG_DATA_HOME=odd/tasks/medida4/home  (RELATIVO -> cae al app real)
+3  open_model   {}                       sin XDG_DATA_HOME
+4  open_model   {}                       XDG_DATA_HOME=/tmp/emptyhome
+5  open_model   {}                       XDG_DATA_HOME=<absoluto> fake home
+6  app_state    {}                       XDG_DATA_HOME=<absoluto> fake home
+7  app_state    {}                       XDG_DATA_HOME=<absoluto> fake home (ya existe live.json)
+8  explain_model{path=modelo.gmdl}       XDG_DATA_HOME=<absoluto> fake home
+9  catalogue    {classes:[Generate]}     XDG_DATA_HOME=<absoluto> fake home
+10 lint         {path=modelo.gmdl}       XDG_DATA_HOME=<absoluto> fake home
+11 apply_edit   {path=modelo.gmdl, target por defecto = file}   XDG_DATA_HOME=<absoluto> fake home
+12 apply_edit   {path=modelo.gmdl, target=proposal, summary, commands}  XDG_DATA_HOME=<absoluto> fake home
+13 app_state    {}                       XDG_DATA_HOME=<absoluto> fake home
+14 tools/list   (consulta, no tool call) XDG_DATA_HOME=<absoluto> fake home
+15 tools/list   (consulta, no tool call) XDG_DATA_HOME=<absoluto> fake home
+16 lint         {path=<staging>/1793662304738-2f7b5729b3af3d82.gmdl}
+17 simulate     {path=<staging>/1793662304738-2f7b5729b3af3d82.gmdl, seed=42}
+18 simulate     {path=modelo.gmdl, seed=42}
+19 app_state    {}   (el stub del app publica proposal {id: TEST-ID-FROM-APP, state: pending})
+20 app_state    {}   (el stub del app publica proposal {state: rejected, note: "no tocar la frecuencia de arribos"})
+21 app_state    {}   (estado final: el stub del app publica proposal {id: 1793662304738-..., state: pending})
+
+22 apply_edit   {sin path, commands:[setCaption id 1]}   XDG_DATA_HOME=/tmp/emptyhome, cwd del servidor=/tmp  -> no_open_model
+
+Total: 20 llamadas de herramienta + 2 consultas tools/list = 22 interacciones con el servidor.
+
+===== CALL #app_state at 2026-11-02T20:33:48 =====
+tool: app_state
+arguments: {}
+env XDG_DATA_HOME: /home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/home
+----- answer -----
+{
+  "diagnostics": [],
+  "dirty": true,
+  "model": null,
+  "path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl",
+  "pid": 169026,
+  "proposal": {
+    "id": "1793662304738-2f7b5729b3af3d82",
+    "note": null,
+    "state": "pending",
+    "summary": "Renombrar el bloque Generate (id 1) a 'LLEGADAS' y cambiar su propiedad Media de 60 a 45 (frecuencia media de arribos)."
+  },
+  "run": null,
+  "schema": "genmsi.live/1"
+}

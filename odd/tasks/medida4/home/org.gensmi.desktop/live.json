@@ -1,0 +1,15 @@
+{
+  "schema": "genmsi.live/1",
+  "path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida4/modelo.gmdl",
+  "pid": 169026,
+  "dirty": true,
+  "diagnostics": [],
+  "model": null,
+  "run": null,
+  "proposal": {
+    "id": "1793662304738-2f7b5729b3af3d82",
+    "state": "pending",
+    "note": null,
+    "summary": "Renombrar el bloque Generate (id 1) a 'LLEGADAS' y cambiar su propiedad Media de 60 a 45 (frecuencia media de arribos)."
+  }
+}

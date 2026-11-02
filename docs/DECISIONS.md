@@ -372,3 +372,55 @@ What this does not change: the tool is a thin adapter over the engine's API
 simulation logic stays in the engine. The new tool is **additive**: a new
 tool, a new document (`genmsi.edit/1`) and a new error class
 (`invalid_command`); nothing that exists changes.
+
+## D22 — The live state of the app: the app publishes it, the agent reads it, and the verb refuses to overwrite what is being read
+
+The app and the MCP already spoke in one direction: the agent wrote the file
+the app had open, the app noticed the change (a fingerprint of mtime and
+size, every 500 ms), reloaded it, compiled it and ran it again, and the reader
+saw the work on the canvas — undoable with Ctrl+Z, because the reload is an
+operation of the session.
+
+The other direction did not exist, and it had a price. The agent could not
+see what the app was doing: only the file. And it could write over a model
+the reader had open **with changes that were not saved**: the app does not
+reload in that case (the reader's work is not thrown away by a change
+somebody else made), so the agent's work stayed invisible on the canvas, and
+when the reader saved, their save overwrote it. The agent could not even know:
+the `dirty` flag was in the app's memory.
+
+The rules that stay:
+
+- **the app publishes what it is showing**: a `genmsi.live/1` document, built
+  by the core (D19), in the app's data directory, beside the file that
+  already said which model was open. It carries the model the app has open,
+  whether the reader has changes that are not saved, what it found in the
+  model, and the last run it made — the report and the parameters it ran
+  with;
+- **the agent reads it**: a new `app_state` tool answers with that document,
+  and with `path: null` when no app is running — an answer, never a failure
+  (the rule `open_model` already follows);
+- **the verb refuses to overwrite what is being read**: `apply_edit` and
+  `save_model` check the state before writing, and when the app has unsaved
+  changes on that model they write **nothing** and answer `model_locked`;
+- **the brake is mechanical, not a rule the agent has to remember**: a rule
+  that depends on the agent's diligence is a rule that some agent will skip.
+  The refusal is in the tool, so it holds whoever calls it;
+- **the agent tells the reader**: the procedure is in the guide — look before
+  you write, say so and wait, and when the reader saves, send the same batch
+  again (the batch is replayable: the commands are the source of truth, not
+  the text);
+- **the app does not say who changed the file**: no trail, no attribution. The
+  reader knows an agent is working because the agent says so, and the app has
+  no channel to know it (it only sees that the file changed).
+
+What travels in the document is on purpose: the model **in memory** travels
+only when it differs from the disk (otherwise the file *is* the model, and the
+agent reads it from there), and the trace of the last run does not travel at
+all (it is enormous, and the agent asks for it when it wants it).
+
+What this does not change: the engine keeps owning the documents (D13, D19),
+the app and the MCP stay thin layers (D2), and the write path of the verb is
+the same one it was — a model that does not compile is not written, and a
+batch is atomic. The refusal adds one more case in which nothing is written,
+and it is the only case in which the *reader* is the reason.

@@ -206,11 +206,18 @@ catalogue: `catalogue` says what a class does without asking for a model.
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
-| `path` | string | — | Path of the `.gmdl` file to write. |
-| `model` | string | — | The whole `.gmdl` document as text. |
+| `path` | string or null | the model the app has open | Path of the `.gmdl` file to write. |
+| `model` | string or null | — | The whole `.gmdl` document as text. |
+| `target` | string | `"file"` | Where the model goes: `"file"` writes it to `path`; `"proposal"` leaves it in the staging area of the app, without touching the disk, and the person decides. |
+| `summary` | string or null | — | One line about what the agent did. It travels with the proposal, so the person reads it before deciding. |
 
 Writes the model to the file and returns the `genmsi.lint/1` document of what
 was written.
+
+**The `path` may be left out.** When it is, the model the app has open is
+the one that is written: the agent works on what the reader is looking at
+instead of guessing a destination. With no app, or with an app that has no
+model open, the failure is `no_open_model` and it says what to do.
 
 **The model is checked before it is written**: a model that does not load,
 does not validate or does not compile is **not** written, and the failure is
@@ -240,10 +247,17 @@ not. `genmsi layout` is the command that says what the composition placed.
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
-| `path` | string or null | — | Path of the `.gmdl` model file. |
+| `path` | string or null | the model the app has open | Path of the `.gmdl` model file. |
 | `model` | string or null | — | The `.gmdl` document as text. |
 | `commands` | array | — | The batch of editing commands, in order. |
 | `layout` | string | `"auto"` | Where the blocks the batch adds go: `"auto"` or `"explicit"`. |
+| `target` | string | `"file"` | Where the result goes: `"file"` writes it to the file the batch edited; `"proposal"` leaves it in the staging area of the app, without touching the disk, and the person decides. |
+| `summary` | string or null | — | One line about what the batch did. It travels with the proposal, so the person reads it before deciding. |
+
+**The `path` may be left out.** When it is, the batch works on the model the
+app has open: the agent works on what the reader is looking at instead of
+guessing a destination. With no app, or with an app that has no model open,
+the failure is `no_open_model` and it says what to do.
 
 **The commands are the engine's own.** They are the same `EditCommand` values
 the desktop application speaks over its own protocol
@@ -342,6 +356,7 @@ right now**.
 | `diagnostics` | array | What the app found in the model. |
 | `model` | object or null | The model **as it is in memory**, when it differs from the disk. Null when the model of the disk is the model of the app: the agent reads that one from the file. |
 | `run` | object or null | The last run the app made: `seed`, `until`, `start` and `report` (the `genmsi.report/1` document). |
+| `proposal` | object or null | The proposal the person has to decide, or the one they decided: `id`, `state` (`pending`, `accepted` or `rejected`), `summary` (what the agent said it did) and `note` (what the person answered). Null when there is no proposal on the table. |
 
 **The answer is never a failure.** When the app is not running, the answer is
 the same document with `path` and `pid` null: the question has an answer
@@ -394,6 +409,60 @@ The app writes it when it opens a model and removes it when it creates a new
 one or closes; the pid of the document says whether the app that wrote it is
 still running, so a file left behind by an app that is gone is read as "no
 model open".
+
+**The directory is the one the platform names, and a relative one does not
+count.** On Linux the server takes `$XDG_DATA_HOME` only when it is an
+**absolute** path, and falls back to `$HOME/.local/share` otherwise: a
+relative `XDG_DATA_HOME` is not a directory of its own, it is the real one.
+An agent (or a test) that wants its own directory has to name it with its
+whole path.
+
+## The proposal: the agent offers a model, the person decides
+
+Writing the file the app has open is the fast road, and it is the right one
+when the reader has nothing pending. It is closed when the reader **has**
+something pending: the brake refuses the write (`model_locked`), because the
+reader's work is not on the disk and writing over it would leave their work
+invisible. The road that stays open is the **proposal**.
+
+A proposal is a model the agent leaves for the person **without touching the
+disk**:
+
+1. the agent asks for it: `apply_edit` (or `save_model`) with
+   `target: "proposal"` and, usually, a `summary` of what it did;
+2. the result is written in the **staging directory of the app**, beside a
+   `genmsi.proposal/1` document that says what the proposal is, what it
+   proposes to change and what the agent did. The answer to the call carries
+   the identity of the proposal (`proposal.id`) and the path of the staged
+   model (`proposal.model`) — the `genmsi.edit/1` document has both;
+3. the app picks the oldest pending proposal up, loads the model **in
+   memory** and puts it on the canvas: the session is **dirty** (the model
+   differs from the disk) and the adoption is **one step of the history**, so
+   the reader can undo it. The file on the disk still holds the old model;
+4. the reader decides. *Aceptar* is the app's normal save; *Descartar* undoes
+   the adoption and leaves a note;
+5. the verdict travels in `genmsi.live/1`: `app_state` carries `proposal`
+   with its `state` (`pending`, `accepted` or `rejected`) and the `note` the
+   reader wrote.
+
+The rules:
+
+- **a proposal never touches the disk**: that is the whole point of it;
+- **the proposal is about the model the agent worked on** — the file it
+  named, or the model the app has open when it named none — and the app
+  adopts a proposal **only** when that is the model it has open. A proposal
+  about another file waits;
+- **the reader's work comes first**: the app does not adopt a proposal while
+  the reader has changes that are not saved. The proposal waits, and the
+  reader is told so. It is the rule of the brake, seen from the other side;
+- **the brake is not bypassed**: a proposal is a way to *show* a model, not a
+  way around the brake. Adopting one leaves the session dirty, so a
+  `model_locked` afterwards is exactly what it was.
+
+The staging directory lives in the **data directory of the app**, beside the
+file that says which model is open (`<data>/staging/`): on Linux,
+`$XDG_DATA_HOME/org.gensmi.desktop/staging` (or
+`$HOME/.local/share/org.gensmi.desktop/staging`).
 
 ## Errors
 
@@ -448,11 +517,12 @@ The classes:
 
 | Class | When |
 |---|---|
-| `invalid_arguments` | The call itself is wrong: no model, or both `path` and `model`. |
+| `invalid_arguments` | The call itself is wrong: both `path` and `model`, or no `model` to write. |
+| `no_open_model` | The app has **no model open** and the call named neither a file nor a document, so there is no destination to guess. Name a `path`, or open a model in the app. |
 | `invalid_command` | A command of the batch could not be applied. The batch is atomic, so no command is applied: the failure names the command that failed (its index in `command` and its `op` in `op`), and the model stays as it was. |
 | `class_not_found` | The class named in `catalogue` is not one of the classes the catalogue lists. The `class` field carries the name that was asked for. |
 | `model_not_found` | The file named by `path` does not exist. (`apply_edit` is the exception: it creates the model, see above.) |
-| `model_locked` | The desktop app has **unsaved changes** on the model the call named, so nothing was written. The `path` field carries the model. The reader has to save it (or discard it) and the agent sends the same edit again: the batch is replayable, because the commands are the source of truth and not the text. |
+| `model_locked` | The desktop app has **unsaved changes** on the model the call named, so nothing was written. The `path` field carries the model. The reader has to save it (or discard it) and the agent sends the same edit again: the batch is replayable, because the commands are the source of truth and not the text. The agent can also leave a **proposal** instead (`target: "proposal"`), which does not touch the disk. |
 | `model_unreadable` | Reserved for a file the tool cannot read outside the model load path; a model the server loads goes through the same `parse_file` call the CLI uses, so its read failures are `invalid_model` (a missing file is still `model_not_found`). |
 | `model_unwritable` | The file could not be written: the permissions, the disk, or the path. A model that does not compile is never written at all, so this class means the write itself failed. |
 | `invalid_xml` | The document is not well-formed XML. The line and the column are known, the block is not. |

@@ -161,6 +161,7 @@ carries the `genmsi.live/1` document:
 | `diagnostics` | What the app found in the model. |
 | `model` | The model **as it is in memory**, when it differs from the disk; nothing when it does not (then the file *is* the model). |
 | `run` | The last run the app made: the `seed`, the horizon, the `start` and the report (`genmsi.report/1`). |
+| `proposal` | The proposal the reader has to decide, or the one they decided: its `id`, its `state` (`pending`, `accepted`, `rejected`), the `summary` the agent wrote and the `note` the reader answered. Nothing when there is no proposal on the table. |
 
 The document is built by the **core** (`genmsi-core`: the engine publishes,
 the app invents nothing) and the write is atomic, like every other write of
@@ -172,6 +173,55 @@ The MCP server reads that file and publishes it as the `app_state` tool, and
 it **refuses** to write on a model the app has open with unsaved changes
 (`model_locked`): the refusal is mechanical, in the tool, because a rule that
 depends on the agent remembering to ask is a rule some agent skips.
+
+### The app adopts the proposal of an agent
+
+Writing the file the app has open is the fast road, and it is the right one
+when the reader has nothing pending. It is closed when the reader **has**
+something pending: the app does not reload a model that changes under it
+while the reader is editing, and the verb refuses the write
+(`model_locked`). The road that stays open is the **proposal**: an agent
+leaves a model in the staging directory of the app, without touching the
+disk, and the app puts it on the canvas.
+
+A proposal is a model the agent wrote in `<data>/staging/` beside a
+`genmsi.proposal/1` document that says what it is, what it proposes to
+change and what the agent did. The **core** owns that format, as it owns
+every other one: the MCP writes the document (state `pending`) and the app
+writes the verdict (`accepted` or `rejected`) through the same writer.
+
+The app adopts it **in memory**:
+
+- the model is loaded and **compiled**: a model that does not compile is
+  refused, as everywhere else;
+- the session becomes **dirty**: the model differs from the disk, and the
+  file keeps the old model until the reader accepts;
+- the adoption is **one step of the history**: the reader undoes it with
+  Ctrl+Z, and the model that was there comes back;
+- the file the app has open **does not move**: a proposal is a change of a
+  model, not a different model.
+
+The reader decides, and the decision is the app's own:
+
+- **Accept** is the app's normal save: the model in memory goes to the file
+  the app has open, and the proposal becomes `accepted`;
+- **Discard** undoes the adoption and leaves a note; the proposal becomes
+  `rejected`, and the note travels back to the agent in the live document.
+
+Two rules keep the promise of the loop:
+
+- **the reader's work comes first**: the app does not adopt a proposal while
+  the reader has changes that are not saved. The proposal waits, and the
+  reader is told so. It is the rule of the brake, seen from the other side;
+- **the proposal is about the model the agent worked on**, and the app
+  adopts it only when that is the model it has open. A proposal about
+  another file waits — and it does not hold the queue in front of the
+  proposals that are about this model.
+
+The four operations live in the **protocol** of the session, where the dev
+bridge speaks them too: `pendingProposal` (is there a proposal waiting?),
+`adoptProposal` (put it on the canvas), `acceptProposal` and
+`discardProposal`.
 
 ### The commands
 

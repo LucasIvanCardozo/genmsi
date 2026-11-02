@@ -322,3 +322,37 @@ invisible para el agente: la app callaba y él esperaba un veredicto que no
 llegaba. El documento vivo publica ahora la propuesta que **espera**
 (`Session::live_body_in`): el agente lee en `app_state` que su propuesta está
 `pending`, y después `accepted` o `rejected` con la nota.
+
+L23 (2026-11-02, verificación diferencial, T6): el MCP del commit base
+(`f6a17ca`) y el de la rama, compilados los dos y comparados con las
+mismas llamadas sobre el mismo modelo: `lint`, `simulate`, `get_trace` y
+`explain_model` con un `path`; `lint` y `simulate` con un documento; `lint`
+con las dos cosas; `apply_edit` y `save_model`; y el catálogo. **La única
+diferencia es la que S1 pide**: la llamada que no nombra ni un archivo ni un
+documento pasó de `invalid_arguments` a `no_open_model` (sin app corriendo no
+hay destino, y el error dice qué hacer). Todo lo demás es idéntico byte a
+byte. El script de la comparación vivió en un `mktemp -d`, fuera del
+repositorio: no se commitea, porque es la prueba de un cambio, no una
+prueba del producto.
+
+L24 (2026-11-02, medición con agente en frío, `odd/tasks/medida4/`): un
+agente que **nunca había visto este MCP** tuvo que cambiar un modelo que la
+persona tenía abierto **con cambios sin guardar**. 22 interacciones con el
+servidor; el archivo de la persona quedó **byte a byte idéntico** (el mismo
+md5) y el cambio quedó como propuesta, compilando y corriendo (el `Generate`
+de 60 a 45: de 61 a 86 entradas). La parte más valiosa fue la blunt:
+
+- **el mensaje de `model_locked` no decía que existe la vía de la
+  propuesta**: el agente tuvo que leer la guía para encontrarla. Arreglado:
+  el error dice ahora "or leave a proposal instead (target: \"proposal\")";
+- **la guía prometía `no_open_model` para "las herramientas"** y el agente lo
+  leyó como si fuera para todas, incluso para `open_model` y `app_state`,
+  que nunca fallan. La guía ahora lo dice con precisión;
+- **un `XDG_DATA_HOME` relativo cae callado al directorio real** (la regla de
+  XDG: sólo cuenta una ruta absoluta). Un agente con un directorio relativo
+  terminó hablando con la app real del usuario. Documentado en
+  `docs/mcp.md`;
+- lo que **no** es de esta feature, anotado para la siguiente: `explain_model`
+  dio 3358 líneas para un modelo de 39 bloques, sin ningún filtro; y el
+  `dirty` de `app_state` vive en `live.json` mientras que el `path` por
+  defecto vive en `open-model.json`: dos archivos, una app.

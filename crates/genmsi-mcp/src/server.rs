@@ -17,8 +17,10 @@ use rmcp::schemars::JsonSchema;
 use rmcp::{tool, tool_handler, tool_router, ServerHandler};
 use serde::{Deserialize, Serialize};
 
-use crate::engine::{self, ModelSource};
-use crate::errors::ToolError;
+use genmsi_format::EditCommand;
+
+use crate::engine::{self, Layout, ModelSource};
+use crate::errors::{Failure, ToolError};
 use crate::glossary;
 
 /// The GenMSI MCP server: the engine served over stdio.
@@ -59,7 +61,7 @@ pub struct ModelInput {
 
 impl ModelInput {
     /// The model the agent asked for.
-    pub fn source(&self) -> Result<ModelSource, ToolError> {
+    pub fn source(&self) -> Result<ModelSource, Failure> {
         source_of(&self.path, &self.model)
     }
 }
@@ -90,7 +92,7 @@ pub struct RunInput {
 
 impl RunInput {
     /// The model the agent asked for.
-    pub fn source(&self) -> Result<ModelSource, ToolError> {
+    pub fn source(&self) -> Result<ModelSource, Failure> {
         source_of(&self.path, &self.model)
     }
 }
@@ -124,7 +126,7 @@ pub struct TraceInput {
 
 impl TraceInput {
     /// The model the agent asked for.
-    pub fn source(&self) -> Result<ModelSource, ToolError> {
+    pub fn source(&self) -> Result<ModelSource, Failure> {
         source_of(&self.path, &self.model)
     }
 }
@@ -139,6 +141,37 @@ pub struct SaveInput {
     /// The tool writes the whole document, not a patch: the agent reads the
     /// model, changes it and hands the complete text back.
     pub model: String,
+}
+
+/// The batch of editing commands an agent applies to a model.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct EditInput {
+    /// Path of the `.gmdl` model file.
+    #[serde(default)]
+    pub path: Option<String>,
+    /// The `.gmdl` document as text, for a model that is not on disk yet.
+    #[serde(default)]
+    pub model: Option<String>,
+    /// The commands to apply, in order.
+    ///
+    /// The commands are the engine's own editing commands: the same ones the
+    /// desktop application speaks. The schema the tool publishes is the one of
+    /// those types, so the vocabulary is the same everywhere.
+    pub commands: Vec<EditCommand>,
+    /// Where the blocks the commands add go.
+    ///
+    /// `auto` (the default) puts every new block where there is room in its
+    /// container, like a drop in the application; `explicit` uses the `x` and
+    /// the `y` of the command.
+    #[serde(default)]
+    pub layout: Layout,
+}
+
+impl EditInput {
+    /// The model the agent asked for.
+    pub fn source(&self) -> Result<ModelSource, Failure> {
+        source_of(&self.path, &self.model)
+    }
 }
 
 /// The class the agent asks about.
@@ -159,16 +192,16 @@ pub struct CatalogueInput {
 }
 
 /// The model the agent asked for: a file on disk or the document itself.
-fn source_of(path: &Option<String>, model: &Option<String>) -> Result<ModelSource, ToolError> {
+fn source_of(path: &Option<String>, model: &Option<String>) -> Result<ModelSource, Failure> {
     match (path, model) {
         (Some(path), None) => Ok(ModelSource::File(PathBuf::from(path))),
         (None, Some(text)) => Ok(ModelSource::Inline(text.clone())),
-        (Some(_), Some(_)) => Err(ToolError::arguments(
+        (Some(_), Some(_)) => Err(Box::new(ToolError::arguments(
             "give `path` or `model`, not both: one names the file, the other carries the document",
-        )),
-        (None, None) => Err(ToolError::arguments(
+        ))),
+        (None, None) => Err(Box::new(ToolError::arguments(
             "give `path` of a model file or `model` with the `.gmdl` document",
-        )),
+        ))),
     }
 }
 
@@ -189,9 +222,11 @@ fn default_start() -> u64 {
 /// The original refuses a `Start` of zero ("El Start debe ser mayor a
 /// cero."), and so does the server: a run whose counter of terminations
 /// starts at zero would end before it begins.
-fn checked_start(start: u64) -> Result<u64, ToolError> {
+fn checked_start(start: u64) -> Result<u64, Failure> {
     if start == 0 {
-        return Err(ToolError::arguments("the start must be greater than zero"));
+        return Err(Box::new(ToolError::arguments(
+            "the start must be greater than zero",
+        )));
     }
     Ok(start)
 }
@@ -292,6 +327,18 @@ impl GenmsiServer {
     pub fn save_model(&self, Parameters(input): Parameters<SaveInput>) -> CallToolResult {
         finish(save_document(&input))
     }
+
+    /// Add, edit and connect the blocks of a model.
+    ///
+    /// The commands are the engine's own editing commands, applied in order.
+    /// The batch is atomic: a command that fails leaves the model as it was.
+    #[tool(
+        name = "apply_edit",
+        description = "Add, edit and connect the blocks of a GenMSI model. The commands are the engine's own editing commands, the same ones the desktop application speaks: `addBlock` {class, container, x, y} creates a block of a catalogue class (call `catalogue` first: it gives the class names, their ports (ioid) and their properties), `connect` {from, fromIoid, to, toIoid} wires an output port to an input port, `setProperty` {id, property, value} sets a declared property, `setCaption` {id, caption} names a block, `moveBlock` {id, x, y} moves one, `removeBlock` {id} takes one away and `removeBlocks` {ids} takes several away as ONE operation; the schema of the tool carries the whole vocabulary. The commands are applied in order and the batch is ATOMIC: if one fails, none is applied and the failure names the command that failed. `layout` says where the blocks the batch adds go: `auto` (the default) puts every new block where there is room in its container, like a drop in the application; `explicit` uses the `x` and the `y` of the command. The model is checked before it is written: one that does not compile is NOT written, and the error names the block that caused it. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text) and returns the genmsi.edit/1 document."
+    )]
+    pub fn apply_edit(&self, Parameters(input): Parameters<EditInput>) -> CallToolResult {
+        finish(edit_document(&input))
+    }
 }
 
 /// Body of the `genmsi.explain/1` document.
@@ -307,7 +354,7 @@ struct ExplainBody {
 }
 
 /// The explain document of a model.
-fn explain_document(input: &ModelInput) -> Result<String, ToolError> {
+fn explain_document(input: &ModelInput) -> Result<String, Failure> {
     let loaded = engine::load(&input.source()?)?;
     let body = ExplainBody {
         program: genmsi_core::program_json(&loaded.program),
@@ -325,11 +372,11 @@ fn explain_document(input: &ModelInput) -> Result<String, ToolError> {
 fn catalogue_document(
     class: Option<&str>,
     classes: Option<&[String]>,
-) -> Result<String, ToolError> {
+) -> Result<String, Failure> {
     match (class, classes) {
-        (Some(_), Some(_)) => Err(ToolError::arguments(
+        (Some(_), Some(_)) => Err(Box::new(ToolError::arguments(
             "give `class` or `classes`, not both: `class` names one class and `classes` names several",
-        )),
+        ))),
         (None, None) => Ok(genmsi_core::to_pretty_json(
             genmsi_core::CLASSLIST_SCHEMA,
             &genmsi_core::class_list_document(),
@@ -359,7 +406,7 @@ fn catalogue_document(
 }
 
 /// The lint document of a model.
-fn lint_document(input: &ModelInput) -> Result<String, ToolError> {
+fn lint_document(input: &ModelInput) -> Result<String, Failure> {
     let loaded = engine::load(&input.source()?)?;
     let document = genmsi_core::lint_document(&loaded.program, &loaded.model, &loaded.name);
     Ok(genmsi_core::to_pretty_json(
@@ -368,8 +415,26 @@ fn lint_document(input: &ModelInput) -> Result<String, ToolError> {
     ))
 }
 
+/// The document of an edit.
+fn edit_document(input: &EditInput) -> Result<String, Failure> {
+    let source = input.source()?;
+    let edited = engine::apply_edits(&source, &input.commands, input.layout)?;
+    let lint = genmsi_core::lint_document(&edited.program, &edited.model, &edited.name);
+    let document = genmsi_core::edit_document(
+        &lint,
+        input.commands.len(),
+        edited.written,
+        edited.created,
+        edited.source,
+    );
+    Ok(genmsi_core::to_pretty_json(
+        genmsi_core::EDIT_SCHEMA,
+        &document,
+    ))
+}
+
 /// The lint document of a model that was written.
-fn save_document(input: &SaveInput) -> Result<String, ToolError> {
+fn save_document(input: &SaveInput) -> Result<String, Failure> {
     let path = PathBuf::from(&input.path);
     let saved = engine::save_model(&path, &input.model)?;
     // The composition is not a finding of the compiler: it is what the engine
@@ -393,7 +458,7 @@ fn save_document(input: &SaveInput) -> Result<String, ToolError> {
 /// The number is the blocks the composition placed: the model root is not
 /// drawn, so it is not one of them.
 /// The report document of a run.
-fn report_document(input: &RunInput) -> Result<String, ToolError> {
+fn report_document(input: &RunInput) -> Result<String, Failure> {
     let loaded = engine::load(&input.source()?)?;
     let start = checked_start(input.start)?;
     let config = engine::config(input.seed, input.until, start, false, 0);
@@ -406,7 +471,7 @@ fn report_document(input: &RunInput) -> Result<String, ToolError> {
 }
 
 /// The trace document of a run.
-fn trace_document(input: &TraceInput) -> Result<String, ToolError> {
+fn trace_document(input: &TraceInput) -> Result<String, Failure> {
     let loaded = engine::load(&input.source()?)?;
     let start = checked_start(input.start)?;
     let config = engine::config(input.seed, input.until, start, true, input.limit);
@@ -419,7 +484,7 @@ fn trace_document(input: &TraceInput) -> Result<String, ToolError> {
 }
 
 /// The outcome of a tool: the document it produced, or the failure it found.
-fn finish(outcome: Result<String, ToolError>) -> CallToolResult {
+fn finish(outcome: Result<String, Failure>) -> CallToolResult {
     match outcome {
         Ok(document) => CallToolResult::success(vec![ContentBlock::text(document)]),
         Err(error) => CallToolResult::error(vec![ContentBlock::text(error.to_json())]),
@@ -434,6 +499,10 @@ impl ServerHandler for GenmsiServer {
              Call `catalogue` before you write a model: it says which block classes \
              exist and what the XML of a block of each class looks like; ask for \
              every class you need in ONE call, with `classes`. \
+             Use `apply_edit` to build or to change a model: it takes a batch of \
+             the engine's editing commands (`addBlock`, `connect`, `setProperty`, \
+             `moveBlock`, `removeBlock`, ...) and writes the model; the batch is \
+             atomic, so a command that fails leaves the model as it was. \
              Use `lint` to validate a model, `simulate` to run it, `get_trace` to read \
              its events and `explain_model` to describe it: its `program` is the \
              compiled GPSS and its `model` is the document itself, with every block, \

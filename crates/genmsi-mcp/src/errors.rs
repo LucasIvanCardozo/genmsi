@@ -156,7 +156,8 @@ impl ToolError {
             error: "model_locked",
             message: format!(
                 "the app has unsaved changes on this model; nothing was written: {path}. \
-                 Ask the reader to save the model and send the edit again."
+                 Ask the reader to save the model and send the edit again, or leave a \
+                 proposal instead (target: \"proposal\") and let the reader decide."
             ),
             path: Some(path),
             line: None,

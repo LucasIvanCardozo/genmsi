@@ -256,6 +256,29 @@ dice, con el nombre que probablemente se quiso ("did you mean 'Tamaño'?").
 L19 (2026-10-31, T9 — la revisión): el assess con el ítem 1 escalado (la
 herramienta escribe en disco) devolvió `risk: high` y un plan de dos
 piezas: auto-verificación del escritor (hecha, L10 y L15) y verificador
-independiente (en curso al cierre de este corte). La verificación
-diferencial contra `main` (18 casos de las siete herramientas viejas) dio
-**0 diferencias**.
+independiente (hecho, L20). La verificación diferencial contra `main` (18
+casos de las siete herramientas viejas) dio **0 diferencias**.
+
+L20 (2026-10-31, L20 — el verificador independiente): el primer verificador
+se quedó consumiendo vueltas sin entregar informe (lo cancelé); el segundo,
+acotado, entregó su veredicto: la feature **cumple su especificación** en
+lo esencial (S3a, S3b, S3c y S7), sin bloqueantes, sin pérdida de datos y
+sin estado inconsistente después de un fallo. Encontró **un defecto real**:
+con geometría incompleta, la composición del motor (que corría después del
+lote) reescribía las posiciones y `layout: "explicit"` no se cumplía —un
+bloque colocado en (321, 654) terminaba en (321, 810)—. **Arreglado**
+(`9de9060`): el lienzo se compone antes del lote y las coordenadas del
+comando son la última palabra, con un test que es un RED real.
+
+El verificador señaló además cinco desacuerdos entre la documentación y el
+código (`auto` y el `paste`, el sentido de `applied`, la ausencia de
+`source` cuando el modelo se escribió, `model_not_found` y la creación del
+archivo, y el "error del compilador" que en un caso es del formato) y un
+test que faltaba (que el esquema publicado sea el del motor). Los seis
+están resueltos en el mismo commit.
+
+Sobre el rollback: la primitiva que usa (`EditSession::undo`) ya está
+probada en el motor (`undo_redo_restores_the_model_exactly`,
+`crates/genmsi-format/src/edit.rs:2447`), y su error se descarta a
+propósito: el undo de un paso que la propia sesión empujó no puede fallar, y
+la sesión se descarta enseguida.

@@ -33,6 +33,7 @@ pub mod oracle;
 pub mod gpss;
 pub mod open_model;
 pub mod program;
+pub mod proposal;
 pub mod report;
 pub mod replication;
 pub mod rng;
@@ -60,6 +61,12 @@ pub use open_model::{
     current_open_model, open_model_document, process_is_running, read_open_model, write_open_model,
 };
 pub use program::{Program, compile, known_classes};
+pub use proposal::{
+    DOCUMENT_EXTENSION, MODEL_EXTENSION, PROPOSAL_SCHEMA, ProposalBody, ProposalDocument,
+    ProposalState, STAGING_DIR, document_file_in, model_file_in, new_id, oldest_pending_in,
+    proposal_document, read_proposal_in, read_proposals_in, resolve_proposal_in, staging_dir,
+    staging_dir_in, write_proposal, write_proposal_model,
+};
 pub use report::{json_report, program_json, render, to_csv, to_json};
 pub use replication::{
     MetricSummary, ReplicationConfig, ReplicationResult, render_summary, replicate,

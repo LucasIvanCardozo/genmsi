@@ -322,7 +322,17 @@ test("the app sees the change of the file by itself: the model is reloaded and r
     assert.equal(useApp.getState().error, null, "the reload was read as a failure");
 
     // The reload and the run went through the session, in that order.
-    assert.deepEqual(shell.ops, ["reload", "runCurrent"], `the app asked for: ${shell.ops}`);
+    // The tick also looks at the staging area of the app: that is how
+    // the proposal of an agent reaches the canvas.
+    assert.deepEqual(
+      shell.ops.filter((op) => op !== "pendingProposal"),
+      ["reload", "runCurrent"],
+      `the app asked for: ${shell.ops}`,
+    );
+    assert.ok(
+      shell.ops.includes("pendingProposal"),
+      `the app did not look at the staging area: ${shell.ops}`,
+    );
 
     // The reload did not take the reader's work away: the selection is
     // still there.

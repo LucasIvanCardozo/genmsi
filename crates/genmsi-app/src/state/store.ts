@@ -15,10 +15,20 @@ import type {
   CatalogueDocument,
   Diagnostics,
   ModelBody,
+  ProposalBody,
+  ProposalDocument,
   ReportDocument,
+  SessionState,
   TraceDocument,
 } from "../types";
 import type { EditCommand } from "../types/generated/EditCommand";
+import {
+  noteForRejection,
+  samePending,
+  shouldAdopt,
+  verdictText,
+  waitsForSave,
+} from "./proposal";
 
 /** What the app is doing right now. */
 export type Status = "idle" | "loading" | "ready" | "running";
@@ -199,6 +209,34 @@ export interface AppState {
   appVersion: string | null;
   /** The path of a save that waits for the user's confirmation. */
   pendingSave: string | null;
+  /**
+   * The proposal the session holds: the one the person has to decide.
+   *
+   * `null` when there is no proposal on the table.
+   */
+  proposal: ProposalBody | null;
+  /**
+   * Whether the proposal of the session is **on the canvas**.
+   *
+   * A proposal that was undone is still the proposal of the session, but
+   * it is not on the canvas: there is nothing to accept or to discard.
+   */
+  proposalOnCanvas: boolean;
+  /**
+   * The proposal that waits in the staging area of the app.
+   *
+   * The app asks the engine for it every half second, the same way it
+   * asks for the fingerprint of the file it has open.
+   */
+  pendingProposal: ProposalDocument | null;
+  /**
+   * The identity of the proposal the app already put on the canvas.
+   *
+   * The app does not put it back behind the back of the reader: if the
+   * adoption comes undone, the band says that the proposal is not on the
+   * canvas, and the reader adopts it again if they want it.
+   */
+  adoptedProposal: string | null;
   /** The message of the last save. */
   savedMessage: string | null;
   /** The models opened lately, the most recent first. */
@@ -283,6 +321,26 @@ export interface AppState {
   confirmSave: () => Promise<void>;
   /** Answer the confirmation of a save with no. */
   dismissSave: () => void;
+  /**
+   * Ask the app whether a proposal is waiting, and adopt it when it has
+   * to.
+   *
+   * The tick of the watcher of the open file calls this: the app looks
+   * at the staging area of the app the same way it looks at the file.
+   */
+  checkProposal: () => Promise<void>;
+  /** Put the proposal that waits on the canvas. */
+  adoptProposal: () => Promise<void>;
+  /**
+   * Accept the proposal: the model in memory is written to the file the
+   * app has open, and the proposal becomes `accepted`.
+   */
+  acceptProposal: () => Promise<void>;
+  /**
+   * Discard the proposal: the model that was there comes back to the
+   * canvas, and the proposal becomes `rejected`, with the note.
+   */
+  discardProposal: (note: string) => Promise<void>;
   /** Take the notice of the last save away. */
   clearSavedMessage: () => void;
   /** Take the error message away. */
@@ -343,6 +401,26 @@ async function fingerprintOf(
   } catch {
     return undefined;
   }
+}
+
+/**
+ * The fields of the store that come from the state of the session.
+ *
+ * Every operation of the session answers with the state, and the state
+ * says the same thing every time: what the model compiles to, what the
+ * history can do and which proposal is on the canvas. The store takes
+ * them from here, so it does not forget one.
+ */
+function sessionFields(state: SessionState): Partial<AppState> {
+  return {
+    model: state.model,
+    diagnostics: state.diagnostics,
+    dirty: state.dirty,
+    canUndo: state.canUndo,
+    canRedo: state.canRedo,
+    proposal: state.proposal ?? null,
+    proposalOnCanvas: state.proposalOnCanvas ?? false,
+  };
 }
 
 /**
@@ -463,6 +541,10 @@ export const useApp = create<AppState>((set, get) => ({
   savedMessage: null,
   recentModels: [],
   fingerprint: undefined,
+  proposal: null,
+  proposalOnCanvas: false,
+  pendingProposal: null,
+  adoptedProposal: null,
 
   loadModels: async () => {
     // The list of the models of the repository: the development server's
@@ -501,12 +583,14 @@ export const useApp = create<AppState>((set, get) => ({
       const state = await engine().openModel(path);
       set({
         runId,
-        model: state.model,
-        diagnostics: state.diagnostics,
+        ...sessionFields(state),
         currentPath: state.path,
-        dirty: state.dirty,
-        canUndo: state.canUndo,
-        canRedo: state.canRedo,
+        // The session is new: there is no proposal on the table, and the
+        // one that waits in the staging area is looked for again.
+        proposal: null,
+        proposalOnCanvas: false,
+        pendingProposal: null,
+        adoptedProposal: null,
         report: null,
         trace: null,
         monitor: null,
@@ -552,12 +636,13 @@ export const useApp = create<AppState>((set, get) => ({
       const state = await engine().newModel();
       set({
         runId,
-        model: state.model,
-        diagnostics: state.diagnostics,
+        ...sessionFields(state),
         currentPath: state.path,
-        dirty: state.dirty,
-        canUndo: state.canUndo,
-        canRedo: state.canRedo,
+        // A new model is a new session: there is no proposal on the table.
+        proposal: null,
+        proposalOnCanvas: false,
+        pendingProposal: null,
+        adoptedProposal: null,
         report: null,
         trace: null,
         monitor: null,
@@ -589,11 +674,7 @@ export const useApp = create<AppState>((set, get) => ({
       const keepsRun = COSMETIC_COMMANDS.has(command.op);
       set({
         runId,
-        model: state.model,
-        diagnostics: state.diagnostics,
-        dirty: state.dirty,
-        canUndo: state.canUndo,
-        canRedo: state.canRedo,
+        ...sessionFields(state),
         history: [...get().history, command],
         redoStack: [],
         // The model moved: the run the monitor replays is not the model any
@@ -627,11 +708,7 @@ export const useApp = create<AppState>((set, get) => ({
       const undone = history[history.length - 1];
       set({
         runId,
-        model: state.model,
-        diagnostics: state.diagnostics,
-        dirty: state.dirty,
-        canUndo: state.canUndo,
-        canRedo: state.canRedo,
+        ...sessionFields(state),
         history: history.slice(0, -1),
         redoStack: undone === undefined ? get().redoStack : [...get().redoStack, undone],
         ...(undone !== undefined && COSMETIC_COMMANDS.has(undone.op)
@@ -659,11 +736,7 @@ export const useApp = create<AppState>((set, get) => ({
       const redone = redoStack[redoStack.length - 1];
       set({
         runId,
-        model: state.model,
-        diagnostics: state.diagnostics,
-        dirty: state.dirty,
-        canUndo: state.canUndo,
-        canRedo: state.canRedo,
+        ...sessionFields(state),
         history: redone === undefined ? get().history : [...get().history, redone],
         redoStack: redoStack.slice(0, -1),
         ...(redone !== undefined && COSMETIC_COMMANDS.has(redone.op)
@@ -694,11 +767,7 @@ export const useApp = create<AppState>((set, get) => ({
     try {
       const result = await engine().save(path);
       set({
-        model: result.state.model,
-        diagnostics: result.state.diagnostics,
-        dirty: result.state.dirty,
-        canUndo: result.state.canUndo,
-        canRedo: result.state.canRedo,
+        ...sessionFields(result.state),
         currentPath: result.state.path,
         pendingSave: null,
         savedMessage: `Se guardó ${result.path} (${result.bytes} bytes).`,
@@ -708,6 +777,9 @@ export const useApp = create<AppState>((set, get) => ({
       // just wrote, or the model the reader saved would be reloaded as if
       // somebody else had changed it.
       set({ fingerprint: await fingerprintOf(result.state.path) });
+      // The work of the person is on the disk: a proposal that was waiting
+      // for the save can go to the canvas now.
+      await get().checkProposal();
     } catch (error) {
       set({ error: `No se pudo guardar el modelo: ${messageOf(error)}` });
     }
@@ -720,6 +792,147 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   dismissSave: () => set({ pendingSave: null }),
+
+  /**
+   * Ask the app whether a proposal is waiting, and adopt it when it has
+   * to.
+   *
+   * The app looks at the staging area of the app the same way it looks at
+   * the file it has open: every half second, and without bothering the
+   * reader when there is nothing there.
+   *
+   * The decision is **state-driven**: a proposal that waits goes to the
+   * canvas when it is not on the canvas. The rule lives in a pure module,
+   * so it can be pinned by a test.
+   */
+  checkProposal: async () => {
+    if (get().currentPath === null) {
+      // No model is open: a proposal is about a model, so there is
+      // nothing to adopt.
+      return;
+    }
+    let pending: ProposalDocument | null;
+    try {
+      pending = await engine().pendingProposal();
+    } catch {
+      // The app does not know where its data lives, or the engine could
+      // not answer: there is no proposal to show, and a poll does not
+      // interrupt the reader.
+      return;
+    }
+    if (!samePending(get().pendingProposal, pending)) {
+      set({ pendingProposal: pending });
+    }
+    if (
+      !shouldAdopt({
+        pending,
+        onCanvas: get().proposalOnCanvas,
+        adopted: get().adoptedProposal,
+        dirty: get().dirty,
+      })
+    ) {
+      return;
+    }
+    await get().adoptProposal();
+  },
+
+  /**
+   * Put the proposal that waits on the canvas.
+   *
+   * The model of the proposal enters the session dirty and undoable: the
+   * file the app has open does not move. A session with changes that are
+   * not saved refuses the adoption, and the proposal waits for the save.
+   */
+  adoptProposal: async () => {
+    try {
+      const state = await engine().adoptProposal();
+      set({
+        ...sessionFields(state),
+        currentPath: state.path ?? get().currentPath,
+        // The app put this proposal on the canvas: it does not put it
+        // back behind the back of the reader when the adoption comes
+        // undone.
+        adoptedProposal: state.proposal?.id ?? get().adoptedProposal,
+        // The model that arrived is not the model the reader was
+        // watching: the run goes away with it.
+        report: null,
+        trace: null,
+        monitor: null,
+        transitions: null,
+        playhead: 0,
+        playing: false,
+        status: "ready",
+        error: null,
+      });
+    } catch (error) {
+      const message = messageOf(error);
+      if (waitsForSave(message)) {
+        // The work of the person is not stepped on: the proposal waits
+        // for the save, and the band of the proposal says so.
+        set({
+          error: null,
+          notice:
+            "Tenés cambios sin guardar: guardá el modelo para que la propuesta vuelva al lienzo.",
+        });
+        return;
+      }
+      set({ error: `No se pudo adoptar la propuesta: ${message}` });
+    }
+  },
+
+  /**
+   * Accept the proposal: the model in memory is written to the file the
+   * app has open, and the proposal becomes `accepted`.
+   */
+  acceptProposal: async () => {
+    try {
+      const result = await engine().acceptProposal();
+      set({
+        ...sessionFields(result.state),
+        currentPath: result.state.path ?? get().currentPath,
+        // The model reached the disk: there is no save waiting for an
+        // answer any more.
+        pendingSave: null,
+        savedMessage: `${verdictText("accepted", null)} Se guardó ${result.path} (${result.bytes} bytes).`,
+        error: null,
+        notice: null,
+      });
+      // The app wrote the file: the watcher has to remember the file it
+      // just wrote, or the model would be reloaded as if somebody else
+      // had changed it.
+      set({ fingerprint: await fingerprintOf(result.state.path) });
+    } catch (error) {
+      set({ error: `No se pudo aceptar la propuesta: ${messageOf(error)}` });
+    }
+  },
+
+  /**
+   * Discard the proposal: the model that was there comes back to the
+   * canvas, and the proposal becomes `rejected`, with the note the
+   * reader wrote.
+   */
+  discardProposal: async (note: string) => {
+    const text = noteForRejection(note);
+    try {
+      const state = await engine().discardProposal(text);
+      set({
+        ...sessionFields(state),
+        // The model that was there is on the canvas again: the run goes
+        // away with it.
+        report: null,
+        trace: null,
+        monitor: null,
+        transitions: null,
+        playhead: 0,
+        playing: false,
+        pendingSave: null,
+        notice: verdictText("rejected", text),
+        error: null,
+      });
+    } catch (error) {
+      set({ error: `No se pudo descartar la propuesta: ${messageOf(error)}` });
+    }
+  },
 
   clearSavedMessage: () => set({ savedMessage: null }),
 
@@ -739,6 +952,10 @@ export const useApp = create<AppState>((set, get) => ({
    * the fingerprint changes, the file changed, and the model is reloaded and
    * run again. The first look is right away, so the change that happens
    * after the model was opened is the one the app sees.
+   *
+   * The same tick looks at the staging area of the app: an agent that
+   * leaves a proposal has to be seen, and the app is the one that puts it
+   * on the canvas.
    */
   watchModel: (path: string) => {
     if (watchedPath !== path) {
@@ -751,10 +968,12 @@ export const useApp = create<AppState>((set, get) => ({
     }
     watchTimer = setInterval(() => {
       void get().checkModelFile();
+      void get().checkProposal();
     }, WATCH_INTERVAL_MS);
     // The timer of Node keeps the process alive: the watcher must not.
     (watchTimer as unknown as { unref?: () => void }).unref?.();
     void get().checkModelFile();
+    void get().checkProposal();
   },
 
   stopWatching: () => {
@@ -829,11 +1048,7 @@ export const useApp = create<AppState>((set, get) => ({
     try {
       const reloaded = await engine().reload(path);
       set({
-        model: reloaded.model,
-        diagnostics: reloaded.diagnostics,
-        dirty: reloaded.dirty,
-        canUndo: reloaded.canUndo,
-        canRedo: reloaded.canRedo,
+        ...sessionFields(reloaded),
         currentPath: reloaded.path ?? path,
         // The run that was on the screen is the run of the model that was
         // there: the run of the model that arrived replaces it.
@@ -1127,11 +1342,7 @@ export const useApp = create<AppState>((set, get) => ({
       // The model moved, but the program did not change: the run the reader
       // was watching stays.
       set({
-        model: state.model,
-        diagnostics: state.diagnostics,
-        dirty: state.dirty,
-        canUndo: state.canUndo,
-        canRedo: state.canRedo,
+        ...sessionFields(state),
         error: null,
         status: "ready",
       });

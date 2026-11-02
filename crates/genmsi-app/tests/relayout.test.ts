@@ -45,6 +45,8 @@ function sessionState(): SessionState {
     dirty: false,
     canUndo: true,
     canRedo: false,
+    proposal: null,
+    proposalOnCanvas: false,
   };
 }
 

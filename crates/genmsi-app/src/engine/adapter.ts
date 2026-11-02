@@ -3,6 +3,7 @@ import type {
   CatalogueDocument,
   LintDocument,
   ModelDocument,
+  ProposalDocument,
   ReportDocument,
   SessionState,
   TraceDocument,
@@ -132,6 +133,35 @@ export interface EngineAdapter {
   undo(): Promise<SessionState>;
   /** Redo the last undone operation. */
   redo(): Promise<SessionState>;
+  /**
+   * The proposal that waits for the person, or `null` when there is none.
+   *
+   * The answer of the engine that carries no document is not a failure:
+   * there is no proposal waiting, and there is nothing to decide.
+   */
+  pendingProposal(): Promise<ProposalDocument | null>;
+  /**
+   * Adopt the proposal that waits into the session.
+   *
+   * The model of the proposal enters the session dirty and undoable: the
+   * file the app has open does not move. A session with changes that are
+   * not saved refuses the adoption.
+   */
+  adoptProposal(): Promise<SessionState>;
+  /**
+   * Accept the proposal the session holds.
+   *
+   * The model in memory is written to the file the app has open —the
+   * normal save of the app— and the proposal becomes `accepted`.
+   */
+  acceptProposal(): Promise<SaveResult>;
+  /**
+   * Discard the proposal the session holds.
+   *
+   * The model that was there comes back to the canvas, and the proposal
+   * becomes `rejected`, with the note the person wrote.
+   */
+  discardProposal(note: string | null): Promise<SessionState>;
   /** Save the model, to its own path or to a new one. */
   save(path?: string): Promise<SaveResult>;
   /** The report of a run of the model in memory. */

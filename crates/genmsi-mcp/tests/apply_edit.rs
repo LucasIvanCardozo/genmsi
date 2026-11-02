@@ -759,6 +759,7 @@ fn app_state(model: &Path, dirty: bool) -> LiveBody {
         diagnostics: Vec::new(),
         model: None,
         run: None,
+        proposal: None,
     }
 }
 

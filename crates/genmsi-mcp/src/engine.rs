@@ -154,7 +154,7 @@ pub fn apply_edits(
     let name = source.name();
     // The model is parsed, but neither validated nor compiled: the commands
     // of the batch may be what makes it valid.
-    let model = match source {
+    let mut model = match source {
         ModelSource::File(path) => match genmsi_format::parse_file(path) {
             Ok(model) => model,
             // A model that is not on the disk yet is a model the batch
@@ -178,6 +178,17 @@ pub fn apply_edits(
         ModelSource::Inline(text) => genmsi_format::parse_str(text)
             .map_err(|error| ToolError::from_format(&error, Some(&name), None))?,
     };
+    // The canvas of the model that is there is the engine's business (D18):
+    // it is composed **before** the batch, so the blocks the batch adds land
+    // on a drawable canvas and the places the commands carry are the last
+    // word. Composing it after would rewrite the positions of every block —
+    // including the ones a command just placed — and `layout: "explicit"`
+    // would be a promise the file does not keep.
+    //
+    // A model that already carries its geometry keeps the disposition its
+    // author left: the composition is only for the models the editor could
+    // not draw.
+    genmsi_format::compose_incomplete(&mut model);
     let mut session = EditSession::new(model);
     let mut created: Vec<u32> = Vec::new();
     for (index, command) in commands.iter().enumerate() {
@@ -199,7 +210,10 @@ pub fn apply_edits(
                 // The failure is built before the rollback, so the position it
                 // carries is the one of the model that failed; the rollback
                 // leaves the session with the model it started with, so a
-                // half-applied batch can never travel anywhere.
+                // half-applied batch can never travel anywhere. The undo of
+                // a step the session pushed cannot fail, and the session is
+                // discarded right after: its error would say nothing the
+                // failure of the command does not already say.
                 for _ in 0..index {
                     let _ = session.undo();
                 }
@@ -207,11 +221,9 @@ pub fn apply_edits(
             }
         }
     }
-    let mut model = session.model().clone();
-    // The composition: the model is composed only when its geometry is
-    // incomplete, so a model its author placed keeps the disposition it was
-    // given (decision D18).
-    genmsi_format::compose_incomplete(&mut model);
+    let model = session.model().clone();
+    // The canvas was composed before the batch: the geometry of the model is
+    // complete, and the places the commands carried survived it.
     genmsi_format::validate(&model)
         .map_err(|error| ToolError::from_format(&error, Some(&name), Some(&model)))?;
     let program = genmsi_core::compile_model(&model)

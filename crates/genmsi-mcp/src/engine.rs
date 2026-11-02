@@ -155,13 +155,26 @@ pub fn apply_edits(
     // The model is parsed, but neither validated nor compiled: the commands
     // of the batch may be what makes it valid.
     let model = match source {
-        ModelSource::File(path) => genmsi_format::parse_file(path).map_err(|error| {
-            if error.is_missing_file() {
-                ToolError::not_found(name.clone())
-            } else {
-                ToolError::from_format(&error, Some(&name), None)
+        ModelSource::File(path) => match genmsi_format::parse_file(path) {
+            Ok(model) => model,
+            // A model that is not on the disk yet is a model the batch
+            // creates: it starts from the skeleton, the same one the
+            // catalogue publishes. `save_model` writes a path that is not
+            // there yet too; the verb creates it the same way, and the
+            // agent does not have to build the model in memory and write it
+            // somewhere else.
+            Err(error) if error.is_missing_file() => genmsi_format::parse_str(
+                genmsi_format::SKELETON_MODEL,
+            )
+            .map_err(|error| ToolError::from_format(&error, Some(&name), None))?,
+            Err(error) => {
+                return Err(Box::new(ToolError::from_format(
+                    &error,
+                    Some(&name),
+                    None,
+                )));
             }
-        })?,
+        },
         ModelSource::Inline(text) => genmsi_format::parse_str(text)
             .map_err(|error| ToolError::from_format(&error, Some(&name), None))?,
     };

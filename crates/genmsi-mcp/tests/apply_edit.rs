@@ -190,6 +190,60 @@ async fn a_batch_that_builds_a_model_writes_it() {
     assert_eq!(simulated["end_reason"], "terminated", "{simulated}");
 }
 
+/// A path that is not on the disk yet is a model the batch creates.
+///
+/// The agent does not have to build the model in memory and write it
+/// somewhere else: the verb starts from the skeleton the catalogue publishes
+/// and writes the file when the model compiles.
+#[tokio::test]
+async fn a_path_that_does_not_exist_is_a_model_the_batch_creates() {
+    let (client, _server) = pair().await;
+    let dir = TempDir::new("edit-new");
+    let path = dir.file("nuevo.gmdl");
+    assert!(!path.exists(), "the file is not there yet");
+
+    let edited = call(
+        &client,
+        "apply_edit",
+        json!({
+            "path": path.to_string_lossy(),
+            "commands": [
+                { "op": "addBlock", "class": "Generate", "container": 0, "x": 0, "y": 0 },
+                { "op": "addBlock", "class": "Terminate", "container": 0, "x": 0, "y": 0 },
+                { "op": "connect", "from": 1, "fromIoid": 1, "to": 2, "toIoid": 1 },
+                { "op": "setProperty", "id": 2, "property": "Unidades", "value": "1" }
+            ]
+        }),
+    )
+    .await;
+
+    assert_eq!(edited["schema"], "genmsi.edit/1", "{edited}");
+    assert_eq!(edited["written"], true, "{edited}");
+    assert_eq!(edited["applied"], 4, "{edited}");
+    // The model starts from the skeleton, whose only block is the root: the
+    // blocks the batch creates are numbered from one.
+    assert_eq!(edited["created"], json!([1, 2]), "{edited}");
+    assert_eq!(edited["status"], "ok", "{edited}");
+
+    assert!(path.exists(), "the model was created");
+    let written = std::fs::read_to_string(&path).expect("the model is readable");
+    let model = genmsi_format::parse_str(&written).expect("the model that was written parses");
+    let classes: Vec<&str> = model
+        .blocks
+        .iter()
+        .filter(|block| !block.is_root())
+        .map(|block| block.class.as_str())
+        .collect();
+    assert_eq!(classes, vec!["Generate", "Terminate"], "{written}");
+    assert_eq!(model.block(0).expect("the root").links.len(), 1, "{written}");
+
+    // The model that was created is a model the engine accepts.
+    let linted = call(&client, "lint", json!({ "path": path.to_string_lossy() })).await;
+    assert_eq!(linted["status"], "ok", "{linted}");
+    let simulated = call(&client, "simulate", json!({ "path": path.to_string_lossy() })).await;
+    assert_eq!(simulated["end_reason"], "terminated", "{simulated}");
+}
+
 /// A command that fails undoes the batch: nothing of it stays.
 ///
 /// The failure says which command failed, so the agent can correct it and

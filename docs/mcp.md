@@ -276,6 +276,16 @@ batch adds in the free spot of its container, the same place the desktop
 application gives a block that is dropped; `layout: "explicit"` uses the `x`
 and the `y` of the command.
 
+**The ids are predictable.** The blocks a batch creates take the next free
+ids, in the order of the commands: a model that starts from the skeleton
+numbers them 1, 2, 3... A command that refers to a block of the same batch
+(the `connect` that wires a block the batch just added) uses that number.
+
+**A `path` that is not on the disk yet is a model the batch creates.** It
+starts from the skeleton the catalogue publishes, and the file is written
+when the model compiles —the same rule `save_model` follows. An agent does
+not have to build the model in memory and write it somewhere else.
+
 Returns the `genmsi.edit/1` document:
 
 | Field | Type | Meaning |

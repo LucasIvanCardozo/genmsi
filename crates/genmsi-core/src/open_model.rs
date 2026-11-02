@@ -70,9 +70,9 @@ impl OpenModelDocument {
     }
 }
 
-/// The failure of publishing the file of the open model.
+/// The failure of publishing a file in the data directory of the app.
 #[derive(Debug, thiserror::Error)]
-pub enum OpenModelError {
+pub enum AppDataError {
     /// The file could not be written.
     #[error("cannot write {path}: {source}")]
     Write {
@@ -171,19 +171,19 @@ pub fn write_open_model(
     directory: &Path,
     path: Option<&Path>,
     pid: u32,
-) -> Result<(), OpenModelError> {
+) -> Result<(), AppDataError> {
     let file = directory.join(OPEN_MODEL_FILE);
     let Some(path) = path else {
         return remove_file(&file);
     };
     let document = OpenModelDocument::of(path, pid);
     let text = to_pretty_json(OPEN_MODEL_SCHEMA, &document);
-    std::fs::create_dir_all(directory).map_err(|source| OpenModelError::Write {
+    std::fs::create_dir_all(directory).map_err(|source| AppDataError::Write {
         path: directory.to_path_buf(),
         source,
     })?;
     let temporary = directory.join(format!("{OPEN_MODEL_FILE}.{pid}.tmp"));
-    std::fs::write(&temporary, text).map_err(|source| OpenModelError::Write {
+    std::fs::write(&temporary, text).map_err(|source| AppDataError::Write {
         path: temporary.clone(),
         source,
     })?;
@@ -191,7 +191,7 @@ pub fn write_open_model(
         // The temporary file is not left behind: the directory of the app
         // does not fill with the remains of a failed write.
         let _ = std::fs::remove_file(&temporary);
-        OpenModelError::Write {
+        AppDataError::Write {
             path: file.clone(),
             source,
         }
@@ -201,11 +201,11 @@ pub fn write_open_model(
 /// Remove the file that says which model the app has open.
 ///
 /// A file that is not there is not a failure: there is nothing to remove.
-fn remove_file(file: &Path) -> Result<(), OpenModelError> {
+fn remove_file(file: &Path) -> Result<(), AppDataError> {
     match std::fs::remove_file(file) {
         Ok(()) => Ok(()),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(source) => Err(OpenModelError::Write {
+        Err(source) => Err(AppDataError::Write {
             path: file.to_path_buf(),
             source,
         }),

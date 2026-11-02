@@ -400,6 +400,7 @@ impl Session {
                 start: run.start,
                 report: run.report.as_deref().and_then(report_value),
             }),
+            proposal: None,
         }
     }
 }
@@ -416,6 +417,7 @@ pub fn empty_live_body() -> LiveBody {
         diagnostics: Vec::new(),
         model: None,
         run: None,
+        proposal: None,
     }
 }
 

@@ -382,6 +382,25 @@ impl EditSession {
         }
     }
 
+    /// Take ownership of a model that is **not** the state of the disk.
+    ///
+    /// The session is dirty from the start: the model differs from the
+    /// checkpoint, so the person is looking at changes that are not saved.
+    /// It is how a model that arrives from outside — a proposal of an agent
+    /// — enters the session of the person.
+    ///
+    /// The stack starts empty: the model that arrives is the state of the
+    /// session, and undoing it is a step of the session that owns it.
+    pub fn adopted(model: GmdlModel, checkpoint: &GmdlModel) -> Self {
+        let checkpoint = crate::to_string(checkpoint);
+        Self {
+            model,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            checkpoint,
+        }
+    }
+
     /// The current model.
     pub fn model(&self) -> &GmdlModel {
         &self.model

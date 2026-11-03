@@ -308,28 +308,43 @@ pub async fn session(app: tauri::AppHandle, request: String) -> Result<String, S
     let request: SessionRequest =
         serde_json::from_str(&request).map_err(|error| error.to_string())?;
     log(&format!("session: {}", describe(&request)));
-    let changes = changes_the_open_model(&request);
-    let run = run_parameters(&request);
     // The proposals live in the data directory of the app: the shell
     // resolves it with the resolver of the platform, and the core
     // resolves the same one.
-    let directory = app.path().app_data_dir().ok();
-    let answered = answer_request(request, directory.clone()).await?;
+    let directory = match app.path().app_data_dir() {
+        Ok(directory) => Some(directory),
+        Err(error) => {
+            log(&format!("session: no hay directorio de datos: {error}"));
+            None
+        }
+    };
+    answer_and_publish(request, directory).await
+}
+
+/// Answer one request of the protocol and publish the state of the app.
+///
+/// The live state is published **whatever the answer is**: the document
+/// is the only publication of the state of the app, and it has to say what
+/// the app is showing after every request —also after the ones that end
+/// in an error, like a run the reader stopped.
+async fn answer_and_publish(
+    request: SessionRequest,
+    directory: Option<PathBuf>,
+) -> Result<String, String> {
+    let run = run_parameters(&request);
+    let answered = answer_request(request, directory.clone()).await;
     // The run happened off the thread of the window: the session keeps its
     // documents, so the live state can say what the reader is seeing.
-    if let Some(run) = run {
-        remember_run(&run, &answered);
+    if let (Some(run), Ok(answer)) = (run, &answered) {
+        remember_run(&run, answer);
     }
-    match app.path().app_data_dir() {
-        Ok(directory) => {
-            if changes {
-                publish_open_model(&directory, &answered);
-            }
-            publish_live(&directory);
-        }
-        Err(error) => log(&format!("session: no hay directorio de datos: {error}")),
+    // The live document carries the model the app has open: it is
+    // published after every request, so an agent that asks always finds
+    // the model the app really has open.
+    if let Some(directory) = directory {
+        publish_live(&directory);
     }
-    Ok(answered)
+    answered
 }
 
 /// The parameters of the run a request asks for.
@@ -441,70 +456,17 @@ fn describe(request: &SessionRequest) -> String {
     }
 }
 
-/// Whether the request changes the model the app has open.
-///
-/// Only the requests that open, reload, create or save a model change it:
-/// the others leave the session as it was, and the file the app publishes
-/// is not touched. Accepting a proposal writes the file the app has open,
-/// so it changes it too.
-fn changes_the_open_model(request: &SessionRequest) -> bool {
-    matches!(
-        request,
-        SessionRequest::Open { .. }
-            | SessionRequest::New
-            | SessionRequest::Reload { .. }
-            | SessionRequest::Save { .. }
-            | SessionRequest::AcceptProposal
-    )
-}
-
-/// Publish the model the app has open, so an agent can find it.
-///
-/// The file lives in the app's data directory, beside the recents: it says
-/// which file the app has open and which process has it open. An agent that
-/// writes the model there is seen by the app, which watches the file it has
-/// open.
-///
-/// The path comes from the answer of the session: it is the model the
-/// session has after the request. A request that failed leaves the session
-/// as it was, and the file is not touched.
-///
-/// A model that is not open is not published: the file goes away, so nobody
-/// reads it and believes there is a model open.
-fn publish_open_model(directory: &Path, answer: &str) {
-    let Ok(answer) = serde_json::from_str::<serde_json::Value>(answer) else {
-        log("publish_open_model: la respuesta no se pudo leer");
-        return;
-    };
-    if answer.get("ok").and_then(serde_json::Value::as_bool) != Some(true) {
-        // The request failed: the session is as it was, and so is the file.
-        return;
-    }
-    let path = answer
-        .get("state")
-        .and_then(|state| state.get("path"))
-        .and_then(serde_json::Value::as_str);
-    // The core owns the format: the shell and the MCP server go through
-    // the same writer, so the bytes they read and write are the same.
-    let path = path.map(|path| {
-        std::path::absolute(path).unwrap_or_else(|_| PathBuf::from(path))
-    });
-    match genmsi_app_engine::write_open_model(directory, path.as_deref(), std::process::id()) {
-        Ok(()) => match &path {
-            Some(path) => log(&format!("publish_open_model: {}", path.display())),
-            None => log("publish_open_model: no hay modelo abierto"),
-        },
-        Err(error) => log(&format!("publish_open_model: {error}")),
-    }
-}
-
 /// Publish the live state of the app, so an agent can see what the reader
 /// sees.
 ///
-/// The file lives in the app's data directory, beside the one that says
-/// which model is open: it says which model the app has open, whether the
-/// reader has changes that are not saved, what the app found in the model
-/// and the last run it made.
+/// The file lives in the app's data directory, beside the recents: it says
+/// which model the app has open, whether the reader has changes that are
+/// not saved, what the app found in the model and the last run it made.
+///
+/// **It is the only document the app publishes about itself.** The model
+/// the app has open travels in it, with the pid of the process that has
+/// it: an agent reads the model the app has open there, and the `dirty`
+/// and the `path` cannot disagree, because they are in the same file.
 ///
 /// The core owns the document: the shell writes it with the writer of the
 /// core and the MCP server reads it with the reader of the core, so the
@@ -561,14 +523,10 @@ fn remember_published_live(directory: &Path, text: String) {
     }
 }
 
-/// Write the file that says which model the app has open.
+/// Forget the state the app published, when the app is closing.
 ///
-/// The write is atomic: the text goes to a temporary file next to the target
-/// and that file is renamed over it, so a reader never sees half of one.
-/// Forget the model the app has open, when the app is closing.
-///
-/// The app is not there any more: the file that says it has a model open
-/// goes away, so nobody reads it and believes there is one.
+/// The app is not there any more: the file that says what it was showing
+/// goes away, so nobody reads it and believes that the app is running.
 pub fn forget_open_model(app: &tauri::AppHandle) {
     let Some(directory) = app.path().app_data_dir().ok() else {
         return;
@@ -578,14 +536,12 @@ pub fn forget_open_model(app: &tauri::AppHandle) {
 
 /// Forget what the app published in a directory.
 ///
-/// The file that says which model is open and the file that says what the
-/// app is showing go away with the app: nobody reads them and believes
-/// there is a model open or that the app is running.
+/// The file that says what the app was showing goes away with the app:
+/// nobody reads it and believes that the app is running.
+///
+/// There is no other file: the app publishes one document about itself,
+/// and that one goes away with it.
 pub fn forget_open_model_in(directory: &Path) {
-    if let Err(error) = genmsi_app_engine::write_open_model(directory, None, std::process::id())
-    {
-        log(&format!("forget_open_model: {error}"));
-    }
     if let Err(error) = std::fs::remove_file(directory.join(LIVE_FILE)) {
         // A file that is not there is not a failure: there is nothing to
         // remove.
@@ -996,20 +952,36 @@ mod tests {
         assert!(!app_version().is_empty(), "the version is empty");
     }
 
-    /// The file the app publishes: the model it has open.
+    /// The file the app publishes: the live one, with the model it has
+    /// open in it.
+    ///
+    /// The app publishes **one** document about itself: `live.json`, with
+    /// the `genmsi.live/1` document. The bytes are the ones the core of
+    /// the engine writes, because the core owns the format: the MCP server
+    /// reads them with the reader of the core.
     #[test]
     fn the_file_the_app_publishes_says_which_model_it_has_open() {
-        let dir = scratch("open-model");
+        let dir = scratch("live-open-model");
         let model = dir.join("modelo.gmdl");
-        genmsi_app_engine::write_open_model(&dir, Some(&model), std::process::id())
-            .expect("the file is written");
+        let body = LiveBody {
+            path: Some(model.display().to_string()),
+            pid: Some(std::process::id()),
+            dirty: false,
+            diagnostics: Vec::new(),
+            model: None,
+            run: None,
+            proposal: None,
+        };
+        genmsi_app_engine::write_live(&dir, &body).expect("the file is written");
 
-        let file = dir.join(genmsi_app_engine::OPEN_MODEL_FILE);
+        let file = dir.join(LIVE_FILE);
         let text = std::fs::read_to_string(&file).expect("the file is there");
         // The bytes are the ones the core of the engine writes for the
-        // `genmsi.openmodel/1` document: the MCP server reads them.
+        // `genmsi.live/1` document: the MCP server reads them.
         let expected = format!(
-            "{{\n  \"schema\": \"genmsi.openmodel/1\",\n  \"path\": \"{}\",\n  \"pid\": {}\n}}",
+            "{{\n  \"schema\": \"genmsi.live/1\",\n  \"path\": \"{}\",\n  \"pid\": {},\n  \
+             \"dirty\": false,\n  \"diagnostics\": [],\n  \"model\": null,\n  \
+             \"run\": null,\n  \"proposal\": null\n}}",
             model.display(),
             std::process::id()
         );
@@ -1026,24 +998,27 @@ mod tests {
     }
 
     /// A model that is not open is not published.
+    ///
+    /// The live document says so: the `path` is empty and the `pid` is
+    /// there, so an agent can tell an app with no model open from an app
+    /// that is not running.
     #[test]
-    fn a_model_that_is_not_open_removes_the_file() {
-        let dir = scratch("open-model-closed");
-        let model = dir.join("modelo.gmdl");
-        genmsi_app_engine::write_open_model(&dir, Some(&model), std::process::id())
-            .expect("the file is written");
-        assert!(
-            dir.join(genmsi_app_engine::OPEN_MODEL_FILE).is_file(),
-            "the file is there"
-        );
+    fn a_model_that_is_not_open_is_not_published() {
+        let dir = scratch("live-no-model");
+        let body = LiveBody {
+            path: None,
+            pid: Some(std::process::id()),
+            dirty: false,
+            diagnostics: Vec::new(),
+            model: None,
+            run: None,
+            proposal: None,
+        };
+        genmsi_app_engine::write_live(&dir, &body).expect("the file is written");
 
-        genmsi_app_engine::write_open_model(&dir, None, std::process::id()).expect("the file is removed");
-        assert!(
-            !dir.join(genmsi_app_engine::OPEN_MODEL_FILE).exists(),
-            "the file is still there"
-        );
-        // A file that is not there is not a failure.
-        genmsi_app_engine::write_open_model(&dir, None, std::process::id()).expect("there is nothing to remove");
+        let document = published(&dir);
+        assert!(document["path"].is_null(), "the model is published: {document}");
+        assert_eq!(document["pid"], std::process::id());
 
         std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
     }
@@ -1181,9 +1156,248 @@ mod tests {
             !dir.join(LIVE_FILE).exists(),
             "the file of the live state is still there"
         );
+
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
+    }
+
+    /// The app publishes **one** document about itself, and it is the live
+    /// one.
+    ///
+    /// The document of the open model is gone: the app does not write it,
+    /// and the file it used to write is not in the directory of the app
+    /// any more. The live document says which model the app has open and
+    /// which process has it: that is what an agent reads.
+    #[test]
+    fn the_app_publishes_one_document_and_it_names_the_model_it_has_open() {
+        let _globals = globals();
+        let dir = scratch("one-document");
+        let models = scratch("one-document-model");
+        let model = open_model(&models);
+
+        let answered = tauri::async_runtime::block_on(answer_and_publish(
+            SessionRequest::Open {
+                path: model.display().to_string(),
+            },
+            Some(dir.clone()),
+        ))
+        .expect("the shell answers");
+        assert_eq!(answer_of(&answered)["ok"], true, "{answered}");
+
+        // The live document is there, and it names the model the app has
+        // open and the process that has it.
+        let document = published(&dir);
+        assert_eq!(document["schema"], "genmsi.live/1");
+        assert_eq!(document["pid"], std::process::id());
+        let published_path = document["path"].as_str().expect("the path is a string");
+        assert_eq!(
+            std::fs::canonicalize(published_path).expect("the model is there"),
+            std::fs::canonicalize(&model).expect("the model is there"),
+            "the live state does not name the model that is open: {document}"
+        );
+
+        // The document of the open model is not published: the app
+        // publishes one document and not two.
         assert!(
-            !dir.join(genmsi_app_engine::OPEN_MODEL_FILE).exists(),
+            !dir.join("open-model.json").exists(),
             "the file of the open model is still there"
+        );
+        // And the directory of the app holds nothing but the live
+        // document: the write is atomic and leaves no temporary file
+        // behind.
+        let files: Vec<String> = std::fs::read_dir(&dir)
+            .expect("the directory is readable")
+            .filter_map(|entry| entry.ok().map(|entry| entry.file_name().display().to_string()))
+            .collect();
+        assert_eq!(
+            files,
+            vec![LIVE_FILE.to_string()],
+            "the app published more than one document: {files:?}"
+        );
+
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
+        std::fs::remove_dir_all(&models).expect("the scratch directory is removed");
+    }
+
+    /// The live state is published when the open model changes.
+    ///
+    /// The model the app has open travels in the live document, and the
+    /// document is published again when that model changes: an agent that
+    /// asks finds the model the app really has open.
+    #[test]
+    fn the_live_state_is_published_when_the_open_model_changes() {
+        let _globals = globals();
+        let dir = scratch("open-model-changes");
+        let models = scratch("open-model-changes-models");
+        let first = open_model(&models);
+        let second = models.join("otro.gmdl");
+        std::fs::copy(reference(), &second).expect("the model is copied");
+
+        // The app opens a model: the live state names it.
+        let answered = tauri::async_runtime::block_on(answer_and_publish(
+            SessionRequest::Open {
+                path: first.display().to_string(),
+            },
+            Some(dir.clone()),
+        ))
+        .expect("the shell answers");
+        assert_eq!(answer_of(&answered)["ok"], true, "{answered}");
+        let document = published(&dir);
+        assert_eq!(
+            std::fs::canonicalize(document["path"].as_str().expect("the path is a string"))
+                .expect("the model is there"),
+            std::fs::canonicalize(&first).expect("the model is there"),
+            "the live state does not name the model that is open: {document}"
+        );
+
+        // The app opens another model: the live state names that one.
+        let answered = tauri::async_runtime::block_on(answer_and_publish(
+            SessionRequest::Open {
+                path: second.display().to_string(),
+            },
+            Some(dir.clone()),
+        ))
+        .expect("the shell answers");
+        assert_eq!(answer_of(&answered)["ok"], true, "{answered}");
+        let document = published(&dir);
+        assert_eq!(
+            std::fs::canonicalize(document["path"].as_str().expect("the path is a string"))
+                .expect("the model is there"),
+            std::fs::canonicalize(&second).expect("the model is there"),
+            "the live state does not name the model that is open: {document}"
+        );
+
+        // The app starts a new, empty model: there is no model open, and
+        // the live state says so.
+        let answered = tauri::async_runtime::block_on(answer_and_publish(
+            SessionRequest::New,
+            Some(dir.clone()),
+        ))
+        .expect("the shell answers");
+        assert_eq!(answer_of(&answered)["ok"], true, "{answered}");
+        let document = published(&dir);
+        assert!(
+            document["path"].is_null(),
+            "the model is still published: {document}"
+        );
+        // The app is running: the pid says so.
+        assert_eq!(document["pid"], std::process::id());
+
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
+        std::fs::remove_dir_all(&models).expect("the scratch directory is removed");
+    }
+
+    /// The live state is published even when the request ends in an error.
+    ///
+    /// The reader can stop a run: the request answers with the reason of
+    /// the stop, and the live document is published all the same. The
+    /// document is the only publication of the state of the app: it has to
+    /// say what the app is showing after every request, and not only after
+    /// the ones that went well.
+    #[test]
+    fn the_live_state_is_published_even_when_the_request_ends_in_an_error() {
+        let _globals = globals();
+        let dir = scratch("stopped-run");
+        let (models, path) = busy_model("stopped-run-model");
+        {
+            let mut guard = SESSION.lock().expect("the session is free");
+            *guard = Some(
+                Session::open(&path, &path.display().to_string()).expect("the model opens"),
+            );
+        }
+
+        // The reader stops the run: the answer is the reason of the stop.
+        let stopper = thread::spawn(move || loop {
+            if cancel_run().unwrap_or(false) {
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        });
+        let answered = tauri::async_runtime::block_on(answer_and_publish(
+            SessionRequest::RunCurrent {
+                seed: Some(1),
+                until: None,
+                limit: Some(10),
+                start: None,
+            },
+            Some(dir.clone()),
+        ))
+        .expect_err("the run was stopped");
+        stopper.join().expect("the reader finishes");
+        assert_eq!(answered, STOPPED_MESSAGE);
+
+        // The live state is published all the same: the document says which
+        // model the app has open.
+        let document = published(&dir);
+        assert_eq!(document["pid"], std::process::id());
+        assert_eq!(
+            std::fs::canonicalize(document["path"].as_str().expect("the path is a string"))
+                .expect("the model is there"),
+            std::fs::canonicalize(&path).expect("the model is there"),
+            "the live state does not name the model that is open: {document}"
+        );
+
+        std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");
+        std::fs::remove_dir_all(&models).expect("the scratch directory is removed");
+    }
+
+    /// The live state is published even when the request fails.
+    ///
+    /// A request can change the model and fail afterwards: a proposal that
+    /// was accepted and whose verdict could not be written, for instance.
+    /// The live document is the only publication of the state of the app,
+    /// so it has to say what the app is really showing: otherwise the
+    /// `dirty` of the document and the file on the disk would disagree, and
+    /// the agent would brake for nothing.
+    #[test]
+    fn the_live_state_is_published_even_when_the_request_fails() {
+        let _globals = globals();
+        let dir = scratch("failed-request");
+        let open = open_model(&dir);
+        proposal(&dir, &open, "1700000000000-ab");
+        {
+            let mut guard = SESSION.lock().expect("the session is free");
+            *guard = Some(
+                Session::open(&open, &open.display().to_string()).expect("the model opens"),
+            );
+        }
+
+        // The proposal is adopted: the session is dirty and the file the
+        // app has open does not move.
+        let answered = tauri::async_runtime::block_on(answer_and_publish(
+            SessionRequest::AdoptProposal,
+            Some(dir.clone()),
+        ))
+        .expect("the shell answers");
+        assert_eq!(answer_of(&answered)["ok"], true, "{answered}");
+        let document = published(&dir);
+        assert_eq!(document["dirty"], true, "{document}");
+
+        // The proposal that waits is gone: the agent took it away. The
+        // person accepts it, the model reaches the disk and the verdict
+        // cannot be written: the request fails.
+        std::fs::remove_file(
+            dir.join("staging")
+                .join("1700000000000-ab.json"),
+        )
+        .expect("the proposal is there");
+        let answered = tauri::async_runtime::block_on(answer_and_publish(
+            SessionRequest::AcceptProposal,
+            Some(dir.clone()),
+        ))
+        .expect("the shell answers");
+        assert_eq!(answer_of(&answered)["ok"], false, "{answered}");
+
+        // The model reached the disk: the live state says so, even though
+        // the request failed.
+        let written = std::fs::read_to_string(&open).expect("the file is there");
+        assert!(
+            written.contains("Modelo propuesto"),
+            "the file does not hold the model of the proposal: {written}"
+        );
+        let document = published(&dir);
+        assert_eq!(
+            document["dirty"], false,
+            "the live state does not say that the model was saved: {document}"
         );
 
         std::fs::remove_dir_all(&dir).expect("the scratch directory is removed");

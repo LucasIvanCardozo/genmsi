@@ -110,29 +110,29 @@ through the MCP's `save_model` (which writes it atomically, so a reader that
 watches the file never sees half of one), and the app, which is watching,
 picks it up by itself.
 
-### The app publishes the model it has open
+### The app publishes one document about itself
 
 For the cycle to close, the agent has to know **which file** the app has
-open. The app says it, in a file of its own data directory: `open-model.json`,
-beside `recent-models.json`. The file carries the `genmsi.openmodel/1`
-document:
+open. The app says it — and everything else it is doing — in **one** file of
+its own data directory: `live.json`, beside `recent-models.json`. The file
+carries the `genmsi.live/1` document, whose `path` is the **absolute path**
+of the file the app has open and whose `pid` is the process that has it.
 
-| Field | Meaning |
-|---|---|
-| `path` | The **absolute path** of the file the app has open. |
-| `pid` | The pid of the process that has it open. |
+There used to be a second file (`open-model.json`, the `genmsi.openmodel/1`
+document) with the same two facts, and the agent read the path from one and
+the `dirty` from the other: two truths that could not disagree, but that
+could — and the measurement with a cold agent showed exactly that. One
+document now, and the facts travel together.
 
-The app writes the file when it opens a model, replaces it when the session
-reloads or saves another file, and **removes it** when the session starts a
-new model (a model that is not open is not published) and when the app
-closes. The write is atomic, like every other write of the app: a reader
+The app writes the file when its state changes, and **removes it** when the
+app closes. The write is atomic, like every other write of the app: a reader
 never sees half of a document.
 
-The MCP server reads that file and publishes it as the `open_model` tool, so
-an agent asks the server instead of guessing where the app writes or asking
-the reader which file is open. When the app is not running, the file is not
-there (or the process it names is gone), and the tool answers with the same
-document with `path` and `pid` empty: that is an answer, not a failure.
+The MCP server reads that file: the tools that take a model and are given
+neither a path nor a document work on the model the app has open, and the
+`app_state` tool publishes the whole document. When the app is not running,
+the file is not there (or the process it names is gone), and the tools say
+so: that is an answer, not a failure.
 
 The directory is the one the shell of the app resolves with Tauri, and the
 one the engine's core computes for the platform:
@@ -150,7 +150,7 @@ while the reader has changes that are not saved produces work that never
 reaches the canvas (the app does not reload a model that changes under it
 while the reader is editing) and that the reader's save overwrites. So the
 app publishes what it is showing, in a file of its own data directory:
-`live.json`, beside `open-model.json` and `recent-models.json`. The file
+`live.json`, beside `recent-models.json`. The file
 carries the `genmsi.live/1` document:
 
 | Field | Meaning |
@@ -167,7 +167,7 @@ The document is built by the **core** (`genmsi-core`: the engine publishes,
 the app invents nothing) and the write is atomic, like every other write of
 the app. The app writes it **when its state changes** and not on every tick:
 a document that did not change is not written again. When the app closes, the
-file is removed, like `open-model.json`.
+file is removed, like every other publication of the app.
 
 The MCP server reads that file and publishes it as the `app_state` tool, and
 it **refuses** to write on a model the app has open with unsaved changes

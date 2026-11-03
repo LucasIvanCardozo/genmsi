@@ -8,7 +8,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use genmsi_format::{Block, GmdlModel};
+use genmsi_format::{Block, GmdlModel, SourcePos};
 
 use self::borders::Borders;
 use crate::error::EngineError;
@@ -780,6 +780,12 @@ pub enum BlockKind {
 pub struct ExecBlock {
     /// `moduleid` of the module this statement came from.
     pub module_id: u32,
+    /// Position of the module in the source file, when it was read from one.
+    ///
+    /// The position stops in the layer of the format until the compiler
+    /// copies it here: the documents that point at a place of the `.gmdl`
+    /// read it from the statement.
+    pub source: Option<SourcePos>,
     /// Block class name.
     pub class: String,
     /// Module name.
@@ -1172,6 +1178,7 @@ impl Compiler<'_> {
                 let index = blocks.len();
                 blocks.push(ExecBlock {
                     module_id: node,
+                    source: module.source,
                     class: $class.to_string(),
                     name: module.name.clone(),
                     label: $label,
@@ -1350,6 +1357,7 @@ impl Compiler<'_> {
                     ));
                     blocks.push(ExecBlock {
                         module_id: node,
+                        source: module.source,
                         class: "Seize".into(),
                         name: module.name.clone(),
                         label: None,
@@ -1362,6 +1370,7 @@ impl Compiler<'_> {
                     });
                     blocks.push(ExecBlock {
                         module_id: node,
+                        source: module.source,
                         class: "Depart".into(),
                         name: module.name.clone(),
                         label: None,
@@ -1384,6 +1393,7 @@ impl Compiler<'_> {
                 }
                 blocks.push(ExecBlock {
                     module_id: node,
+                    source: module.source,
                     class: "Advance".into(),
                     name: module.name.clone(),
                     label: None,
@@ -1394,6 +1404,7 @@ impl Compiler<'_> {
                 });
                 blocks.push(ExecBlock {
                     module_id: node,
+                    source: module.source,
                     class: "Release".into(),
                     name: module.name.clone(),
                     label: None,
@@ -1480,6 +1491,7 @@ impl Compiler<'_> {
                     ));
                     blocks.push(ExecBlock {
                         module_id: node,
+                        source: module.source,
                         class: "Preempt".into(),
                         name: module.name.clone(),
                         label: None,
@@ -1496,6 +1508,7 @@ impl Compiler<'_> {
                     });
                     blocks.push(ExecBlock {
                         module_id: node,
+                        source: module.source,
                         class: "Depart".into(),
                         name: module.name.clone(),
                         label: None,
@@ -1522,6 +1535,7 @@ impl Compiler<'_> {
                 }
                 blocks.push(ExecBlock {
                     module_id: node,
+                    source: module.source,
                     class: "Advance".into(),
                     name: module.name.clone(),
                     label: None,
@@ -1532,6 +1546,7 @@ impl Compiler<'_> {
                 });
                 blocks.push(ExecBlock {
                     module_id: node,
+                    source: module.source,
                     class: "Return".into(),
                     name: module.name.clone(),
                     label: None,
@@ -1564,6 +1579,7 @@ impl Compiler<'_> {
                     ));
                     blocks.push(ExecBlock {
                         module_id: node,
+                        source: module.source,
                         class: "Enter".into(),
                         name: module.name.clone(),
                         label: None,
@@ -1577,6 +1593,7 @@ impl Compiler<'_> {
                     });
                     blocks.push(ExecBlock {
                         module_id: node,
+                        source: module.source,
                         class: "Depart".into(),
                         name: module.name.clone(),
                         label: None,
@@ -1600,6 +1617,7 @@ impl Compiler<'_> {
                 }
                 blocks.push(ExecBlock {
                     module_id: node,
+                    source: module.source,
                     class: "Advance".into(),
                     name: module.name.clone(),
                     label: None,
@@ -1610,6 +1628,7 @@ impl Compiler<'_> {
                 });
                 blocks.push(ExecBlock {
                     module_id: node,
+                    source: module.source,
                     class: "Leave".into(),
                     name: module.name.clone(),
                     label: None,

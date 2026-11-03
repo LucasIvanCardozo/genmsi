@@ -1588,10 +1588,17 @@ pub fn program_json(program: &Program) -> serde_json::Value {
         // the default of the run, the one the original's panel shows. It
         // stays a float, so this document does not change.
         "start_counter": crate::sim::DEFAULT_START as f64,
-        "blocks": program.blocks.iter().map(|block| json!({
+        "blocks": program.blocks.iter().enumerate().map(|(index, block)| json!({
+            // The index of the statement in the program: the trace numbers
+            // its events with it, so the two documents speak of the same
+            // statement.
+            "index": index,
             "node": block.module_id,
             "class": block.class,
             "label": block.label,
+            // The position of the module in the `.gmdl`, when it has one.
+            "line": block.source.map(|position| position.line),
+            "column": block.source.map(|position| position.column),
             "operands": operands(block, program),
             "ports": block.port_names,
         })).collect::<Vec<_>>(),

@@ -227,8 +227,12 @@ impl Queue {
     ///
     /// A transaction that did not wait adds nothing to the integral, so the
     /// integral of the entries that waited is the whole one.
+    ///
+    /// The subtraction is saturated: a departure of a queue the transaction
+    /// never entered counts a zero wait without an entry to subtract it
+    /// from, and the count of the entries that waited cannot go below zero.
     pub fn average_time_nonzero(&self) -> f64 {
-        let nonzero = self.entries - self.zero_entries;
+        let nonzero = self.entries.saturating_sub(self.zero_entries);
         if nonzero == 0 {
             0.0
         } else {

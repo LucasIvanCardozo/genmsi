@@ -18,7 +18,7 @@ It is the only sanctioned place to learn the format: the catalogue holds the fac
 4. **`lint({ path })`** — the model as it is now on disk. It loads, validates and compiles the model and reports what it found. A model that does not compile is a tool error, not an empty report. The lint also names the **property a block carries that its class does not declare** (`Tamano` for `Tamaño`, with the name it probably meant): a typo is silent in the engine, so the lint is where it shows up — as a finding of a model that compiles, because a missing *operand* is a refusal and never reaches the findings.
 5. **`explain_model({ path })`** — the model as the document writes it: every block with its class, its properties **by name** and its ports, and the `edges` that wire the blocks. It is the cheapest way to see that the model is the model you meant. (It compiles the model first, so read it after `lint`.)
 6. **`simulate({ path, seed })`** — the GPSS report. Read its `blocks` (the statements the model compiles to, with their counts) and its `entities` (the queues, facilities and storages it used).
-7. **`open_model()`** — the file the desktop app has open (`path` and `pid`; both null when the app is not running). **`app_state()`** — what the reader is seeing right now (see *The person reading* below): whether that file has changes that are not saved, and the **proposal** on the table, if you left one.
+7. **`app_state()`** — what the reader is seeing right now (see *The person reading* below): the model the app has open, whether that file has changes that are not saved, and the **proposal** on the table, if you left one.
 8. **`save_model({ path, model })`** — only for a document you wrote by hand: it takes the **whole** document as text. To change a model that is already on disk, use `apply_edit` on its `path`, not `save_model`.
 
 The order matters: `lint` before `simulate` (a model that does not compile is a tool error, not an empty report), and `simulate` before you are done (never keep a model you have not run).
@@ -86,15 +86,24 @@ and name neither a file nor a document, they work on **the model the app has
 open** — the one the reader is looking at. That is what you mean, unless you
 say otherwise. With no app running, or with no model open, the tools that
 take a model answer `no_open_model` and tell you to name a file: there is no
-destination to guess. (`open_model` and `app_state` never fail: they answer
-with their document and `path: null` when there is no app — a `null` path is
-what "nobody has a model open" looks like.)
+destination to guess. (`app_state` never fails: it answers with its document
+and `path: null` when there is no app — a `null` path is what "nobody has a
+model open" looks like.)
 
 **`app_state()`** says what the reader is seeing right now: the model the
 application has open, whether they have changes that are **not saved**, what
 it found in the model, the last run it made (the report and the seed it ran
 with), and **the proposal on the table**. Without the application running it
 answers with `path: null`.
+
+The tools do not need a path: when you ask for a model and name neither a
+file nor a document, they work on **the model the app has open** — the one
+the reader is looking at. That is what you mean, unless you say otherwise.
+With no app running, or with no model open, the tools that take a model
+answer `no_open_model` and tell you to name a file: there is no destination
+to guess. (`app_state` never fails: it answers with its document and
+`path: null` when there is no app — a `null` path is what "nobody has a
+model open" looks like.)
 
 **Look before you write.** If the model you are about to change is the one
 the application has open, ask `app_state()` first:
@@ -296,7 +305,7 @@ Do not mix the two percentage forms: in an expression `70%` is 700, but in `Tran
 - **A `Clock` has no output port**, so it cannot send a transaction anywhere: it is the horizon of the run, not an event. An event at a given time is a `Generate` with an `OffSet`, or a `Logic` that a `GateL` waits for.
 - **A `Terminate` with `Unidades=0` removes the transaction and never ends the run**; with a number it takes that many units from the counter of the run for every transaction that arrives (the run ends when the counter reaches zero).
 - **A `Table` tabulates an expression.** Its `Atributo` is evaluated at the `Tabulate` block, not when the table is declared: `Atributo="AC1-P:HoraLlegada"` records the time each transaction waited.
-- **A generator does not arrive at time 0**: the first transaction arrives one interval later — unless `OffSet` shifts it, and then the first arrival is *at* the offset (`OffSet=120` arrives at time 120, not at 130). A numeric `Modificador` is a symmetric spread, `uniform(Media-Modificador, Media+Modificador)`; `Modificador=0` means exactly `Media`; a **function** as the modifier multiplies the mean (`Media * f(u)`), the idiom for an exponential service.
+- **A generator does not arrive at time 0**: the first transaction arrives one interval later — unless `OffSet` shifts it, and then the first arrival is *at* the offset (`OffSet=120` arrives at time 120, not at 130). A numeric `Modificador` is a symmetric spread, `uniform(Media-Modificador, Media+Modificador)`; `Modificador=0` means exactly `Media`; a **function** as the modifier multiplies the mean (`Media * f(u)`), the idiom for an exponential service. **With a spread, the first interval is drawn too**, like the ones that follow: the original does that and so does the engine (`crates/genmsi-core/tests/primera_llegada.rs` pins the three cases).
 - **`FacilityUse` is five statements**: queue, seize, depart, advance, release. The transaction waits in the `Queue` while the facility is busy.
 - **`Queue` joins, it does not dequeue**: the transaction enters the queue and goes on its way; it stays in the queue until a `Depart` takes it out. A queue whose model has no `Depart` never empties, and the report says so (`content` grows, `zero_entries` stays at zero).
 - **`Match` is a rendezvous**: the transaction waits at the block (the trace shows a `backup` event) for the transaction that carries the conjugate label; the pair then continues together — **both** of them, so **both** keep whatever they had taken. A rendezvous is not a handover of one item to the other.
@@ -304,7 +313,7 @@ Do not mix the two percentage forms: in an expression `70%` is 700, but in `Tran
 - **A storage needs its capacity**: `StorageDef` declares it. `Enter` takes units and keeps them until a `Leave` gives them back; a transaction that does not fit **waits at the `Enter`**, and a `Leave` never waits. `StorageUse` is the pair in one block: it joins the queue, takes the units, leaves the queue, waits the `Media` and gives the units back. The unit is **held, not consumed**, so a storage of capacity N admits N transactions at a time and the next one waits.
 - **The gate blocks** (`GateF`, `GateL`, `GateS`, `GateM`): the pass goes to `Salida1`; when `Salida2` is not connected, the transaction waits in the block and every change of the state retries the waiters.
 - **`Split` creates copies**: the original continues to its own output and the copies go to `Salida2`.
-- One deviation is documented and **not settled**: with a dispersion, the original draws the first interarrival while the engine schedules the first arrival exactly at `Media`. Do not use the first arrival of a generator to tell the two apart; use the counts over many replications.
+
 
 ## Probe before you rely on it
 

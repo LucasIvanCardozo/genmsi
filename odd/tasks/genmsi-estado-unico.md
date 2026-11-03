@@ -136,3 +136,14 @@ navegador) nunca publica el estado vivo, así que en ese modo el agente
 sigue sin ver el estado de la app. Y `live.json` no se publica hasta que
 hay una petición: una app recién abierta, sin Modelo y sin petición, no
 tiene estado publicado.
+
+L9 (2026-11-02, T5, el cierre): `cargo test --workspace` verde, clippy
+limpio, el shell (26) y el frente (398) verdes. La verificación diferencial
+contra el commit base dice que **lo único que cambió es lo que se pidió**:
+la herramienta `open_model` se fue, la llamada que no nombra un modelo
+pasó de `invalid_arguments` a `no_open_model`, y todo lo demás —el
+linter, el simulador, el catálogo, las propuestas— responde igual.
+
+**Lo que queda**: la versión ya sube a 0.5.0 (el cambio rompe), pero la
+publicación es decisión de la persona: `scripts/bump-version.sh` ya escribió
+las siete copias y el tag lo pone quien publica.

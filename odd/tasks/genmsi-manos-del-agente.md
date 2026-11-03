@@ -318,3 +318,37 @@ el código, usó los filtros, el resumen y el mapa. Lo que encontró:
   el cruce (por el número de statement) ahora está documentado;
 - un `XDG_DATA_HOME` **relativo** se descarta en silencio y el MCP pasa a
   hablar con la app real de la máquina: documentado en `docs/mcp.md`.
+
+L16 (2026-11-02, T7, la verificación diferencial, contra el commit base
+`f6a17ca`): el MCP de la base y el de la rama, compilados los dos y
+comparados con las mismas llamadas. **Las mismas respuestas** en `lint` con
+un archivo, `simulate` con un archivo, `lint` y `simulate` con un
+documento, y `lint` con las dos cosas. Y **diferencias sólo donde las
+pedimos**: el documento de la traza lleva el filtro y el `node`; el del
+explain lleva el `index`, la línea y la columna; la llamada que no nombra
+ni archivo ni documento pasó de `invalid_arguments` a `no_open_model`; la
+falla de un comando nombra el bloque; el catálogo publica los contratos y
+tres descripciones que mentían; y la herramienta `open_model` ya no está.
+El script vivió en un `mktemp -d`, fuera del repositorio: es la prueba de
+un cambio, no una prueba del producto.
+
+L17 (2026-11-02, T7, el cierre): `cargo test --workspace` verde, clippy del
+workspace limpio, el shell (26) y el frente (398) verdes, el typecheck
+limpio, y la medición en frío de `odd/tasks/medida5/`.
+
+**Lo que quedó para la siguiente sesión**, y es lo más valioso que salió
+de todo esto:
+1. **el motor acepta un operando numérico que no es un número en
+   silencio** (`Media="no-es-un-numero"` compila y la simulación cambia):
+   un `dry_run` que dice "ok" sobre eso da una falsa confianza. Es una
+   validación de operando que falta en el motor;
+2. **los tests de las reglas falsificables** de los contratos (T3 de la
+   feature de la semántica);
+3. la **semántica** de las 66 clases, ya escrita y publicada: lo que falta
+   es la medición con un agente que **no** sondea (la prueba de que
+   sirve);
+4. el **puente de desarrollo** (el modo del navegador) no publica el
+   estado vivo: el agente sigue sin ver la app en ese modo;
+5. la propuesta **sin la app corriendo**: el veredicto vive en el documento
+   al lado del modelo y la respuesta dice dónde, pero ninguna herramienta lo
+   devuelve: un `proposal_state` sería la respuesta natural.

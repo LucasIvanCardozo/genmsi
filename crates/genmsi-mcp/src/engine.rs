@@ -7,7 +7,7 @@
 
 use std::path::{Path, PathBuf};
 
-use genmsi_core::{Program, RunResult, SimConfig, Simulation};
+use genmsi_core::{Program, RunResult, SimConfig, Simulation, TraceFilter};
 use genmsi_format::{EditCommand, EditSession, GmdlModel};
 use rmcp::schemars;
 use rmcp::schemars::JsonSchema;
@@ -488,6 +488,27 @@ pub fn config(
         trace,
         trace_limit: limit,
         ..SimConfig::default()
+    }
+}
+
+/// The configuration of a run whose trace is filtered and maybe summarized.
+///
+/// The filter goes to the engine, which applies it **when the event is
+/// recorded**: the limit counts the events that pass it, and not the events
+/// of the run. The summary is asked for with `summary`; it is the summary of
+/// the whole run, and it does not change the run.
+pub fn trace_config(
+    seed: u64,
+    until: Option<f64>,
+    start: u64,
+    limit: usize,
+    filter: TraceFilter,
+    summary: bool,
+) -> SimConfig {
+    SimConfig {
+        trace_filter: filter,
+        trace_summary: summary,
+        ..config(seed, until, start, true, limit)
     }
 }
 

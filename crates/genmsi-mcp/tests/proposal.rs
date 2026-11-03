@@ -19,7 +19,8 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
-use genmsi_core::open_model::{APP_IDENTIFIER, write_open_model};
+use genmsi_core::live::{LiveBody, write_live};
+use genmsi_core::open_model::APP_IDENTIFIER;
 use serde_json::{Value, json};
 
 /// A model that works: a generator, a terminator and the link between them.
@@ -191,8 +192,18 @@ fn staged_files(data_home: &Path) -> Vec<String> {
 /// The pid is the pid of the test: the process is alive, so the document
 /// says that the app is running.
 fn publish_open_model(data_home: &Path, model: &Path) {
-    write_open_model(&data_dir(data_home), Some(model), std::process::id())
-        .expect("the open model is published");
+    // The app publishes ONE document about itself, and it carries the
+    // model it has open.
+    let body = LiveBody {
+        path: Some(model.display().to_string()),
+        pid: Some(std::process::id()),
+        dirty: false,
+        diagnostics: Vec::new(),
+        model: None,
+        run: None,
+        proposal: None,
+    };
+    write_live(&data_dir(data_home), &body).expect("the live state is published");
 }
 
 /// The default of a tool: the model the app has open.
@@ -294,8 +305,18 @@ fn an_app_that_died_does_not_hold_a_model() {
         .spawn()
         .expect("the process starts");
     process.wait().expect("the process ends");
-    write_open_model(&data_dir(&home), Some(&model), process.id())
-        .expect("the open model is published");
+    // The app that died published its state: the pid says that the process
+    // is not alive, so the model it had open is nobody's destination.
+    let body = LiveBody {
+        path: Some(model.display().to_string()),
+        pid: Some(process.id()),
+        dirty: false,
+        diagnostics: Vec::new(),
+        model: None,
+        run: None,
+        proposal: None,
+    };
+    write_live(&data_dir(&home), &body).expect("the live state is published");
 
     let mut server = Server::start(&home);
     let (answer, failed) = server.call("lint", json!({}));

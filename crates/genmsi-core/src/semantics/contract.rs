@@ -27,7 +27,7 @@
 //! know, and it goes in the gotchas.
 
 /// What a class does to the simulation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct Semantics {
     /// What the class does to the flow of the transaction: which port the
     /// transaction takes, which one it loses, which one it waits at.

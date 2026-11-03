@@ -38,7 +38,7 @@ with `1`.
 
 | Tool | What it does | Returns |
 |---|---|---|
-| `catalogue` | Says which block classes exist and what a block of one of them looks like: what the class does, its ports, its properties and the XML of the block. | `genmsi.classlist/1` or `genmsi.class/1` |
+| `catalogue` | Says which block classes exist and what a block of one of them looks like: what the class does, its ports, its properties, the XML of the block and the **contract** of the class (what it does to the flow, what it blocks, the rules of taking and releasing, and the traps). | `genmsi.classlist/1` or `genmsi.class/1` |
 | `lint` | Loads the model, validates it and compiles it. It does not simulate. It reports what it found. | `genmsi.lint/1` |
 | `simulate` | Runs the model once and returns its GPSS report. | `genmsi.report/1` |
 | `get_trace` | Runs the model with the event trace enabled and returns the records. | `genmsi.trace/1` |

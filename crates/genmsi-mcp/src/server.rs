@@ -341,6 +341,8 @@ struct Staged {
     id: String,
     /// The model the proposal carries.
     model: PathBuf,
+    /// The document that describes the proposal: where its verdict lives.
+    document: PathBuf,
 }
 
 /// Leave a model in the staging area of the app.
@@ -360,8 +362,12 @@ fn stage(text: &str, target: &Path, summary: Option<&str>) -> Result<Staged, Fai
         .map_err(ToolError::cannot_stage)?;
     let document = genmsi_core::ProposalDocument::pending(&id, &model, Some(target))
         .with_summary(summary);
-    genmsi_core::write_proposal(&directory, &document).map_err(ToolError::cannot_stage)?;
-    Ok(Staged { id, model })
+    let written = genmsi_core::write_proposal(&directory, &document).map_err(ToolError::cannot_stage)?;
+    Ok(Staged {
+        id,
+        model,
+        document: written,
+    })
 }
 
 /// The default seed of a run: one drawn at random, as the CLI does.
@@ -679,6 +685,7 @@ fn edit_document(input: &EditInput) -> Result<String, Failure> {
             Some(genmsi_core::documents::EditProposal {
                 id: staged.id,
                 model: staged.model.display().to_string(),
+                document: staged.document.display().to_string(),
             })
         }
     };

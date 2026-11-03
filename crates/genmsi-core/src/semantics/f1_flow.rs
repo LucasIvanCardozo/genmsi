@@ -55,7 +55,7 @@ pub static CONTRACTS: &[(&str, Semantics)] = &[
             flow: "The generator creates the transactions and sends each one to `Salida1`: the transaction is born in the generator and the flow goes on from there. A generator with no output creates the transactions and they end there.",
             blocking: "It blocks nothing: the generator does not wait for the transactions it creates, and a transaction that waits later (at a `Gate`, at an `Enter`) is still counted in the generator.",
             resources: "It takes nothing and gives nothing back. `Generate.Cantidad` limits the total (empty = forever, a number = that many, zero = none), `Generate.Media` is the mean of the intervals, `Generate.Modificador` the spread, `Generate.OffSet` the increment of the first arrival and `Generate.Prioridad` the priority of the transactions it creates.",
-            gotchas: "The first arrival is not at time 0: it comes at `Generate.Media`, or at `Generate.OffSet` when the model sets one, and with a spread the first interval is drawn like the ones that follow. A `Generate.Cantidad` that is not a literal number does not limit the generator: the listing writes no limit and the generator creates transactions forever.",
+            gotchas: "The first arrival is not at time 0: it comes at `Generate.Media`, or at `Generate.OffSet` when the model sets one — and an `OffSet` of **zero** puts the first arrival at time 0, while an `OffSet` that is empty leaves it drawn from the mean. With a spread the first interval is drawn like the ones that follow. A `Generate.Cantidad` that is not a literal number does not limit the generator: the listing writes no limit and the generator creates transactions forever.",
         },
     ),
     (

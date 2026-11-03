@@ -175,3 +175,50 @@ L5 (2026-11-02, análisis, el hueco que queda): el catálogo publica
 **qué** es esa entidad ni quién la crea. La cadena del `Unlink` es el
 ejemplo: la crea el uso (GPSS la crea por uso y así la deja el chequeo de
 declaraciones), y `Cadena` es el nombre con el que el agente la nombra.
+
+L10 (2026-11-02, el método de los seis subagentes, T1): el módulo de las
+semánticas es `crates/genmsi-core/src/semantics/`: `contract.rs` (la forma
+del contrato), `mod.rs` (la tabla que junta las familias y la función
+`contract(class)`) y un archivo por familia. Los seis subagentes **no se
+pisan**: cada uno escribe el archivo de su familia y nada más.
+
+El método que sigue es el que cada subagente recibe:
+
+1. **Dónde está la verdad, en este orden**: (a) el motor —
+   `crates/genmsi-core/src/program.rs` (el `BlockKind` de la clase y el
+   `expand` que la compila: una clase que son varias sentencias lo dice) y
+   `crates/genmsi-core/src/sim.rs` (la ejecución: qué le pasa a la
+   transacción, si espera, qué toma); (b) el original — los
+   `fixtures/models/*.gmdl` son modelos de la materia y los
+   `fixtures/outputs/*.report.txt` son **las respuestas grabadas del
+   original**; el motor está medido contra ellos, así que lo que hace el
+   motor es lo que hacía el original, salvo lo que fijan las divergencias;
+   (c) las divergencias — `crates/genmsi-core/tests/diferencias_fase8.rs` y
+   `diferencias_restantes.rs`: si la clase aparece ahí, el `gotchas` lo dice;
+   (d) la guía — la sección *Runtime semantics worth knowing* ya dice
+   varias reglas en las palabras del agente: se usan (son ciertas) y se
+   agrega lo que falta.
+
+2. **El texto**: en inglés (el catálogo y el glosario lo están), una o dos
+   frases por parte, en el orden del catálogo. `flow` (qué le hace al flujo),
+   `blocking` (qué bloquea y qué no), `resources` (las reglas de tomar y
+   soltar) y `gotchas` (las trampas y la divergencia con el original; vacío
+   si no hay trampa).
+
+3. **Las reglas**: se dice **lo que hace el motor**, no lo que hace GPSS; no
+   se adivina (una parte que no se puede determinar queda vacía y se dice en
+   el informe); no se especula sobre el original (sus respuestas están
+   grabadas); los nombres son los del motor (`StorageDef.Tamaño`,
+   `Advance.Media`), para que el agente los pueda buscar en el catálogo.
+
+4. **El reparto**: F1 flujo (Advance, Clock, Depart, Enter, Generate, Leave,
+   Priority, Queue, Split, Terminate, Transfer); F2 recursos (Buffer,
+   Examine, FacilityInt, FacilityUse, GateF, GateL, GateS, Release, Seize,
+   StorageDef, StorageUse); F3 grupos y cadenas (Assemble, Gather, JoinMe,
+   JoinNumber, Link, Match, RemoveMe, RemoveNumber, RemoveTrans, Return,
+   Unlink); F4 control (Alter, Counter, ExamineNumber, GateM, Loop, Mark,
+   Preempt, Scan, Select, SelectF, Test); F5 selección y datos (Assign,
+   InitiaSV, InitialLS, Logic, Note, QTable, SaveValue, SelectL, SelectS,
+   SelectSNA, Tabulate); F6 funciones y variables (Function, FunctionDist,
+   FunctionExpon, MFunction, MFunctionDist, Multifurcacion, MultifurcacionP,
+   Table, Variable, VariableA, VariableN).

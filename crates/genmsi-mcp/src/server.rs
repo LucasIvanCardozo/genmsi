@@ -205,6 +205,13 @@ pub struct EditInput {
     /// It travels with the proposal, so the person reads it before deciding.
     #[serde(default)]
     pub summary: Option<String>,
+    /// Try the batch without writing it.
+    ///
+    /// The commands are applied and the model is compiled, and **nothing is
+    /// written**: the answer says what would have happened, and carries the
+    /// model it would have written.
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 impl EditInput {
@@ -451,7 +458,7 @@ impl GenmsiServer {
     /// The batch is atomic: a command that fails leaves the model as it was.
     #[tool(
         name = "apply_edit",
-        description = "Add, edit and connect the blocks of a GenMSI model. The commands are the engine's own editing commands, the same ones the desktop application speaks: `addBlock` {class, container, x, y} creates a block of a catalogue class (call `catalogue` first: it gives the class names, their ports (ioid) and their properties), `connect` {from, fromIoid, to, toIoid} wires an output port to an input port, `setProperty` {id, property, value} sets a declared property, `setCaption` {id, caption} names a block, `moveBlock` {id, x, y} moves one, `removeBlock` {id} takes one away and `removeBlocks` {ids} takes several away as ONE operation; the schema of the tool carries the whole vocabulary. The commands are applied in order and the batch is ATOMIC: if one fails, none is applied and the failure names the command that failed. `layout` says where the blocks the batch adds go: `auto` (the default) puts every block an `addBlock` adds where there is room in its container, like a drop in the application; `explicit` uses the `x` and the `y` of the command. The model is checked before it is written: one that does not compile is NOT written, and the error names the block that caused it. The blocks the batch creates take the next free ids, in the order of the commands. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text): `path` may be left out, and then the model the app has open is the one the batch edits; a `path` that is not on the disk yet is a model the batch CREATES, and the file is written when the model compiles. `target` says where the result goes: `file` (the default) writes it to the file the batch edited, and `proposal` leaves the model in the staging area of the app, without touching the disk, where the person sees it and decides to accept it or to discard it — the verdict comes back in `app_state`. `summary` is one line about what the batch did; it travels with the proposal. Returns the genmsi.edit/1 document."
+        description = "Add, edit and connect the blocks of a GenMSI model. The commands are the engine's own editing commands, the same ones the desktop application speaks: `addBlock` {class, container, x, y} creates a block of a catalogue class (call `catalogue` first: it gives the class names, their ports (ioid) and their properties), `connect` {from, fromIoid, to, toIoid} wires an output port to an input port, `setProperty` {id, property, value} sets a declared property, `setCaption` {id, caption} names a block, `moveBlock` {id, x, y} moves one, `removeBlock` {id} takes one away and `removeBlocks` {ids} takes several away as ONE operation; the schema of the tool carries the whole vocabulary. The commands are applied in order and the batch is ATOMIC: if one fails, none is applied and the failure names the command that failed —its index, its `op`, the block it was about with the class and the name the agent gave it, and the property it was setting. `layout` says where the blocks the batch adds go: `auto` (the default) puts every block an `addBlock` adds where there is room in its container, like a drop in the application; `explicit` uses the `x` and the `y` of the command. `dry_run` tries the batch WITHOUT writing it: the commands are applied and the model is compiled, nothing is written, and the answer carries the model it would have written. The model is checked before it is written: one that does not compile is NOT written, and the error names the block that caused it. The blocks the batch creates take the next free ids, in the order of the commands. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text): `path` may be left out, and then the model the app has open is the one the batch edits; a `path` that is not on the disk yet is a model the batch CREATES, and the file is written when the model compiles. `target` says where the result goes: `file` (the default) writes it to the file the batch edited, and `proposal` leaves the model in the staging area of the app, without touching the disk, where the person sees it and decides to accept it or to discard it — the verdict comes back in `app_state`. `summary` is one line about what the batch did; it travels with the proposal. Returns the genmsi.edit/1 document."
     )]
     pub fn apply_edit(&self, Parameters(input): Parameters<EditInput>) -> CallToolResult {
         finish(edit_document(&input))
@@ -550,16 +557,23 @@ fn app_state_document() -> String {
 /// The document of an edit.
 fn edit_document(input: &EditInput) -> Result<String, Failure> {
     let source = input.source()?;
-    let destination = match input.target {
-        Target::File => Destination::File,
-        Target::Proposal => Destination::Staging,
+    // The trial comes first: a dry run writes nothing, whatever the target
+    // says. The engine already compiles the model before it writes it, so
+    // the trial is the same road without the writing.
+    let destination = if input.dry_run {
+        Destination::Trial
+    } else {
+        match input.target {
+            Target::File => Destination::File,
+            Target::Proposal => Destination::Staging,
+        }
     };
     // The proposal is about the model the agent worked on: the file it
     // named, or the model the app has open when it named none. It is
     // resolved before the batch runs, so a proposal that has nowhere to go
     // fails without touching anything.
     let target = match destination {
-        Destination::File => None,
+        Destination::File | Destination::Trial => None,
         Destination::Staging => Some(destination_path(&input.path)?),
     };
     let edited = engine::apply_edits(&source, &input.commands, input.layout, destination)?;

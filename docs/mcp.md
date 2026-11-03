@@ -214,6 +214,10 @@ catalogue: `catalogue` says what a class does without asking for a model.
 Writes the model to the file and returns the `genmsi.lint/1` document of what
 was written.
 
+**The trial of a document is `lint`.** To know whether a document compiles
+before writing it, hand it to `lint` as `model`: it loads, validates and
+compiles it and reports what it found, and writes nothing.
+
 **The `path` may be left out.** When it is, the model the app has open is
 the one that is written: the agent works on what the reader is looking at
 instead of guessing a destination. With no app, or with an app that has no
@@ -253,6 +257,7 @@ not. `genmsi layout` is the command that says what the composition placed.
 | `layout` | string | `"auto"` | Where the blocks the batch adds go: `"auto"` or `"explicit"`. |
 | `target` | string | `"file"` | Where the result goes: `"file"` writes it to the file the batch edited; `"proposal"` leaves it in the staging area of the app, without touching the disk, and the person decides. |
 | `summary` | string or null | — | One line about what the batch did. It travels with the proposal, so the person reads it before deciding. |
+| `dry_run` | boolean | `false` | Try the batch **without writing it**: the commands are applied and the model is compiled, nothing is written, and the answer carries the model it would have written. |
 
 **The `path` may be left out.** When it is, the batch works on the model the
 app has open: the agent works on what the reader is looking at instead of
@@ -285,6 +290,21 @@ ones that were applied are undone and the model stays exactly as it was. The
 failure is an `invalid_command` that names the command that failed —its index
 and its `op`— so the agent corrects that command and sends the batch again.
 The batch is replayable: the commands are the source of truth, not the text.
+
+**The failure names what the agent wrote.** Besides the index and the `op`,
+the failure says the **block** the command was about, its **class**, the
+**name the agent gave it** and the **property** the command was setting: the
+`name` and the `property` are fields of the failure, and they are in the
+message too. An agent that built a model with fifty blocks named them, and
+the name is what it has to look for — not the number the engine counts
+blocks with.
+
+**The trial.** `dry_run` applies the batch and compiles the model **without
+writing anything**: the answer says what would have happened (`written:
+false`) and carries the model it would have written, in `source`. The engine
+compiles the model before it writes it, so the trial is the same road with
+the last step left out — and a trial of a batch that fails fails the same
+way.
 
 **The model is checked before it is written.** A model that does not compile
 is **not** written, and the failure is the one of the format or of the
@@ -493,6 +513,8 @@ empty report and no prose message an agent has to parse.
 | `class` | string | GPSS class of the offending block. |
 | `command` | number | Index of the command that failed, when the failure is a command. |
 | `op` | string | The `op` of the command that failed. |
+| `name` | string | The name the agent gave the block the failure is about (its `caption`). |
+| `property` | string | The property the command that failed was about. |
 
 The fields that do not apply are absent — never `null`, never `0`. **The line
 and the column point at the opening tag of the offending element of the
@@ -519,7 +541,7 @@ The classes:
 |---|---|
 | `invalid_arguments` | The call itself is wrong: both `path` and `model`, or no `model` to write. |
 | `no_open_model` | The app has **no model open** and the call named neither a file nor a document, so there is no destination to guess. Name a `path`, or open a model in the app. |
-| `invalid_command` | A command of the batch could not be applied. The batch is atomic, so no command is applied: the failure names the command that failed (its index in `command` and its `op` in `op`), and the model stays as it was. |
+| `invalid_command` | A command of the batch could not be applied. The batch is atomic, so no command is applied: the failure names the command that failed (its index in `command` and its `op` in `op`), the block it was about with the class and the name the agent gave it (`node`, `class`, `name`) and the property it was setting (`property`), and the model stays as it was. |
 | `class_not_found` | The class named in `catalogue` is not one of the classes the catalogue lists. The `class` field carries the name that was asked for. |
 | `model_not_found` | The file named by `path` does not exist. (`apply_edit` is the exception: it creates the model, see above.) |
 | `model_locked` | The desktop app has **unsaved changes** on the model the call named, so nothing was written. The `path` field carries the model. The reader has to save it (or discard it) and the agent sends the same edit again: the batch is replayable, because the commands are the source of truth and not the text. The agent can also leave a **proposal** instead (`target: "proposal"`), which does not touch the disk. |

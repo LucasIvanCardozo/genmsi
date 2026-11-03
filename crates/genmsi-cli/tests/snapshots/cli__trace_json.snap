@@ -12,11 +12,19 @@ expression: stdout(&output)
   "limit": 3,
   "records": 3,
   "truncated": true,
+  "filter": {
+    "classes": [],
+    "nodes": [],
+    "xact": null,
+    "from": null,
+    "to": null
+  },
   "events": [
     {
       "time": 2700.0,
       "xact": 1,
       "block": 0,
+      "node": 6,
       "class": "Generate",
       "label": null,
       "event": "generate",
@@ -26,6 +34,7 @@ expression: stdout(&output)
       "time": 2700.0,
       "xact": 1,
       "block": 0,
+      "node": 6,
       "class": "Generate",
       "label": null,
       "event": "leave",
@@ -35,6 +44,7 @@ expression: stdout(&output)
       "time": 2700.0,
       "xact": 1,
       "block": 13,
+      "node": 16,
       "class": "Queue",
       "label": "A_Queue",
       "event": "enter",

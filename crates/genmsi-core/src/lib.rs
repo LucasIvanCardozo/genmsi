@@ -31,7 +31,7 @@ pub mod glossary;
 pub mod live;
 pub mod oracle;
 pub mod gpss;
-pub mod open_model;
+pub mod app_data;
 pub mod program;
 pub mod proposal;
 pub mod report;
@@ -58,10 +58,7 @@ pub use live::{
     live_file, model_value, read_live_in, report_value, same_file, unsaved_changes_in,
     unsaved_changes_on, write_live,
 };
-pub use open_model::{
-    APP_IDENTIFIER, OPEN_MODEL_FILE, AppDataError, OpenModelDocument, app_data_dir,
-    current_open_model, open_model_document, process_is_running, read_open_model, write_open_model,
-};
+pub use app_data::{APP_IDENTIFIER, AppDataError, app_data_dir, process_is_running};
 pub use program::{Program, compile, known_classes};
 pub use proposal::{
     DOCUMENT_EXTENSION, MODEL_EXTENSION, PROPOSAL_SCHEMA, ProposalBody, ProposalDocument,

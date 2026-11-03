@@ -143,7 +143,7 @@ fn scratch(name: &str) -> PathBuf {
 
 /// The directory of the app's data, inside the scratch one.
 fn data_dir(data_home: &Path) -> PathBuf {
-    data_home.join(genmsi_core::open_model::APP_IDENTIFIER)
+    data_home.join(genmsi_core::app_data::APP_IDENTIFIER)
 }
 
 /// The pid of a process that is not running any more.

@@ -194,6 +194,12 @@ pub struct EditProposal {
     pub id: String,
     /// The absolute path of the model the proposal carries.
     pub model: String,
+    /// The absolute path of the document that describes the proposal.
+    ///
+    /// It is where the **verdict** lives: the app writes the state of the
+    /// proposal there when the person decides, and an agent whose app is
+    /// closed reads it there.
+    pub document: String,
 }
 
 /// Build the `genmsi.edit/1` body from the lint of the model it edited.
@@ -692,6 +698,12 @@ pub struct ClassDocument {
     pub uses: Vec<CatalogueEntity>,
     /// The XML of a minimal, valid block of this class.
     pub template: String,
+    /// What the class does to the simulation.
+    ///
+    /// The contract of the class, in four parts: what it does to the flow of
+    /// the transaction, what it blocks, the rules of taking and releasing,
+    /// and the traps. It is empty for a class the contracts do not cover.
+    pub semantics: Option<crate::semantics::Semantics>,
 }
 
 /// An entity a class declares or uses.
@@ -731,6 +743,7 @@ pub fn class_document(class: &str) -> Option<ClassDocument> {
         declares,
         uses,
         template: spec.template(),
+        semantics: crate::semantics::contract(spec.class).copied(),
     })
 }
 

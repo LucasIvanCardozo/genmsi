@@ -24,21 +24,24 @@ pub use contract::Semantics;
 /// The families are joined here: the table is the one the catalogue reads,
 /// and it is built from the six families so that each of them can be
 /// written (and read) on its own.
-pub static CONTRACTS: &[(&str, Semantics)] = &[
-    // The flow.
-    f1_flow::CONTRACTS,
-    // The resources.
-    f2_resources::CONTRACTS,
-    // The groups and the chains.
-    f3_groups::CONTRACTS,
-    // The control.
-    f4_control::CONTRACTS,
-    // The selection and the data.
-    f5_data::CONTRACTS,
-    // The functions and the variables.
-    f6_functions::CONTRACTS,
-]
-.concat();
+pub static CONTRACTS: std::sync::LazyLock<Vec<(&'static str, Semantics)>> =
+    std::sync::LazyLock::new(|| {
+        [
+            // The flow.
+            f1_flow::CONTRACTS,
+            // The resources.
+            f2_resources::CONTRACTS,
+            // The groups and the chains.
+            f3_groups::CONTRACTS,
+            // The control.
+            f4_control::CONTRACTS,
+            // The selection and the data.
+            f5_data::CONTRACTS,
+            // The functions and the variables.
+            f6_functions::CONTRACTS,
+        ]
+        .concat()
+    });
 
 /// The contract of a class, when it has one.
 pub fn contract(class: &str) -> Option<&'static Semantics> {

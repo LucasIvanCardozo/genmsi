@@ -37,7 +37,7 @@ const GLOSSARY: &[(&str, &str)] = &[
     ),
     (
         "Counter",
-        "Counts the arrivals of the group Param and stores the count in the savevalue SaveValue.",
+        "Adds Incremento to the savevalue SaveValue every time the block is passed, and copies the count into the parameter Param.",
     ),
     (
         "Depart",
@@ -49,7 +49,7 @@ const GLOSSARY: &[(&str, &str)] = &[
     ),
     (
         "ExamineNumber",
-        "Waits until the group Grupo holds Numero transactions, then lets the transaction continue.",
+        "Tests whether the group Grupo holds Numero transactions: the transaction continues by Salida1 when it does, and by Salida2 when it does not.",
     ),
     (
         "FacilityInt",

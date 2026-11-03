@@ -10,16 +10,18 @@ It is the only sanctioned place to learn the format: the catalogue holds the fac
 
 ## The workflow
 
-1. **One catalogue call.** `catalogue({ classes: ["Generate", "Queue", "FacilityUse", "Terminate", "Clock"] })` — every class the model needs, in **one call**, not one call per class. The answer carries, for each class: the title and the description, the input ports (`ioid`, `name`), the output ports (`ioid`, `name`), the properties (`name`, `hint`, `ty`, `subtype`, and the `options` of a listed property), the entity kinds the class `declares` and the ones it `uses`, and the XML template of a minimal valid block of that class.
+1. **One catalogue call.** `catalogue({ classes: ["Generate", "Queue", "FacilityUse", "Terminate", "Clock"] })` — every class the model needs, in **one call**, not one call per class. The answer carries, for each class: the title and the description, the input ports (`ioid`, `name`), the output ports (`ioid`, `name`), the properties (`name`, `hint`, `ty`, `subtype`, and the `options` of a listed property), the entity kinds the class `declares` and the ones it `uses`, the XML template of a minimal valid block of that class, and the **contract** of the class: what it does to the flow of the transaction, what it blocks, the rules of taking and releasing, and the traps.
    - `catalogue()` with no argument returns the list of every class and the skeleton of a model.
    - `catalogue({ class: "Generate" })` returns one class.
 2. **Design before writing.** Decide the flow of the transactions, the entities the model needs and the class of every block. The catalogue tells you what a class does; the design is yours.
-3. **Build the model with `apply_edit`.** One call, one batch of the engine's editing commands: an `addBlock` per block, a `connect` per link, a `setProperty` per operand. The engine gives every new block a place on the canvas, checks that the model compiles and writes it. The batch is **atomic**: if a command fails, no command is applied and the error names the command that failed. See *The verb* below. You do not have to name a file: when you name neither a `path` nor a `model`, the batch works on **the model the app has open**.
-4. **`lint({ path })`** — the model as it is now on disk. It loads, validates and compiles the model and reports what it found. A model that does not compile is a tool error, not an empty report. The lint also names the **property a block carries that its class does not declare** (`Tamano` for `Tamaño`, with the name it probably meant): a typo is silent in the engine, so the lint is where it shows up — as a finding of a model that compiles, because a missing *operand* is a refusal and never reaches the findings.
-5. **`explain_model({ path })`** — the model as the document writes it: every block with its class, its properties **by name** and its ports, and the `edges` that wire the blocks. It is the cheapest way to see that the model is the model you meant. (It compiles the model first, so read it after `lint`.)
+3. **Build the model with `apply_edit`.** One call, one batch of the engine's editing commands: an `addBlock` per block, a `connect` per link, a `setProperty` per operand. The engine gives every new block a place on the canvas, checks that the model compiles and writes it. The batch is **atomic**: if a command fails, no command is applied and the error names the command that failed, the block it was about (with its class and **the name you gave it**) and the property it was setting. See *The verb* below. You do not have to name a file: when you name neither a `path` nor a `model`, the batch works on **the model the app has open**.
+4. **`lint({ path })`** — the model as it is now on disk. It loads, validates and compiles the model and reports what it found. A model that does not compile is a tool error, not an empty report. The lint also names the **property a block carries that its class does not declare** (`Tamano` for `Tamaño`, with the name it probably meant): a typo is silent in the engine **when the model was written by hand**, so the lint is where it shows up — as a finding of a model that compiles, because a missing *operand* is a refusal and never reaches the findings. **Through the editing path it is not silent**: `setProperty` with a property the class does not declare fails, and the failure names the property and the block.
+5. **`explain_model({ path })`** — the model as the document writes it: every block with its class, its properties **by name** and its ports, and the `edges` that wire the blocks. It is the cheapest way to see that the model is the model you meant. (It compiles the model first, so read it after `lint`.) It also carries the **map** between the compiled statements and the blocks of the document: one row per statement, with the block, the name you gave it and where it is in the `.gmdl`.
 6. **`simulate({ path, seed })`** — the GPSS report. Read its `blocks` (the statements the model compiles to, with their counts) and its `entities` (the queues, facilities and storages it used).
-7. **`app_state()`** — what the reader is seeing right now (see *The person reading* below): the model the app has open, whether that file has changes that are not saved, and the **proposal** on the table, if you left one.
-8. **`save_model({ path, model })`** — only for a document you wrote by hand: it takes the **whole** document as text. To change a model that is already on disk, use `apply_edit` on its `path`, not `save_model`.
+   - **Always pass the `seed` explicitly.** The default is drawn at random, so two calls with the same arguments are two different runs. The seed you pass is the seed you can repeat.
+7. **`get_trace({ path, seed, ... })`** — the events of a run, and the **summary** of it. The filters (by class, by block, by transaction, by window of time) are applied when the event is recorded, so the `limit` counts the events that pass them: ask for the events of one class and you get those, not the first ones of the run. With `summary: true` the answer is the summary of the run — what each block did, how many times a transaction entered it and when the first and the last one entered it. See *Reading a run* below.
+8. **`app_state()`** — what the reader is seeing right now (see *The person reading* below): the model the app has open, whether that file has changes that are not saved, and the **proposal** on the table, if you left one.
+9. **`save_model({ path, model })`** — only for a document you wrote by hand: it takes the **whole** document as text. To change a model that is already on disk, use `apply_edit` on its `path`, not `save_model`.
 
 The order matters: `lint` before `simulate` (a model that does not compile is a tool error, not an empty report), and `simulate` before you are done (never keep a model you have not run).
 
@@ -53,6 +55,10 @@ The order matters: `lint` before `simulate` (a model that does not compile is a 
 | `moveBlock` | `id`, `x`, `y` | Moves a block, keeping its size. |
 | `removeBlock` | `id` | Removes a block, its descendants and the links that touch them. |
 | `removeBlocks` | `ids` | Removes several blocks as ONE operation. |
+| `setLayouts` | `placements` | Places many things at once. |
+| `movePort` | `block`, `ioid`, `input`, `x`, `y` | Moves a door of a container. |
+| `removePort` | `block`, `ioid`, `input` | Removes a door of a container. |
+| `paste` | `ids`, `dx`, `dy` | Copies blocks with fresh ids and remapped links. |
 
 - **The batch is atomic.** A command that fails undoes the ones that were
   applied: the model stays as it was, and the error (`invalid_command`) says
@@ -74,6 +80,45 @@ The order matters: `lint` before `simulate` (a model that does not compile is a 
   area of the app, **without touching the disk**, and the reader sees it on
   their canvas and decides — see *The person reading* below. A `summary` of
   what you did travels with the proposal.
+
+## Reading a run
+
+A run has two faces: the **events** (what happened, one by one) and the
+**summary** (what each block did). The trace is the first and the summary is
+the second, and most of the questions an agent asks are about the second.
+
+**The filters.** `get_trace` takes `classes` (the classes of the blocks),
+`nodes` (the blocks of the document, by their `moduleid`), `xact` (a
+transaction), and `from` and `to` (a window of simulated time). They are
+applied **when the event is recorded**, so the `limit` counts the events
+that pass them: asking for the events of one class gives those events, not
+the first ones of the run. The answer says which filter it used.
+
+**The summary.** `get_trace({ summary: true })` answers the summary of the
+**whole run** (not of the events that were kept, and not cut by the limit):
+one row per statement, with the block of the document, its class, how many
+times a transaction entered it and when the first and the last one entered
+it. A block nobody entered is in it, with zero entries.
+
+**The map.** The trace numbers the *statements* the model compiles to (a
+`FacilityUse` is five statements), and the summary does the same. The
+`map` of `explain_model` is the bridge: one row per statement, with the
+`node` of the block of the document, the **name you gave it** and where it
+is in the `.gmdl` (its line and column). With it, "what block is statement
+218" is one lookup: the event's `node` is the block, and the map says where
+that block is in the file.
+
+The summary and the map are crossed by their number: the `block` of a row of
+the summary is the `statement` of a row of the map. The summary says how
+many times the flow went through there; the map says which block that was,
+what you called it and where it is in the file.
+
+**Trying a batch without writing it.** `apply_edit({ dry_run: true })`
+applies the commands and compiles the model, and **writes nothing**: the
+answer says what would have happened (`written: false`) and carries the
+model it would have written, in `source`. A batch that would fail fails the
+same way. Use it before a big batch, and when the model is not yours to
+overwrite.
 
 ## The person reading
 
@@ -139,6 +184,12 @@ identity of the proposal, its `state` (`pending`, `accepted` or `rejected`)
 and the `note`. A proposal that is still `pending` means the reader has not
 decided yet: wait for it, and do not send the same batch again — the
 proposal is the batch, replayed on the reader's canvas.
+
+**With the app closed, nobody decides.** The verdict lives in the document
+of the proposal, beside the model it carries, and the answer of the tool
+that left it says where that document is (`proposal.document`). Read it when
+there is no app to ask: its `state` is `pending` until the app takes the
+proposal and the person decides.
 
 And if the reader asks you what you did, `app_state()` also tells you whether
 your change actually landed on their canvas.

@@ -242,3 +242,20 @@ el mensaje los nombra también. El motor sabe el nombre del bloque y su
 clase; el comando sabe la propiedad. Los tres tests nuevos: el ensayo no
 escribe, el ensayo de un lote que falla falla, y la falla nombra lo que el
 agente escribió.
+
+L9 (2026-11-02, análisis, el dialecto: TERCER diagnóstico equivocado de la
+sesión `chat`): la devolución decía "El dialecto numérico no está
+documentado en ningún lado". **La guía lo documenta**, con una tabla
+completa (los prefijos, los operadores, el porcentaje por mil, el nombre
+pelado) en su sección *Expressions*. El agente la leyó (la leyó primero, en
+la sesión) y de todos modos loDeclaró ausente: el problema no era que
+faltaba, sino que nadie lo decía en el lugar donde se lo busca.
+
+Y encima la guía y la gramática **se contradecían**: el comentario de la
+gramática decía que `#` es "división entera" y el parser dice
+`"#" => BinOp::Mul` (multiplicación) — la guía tenía razón y la gramática
+mintiendo. El comentario de la gramática quedó corregido.
+
+El arreglo que de verdad importa no es otra tabla: es que **la tabla la
+publica el motor** y que un test la compare con la gramática, para que no
+puedan discrepar (T5).

@@ -3,7 +3,8 @@
 //! The syntax follows the values the editor stores in properties: `P:Media`,
 //! `FN:Horario`, `X:Count`, `V:calculo`, `Q:cola`, `S:storage`, `CH:Cadena`,
 //! `CH:*NroColectivo` (indirect name), `AC1`, `RN2`, `[containerParam]`, with
-//! the GPSS operators `+ - * /` plus `#` (integer division) and `@` (modulo).
+//! the GPSS operators `+ - * /` plus `#` (multiplication, the way the
+//! original's editor writes it: it has no `*` key) and `@` (modulo).
 //! `$` is accepted as an alternative separator so generated GPSS text
 //! (`P$Media`) parses too.
 

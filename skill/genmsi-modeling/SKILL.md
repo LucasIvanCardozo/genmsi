@@ -238,6 +238,10 @@ Two that are easy to mix up:
 - a **save value** is created where it is used; `InitiaSV` only sets its initial value.
 - a **label** is declared by the `Match` that carries it (`RotuloPropio`); `RotuloMatch` uses the conjugate one.
 
+And one that is not declared but has a name:
+
+- a **user chain** is named by the `Cadena` property of the `Link` and the `Unlink` blocks, and the two blocks name the same chain when they are about the same chain. The name is yours: `setProperty` on `Cadena` renames it, and nothing has to declare it. (The name a block gets by itself, the `A_Queue` of a connection, is a different thing: it is the label of the connection, the `LOC` of the statement.)
+
 Two rules about names: an entity name may not contain whitespace or `:`; and the check only fires for a plain name — a computed name (`*Cuadra`) or a placeholder (`[storage]`) is not checked.
 
 `lint` reports a missing declaration as a finding and the model still compiles; `simulate` refuses the run: `the storage 'SalaEspera' is used but no StorageDef declares it`.

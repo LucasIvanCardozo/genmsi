@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::open_model::{AppDataError, app_data_dir, process_is_running};
+use crate::app_data::{AppDataError, app_data_dir, process_is_running};
 use crate::proposal::ProposalBody;
 
 /// The schema of the live document.
@@ -160,6 +160,41 @@ pub fn current_live_in(directory: &Path) -> Option<Value> {
         Some(pid) if !process_is_running(pid as u32) => None,
         _ => Some(document),
     }
+}
+
+/// The model the app has open, read from the live document.
+///
+/// The live document is the **only** publication of the app's state: it
+/// carries the model it has open and the pid of the process that has it.
+/// A document left behind by an app that is gone says nothing, and the pid
+/// is what says so.
+///
+/// The document of the open model (`genmsi.openmodel/1`) used to be a second
+/// file with the same two facts, and two files could disagree: an agent
+/// read the path from one and the `dirty` from the other. There is one file
+/// now, and this is how it is read.
+pub fn open_model_from_live() -> Option<OpenModel> {
+    open_model_from_live_in(&app_data_dir()?)
+}
+
+/// The model the app has open, read from the live document of a directory.
+pub fn open_model_from_live_in(directory: &Path) -> Option<OpenModel> {
+    let document = current_live_in(directory)?;
+    let pid = document.get("pid").and_then(|pid| pid.as_u64())? as u32;
+    let path = document
+        .get("path")
+        .and_then(|path| path.as_str())
+        .map(str::to_string);
+    Some(OpenModel { path, pid: Some(pid) })
+}
+
+/// The model the app has open, as the live document says it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpenModel {
+    /// The absolute path of the model the app has open.
+    pub path: Option<String>,
+    /// The pid of the process that has it open.
+    pub pid: Option<u32>,
 }
 
 /// Whether the app has changes that are not saved on the model at `path`.

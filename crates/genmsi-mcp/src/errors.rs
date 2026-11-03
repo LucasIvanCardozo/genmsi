@@ -8,7 +8,7 @@
 use std::fmt;
 
 use genmsi_core::EngineError;
-use genmsi_format::{FormatError, GmdlModel};
+use genmsi_format::{EditCommand, FormatError, GmdlModel};
 use serde::Serialize;
 
 /// The failure a tool returns, boxed.
@@ -18,6 +18,55 @@ use serde::Serialize;
 /// tool small, and it does not change the body the agent reads: the JSON is
 /// the contract, not the size of the Rust type.
 pub type Failure = Box<ToolError>;
+
+/// What a command of the batch names.
+///
+/// A command is what the agent wrote, and it is the only place where the
+/// class of a block, the name the agent gave it and the property it sets
+/// are known in the form the agent used them.
+#[derive(Debug, Clone, Default)]
+pub struct Named {
+    /// The block the command is about.
+    pub block: Option<u32>,
+    /// The property the command names.
+    pub property: Option<String>,
+    /// The class the command creates, when it creates one.
+    pub class: Option<String>,
+}
+
+impl Named {
+    /// What a command names.
+    pub fn of(command: &EditCommand) -> Self {
+        match command {
+            EditCommand::AddBlock { class, .. } => Self {
+                class: Some(class.clone()),
+                ..Self::default()
+            },
+            EditCommand::RemoveBlock { id, .. }
+            | EditCommand::MoveBlock { id, .. }
+            | EditCommand::SetCaption { id, .. } => Self {
+                block: Some(*id),
+                ..Self::default()
+            },
+            EditCommand::SetProperty { id, property, .. } => Self {
+                block: Some(*id),
+                property: Some(property.clone()),
+                ..Self::default()
+            },
+            EditCommand::Connect { from, .. } | EditCommand::Disconnect { from, .. } => Self {
+                block: Some(*from),
+                ..Self::default()
+            },
+            EditCommand::MovePort { block, .. } | EditCommand::RemovePort { block, .. } => Self {
+                block: Some(*block),
+                ..Self::default()
+            },
+            EditCommand::RemoveBlocks { .. }
+            | EditCommand::SetLayouts { .. }
+            | EditCommand::Paste { .. } => Self::default(),
+        }
+    }
+}
 
 /// A failure a tool returns to the agent.
 #[derive(Debug, Clone, Serialize)]
@@ -47,6 +96,20 @@ pub struct ToolError {
     /// The `op` of the command that failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub op: Option<String>,
+    /// The name the agent gave to the block the failure is about.
+    ///
+    /// It is the `caption` of the block: the name **the agent** wrote, not
+    /// the number the engine counts blocks with. An agent that built a model
+    /// with fifty blocks named them, and the name is what it has to look
+    /// for.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// The property the command that failed was about.
+    ///
+    /// A command that sets a property names it; a failure that is about that
+    /// property has to say which one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub property: Option<String>,
 }
 
 impl ToolError {
@@ -82,6 +145,8 @@ impl ToolError {
             class: None,
             command: None,
             op: None,
+            name: None,
+            property: None,
         }
     }
 
@@ -98,6 +163,8 @@ impl ToolError {
             class: None,
             command: None,
             op: None,
+            name: None,
+            property: None,
         }
     }
 
@@ -118,6 +185,8 @@ impl ToolError {
             class: Some(class),
             command: None,
             op: None,
+            name: None,
+            property: None,
         }
     }
 
@@ -140,6 +209,8 @@ impl ToolError {
             class: None,
             command: None,
             op: None,
+            name: None,
+            property: None,
         }
     }
 
@@ -166,6 +237,8 @@ impl ToolError {
             class: None,
             command: None,
             op: None,
+            name: None,
+            property: None,
         }
     }
 
@@ -188,6 +261,8 @@ impl ToolError {
             class: None,
             command: None,
             op: None,
+            name: None,
+            property: None,
         }
     }
 
@@ -207,6 +282,8 @@ impl ToolError {
             class: None,
             command: None,
             op: None,
+            name: None,
+            property: None,
         }
     }
 
@@ -223,6 +300,8 @@ impl ToolError {
             class: None,
             command: None,
             op: None,
+            name: None,
+            property: None,
         }
     }
 
@@ -231,18 +310,46 @@ impl ToolError {
     /// The batch is atomic: when a command fails, the model stays as it was.
     /// The failure says **which** command failed (its index and its `op`) and
     /// why, so the agent can correct that command and send the batch again.
+    ///
+    /// It also says **what the agent wrote**: the class of the block, the
+    /// name the agent gave it and the property the command was about. An
+    /// agent that built a model with fifty blocks named them; the name is
+    /// what it has to look for, not the number the engine counts with.
     pub fn command_failed(
         index: usize,
         op: &str,
+        command: &EditCommand,
         error: &FormatError,
         path: Option<&str>,
         model: Option<&GmdlModel>,
     ) -> Self {
-        let (_, message) = Self::classify(error);
+        let (_, reason) = Self::classify(error);
         let location = error.location();
+        let named = Named::of(command);
+        // The name the agent gave to the block the failure is about.
+        let name = named.block.and_then(|id| {
+            model
+                .and_then(|model| model.block(id))
+                .map(|block| block.caption.trim().to_string())
+                .filter(|caption| !caption.is_empty())
+        });
+        let mut message = format!("command {index} ({op}) failed");
+        if let Some(class) = &named.class {
+            message.push_str(&format!(" on the {class}"));
+        }
+        if let Some(id) = named.block {
+            message.push_str(&format!(" on the block {id}"));
+            if let Some(name) = &name {
+                message.push_str(&format!(" ({name:?})"));
+            }
+        }
+        if let Some(property) = &named.property {
+            message.push_str(&format!(", property {property:?}"));
+        }
+        message.push_str(&format!(": {reason}"));
         let failure = Self {
             error: "invalid_command",
-            message: format!("command {index} ({op}) failed: {message}"),
+            message,
             path: path.map(str::to_string),
             line: location.line.map(|line| line as u32),
             column: location.column.map(|column| column as u32),
@@ -250,6 +357,8 @@ impl ToolError {
             class: None,
             command: Some(index),
             op: Some(op.to_string()),
+            name,
+            property: named.property,
         };
         match model {
             Some(model) => failure.locate(model),
@@ -278,6 +387,8 @@ impl ToolError {
             class: None,
             command: None,
             op: None,
+            name: None,
+            property: None,
         };
         match model {
             Some(model) => failure.locate(model),
@@ -298,6 +409,8 @@ impl ToolError {
                 class: Some(class.clone()),
                 command: None,
                 op: None,
+                name: None,
+                property: None,
             },
             EngineError::InvalidBlock { node, class, message } => Self {
                 error: "invalid_block",
@@ -309,6 +422,8 @@ impl ToolError {
                 class: Some(class.clone()),
                 command: None,
                 op: None,
+                name: None,
+                property: None,
             },
             EngineError::Expression { text, message } => Self {
                 error: "invalid_expression",
@@ -320,6 +435,8 @@ impl ToolError {
                 class: None,
                 command: None,
                 op: None,
+                name: None,
+                property: None,
             },
             EngineError::Format(format) => Self::from_format(format, Some(path), Some(model)),
             EngineError::Graph { message } => Self {
@@ -332,6 +449,8 @@ impl ToolError {
                 class: None,
                 command: None,
                 op: None,
+                name: None,
+                property: None,
             },
             EngineError::Runtime(message) => Self {
                 error: "runtime_error",
@@ -343,6 +462,8 @@ impl ToolError {
                 class: None,
                 command: None,
                 op: None,
+                name: None,
+                property: None,
             },
         };
         failure = failure.locate(model);

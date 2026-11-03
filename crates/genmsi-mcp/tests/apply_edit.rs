@@ -13,7 +13,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
-use genmsi_core::open_model::APP_IDENTIFIER;
+use genmsi_core::app_data::APP_IDENTIFIER;
 use genmsi_core::{LiveBody, write_live};
 use genmsi_mcp::GenmsiServer;
 use rmcp::model::{CallToolRequestParams, ContentBlock};
@@ -390,8 +390,8 @@ async fn a_failing_command_leaves_the_file_as_it_was() {
     assert_eq!(failure["op"], "connect", "the operation that failed: {failure}");
     let message = failure["message"].as_str().expect("a message");
     assert!(
-        message.starts_with("command 1 (connect) failed:"),
-        "the message names the command: {message}"
+        message.starts_with("command 1 (connect) failed on the block 99:"),
+        "the message names the command and the block: {message}"
     );
 
     // The file is byte for byte the file that was there.
@@ -900,5 +900,134 @@ fn a_model_of_text_is_not_locked() {
     assert!(
         answer["source"].as_str().is_some(),
         "the text of the model comes back: {answer}"
+    );
+}
+
+/// The dry run: the batch is applied and compiled, and **nothing is
+/// written**.
+///
+/// The trial is the same road the verb walks, without the writing: the
+/// engine compiles the model before it writes it, so a trial is the same
+/// work with the last step left out. The answer says what would have
+/// happened, and carries the model it would have written.
+#[tokio::test]
+async fn a_dry_run_writes_nothing_and_says_what_would_happen() {
+    let (client, _server) = pair().await;
+    let directory = TempDir::new("dry-run");
+    let path = directory.file("modelo.gmdl");
+    std::fs::write(&path, WORKING_MODEL).expect("the model is on the disk");
+    let before = std::fs::read(&path).expect("the model is readable");
+
+    let answer = call(
+        &client,
+        "apply_edit",
+        json!({
+            "path": path.to_string_lossy(),
+            "dry_run": true,
+            "commands": [
+                { "op": "setCaption", "id": 1, "caption": "Entrada" },
+                { "op": "setProperty", "id": 1, "property": "Media", "value": "45" }
+            ]
+        }),
+    )
+    .await;
+
+    assert_eq!(answer["schema"], "genmsi.edit/1", "{answer}");
+    assert_eq!(answer["applied"], 2, "the batch was applied: {answer}");
+    assert_eq!(answer["written"], false, "a trial writes nothing: {answer}");
+
+    // The model travels with the answer: there is no file that holds it
+    // now, so the answer is the only place it is.
+    let source = answer["source"].as_str().expect("the model travels");
+    assert!(source.contains("Entrada"), "the batch is in the model: {source}");
+    assert!(source.contains("45"), "the batch is in the model: {source}");
+
+    // The file is byte for byte the file that was there.
+    let after = std::fs::read(&path).expect("the model is readable");
+    assert_eq!(after, before, "a trial writes nothing");
+}
+
+/// A trial of a batch that fails fails the same way.
+///
+/// A trial that hides the failures is a trial that says nothing: the
+/// agent has to know that the batch would not have worked.
+#[tokio::test]
+async fn a_dry_run_of_a_failing_batch_fails() {
+    let (client, _server) = pair().await;
+    let directory = TempDir::new("dry-run-fail");
+    let path = directory.file("modelo.gmdl");
+    std::fs::write(&path, WORKING_MODEL).expect("the model is on the disk");
+
+    let failure = call(
+        &client,
+        "apply_edit",
+        json!({
+            "path": path.to_string_lossy(),
+            "dry_run": true,
+            "commands": [
+                { "op": "connect", "from": 99, "fromIoid": 1, "to": 2, "toIoid": 1 }
+            ]
+        }),
+    )
+    .await;
+
+    assert_eq!(failure["error"], "invalid_command", "{failure}");
+    assert_eq!(failure["command"], 0, "{failure}");
+}
+
+/// The failure names what the agent wrote.
+///
+/// The agent built the model and gave the blocks their names: the failure
+/// says the block, the class, the name the agent gave it and the property
+/// the command was about, so the agent does not have to map ids to names
+/// with a script of its own.
+#[tokio::test]
+async fn the_failure_names_the_block_the_agent_named() {
+    let (client, _server) = pair().await;
+    let directory = TempDir::new("named-error");
+    let path = directory.file("modelo.gmdl");
+    std::fs::write(&path, WORKING_MODEL).expect("the model is on the disk");
+
+    let failure = call(
+        &client,
+        "apply_edit",
+        json!({
+            "path": path.to_string_lossy(),
+            "commands": [
+                { "op": "setCaption", "id": 1, "caption": "LLEGADAS" },
+                { "op": "setProperty", "id": 1, "property": "MediaQueNoExiste", "value": "45" }
+            ]
+        }),
+    )
+    .await;
+
+    assert_eq!(failure["error"], "invalid_command", "{failure}");
+    assert_eq!(failure["command"], 1, "the command that failed: {failure}");
+    assert_eq!(failure["op"], "setProperty", "{failure}");
+    // The block, its class and the name the agent gave it.
+    assert_eq!(failure["node"], 1, "the block: {failure}");
+    assert_eq!(failure["class"], "Generate", "the class: {failure}");
+    assert_eq!(
+        failure["name"], "LLEGADAS",
+        "the name the agent gave the block: {failure}"
+    );
+    // The property the command was about.
+    assert_eq!(
+        failure["property"], "MediaQueNoExiste",
+        "the property: {failure}"
+    );
+    // And the message says all of it.
+    let message = failure["message"].as_str().expect("a message");
+    assert!(
+        message.contains("block 1"),
+        "the message names the block: {message}"
+    );
+    assert!(
+        message.contains("LLEGADAS"),
+        "the message names the block the agent named: {message}"
+    );
+    assert!(
+        message.contains("MediaQueNoExiste"),
+        "the message names the property: {message}"
     );
 }

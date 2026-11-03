@@ -1,0 +1,9 @@
+{
+  "schema": "genmsi.proposal/1",
+  "id": "1793667085547-f375446fe41f5376",
+  "model": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida5/home/org.gensmi.desktop/staging/1793667085547-f375446fe41f5376.gmdl",
+  "target": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida5/modelo.gmdl",
+  "summary": "Renombra el bloque FacilityUse (18) a 'Mesa de recepcion' y sube su propiedad Media de 25 a 30",
+  "state": "pending",
+  "note": null
+}

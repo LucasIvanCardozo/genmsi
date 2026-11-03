@@ -20,7 +20,7 @@
 #
 #     packaging/arch/aur-pkgbuild.sh
 pkgname=genmsi
-pkgver=0.4.0
+pkgver=0.5.0
 pkgrel=1
 pkgdesc="GenMSI: simulador de eventos discretos al estilo GPSS"
 arch=('x86_64')

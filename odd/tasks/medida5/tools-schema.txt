@@ -1,0 +1,851 @@
+======================================================================
+app_state - See what the GenMSI desktop app is showing right now: the model it has open (`path`), whether the reader has changes that are not saved on it (`dirty`), what the app found in that model (`diagnostics`) and the last run the app made (`run`). It returns the genmsi.live/1 document, the one the app publishes; when the app is not running the document has `path: null` —that is an answer, not a failure. Ask it BEFORE you write on the model the app has open: `apply_edit` and `save_model` refuse with `model_locked` while the app has unsaved changes on that model, so tell the reader to save it and send the same edit again.
+{
+  "properties": {},
+  "type": "object"
+}
+======================================================================
+apply_edit - Add, edit and connect the blocks of a GenMSI model. The commands are the engine's own editing commands, the same ones the desktop application speaks: `addBlock` {class, container, x, y} creates a block of a catalogue class (call `catalogue` first: it gives the class names, their ports (ioid) and their properties), `connect` {from, fromIoid, to, toIoid} wires an output port to an input port, `setProperty` {id, property, value} sets a declared property, `setCaption` {id, caption} names a block, `moveBlock` {id, x, y} moves one, `removeBlock` {id} takes one away and `removeBlocks` {ids} takes several away as ONE operation; the schema of the tool carries the whole vocabulary. The commands are applied in order and the batch is ATOMIC: if one fails, none is applied and the failure names the command that failed —its index, its `op`, the block it was about with the class and the name the agent gave it, and the property it was setting. `layout` says where the blocks the batch adds go: `auto` (the default) puts every block an `addBlock` adds where there is room in its container, like a drop in the application; `explicit` uses the `x` and the `y` of the command. `dry_run` tries the batch WITHOUT writing it: the commands are applied and the model is compiled, nothing is written, and the answer carries the model it would have written. The model is checked before it is written: one that does not compile is NOT written, and the error names the block that caused it. The blocks the batch creates take the next free ids, in the order of the commands. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text): `path` may be left out, and then the model the app has open is the one the batch edits; a `path` that is not on the disk yet is a model the batch CREATES, and the file is written when the model compiles. `target` says where the result goes: `file` (the default) writes it to the file the batch edited, and `proposal` leaves the model in the staging area of the app, without touching the disk, where the person sees it and decides to accept it or to discard it — the verdict comes back in `app_state`. `summary` is one line about what the batch did; it travels with the proposal. Returns the genmsi.edit/1 document.
+{
+  "$defs": {
+    "EditCommand": {
+      "description": "One editing operation over the model.",
+      "oneOf": [
+        {
+          "description": "Create a block of a catalogue class inside a container.",
+          "properties": {
+            "class": {
+              "description": "Catalogue class (`Generate`, `Queue`, ...).",
+              "type": "string"
+            },
+            "container": {
+              "description": "Owning container id.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "op": {
+              "const": "addBlock",
+              "type": "string"
+            },
+            "x": {
+              "description": "Horizontal position.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Vertical position.",
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op",
+            "class",
+            "container",
+            "x",
+            "y"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Remove a block, its descendants and every link that touches them.",
+          "properties": {
+            "id": {
+              "description": "Block id (the model root is refused).",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "op": {
+              "const": "removeBlock",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Remove several blocks as ONE operation.\n\nThe blocks that one of them owns are removed with it, and a block\nthat is already gone when its turn comes is skipped.",
+          "properties": {
+            "ids": {
+              "description": "Block ids.",
+              "items": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "op": {
+              "const": "removeBlocks",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "ids"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Move a block, keeping its size.",
+          "properties": {
+            "id": {
+              "description": "Block id.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "op": {
+              "const": "moveBlock",
+              "type": "string"
+            },
+            "x": {
+              "description": "Horizontal position.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Vertical position.",
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op",
+            "id",
+            "x",
+            "y"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Set the position of many things as ONE operation (the re-layout).\n\nThe things are the blocks of the scope that was composed and the\ndoors of its container: a door is a block of the picture, and its\nplace is written like the place of any other block.",
+          "properties": {
+            "op": {
+              "const": "setLayouts",
+              "type": "string"
+            },
+            "placements": {
+              "description": "One place per thing that was composed.",
+              "items": {
+                "$ref": "#/$defs/Placement"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "op",
+            "placements"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Move a door of a container.\n\nA door is a block of the picture in its own right: the reader drags it\nwhere he wants it, and its place is kept.",
+          "properties": {
+            "block": {
+              "description": "The container that owns the door.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "input": {
+              "description": "Whether the door is an entry one.",
+              "type": "boolean"
+            },
+            "ioid": {
+              "description": "The id of the door inside the container.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "op": {
+              "const": "movePort",
+              "type": "string"
+            },
+            "x": {
+              "description": "Horizontal position.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "y": {
+              "description": "Vertical position.",
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op",
+            "block",
+            "ioid",
+            "input",
+            "x",
+            "y"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Remove a door of a container.\n\nThe links that touch the door go with it: a link that starts at a\ndoor that is gone, or that ends at it, is a link that cannot be.",
+          "properties": {
+            "block": {
+              "description": "The container that owns the door.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "input": {
+              "description": "Whether the door is an entry one.",
+              "type": "boolean"
+            },
+            "ioid": {
+              "description": "The id of the door inside the container.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "op": {
+              "const": "removePort",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "block",
+            "ioid",
+            "input"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Connect an output port to an input port of a sibling block.\n\nThe link may also cross the border of a container: the entry port of\na container is the source of the link that brings the flow into it,\nand its exit port is the target of the link that takes the flow out\nof it.",
+          "properties": {
+            "from": {
+              "description": "Source block id.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "fromIoid": {
+              "description": "Source output port id.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "op": {
+              "const": "connect",
+              "type": "string"
+            },
+            "to": {
+              "description": "Target block id.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "toIoid": {
+              "description": "Target input port id.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op",
+            "from",
+            "fromIoid",
+            "to",
+            "toIoid"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Remove the link that starts at a port of a container's child.",
+          "properties": {
+            "container": {
+              "description": "Owning container id.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "from": {
+              "description": "Source block id.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "fromIoid": {
+              "description": "Source output port id.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "op": {
+              "const": "disconnect",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "container",
+            "from",
+            "fromIoid"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Set the value of a declared property.",
+          "properties": {
+            "id": {
+              "description": "Block id.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "op": {
+              "const": "setProperty",
+              "type": "string"
+            },
+            "property": {
+              "description": "Property name.",
+              "type": "string"
+            },
+            "value": {
+              "description": "Decoded value; the file's encoding convention is kept.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "id",
+            "property",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Set the block's caption.",
+          "properties": {
+            "caption": {
+              "description": "New caption.",
+              "type": "string"
+            },
+            "id": {
+              "description": "Block id.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "op": {
+              "const": "setCaption",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "id",
+            "caption"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Copy blocks with fresh ids, remapped links and fresh labels.",
+          "properties": {
+            "dx": {
+              "description": "Horizontal offset for the copies.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "dy": {
+              "description": "Vertical offset for the copies.",
+              "format": "int32",
+              "type": "integer"
+            },
+            "ids": {
+              "description": "Ids of the blocks to copy, in request order.",
+              "items": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "op": {
+              "const": "paste",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "ids",
+            "dx",
+            "dy"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Layout": {
+      "description": "Where the blocks a batch adds go.\n\nThe canvas belongs to the engine (decision D18): the place of a block that\nan agent adds is the free spot of its container, the same place the desktop\napp gives a block that is dropped. An agent that wants a block somewhere\nparticular says so with [`Layout::Explicit`].",
+      "oneOf": [
+        {
+          "const": "auto",
+          "description": "The engine places the block where there is room (the default).",
+          "type": "string"
+        },
+        {
+          "const": "explicit",
+          "description": "The coordinates of the command are used, as they were sent.",
+          "type": "string"
+        }
+      ]
+    },
+    "PlacedId": {
+      "description": "What a placement is: a block of the model, or a door of a container.\n\nA door is a block of the picture in its own right, and it is placed like\none: the composition gives it a place and the model keeps it. The\nidentity says which of the two a placement is.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A block of the model.",
+          "properties": {
+            "Block": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "Block"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A door of a container.",
+          "properties": {
+            "Door": {
+              "properties": {
+                "container": {
+                  "description": "The container that owns the door.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "input": {
+                  "description": "Whether the door is an entry one.",
+                  "type": "boolean"
+                },
+                "ioid": {
+                  "description": "The id of the door inside the container.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "container",
+                "ioid",
+                "input"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Door"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Placement": {
+      "description": "One thing placed on the canvas: a block of the model, or a door of a\ncontainer.\n\nThe two are the same kind of thing for the composition: a place on the\ncanvas. The identity says which one it is, and the applier writes the\nplace where it belongs.",
+      "properties": {
+        "height": {
+          "default": null,
+          "description": "The new height, when the thing changes its size.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/PlacedId",
+          "description": "What is placed."
+        },
+        "width": {
+          "default": null,
+          "description": "The new width, when the thing changes its size.",
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "x": {
+          "description": "Horizontal position.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "y": {
+          "description": "Vertical position.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "Target": {
+      "description": "Where a model goes.",
+      "oneOf": [
+        {
+          "const": "file",
+          "description": "The model goes to the file it was named by.",
+          "type": "string"
+        },
+        {
+          "const": "proposal",
+          "description": "The model goes to the staging area of the app: it does not touch the\ndisk, and the person decides.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "commands": {
+      "description": "The commands to apply, in order.\n\nThe commands are the engine's own editing commands: the same ones the\ndesktop application speaks. The schema the tool publishes is the one of\nthose types, so the vocabulary is the same everywhere.",
+      "items": {
+        "$ref": "#/$defs/EditCommand"
+      },
+      "type": "array"
+    },
+    "dry_run": {
+      "default": false,
+      "description": "Try the batch without writing it.\n\nThe commands are applied and the model is compiled, and **nothing is\nwritten**: the answer says what would have happened, and carries the\nmodel it would have written.",
+      "type": "boolean"
+    },
+    "layout": {
+      "$ref": "#/$defs/Layout",
+      "description": "Where the blocks the commands add go.\n\n`auto` (the default) puts every new block where there is room in its\ncontainer, like a drop in the application; `explicit` uses the `x` and\nthe `y` of the command."
+    },
+    "model": {
+      "default": null,
+      "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "path": {
+      "default": null,
+      "description": "Path of the `.gmdl` model file.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "summary": {
+      "default": null,
+      "description": "What the agent did, in one line.\n\nIt travels with the proposal, so the person reads it before deciding.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "target": {
+      "$ref": "#/$defs/Target",
+      "description": "Where the result goes.\n\n`file` (the default) writes the model to the file the batch edited;\n`proposal` leaves it in the staging area of the app, without touching\nthe disk, and the person decides."
+    }
+  },
+  "required": [
+    "commands"
+  ],
+  "type": "object"
+}
+======================================================================
+catalogue - Describe the block classes a GenMSI model is built from. Call it BEFORE writing a model: it tells you which classes exist, what each one does (its description), which ports (ioid) and properties (name, hint, ty, subtype) each class declares, which entities the class declares and which it uses, and the exact XML of a block of that class —with the default value of each property— so you never have to guess an element name. Without arguments it returns the genmsi.classlist/1 document (every class plus the skeleton of a model). With `class` (for example "Generate") it returns the genmsi.class/1 document of that class; with `classes` (a list of names) it returns the genmsi.classes/1 document with every class asked for, so an agent that needs several classes asks for them all in ONE call.
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "class": {
+      "default": null,
+      "description": "Name of the class to describe (`Generate`, `Queue`, ...).\n\nWithout it the tool returns the list of the classes and the skeleton\nof a model.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "classes": {
+      "default": null,
+      "description": "Names of several classes to describe, in one call.\n\nAn agent that needs eight classes asks for the eight: one call\ninstead of eight. Give `class` or `classes`, not both.",
+      "items": {
+        "type": "string"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    }
+  },
+  "type": "object"
+}
+======================================================================
+explain_model - Describe a GenMSI model: its blocks, operands and ports, plus what each GPSS statement of the model does. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text) and returns the genmsi.explain/1 document. The document has three parts: `program` is the compiled GPSS (one entry per statement, with the block of the document it came from and the line and column of that block in the .gmdl), `model` is the document itself, with every block, its properties by name and the links that wire the blocks, and `map` joins the two: one row per compiled statement, with the `node` of the block of the document it came from, the class of that statement, the name the agent gave the block (its `caption`) and the line and column of the block in the .gmdl. With the `node` that every event of the trace carries, the map answers "what block is the statement 218?" in one line.
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "model": {
+      "default": null,
+      "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "path": {
+      "default": null,
+      "description": "Path of the `.gmdl` model file.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "type": "object"
+}
+======================================================================
+get_trace - Simulate a GenMSI model and return its event trace, or —with `summary`— the summary of the run. Takes `path` or `model`, plus the optional `seed`, `until`, `start` and `limit`, and returns the genmsi.trace/1 document. The trace can be FILTERED: `classes` keeps only the events of those block classes ("Queue", "Terminate", ...), `nodes` keeps only the events of those blocks of the document (their `moduleid`, the `node` every event carries), `xact` keeps only the events of that transaction, and `from` and `to` keep only the events of that window of simulated time (the window is closed at both ends; `until` is something else: it is the horizon of the run). The filter is applied in the engine WHEN THE EVENT IS RECORDED, so `limit` counts the events that pass the filter and not the events of the run: asking for the events of one class gives those events, not the first ones of the run. Without a filter the answer is the whole trace, exactly as before. With `summary: true` the tool answers the genmsi.trace_summary/1 document instead: for every block, how many times the flow went through it and the first and the last time it went through it — the question the agent asks the ninety percent of the time ("how many times did the flow go through here?") — and not the events. The summary is the summary of the WHOLE run, and the filters do not cut it.
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "classes": {
+      "default": [],
+      "description": "Keep only the events of these classes of block.\n\nThe names are the classes of the catalogue (`\"Queue\"`, `\"Terminate\"`,\n...). Empty (the default) keeps the events of every class.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "from": {
+      "default": null,
+      "description": "Keep only the events from this simulated time on.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "limit": {
+      "default": 100,
+      "description": "Maximum number of trace records to keep.\n\nThe limit counts the events that pass the filter, and not the events\nof the run.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "model": {
+      "default": null,
+      "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "nodes": {
+      "default": [],
+      "description": "Keep only the events of these blocks of the document.\n\nThe numbers are the `moduleid` of the blocks —the `node` the events\ncarry and the `node` the map of the explain publishes—. Empty (the\ndefault) keeps the events of every block.",
+      "items": {
+        "format": "uint32",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "type": "array"
+    },
+    "path": {
+      "default": null,
+      "description": "Path of the `.gmdl` model file.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "seed": {
+      "default": 15598816602025196018,
+      "description": "Seed of every random stream; the same seed reproduces the same run.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "start": {
+      "default": 1,
+      "description": "The `START` of the run: how many termination units end it.\n\nThe original has the same field in the panel of its simulator (\"Start:\",\none by default) and the model does not declare it: it is a parameter of\nthe run, like the horizon. It has to be greater than zero.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "summary": {
+      "default": false,
+      "description": "Answer with the summary of the run instead of its events.\n\nThe summary says how many times the flow went through each block, and\nthe first and the last time it went through it.",
+      "type": "boolean"
+    },
+    "to": {
+      "default": null,
+      "description": "Keep only the events until this simulated time.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "until": {
+      "default": null,
+      "description": "Stop once the simulated clock passes this time.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "xact": {
+      "default": null,
+      "description": "Keep only the events of this transaction.\n\nWithout it the events of every transaction are kept.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    }
+  },
+  "type": "object"
+}
+======================================================================
+lint - Validate a GenMSI model: it loads, validates and compiles, and reports what it found (the compiler's observations and the warnings of the format, such as an entity the model uses without declaring it). Takes `path` (a .gmdl file) or `model` (the .gmdl document as text) and returns the genmsi.lint/1 document.
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "model": {
+      "default": null,
+      "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "path": {
+      "default": null,
+      "description": "Path of the `.gmdl` model file.",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "type": "object"
+}
+======================================================================
+save_model - Write a GPSS model to a .gmdl file. The model is checked before it is written: one that does not load, does not validate or does not compile is NOT written, and the error names the block that caused it. A model that carries no canvas geometry is composed before it is written, so the editor can draw it; a model that already carries its geometry keeps the disposition its author left. Takes `model` (the whole .gmdl document as text, not a patch) and `path` (the file to write): `path` may be left out, and then the model the app has open is the one that is written. `target` says where the model goes: `file` (the default) writes it to that file, and `proposal` leaves the model in the staging area of the app, without touching the disk (the `path` is not written to), where the person sees it and decides to accept it or to discard it — the verdict comes back in `app_state`. `summary` is one line about what the agent did; it travels with the proposal. Returns the genmsi.lint/1 document of what was written. Use it to create or to change a model: read it first with explain_model, change the text and hand the complete document back.
+{
+  "$defs": {
+    "Target": {
+      "description": "Where a model goes.",
+      "oneOf": [
+        {
+          "const": "file",
+          "description": "The model goes to the file it was named by.",
+          "type": "string"
+        },
+        {
+          "const": "proposal",
+          "description": "The model goes to the staging area of the app: it does not touch the\ndisk, and the person decides.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "model": {
+      "default": null,
+      "description": "The whole `.gmdl` document as text.\n\nThe tool writes the whole document, not a patch: the agent reads the\nmodel, changes it and hands the complete text back.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "path": {
+      "default": null,
+      "description": "Path of the `.gmdl` file to write.\n\nWithout it the model the app has open is the one that is written.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "summary": {
+      "default": null,
+      "description": "What the agent did, in one line.\n\nIt travels with the proposal, so the person reads it before deciding.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "target": {
+      "$ref": "#/$defs/Target",
+      "description": "Where the model goes.\n\n`file` (the default) writes the model to the file it was named by;\n`proposal` leaves it in the staging area of the app, without touching\nthe disk, and the person decides."
+    }
+  },
+  "type": "object"
+}
+======================================================================
+simulate - Simulate a GenMSI model and return its report. Takes `path` or `model`, plus the optional `seed`, `until` and `start`, and returns the genmsi.report/1 document.
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "model": {
+      "default": null,
+      "description": "The `.gmdl` document as text, for a model that is not on disk yet.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "path": {
+      "default": null,
+      "description": "Path of the `.gmdl` model file.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "seed": {
+      "default": 3982041859211083264,
+      "description": "Seed of every random stream; the same seed reproduces the same run.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "start": {
+      "default": 1,
+      "description": "The `START` of the run: how many termination units end it.\n\nThe original has the same field in the panel of its simulator (\"Start:\",\none by default) and the model does not declare it: it is a parameter of\nthe run, like the horizon. It has to be greater than zero.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "until": {
+      "default": null,
+      "description": "Stop once the simulated clock passes this time.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "type": "object"
+}

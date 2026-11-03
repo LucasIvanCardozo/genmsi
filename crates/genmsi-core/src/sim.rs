@@ -171,6 +171,17 @@ pub struct SimConfig {
     pub trace: bool,
     /// Maximum number of trace records kept.
     pub trace_limit: usize,
+    /// What the trace keeps.
+    ///
+    /// The default keeps every event, so a run without a filter behaves
+    /// exactly as it did before the filter existed.
+    pub trace_filter: TraceFilter,
+    /// Whether the run keeps the summary of what each block did.
+    ///
+    /// The default is off: a run without a summary behaves exactly as it did
+    /// before the summary existed, and the summary costs nothing when nobody
+    /// asks for it.
+    pub trace_summary: bool,
     /// Optional simulated-time horizon: stop once the clock passes it.
     pub stop_time: Option<f64>,
     /// The `START` of the run: how many termination units end it.
@@ -207,6 +218,8 @@ impl Default for SimConfig {
             max_events: DEFAULT_MAX_EVENTS,
             trace: false,
             trace_limit: 100_000,
+            trace_filter: TraceFilter::default(),
+            trace_summary: false,
             stop_time: None,
             start: DEFAULT_START,
             stop: None,
@@ -242,6 +255,12 @@ pub struct TraceEvent {
     /// Block index in the program.
     #[cfg_attr(feature = "ts", ts(as = "f64"))]
     pub block: usize,
+    /// The `moduleid` of the block of the document the statement came from.
+    ///
+    /// The `block` field is the index of the compiled statement; this one is
+    /// the block of the `.gmdl` the statement was compiled from, so the agent
+    /// does not have to invert the order of the compilation to find it.
+    pub node: u32,
     /// Block class.
     pub class: String,
     /// Block label.
@@ -259,6 +278,110 @@ pub struct TraceEvent {
     /// separate the two by the *last* space: the name may contain spaces, the
     /// value never does.
     pub detail: String,
+}
+
+/// What the trace keeps.
+///
+/// The filter is applied **when the event is recorded**, so the limit of
+/// the trace counts the events that pass it: an agent that asks for the
+/// events of one class gets those events, not the first ones of the run.
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct TraceFilter {
+    /// The classes whose events are kept (empty: all of them).
+    pub classes: Vec<String>,
+    /// The blocks of the document whose events are kept (empty: all).
+    pub nodes: Vec<u32>,
+    /// The transaction whose events are kept (None: all of them).
+    pub xact: Option<u64>,
+    /// The time from which the events are kept (None: from the start).
+    pub from: Option<f64>,
+    /// The time until which the events are kept (None: until the end).
+    pub to: Option<f64>,
+}
+
+impl TraceFilter {
+    /// Whether the filter keeps every event.
+    pub fn keeps_everything(&self) -> bool {
+        self.classes.is_empty()
+            && self.nodes.is_empty()
+            && self.xact.is_none()
+            && self.from.is_none()
+            && self.to.is_none()
+    }
+
+    /// Whether an event passes the filter.
+    ///
+    /// The class is matched by name, exactly; the window of time is closed
+    /// at both ends (an event at `from` or at `to` passes).
+    pub fn keeps(&self, event: &TraceEvent) -> bool {
+        if !self.classes.is_empty() && !self.classes.iter().any(|name| name == &event.class) {
+            return false;
+        }
+        if !self.nodes.is_empty() && !self.nodes.contains(&event.node) {
+            return false;
+        }
+        if let Some(xact) = self.xact
+            && event.xact != xact
+        {
+            return false;
+        }
+        if let Some(from) = self.from
+            && event.time < from
+        {
+            return false;
+        }
+        if let Some(to) = self.to
+            && event.time > to
+        {
+            return false;
+        }
+        true
+    }
+}
+
+/// What a block did in a run.
+#[derive(Debug, Clone, Serialize)]
+pub struct BlockSummary {
+    /// The statement the summary is about (the index in `program.blocks`).
+    pub block: usize,
+    /// The block of the document the statement came from.
+    pub node: u32,
+    /// The class of the block.
+    pub class: String,
+    /// The label of the block, when it has one.
+    pub label: Option<String>,
+    /// How many times a transaction entered the block.
+    pub entries: u64,
+    /// The first time a transaction entered it.
+    ///
+    /// It is `0.0` when nobody entered the block: the count of the entries
+    /// is then zero, and it says so.
+    pub first: f64,
+    /// The last time a transaction entered it.
+    ///
+    /// It is `0.0` when nobody entered the block: the count of the entries
+    /// is then zero, and it says so.
+    pub last: f64,
+}
+
+/// The summary of a run: what each block did.
+///
+/// The blocks are the ones of the program, in the order of the program: the
+/// block nobody entered is in the summary too, with no entries.
+#[derive(Debug, Clone, Serialize)]
+pub struct TraceSummary {
+    /// The title of the model.
+    pub title: String,
+    /// The seed of the run.
+    pub seed: u64,
+    /// The time the run started.
+    pub start_time: f64,
+    /// The time the run ended.
+    pub end_time: f64,
+    /// Why the run ended.
+    pub end_reason: String,
+    /// One entry per block, in the order of the program.
+    pub blocks: Vec<BlockSummary>,
 }
 
 /// The statistics of a logic switch.
@@ -350,6 +473,15 @@ pub struct RunResult {
     pub entities: Entities,
     /// Structured event trace, when enabled.
     pub trace: Vec<TraceEvent>,
+    /// The filter the trace was recorded with.
+    ///
+    /// The document of the trace says what was filtered, so an agent that
+    /// asks for the events of one class knows what it is looking at.
+    pub filter: TraceFilter,
+    /// What each block did, when the run kept the summary.
+    ///
+    /// It is empty when nobody asked for the summary.
+    pub summary: Vec<BlockSummary>,
     /// Compiler diagnostics repeated on the result.
     pub diagnostics: Vec<String>,
     /// Names of the tables defined by the model, in report order.
@@ -478,6 +610,10 @@ pub struct Simulation<'p> {
     events: u64,
     streams: Streams,
     trace: Vec<TraceEvent>,
+    /// What each block did, while the run goes on.
+    ///
+    /// It is empty when nobody asked for the summary.
+    summary: Vec<BlockSummary>,
     label_index: HashMap<String, usize>,
     passed: HashMap<String, u64>,
     transaction_groups: BTreeMap<String, Vec<XactId>>,
@@ -525,6 +661,26 @@ impl<'p> Simulation<'p> {
         // The `START` of the run is a parameter of the run, not of the
         // program: the counter of terminations starts with it.
         let start = config.start;
+        // The summary of the run is asked for or not: a run that nobody
+        // asked the summary of pays nothing for it.
+        let summary = if config.trace_summary {
+            program
+                .blocks
+                .iter()
+                .enumerate()
+                .map(|(index, block)| BlockSummary {
+                    block: index,
+                    node: block.module_id,
+                    class: block.class.clone(),
+                    label: block.label.clone(),
+                    entries: 0,
+                    first: 0.0,
+                    last: 0.0,
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
         let mut sim = Self {
             program,
             config,
@@ -544,6 +700,7 @@ impl<'p> Simulation<'p> {
             events: 0,
             streams: Streams::new(seed),
             trace: Vec::new(),
+            summary,
             label_index: program.label_index(),
             passed: HashMap::new(),
             transaction_groups: BTreeMap::new(),
@@ -866,6 +1023,8 @@ impl<'p> Simulation<'p> {
             connection_entries: self.connection_entries,
             entities: self.entities,
             trace: self.trace,
+            filter: self.config.trace_filter.clone(),
+            summary: self.summary,
             diagnostics,
             table_names,
             qtable_names,
@@ -1000,6 +1159,9 @@ impl<'p> Simulation<'p> {
         }
 
         self.block_stats[block_index].entries += 1;
+        // The arrival is an entry of the generator: the transaction is born
+        // there, and the flow goes through the block.
+        self.count_entry(block_index);
         let priority = self.generator_priority(&spec);
         let xact = self.new_transaction(priority, self.now);
         if self.config.trace {
@@ -1110,19 +1272,47 @@ impl<'p> Simulation<'p> {
         event: &'static str,
         detail: String,
     ) {
-        if !self.config.trace || self.trace.len() >= self.config.trace_limit {
+        if !self.config.trace {
             return;
         }
         let reference = &self.program.blocks[block];
-        self.trace.push(TraceEvent {
+        let recorded = TraceEvent {
             time: self.now,
             xact,
             block,
+            node: reference.module_id,
             class: reference.class.clone(),
             label: reference.label.clone(),
             event,
             detail,
-        });
+        };
+        // The filter comes before the limit: the limit counts the events
+        // that pass it, and not the events of the run.
+        if !self.config.trace_filter.keeps(&recorded) {
+            return;
+        }
+        if self.trace.len() >= self.config.trace_limit {
+            return;
+        }
+        self.trace.push(recorded);
+    }
+
+    /// Count an entry of a block in the summary of the run.
+    ///
+    /// The summary is independent of the trace: it is computed whether the
+    /// trace is on or not, and it is not cut by the limit of the trace.
+    fn count_entry(&mut self, block: usize) {
+        if self.summary.is_empty() {
+            return;
+        }
+        let now = self.now;
+        if let Some(summary) = self.summary.get_mut(block) {
+            if summary.entries == 0 {
+                summary.first = now;
+            }
+            summary.entries += 1;
+            summary.last = now;
+        }
     }
 
     /// Execute (or resume) one block for one transaction.
@@ -1137,6 +1327,9 @@ impl<'p> Simulation<'p> {
         }
         let block = self.program.blocks[block_index].clone();
         if !resume {
+            // The transaction enters the block: the summary counts the
+            // entry, whether the trace is on or not.
+            self.count_entry(block_index);
             if let Some(transaction) = self.xacts.get_mut(&xact) {
                 transaction.current_block = Some(block_index);
                 transaction.entered_at = self.now;

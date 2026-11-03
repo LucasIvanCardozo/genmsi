@@ -21,6 +21,14 @@ xact: number,
  */
 block: number, 
 /**
+ * The `moduleid` of the block of the document the statement came from.
+ *
+ * The `block` field is the index of the compiled statement; this one is
+ * the block of the `.gmdl` the statement was compiled from, so the agent
+ * does not have to invert the order of the compilation to find it.
+ */
+node: number, 
+/**
  * Block class.
  */
 class: string, 

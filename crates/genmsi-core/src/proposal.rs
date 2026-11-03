@@ -31,7 +31,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::documents::to_pretty_json;
 use crate::live::same_file;
-use crate::open_model::{AppDataError, app_data_dir};
+use crate::app_data::{AppDataError, app_data_dir};
 
 /// The schema of the proposal document.
 pub const PROPOSAL_SCHEMA: &str = "genmsi.proposal/1";

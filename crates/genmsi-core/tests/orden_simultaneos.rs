@@ -35,6 +35,7 @@ fn run_with_trace(program: &Program) -> RunResult {
             max_events: 5_000_000,
             start: 1,
             stop: None,
+            ..SimConfig::default()
         },
     )
     .run()

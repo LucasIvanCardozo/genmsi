@@ -89,7 +89,7 @@ echo "Se abre con: ${app_dir}/genmsi-app-desktop"
 
 # El MCP: la misma CLI, con el subcomando `mcp`, habla el protocolo y
 # publica ocho herramientas (lint, simulate, get_trace, explain_model,
-# catalogue, save_model, apply_edit y open_model). Sin esto, un agente no
+# catalogue, save_model, apply_edit y app_state). Sin esto, un agente no
 # puede trabajar con los modelos.
 if [[ $with_mcp -eq 1 ]]; then
   echo

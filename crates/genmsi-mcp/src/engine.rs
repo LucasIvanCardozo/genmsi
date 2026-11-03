@@ -91,11 +91,18 @@ pub enum Destination {
     /// The model is written to the file it was named by.
     #[default]
     File,
-    /// The model is not written: it is staged for the app to show.
+    /// The model is not written anywhere, it is offered to the person.
     ///
     /// The staging area is the way the agent offers its work to the person
     /// without touching the disk.
     Staging,
+    /// The model is not written: the batch is tried and the answer says what
+    /// would have happened.
+    ///
+    /// The dry run of the verb: the commands are applied, the model is
+    /// compiled and **nothing is written**. The engine already compiles
+    /// before it writes, so the trial is the same road without the writing.
+    Trial,
 }
 
 /// A model that was written to a file.
@@ -226,7 +233,7 @@ pub fn apply_edits(
     for (index, command) in commands.iter().enumerate() {
         let op = op_of(command);
         let command = prepared(command, session.model(), layout);
-        match session.apply(command) {
+        match session.apply(command.clone()) {
             Ok(ids) => created.extend(ids),
             Err(error) => {
                 // The failure is built before the rollback, so the position it
@@ -234,6 +241,7 @@ pub fn apply_edits(
                 let failure = ToolError::command_failed(
                     index,
                     &op,
+                    &command,
                     &error,
                     Some(&name),
                     Some(session.model()),
@@ -271,6 +279,14 @@ pub fn apply_edits(
         (ModelSource::File(_), Destination::Staging) => {
             let text = genmsi_format::to_string(&model);
             (false, None, Some(text))
+        }
+        // The trial: nothing is written and nothing is staged. The model
+        // travels with the answer, because there is no file that holds it
+        // now: the agent asked what would happen, and the answer is the
+        // model it would have written.
+        (ModelSource::File(_), Destination::Trial) => {
+            let text = genmsi_format::to_string(&model);
+            (false, Some(text.clone()), None)
         }
         (ModelSource::Inline(_), _) => {
             let text = genmsi_format::to_string(&model);

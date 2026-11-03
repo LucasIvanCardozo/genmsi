@@ -105,7 +105,7 @@ const GLOSSARY: &[(&str, &str)] = &[
     ),
     (
         "JoinNumber",
-        "Joins the group Grupo and waits until it holds Numero transactions.",
+        "Joins the group Grupo and lets the transaction continue: the engine does not wait for the group to hold Numero transactions.",
     ),
     (
         "Leave",

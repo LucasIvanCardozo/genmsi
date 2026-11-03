@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 use genmsi_core::live::{LiveBody, write_live};
-use genmsi_core::open_model::APP_IDENTIFIER;
+use genmsi_core::app_data::APP_IDENTIFIER;
 use serde_json::{Value, json};
 
 /// A model that works: a generator, a terminator and the link between them.

@@ -13,7 +13,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
-use genmsi_core::open_model::APP_IDENTIFIER;
+use genmsi_core::app_data::APP_IDENTIFIER;
 use genmsi_core::{LiveBody, write_live};
 use genmsi_mcp::GenmsiServer;
 use rmcp::model::{CallToolRequestParams, ContentBlock};

@@ -37,6 +37,7 @@ pub mod proposal;
 pub mod report;
 pub mod replication;
 pub mod rng;
+pub mod semantics;
 pub mod sim;
 pub mod stat;
 pub mod xact;
@@ -47,9 +48,9 @@ pub use documents::{
     ClassesDocument, ClassListDocument, ClassListEntry, DefinitionCounts, EDIT_SCHEMA,
     EXPLAIN_SCHEMA, Envelope, EditDocument, EditProposal, LINT_SCHEMA, LintDocument, MODEL_SCHEMA,
     ModelBlock, ModelDocument, ModelEdge, ModelPort, ModelProperty, ModelRect, OPEN_MODEL_SCHEMA,
-    REPORT_SCHEMA, TRACE_SCHEMA, TraceDocument, catalogue_document, class_document,
-    class_list_document, edit_document, lint_diagnostics, lint_document, model_document,
-    to_pretty_json, trace_document,
+    REPORT_SCHEMA, TRACE_SCHEMA, TRACE_SUMMARY_SCHEMA, TraceDocument,
+    catalogue_document, class_document, class_list_document, edit_document, lint_diagnostics,
+    lint_document, model_document, to_pretty_json, trace_document, trace_summary,
 };
 pub use error::EngineError;
 pub use live::{
@@ -73,9 +74,11 @@ pub use replication::{
     MetricSummary, ReplicationConfig, ReplicationResult, render_summary, replicate,
 };
 pub use sim::{
-    BlockStats, DEFAULT_MAX_EVENTS, DEFAULT_START, EndReason, RunResult, SimConfig, Simulation,
-    TraceEvent,
+    BlockStats, BlockSummary, DEFAULT_MAX_EVENTS, DEFAULT_START, EndReason, RunResult, SimConfig,
+    Simulation, TraceEvent, TraceFilter, TraceSummary,
 };
+
+pub use semantics::{CONTRACTS as SEMANTIC_CONTRACTS, Semantics, contract};
 
 use genmsi_format::GmdlModel;
 

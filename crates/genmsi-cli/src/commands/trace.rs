@@ -66,6 +66,7 @@ mod tests {
             time,
             xact,
             block,
+            node: 0,
             class: "Queue".to_string(),
             label: None,
             event: "enter",

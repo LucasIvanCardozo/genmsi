@@ -222,3 +222,41 @@ El método que sigue es el que cada subagente recibe:
    SelectSNA, Tabulate); F6 funciones y variables (Function, FunctionDist,
    FunctionExpon, MFunction, MFunctionDist, Multifurcacion, MultifurcacionP,
    Table, Variable, VariableA, VariableN).
+
+L11 (2026-11-02, T1, las seis familias): cada familia la escribió un
+subagente que leyó el motor (el `expand` que compila la clase y su
+ejecución) y la contrastó con las respuestas grabadas del original. Lo que
+quedó resuelto, y era lo que la sesión `chat` había adivinado por sondeo:
+- `Seize` de un recurso ocupado **sí** bloquea (la transacción espera en la
+  cadena de retraso del recurso);
+- **terminar una transacción no libera lo que tenía**: el recurso queda
+  tomado hasta un `Release` explícito;
+- el `Loop` repite por su **puerto 3** (`Salida2`, el epígrafe `loop`) y sale
+  por el puerto 2 (`Salida1`), y con el puerto de repetición sin conectar el
+  bucle corre **una vez, sin error**;
+- una función **no recibe argumento**: la variable independiente es el
+  `Atributo` del propio bloque;
+- un `Select` con `ClaseSNA=SV` **recorre los almacenamientos**, y el
+  prefijo que lee un save value es `X:`;
+- la cadena la crea el uso y la nombra la propiedad `Cadena`.
+
+Dos descripciones de una línea del propio motor **minten** y quedaron
+corregidas: el `Counter` no cuenta las llegadas de un grupo (suma
+`Incremento` a un save value y copia la cuenta a un parámetro) y el
+`ExamineNumber` no espera (comprueba y bifurca).
+
+Y una afirmación del worker resultó falsa: el catálogo **sí** declara
+`Variable.Expresion` y `MFunctionDist.Resultados` (las propiedades se declaran
+en la especificación de la clase, no en la tabla de valores por defecto).
+
+L12 (2026-11-02, T2, la publicación): el documento de una clase lleva ahora
+el contrato (`semantics`), y el catálogo lo publica. El campo es aditivo: un
+lector que no lo mira no cambia, y una clase sin contrato lo dice en vez de
+inventar uno.
+
+L13 (2026-11-02, T3, lo que falta): las reglas **falsificables** de los
+contratos necesitan un test que las compruebe. Con lo que hay hoy, el
+oráculo mide el motor contra el original en los modelos de referencia, y los
+tests de divergencias fijan lo que se aparta; lo que falta es un test por
+regla del contrato que se pueda Falsear. Queda como la primera tarea de la
+siguiente sesión.

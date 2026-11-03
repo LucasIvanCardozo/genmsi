@@ -259,3 +259,62 @@ mintiendo. El comentario de la gramática quedó corregido.
 El arreglo que de verdad importa no es otra tabla: es que **la tabla la
 publica el motor** y que un test la compare con la gramática, para que no
 puedan discrepar (T5).
+
+L10 (2026-11-02, T3 y T4, el núcleo): el filtro se aplica **al registrar el
+evento** (`record_trace`), así que el límite cuenta lo que pasa el filtro: el
+agente que pide los eventos de una clase recibe esos eventos, no el principio
+del relato. El resumen (las entradas de cada bloque, su primer y último
+tiempo) se acumula **fuera de la traza**: no lo corta el límite y se calcula
+con la traza apagada. El evento de la traza lleva el `node` (el `moduleid`
+del bloque del documento) y el statement lleva la posición de su bloque en el
+`.gmdl`: la pregunta "qué bloque es el 218" tiene respuesta de una línea.
+
+L11 (2026-11-02, T3 y T4, el MCP): `get_trace` toma los filtros (`classes`,
+`nodes`, `xact`, `from`, `to`) y el `summary`; el documento de la traza
+publica el filtro que usó; y el documento del explain lleva el **mapa**: una
+fila por statement, con el `node` del bloque del documento, el **nombre que
+le dio el agente** y su línea y columna. El `until` es el horizonte de la
+corrida y el `from`/`to` son la ventana del filtro: son dos cosas y la
+descripción lo dice.
+
+L12 (2026-11-02, el defecto que encontró la familia F1): un `Depart` de una
+cola en la que la transacción nunca entró **hacía caer al motor**: la salida
+cuenta una espera cero y la cola no tiene ninguna entrada de la que restarla,
+así que la resta se iba por debajo de cero y el motor entraba en pánico al
+escribir el reporte. La resta es saturada ahora, y dos tests lo fijan. Un
+modelo que una persona puede escribir no puede tirar el motor.
+
+L13 (2026-11-02, la guía estaba atrasada y la medición lo dijo): la guía no
+mencionaba el ensayo, ni los filtros de la traza, ni el resumen, ni el mapa;
+su tabla de comandos listaba 8 de las 12 operaciones; y decía que un nombre
+de propiedad mal escrito es silencioso, lo cual es cierto **por la vía de la
+escritura a mano** y falso por la vía de la edición (`setProperty` falla y
+nombra la propiedad y el bloque). Todo corregido, y la guía dice ahora que la
+semilla hay que pasarla explícita (la que se dibuja al azar hace que dos
+corridas "iguales" no sean la misma).
+
+L14 (2026-11-02, T5 y T6, la guía y la cadena): la cadena se nombra con la
+propiedad `Cadena` (el modelo de referencia `TP7__Clase 7_1_Link_Unlink` la
+nombra `Cadena`), la crea el uso, y **no** es la etiqueta de conexión
+(`A_Queue`): lo comprobé de punta a punta — renombré la cadena del modelo de
+referencia con `setProperty` y la simulación dio los mismos números (51, 3,
+3, 52). Y el comentario de la gramática decía que `#` es "división entera"
+cuando el parser dice `"#" => BinOp::Mul`: la guía tenía razón y la
+gramática mintiendo; el comentario quedó corregido.
+
+L15 (2026-11-02, la medición en frío, `odd/tasks/medida5/`): 32 llamadas
+reales contra la superficie nueva. El agente dejó el cambio como propuesta
+sin tocar el archivo del lector (el md5 del archivo es el mismo antes y
+después), provocó tres fallos a propósito y los tres lo nombraron sin tocar
+el código, usó los filtros, el resumen y el mapa. Lo que encontró:
+- **el motor acepta un operando numérico que no es un número en silencio**
+  (`Media="no-es-un-numero"` compila y la simulación cambia): un `dry_run`
+  que dice "ok" sobre eso da una falsa confianza. Es el hueco más serio que
+  quedó;
+- **sin la app corriendo ninguna herramienta devuelve el veredicto**: el
+  estado de la propuesta vive en el documento que va al lado del modelo, y
+  ahora la respuesta dice dónde está (`proposal.document`);
+- el resumen no trae el nombre del bloque: hay que cruzarlo con el mapa, y
+  el cruce (por el número de statement) ahora está documentado;
+- un `XDG_DATA_HOME` **relativo** se descarta en silencio y el MCP pasa a
+  hablar con la app real de la máquina: documentado en `docs/mcp.md`.

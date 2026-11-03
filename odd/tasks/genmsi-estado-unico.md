@@ -108,3 +108,31 @@ L4 (2026-11-02, análisis, la asimetría): `open_model` responde un subconjunto
 de lo que responde `app_state`: el modelo abierto y el pid, sin el `dirty`,
 sin los diagnósticos, sin la corrida y sin la propuesta. La herramienta que
 sobra es la que responde menos.
+
+L5 (2026-11-02, T1 y T2, el núcleo y el MCP): el documento vivo es la
+única fuente del modelo abierto: `genmsi_core::live::open_model_from_live`
+lo lee de ahí (con la regla de siempre: un pid muerto no cuenta), y la
+herramienta `open_model` **desaparece**. El conjunto de herramientas pasa de
+nueve a ocho, y `crates/genmsi-mcp/tests/tools.rs` lo fija.
+
+El módulo del núcleo que alojaba el documento del modelo abierto se quedó
+con lo que sigue siendo cierto —dónde viven los datos de la app y si un
+proceso vive— y se renombró `app_data`: el nombre viejo mentía.
+
+L6 (2026-11-02, T3, la app): la app publica el estado vivo después de
+**cada** petición, incluso de las que terminan en un error: con un solo
+archivo como fuente, "siempre publicar" es la invariante que evita que el
+`dirty` y el archivo del disco cuenten historias distintas. El shell ya lo
+hacía; se cerró un agujero (una petición que terminaba en error se saltaba
+la publicación).
+
+L7 (2026-11-02, T4, la versión): el cambio **rompe** —una herramienta del
+conjunto y un documento publicado se van— y la regla (D13) es que un cambio
+que rompe sube el número: la versión va a **0.5.0**, escrita en las siete
+copias por `scripts/bump-version.sh`.
+
+L8 (2026-11-02, lo que queda): el **puente de desarrollo** (el modo del
+navegador) nunca publica el estado vivo, así que en ese modo el agente
+sigue sin ver el estado de la app. Y `live.json` no se publica hasta que
+hay una petición: una app recién abierta, sin Modelo y sin petición, no
+tiene estado publicado.

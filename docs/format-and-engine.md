@@ -211,24 +211,26 @@ text in entity-name positions.
   original stops the run with "Referencia a una entidad storage inexistente",
   and the compiler refuses the model before it runs.
 
-### Known deviation, not settled: the first interval with a dispersion
+### Settled: the first interval with a dispersion is drawn
 
-With a dispersion (`B` not empty and not zero), the original **draws** the
-first interarrival from `A` and `B`, like every other interarrival, and our
-engine does not: it schedules the first arrival at exactly `A` and starts
-drawing from the second interval on (`crates/genmsi-core/src/sim.rs`,
-`Simulation::init`). The original's manual says the first increment is
-"calculated from the operands A and B"; with `A` alone that is the exact `A`
-our engine uses, but with a dispersion it is a draw.
+With a dispersion (`B` not empty and not zero), the first interarrival is
+**drawn** from `A` and `B`, like every other interarrival. The original's
+manual says the first increment is "calculated from the operands A and B";
+with `A` alone that is the exact `A`, and with a dispersion it is a draw.
 
-The consequence shows with several copies of the same generator: ours release
-their first transaction all at the same instant, the original staggers them.
-
-This is **not settled**. No count of entries can separate the two readings,
-because the expected number of arrivals is the same either way — the measured
-difference is 0.01 arrivals over 200,000 samples. The evidence, the models it
-cannot settle and the proposed change are in
-`odd/tasks/notas-primera-llegada.md`.
+This used to be a known deviation — the engine scheduled the first arrival at
+exactly `A` and started drawing from the second interval on — and it is
+**settled**: the engine draws the first one too
+(`crates/genmsi-core/src/sim.rs`, `first_arrival` → `apply_modifier`), and
+`crates/genmsi-core/tests/primera_llegada.rs` pins the three cases the rule
+has (with a spread the first arrival is drawn and not the mean; without a
+spread there is nothing to draw and the first arrival is the mean, exactly;
+with an offset the offset is the increment of the first transaction and
+nothing is drawn). The measurement that settled it is in
+`odd/tasks/notas-primera-llegada.md`: sixty first arrivals of the original
+read with a `MARK` give a mean of 57.133 against the 60 the model asks for,
+and the Kolmogorov-Smirnov test against `U(30,90)` does not reject the
+uniform (D=0.1167, p=0.3666).
 
 ## 6. Validation inferred from the five error outputs
 

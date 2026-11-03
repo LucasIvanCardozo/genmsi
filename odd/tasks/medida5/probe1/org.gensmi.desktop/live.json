@@ -1,0 +1,14 @@
+{
+  "schema": "genmsi.live/1",
+  "path": "/home/lucas/Documentos/Workspace/Genmsi/odd/tasks/medida5/modelo.gmdl",
+  "pid": 382987,
+  "dirty": true,
+  "diagnostics": [],
+  "model": null,
+  "run": null,
+  "proposal": {
+    "id": "1793667085547-f375446fe41f5376",
+    "state": "pending",
+    "note": null
+  }
+}

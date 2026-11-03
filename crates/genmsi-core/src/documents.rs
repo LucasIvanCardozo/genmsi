@@ -11,7 +11,7 @@ use serde::Serialize;
 use crate::glossary;
 use crate::program::Program;
 use crate::program::borders::{LinkKey, hops_of};
-use crate::sim::{RunResult, TraceEvent};
+use crate::sim::{RunResult, TraceEvent, TraceFilter, TraceSummary};
 use genmsi_format::{GmdlModel, percent_decode};
 
 /// Schema id of the `lint` document.
@@ -20,6 +20,8 @@ pub const LINT_SCHEMA: &str = "genmsi.lint/1";
 pub const REPORT_SCHEMA: &str = "genmsi.report/1";
 /// Schema id of the `trace` document.
 pub const TRACE_SCHEMA: &str = "genmsi.trace/1";
+/// Schema id of the `trace summary` document.
+pub const TRACE_SUMMARY_SCHEMA: &str = "genmsi.trace_summary/1";
 /// Schema id of the `explain` document.
 pub const EXPLAIN_SCHEMA: &str = "genmsi.explain/1";
 
@@ -192,6 +194,12 @@ pub struct EditProposal {
     pub id: String,
     /// The absolute path of the model the proposal carries.
     pub model: String,
+    /// The absolute path of the document that describes the proposal.
+    ///
+    /// It is where the **verdict** lives: the app writes the state of the
+    /// proposal there when the person decides, and an agent whose app is
+    /// closed reads it there.
+    pub document: String,
 }
 
 /// Build the `genmsi.edit/1` body from the lint of the model it edited.
@@ -690,6 +698,12 @@ pub struct ClassDocument {
     pub uses: Vec<CatalogueEntity>,
     /// The XML of a minimal, valid block of this class.
     pub template: String,
+    /// What the class does to the simulation.
+    ///
+    /// The contract of the class, in four parts: what it does to the flow of
+    /// the transaction, what it blocks, the rules of taking and releasing,
+    /// and the traps. It is empty for a class the contracts do not cover.
+    pub semantics: Option<crate::semantics::Semantics>,
 }
 
 /// An entity a class declares or uses.
@@ -729,6 +743,7 @@ pub fn class_document(class: &str) -> Option<ClassDocument> {
         declares,
         uses,
         template: spec.template(),
+        semantics: crate::semantics::contract(spec.class).copied(),
     })
 }
 
@@ -787,6 +802,12 @@ pub struct TraceDocument<'a> {
     pub records: usize,
     /// Whether the limit may have cut the trace.
     pub truncated: bool,
+    /// What was filtered out of the trace.
+    ///
+    /// The filter is applied when the event is recorded, so the limit
+    /// counts the events that pass it: the document says which ones were
+    /// kept, and the agent does not have to guess what it is not seeing.
+    pub filter: &'a TraceFilter,
     /// Trace records, in simulation order.
     pub events: &'a [TraceEvent],
 }
@@ -806,7 +827,24 @@ pub fn trace_document<'a>(result: &'a RunResult, limit: usize) -> TraceDocument<
         limit,
         records,
         truncated: records >= limit,
+        filter: &result.filter,
         events: &result.trace,
+    }
+}
+
+/// Build the `genmsi.trace_summary/1` body for a finished run.
+///
+/// The summary is the **whole** summary of the run: the blocks and what each
+/// of them did, and not the events. A run that did not ask for the summary
+/// has an empty one, and the document says so with an empty list of blocks.
+pub fn trace_summary(result: &RunResult) -> TraceSummary {
+    TraceSummary {
+        title: result.title.clone(),
+        seed: result.seed,
+        start_time: result.start_time,
+        end_time: result.end_time,
+        end_reason: result.end_reason.as_str().to_string(),
+        blocks: result.summary.clone(),
     }
 }
 

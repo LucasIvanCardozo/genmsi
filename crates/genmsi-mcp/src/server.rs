@@ -97,7 +97,7 @@ impl RunInput {
     }
 }
 
-/// The model, the knobs of a run and the bound of the trace.
+/// The model, the knobs of a run, the bound of the trace and its filters.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct TraceInput {
     /// Path of the `.gmdl` model file.
@@ -120,14 +120,62 @@ pub struct TraceInput {
     #[serde(default = "default_start")]
     pub start: u64,
     /// Maximum number of trace records to keep.
+    ///
+    /// The limit counts the events that pass the filter, and not the events
+    /// of the run.
     #[serde(default = "default_limit")]
     pub limit: usize,
+    /// Keep only the events of these classes of block.
+    ///
+    /// The names are the classes of the catalogue (`"Queue"`, `"Terminate"`,
+    /// ...). Empty (the default) keeps the events of every class.
+    #[serde(default)]
+    pub classes: Vec<String>,
+    /// Keep only the events of these blocks of the document.
+    ///
+    /// The numbers are the `moduleid` of the blocks —the `node` the events
+    /// carry and the `node` the map of the explain publishes—. Empty (the
+    /// default) keeps the events of every block.
+    #[serde(default)]
+    pub nodes: Vec<u32>,
+    /// Keep only the events of this transaction.
+    ///
+    /// Without it the events of every transaction are kept.
+    #[serde(default)]
+    pub xact: Option<u64>,
+    /// Keep only the events from this simulated time on.
+    #[serde(default)]
+    pub from: Option<f64>,
+    /// Keep only the events until this simulated time.
+    #[serde(default)]
+    pub to: Option<f64>,
+    /// Answer with the summary of the run instead of its events.
+    ///
+    /// The summary says how many times the flow went through each block, and
+    /// the first and the last time it went through it.
+    #[serde(default)]
+    pub summary: bool,
 }
 
 impl TraceInput {
     /// The model the agent asked for.
     pub fn source(&self) -> Result<ModelSource, Failure> {
         source_of(&self.path, &self.model)
+    }
+
+    /// The filter the agent asked for.
+    ///
+    /// The filter goes to the engine, which applies it when the event is
+    /// recorded: an empty filter keeps every event, exactly as a run without
+    /// a filter does.
+    pub fn filter(&self) -> genmsi_core::TraceFilter {
+        genmsi_core::TraceFilter {
+            classes: self.classes.clone(),
+            nodes: self.nodes.clone(),
+            xact: self.xact,
+            from: self.from,
+            to: self.to,
+        }
     }
 }
 
@@ -205,6 +253,13 @@ pub struct EditInput {
     /// It travels with the proposal, so the person reads it before deciding.
     #[serde(default)]
     pub summary: Option<String>,
+    /// Try the batch without writing it.
+    ///
+    /// The commands are applied and the model is compiled, and **nothing is
+    /// written**: the answer says what would have happened, and carries the
+    /// model it would have written.
+    #[serde(default)]
+    pub dry_run: bool,
 }
 
 impl EditInput {
@@ -255,7 +310,7 @@ fn source_of(path: &Option<String>, model: &Option<String>) -> Result<ModelSourc
 /// Without a model open there is no destination to guess: the failure is its
 /// own class, and it says what to do.
 fn open_model_path() -> Result<PathBuf, Failure> {
-    match genmsi_core::current_open_model().and_then(|document| document.path) {
+    match genmsi_core::live::open_model_from_live().and_then(|document| document.path) {
         Some(path) => Ok(PathBuf::from(path)),
         None => Err(Box::new(ToolError::no_open_model())),
     }
@@ -286,6 +341,8 @@ struct Staged {
     id: String,
     /// The model the proposal carries.
     model: PathBuf,
+    /// The document that describes the proposal: where its verdict lives.
+    document: PathBuf,
 }
 
 /// Leave a model in the staging area of the app.
@@ -305,8 +362,12 @@ fn stage(text: &str, target: &Path, summary: Option<&str>) -> Result<Staged, Fai
         .map_err(ToolError::cannot_stage)?;
     let document = genmsi_core::ProposalDocument::pending(&id, &model, Some(target))
         .with_summary(summary);
-    genmsi_core::write_proposal(&directory, &document).map_err(ToolError::cannot_stage)?;
-    Ok(Staged { id, model })
+    let written = genmsi_core::write_proposal(&directory, &document).map_err(ToolError::cannot_stage)?;
+    Ok(Staged {
+        id,
+        model,
+        document: written,
+    })
 }
 
 /// The default seed of a run: one drawn at random, as the CLI does.
@@ -369,10 +430,11 @@ impl GenmsiServer {
     /// Run a model and return its event trace.
     ///
     /// Returns the `genmsi.trace/1` document, the same one `genmsi trace
-    /// --json` prints.
+    /// --json` prints. The trace can be filtered, and the run can be
+    /// summarized.
     #[tool(
         name = "get_trace",
-        description = "Simulate a GenMSI model and return its event trace. Takes `path` or `model`, plus the optional `seed`, `until`, `start` and `limit`, and returns the genmsi.trace/1 document."
+        description = "Simulate a GenMSI model and return its event trace, or —with `summary`— the summary of the run. Takes `path` or `model`, plus the optional `seed`, `until`, `start` and `limit`, and returns the genmsi.trace/1 document. The trace can be FILTERED: `classes` keeps only the events of those block classes (\"Queue\", \"Terminate\", ...), `nodes` keeps only the events of those blocks of the document (their `moduleid`, the `node` every event carries), `xact` keeps only the events of that transaction, and `from` and `to` keep only the events of that window of simulated time (the window is closed at both ends; `until` is something else: it is the horizon of the run). The filter is applied in the engine WHEN THE EVENT IS RECORDED, so `limit` counts the events that pass the filter and not the events of the run: asking for the events of one class gives those events, not the first ones of the run. Without a filter the answer is the whole trace, exactly as before. With `summary: true` the tool answers the genmsi.trace_summary/1 document instead: for every block, how many times the flow went through it and the first and the last time it went through it — the question the agent asks the ninety percent of the time (\"how many times did the flow go through here?\") — and not the events. The summary is the summary of the WHOLE run, and the filters do not cut it."
     )]
     pub fn get_trace(&self, Parameters(input): Parameters<TraceInput>) -> CallToolResult {
         finish(trace_document(&input))
@@ -381,10 +443,11 @@ impl GenmsiServer {
     /// Describe a model: its blocks, its operands and what each statement does.
     ///
     /// Returns the `genmsi.explain/1` document: the engine's own program
-    /// description plus the glossary of the classes the model uses.
+    /// description, the map between the statements and the blocks of the
+    /// document, and the glossary of the classes the model uses.
     #[tool(
         name = "explain_model",
-        description = "Describe a GenMSI model: its blocks, operands and ports, plus what each GPSS statement of the model does. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text) and returns the genmsi.explain/1 document."
+        description = "Describe a GenMSI model: its blocks, operands and ports, plus what each GPSS statement of the model does. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text) and returns the genmsi.explain/1 document. The document has three parts: `program` is the compiled GPSS (one entry per statement, with the block of the document it came from and the line and column of that block in the .gmdl), `model` is the document itself, with every block, its properties by name and the links that wire the blocks, and `map` joins the two: one row per compiled statement, with the `node` of the block of the document it came from, the class of that statement, the name the agent gave the block (its `caption`) and the line and column of the block in the .gmdl. With the `node` that every event of the trace carries, the map answers \"what block is the statement 218?\" in one line."
     )]
     pub fn explain_model(&self, Parameters(input): Parameters<ModelInput>) -> CallToolResult {
         finish(explain_document(&input))
@@ -402,17 +465,6 @@ impl GenmsiServer {
     )]
     pub fn catalogue(&self, Parameters(input): Parameters<CatalogueInput>) -> CallToolResult {
         finish(catalogue_document(input.class.as_deref(), input.classes.as_deref()))
-    }
-
-    /// Say which model the app has open.
-    ///
-    /// Returns the `genmsi.openmodel/1` document.
-    #[tool(
-        name = "open_model",
-        description = "Say which model the GenMSI desktop app has open, so you do not have to guess where to write it. It returns the genmsi.openmodel/1 document: `path` is the absolute path of the file the app has open and `pid` is the process that has it open; both are null when the app is not running. Write the model to that path (with save_model) and the app, which watches the file it has open, reloads it and runs it again, so the reader sees the change."
-    )]
-    pub fn open_model(&self) -> CallToolResult {
-        finish(Ok(genmsi_core::open_model_document()))
     }
 
     /// Say what the app is showing right now.
@@ -451,7 +503,7 @@ impl GenmsiServer {
     /// The batch is atomic: a command that fails leaves the model as it was.
     #[tool(
         name = "apply_edit",
-        description = "Add, edit and connect the blocks of a GenMSI model. The commands are the engine's own editing commands, the same ones the desktop application speaks: `addBlock` {class, container, x, y} creates a block of a catalogue class (call `catalogue` first: it gives the class names, their ports (ioid) and their properties), `connect` {from, fromIoid, to, toIoid} wires an output port to an input port, `setProperty` {id, property, value} sets a declared property, `setCaption` {id, caption} names a block, `moveBlock` {id, x, y} moves one, `removeBlock` {id} takes one away and `removeBlocks` {ids} takes several away as ONE operation; the schema of the tool carries the whole vocabulary. The commands are applied in order and the batch is ATOMIC: if one fails, none is applied and the failure names the command that failed. `layout` says where the blocks the batch adds go: `auto` (the default) puts every block an `addBlock` adds where there is room in its container, like a drop in the application; `explicit` uses the `x` and the `y` of the command. The model is checked before it is written: one that does not compile is NOT written, and the error names the block that caused it. The blocks the batch creates take the next free ids, in the order of the commands. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text): `path` may be left out, and then the model the app has open is the one the batch edits; a `path` that is not on the disk yet is a model the batch CREATES, and the file is written when the model compiles. `target` says where the result goes: `file` (the default) writes it to the file the batch edited, and `proposal` leaves the model in the staging area of the app, without touching the disk, where the person sees it and decides to accept it or to discard it — the verdict comes back in `app_state`. `summary` is one line about what the batch did; it travels with the proposal. Returns the genmsi.edit/1 document."
+        description = "Add, edit and connect the blocks of a GenMSI model. The commands are the engine's own editing commands, the same ones the desktop application speaks: `addBlock` {class, container, x, y} creates a block of a catalogue class (call `catalogue` first: it gives the class names, their ports (ioid) and their properties), `connect` {from, fromIoid, to, toIoid} wires an output port to an input port, `setProperty` {id, property, value} sets a declared property, `setCaption` {id, caption} names a block, `moveBlock` {id, x, y} moves one, `removeBlock` {id} takes one away and `removeBlocks` {ids} takes several away as ONE operation; the schema of the tool carries the whole vocabulary. The commands are applied in order and the batch is ATOMIC: if one fails, none is applied and the failure names the command that failed —its index, its `op`, the block it was about with the class and the name the agent gave it, and the property it was setting. `layout` says where the blocks the batch adds go: `auto` (the default) puts every block an `addBlock` adds where there is room in its container, like a drop in the application; `explicit` uses the `x` and the `y` of the command. `dry_run` tries the batch WITHOUT writing it: the commands are applied and the model is compiled, nothing is written, and the answer carries the model it would have written. The model is checked before it is written: one that does not compile is NOT written, and the error names the block that caused it. The blocks the batch creates take the next free ids, in the order of the commands. Takes `path` (a .gmdl file) or `model` (the .gmdl document as text): `path` may be left out, and then the model the app has open is the one the batch edits; a `path` that is not on the disk yet is a model the batch CREATES, and the file is written when the model compiles. `target` says where the result goes: `file` (the default) writes it to the file the batch edited, and `proposal` leaves the model in the staging area of the app, without touching the disk, where the person sees it and decides to accept it or to discard it — the verdict comes back in `app_state`. `summary` is one line about what the batch did; it travels with the proposal. Returns the genmsi.edit/1 document."
     )]
     pub fn apply_edit(&self, Parameters(input): Parameters<EditInput>) -> CallToolResult {
         finish(edit_document(&input))
@@ -468,6 +520,56 @@ struct ExplainBody {
     model: genmsi_core::ModelDocument,
     /// What each statement of the model does.
     glossary: BTreeMap<String, String>,
+    /// The map between the compiled statements and the blocks of the document.
+    map: Vec<StatementMap>,
+}
+
+/// The map between the compiled statements and the blocks of the document.
+///
+/// The trace numbers the **statements** of the compiled program, and the
+/// model numbers the **blocks** of the document: this map joins the two, so
+/// the agent does not have to invert the order of the compilation by hand.
+#[derive(Debug, Clone, Serialize)]
+pub struct StatementMap {
+    /// The statement: its index in the program.
+    pub statement: usize,
+    /// The block of the document it came from (its `moduleid`).
+    pub node: u32,
+    /// The class of the block.
+    pub class: String,
+    /// The name the agent gave the block (its `caption`).
+    pub caption: String,
+    /// The line of the block in the `.gmdl`, when it has a position.
+    pub line: Option<u32>,
+    /// The column of the block in the `.gmdl`, when it has a position.
+    pub column: Option<u32>,
+}
+
+/// The map between the compiled statements and the blocks of the document.
+///
+/// One row per statement, in the order of the program: the program knows the
+/// block of the document the statement came from, the class it compiled to
+/// and the place of that block in the `.gmdl`, and the model knows the name
+/// the agent gave the block.
+fn statement_map(loaded: &engine::Loaded) -> Vec<StatementMap> {
+    loaded
+        .program
+        .blocks
+        .iter()
+        .enumerate()
+        .map(|(statement, block)| StatementMap {
+            statement,
+            node: block.module_id,
+            class: block.class.clone(),
+            caption: loaded
+                .model
+                .block(block.module_id)
+                .map(|module| module.caption.clone())
+                .unwrap_or_default(),
+            line: block.source.map(|position| position.line as u32),
+            column: block.source.map(|position| position.column as u32),
+        })
+        .collect()
 }
 
 /// The explain document of a model.
@@ -477,6 +579,7 @@ fn explain_document(input: &ModelInput) -> Result<String, Failure> {
         program: genmsi_core::program_json(&loaded.program),
         model: genmsi_core::model_document(&loaded.model, &loaded.name),
         glossary: glossary::for_model(&loaded.model),
+        map: statement_map(&loaded),
     };
     Ok(genmsi_core::to_pretty_json(
         genmsi_core::EXPLAIN_SCHEMA,
@@ -550,16 +653,23 @@ fn app_state_document() -> String {
 /// The document of an edit.
 fn edit_document(input: &EditInput) -> Result<String, Failure> {
     let source = input.source()?;
-    let destination = match input.target {
-        Target::File => Destination::File,
-        Target::Proposal => Destination::Staging,
+    // The trial comes first: a dry run writes nothing, whatever the target
+    // says. The engine already compiles the model before it writes it, so
+    // the trial is the same road without the writing.
+    let destination = if input.dry_run {
+        Destination::Trial
+    } else {
+        match input.target {
+            Target::File => Destination::File,
+            Target::Proposal => Destination::Staging,
+        }
     };
     // The proposal is about the model the agent worked on: the file it
     // named, or the model the app has open when it named none. It is
     // resolved before the batch runs, so a proposal that has nowhere to go
     // fails without touching anything.
     let target = match destination {
-        Destination::File => None,
+        Destination::File | Destination::Trial => None,
         Destination::Staging => Some(destination_path(&input.path)?),
     };
     let edited = engine::apply_edits(&source, &input.commands, input.layout, destination)?;
@@ -575,6 +685,7 @@ fn edit_document(input: &EditInput) -> Result<String, Failure> {
             Some(genmsi_core::documents::EditProposal {
                 id: staged.id,
                 model: staged.model.display().to_string(),
+                document: staged.document.display().to_string(),
             })
         }
     };
@@ -662,11 +773,29 @@ fn report_document(input: &RunInput) -> Result<String, Failure> {
 }
 
 /// The trace document of a run.
+///
+/// With `summary` the answer is the summary of the run —the `genmsi.trace_summary/1`
+/// document— and not the events. The summary is the summary of the **whole**
+/// run: the filters cut the events, and not the summary.
 fn trace_document(input: &TraceInput) -> Result<String, Failure> {
     let loaded = engine::load(&input.source()?)?;
     let start = checked_start(input.start)?;
-    let config = engine::config(input.seed, input.until, start, true, input.limit);
+    let config = engine::trace_config(
+        input.seed,
+        input.until,
+        start,
+        input.limit,
+        input.filter(),
+        input.summary,
+    );
     let result = engine::run(&loaded, config)?;
+    if input.summary {
+        let summary = genmsi_core::trace_summary(&result);
+        return Ok(genmsi_core::to_pretty_json(
+            genmsi_core::TRACE_SUMMARY_SCHEMA,
+            &summary,
+        ));
+    }
     let document = genmsi_core::trace_document(&result, input.limit);
     Ok(genmsi_core::to_pretty_json(
         genmsi_core::TRACE_SCHEMA,
@@ -697,7 +826,14 @@ impl ServerHandler for GenmsiServer {
              Use `lint` to validate a model, `simulate` to run it, `get_trace` to read \
              its events and `explain_model` to describe it: its `program` is the \
              compiled GPSS and its `model` is the document itself, with every block, \
-             its properties by name and the links that wire the blocks. Give the model \
+             its properties by name and the links that wire the blocks. \
+             `get_trace` can be FILTERED (`classes`, `nodes`, `xact`, `from`, `to`) \
+             and can answer with the summary of the run (`summary`), which says how \
+             many times the flow went through each block; `explain_model` publishes \
+             the `map` that joins the statements of the compiled program with the \
+             blocks of the document, and every event of the trace carries the `node` \
+             of the block of the document it came from. \
+             Give the model \
              either as `path` (a .gmdl file) or as `model` (the .gmdl document as text); \
              when you give neither, the model the desktop app has open is the one the tool \
              works on: the same model the reader is looking at. \
@@ -708,8 +844,6 @@ impl ServerHandler for GenmsiServer {
              Two blocks are connected by a link inside the `<links>` of their container: \
              `<link frommoduleid=\"1\" fromioid=\"1\" tomoduleid=\"2\" toioid=\"1\"/>`, \
              where the ioids are the ports the catalogue publishes for the class. \
-             Call `open_model` to learn which file the desktop app has open: write \
-             the model there and the app reloads it and runs it again. \
              Call `app_state` to see what the reader is looking at right now (the \
              model the app has open, whether it has changes that are not saved, \
              what it found and the last run it made): ask it before you write on \
@@ -761,6 +895,12 @@ mod tests {
             until: None,
             start: 1,
             limit: 100,
+            classes: Vec::new(),
+            nodes: Vec::new(),
+            xact: None,
+            from: None,
+            to: None,
+            summary: false,
         }
     }
 
@@ -797,6 +937,54 @@ mod tests {
         let text = text_of(&result);
         assert!(text.contains("\"schema\": \"genmsi.trace/1\""), "{text}");
         assert!(text.contains("\"event\": \"generate\""), "{text}");
+    }
+
+    #[test]
+    fn the_trace_is_filtered_by_class() {
+        let mut input = trace_input();
+        input.classes = vec!["Terminate".to_string()];
+        let result = GenmsiServer::new().get_trace(Parameters(input));
+        assert_eq!(result.is_error, Some(false));
+        let text = text_of(&result);
+        assert!(text.contains("\"schema\": \"genmsi.trace/1\""), "{text}");
+        assert!(text.contains("\"class\": \"Terminate\""), "{text}");
+        assert!(
+            !text.contains("\"class\": \"Generate\""),
+            "the filter keeps only the events of the class: {text}"
+        );
+        // The document says what was filtered.
+        assert!(text.contains("\"classes\": ["), "{text}");
+        assert!(text.contains("\"Terminate\""), "{text}");
+    }
+
+    #[test]
+    fn the_summary_answers_the_summary_document() {
+        let mut input = trace_input();
+        input.summary = true;
+        let result = GenmsiServer::new().get_trace(Parameters(input));
+        assert_eq!(result.is_error, Some(false));
+        let text = text_of(&result);
+        assert!(
+            text.contains("\"schema\": \"genmsi.trace_summary/1\""),
+            "{text}"
+        );
+        assert!(text.contains("\"blocks\""), "{text}");
+        assert!(text.contains("\"entries\""), "{text}");
+        assert!(text.contains("\"first\""), "{text}");
+        assert!(text.contains("\"last\""), "{text}");
+    }
+
+    #[test]
+    fn the_explain_document_publishes_the_map_of_the_statements() {
+        let result = GenmsiServer::new().explain_model(Parameters(model_input()));
+        assert_eq!(result.is_error, Some(false));
+        let text = text_of(&result);
+        assert!(text.contains("\"map\""), "{text}");
+        assert!(text.contains("\"statement\": 0"), "{text}");
+        assert!(text.contains("\"node\": 1"), "{text}");
+        assert!(text.contains("\"caption\": \"g\""), "{text}");
+        assert!(text.contains("\"line\""), "{text}");
+        assert!(text.contains("\"column\""), "{text}");
     }
 
     #[test]
@@ -859,7 +1047,7 @@ mod tests {
         // to guess, and the failure is its own class and says what to do.
         match ModelInput::default().source() {
             Ok(ModelSource::File(path)) => {
-                let open = genmsi_core::current_open_model()
+                let open = genmsi_core::live::open_model_from_live()
                     .and_then(|document| document.path)
                     .expect("the app has a model open");
                 assert_eq!(path, PathBuf::from(open));

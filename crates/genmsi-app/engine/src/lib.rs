@@ -40,15 +40,13 @@ pub use genmsi_core::proposal::{
 // them, so the backends that speak it name them.
 pub use genmsi_format::edit::EditCommand;
 
-// The document that says which model the desktop application has open.
+// Where the data of the desktop application lives, and the facts the live
+// state needs about the process that writes it.
 //
-// The core owns the format: the shell publishes the file and the MCP
-// server reads it, and both go through these functions, so the two sides
-// cannot write different bytes.
-pub use genmsi_core::documents::OPEN_MODEL_SCHEMA;
-pub use genmsi_core::open_model::{
-    APP_IDENTIFIER, OPEN_MODEL_FILE, OpenModelDocument, app_data_dir, write_open_model,
-};
+// The live document is the **only** publication of the app's state: it
+// carries the model the app has open and the pid of the process that has
+// it. There is no second document, and no second writer.
+pub use genmsi_core::{APP_IDENTIFIER, AppDataError, app_data_dir, process_is_running};
 
 // The document that says what the desktop application is showing.
 //
@@ -56,7 +54,7 @@ pub use genmsi_core::open_model::{
 // functions and the MCP server reads it with the same ones, so the app
 // does not invent the shape of the state it publishes.
 pub use genmsi_core::live::{
-    LIVE_FILE, LiveBody, LiveRun, live_document, model_value, report_value, write_live,
+    LIVE_FILE, LiveBody, LiveRun, live_document, model_value, report_value, same_file, write_live,
 };
 
 /// How many runs the facade has made.

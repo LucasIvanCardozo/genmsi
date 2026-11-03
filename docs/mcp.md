@@ -5,8 +5,9 @@ the engine to an AI agent over stdio with the eight tools of decision D7 —
 `simulate`, `lint`, `get_trace` and `explain_model`, plus `save_model`, which
 writes a model the agent built, `apply_edit`, which builds and changes one
 block by block, `catalogue`, which tells the agent which block classes exist
-and what the XML of a block of each one looks like, and `open_model`, which
-tells the agent which model the desktop app has open. The
+and what the XML of a block of each one looks like, and `app_state`, which
+tells the agent what the desktop app is showing right now (the model it has
+open among it). The
 binary is a thin layer over `genmsi-core` and `genmsi-format`; it carries no
 simulation logic (decision D2), and the documents it returns are the ones the
 CLI publishes (decision D13).
@@ -33,7 +34,7 @@ Standard output belongs to the protocol: the server writes nothing else there.
 A failure that stops the server goes to standard error and the process exits
 with `1`.
 
-## The nine tools
+## The eight tools
 
 | Tool | What it does | Returns |
 |---|---|---|
@@ -44,10 +45,9 @@ with `1`.
 | `explain_model` | Describes the model: its blocks, its operands and what each statement does. | `genmsi.explain/1` |
 | `save_model` | Writes a model the agent built to a file, after checking that it compiles. | `genmsi.lint/1` |
 | `apply_edit` | Adds, edits and connects the blocks of a model: a batch of the engine's own editing commands. | `genmsi.edit/1` |
-| `open_model` | Says which model the desktop app has open: the file it has open and the process that has it. | `genmsi.openmodel/1` |
 | `app_state` | Says what the desktop app is showing right now: the model it has open, whether the reader has unsaved changes on it, what it found and the last run it made. | `genmsi.live/1` |
 
-Every tool but `catalogue` and `open_model` takes the model in one of two ways:
+Every tool but `catalogue` takes the model in one of two ways:
 
 - `path`: the path of a `.gmdl` file on disk.
 - `model`: the `.gmdl` document as text, for a model an agent is building and
@@ -169,10 +169,29 @@ Returns the `genmsi.report/1` document, the same document
 | `until` | number or null | — | Stop once the simulated clock passes this time. |
 | `start` | number | `1` | How many terminations the run waits for, like the original's `Start` field. The run ends when the counter reaches zero or below. The model does not declare it. A value below one is refused. |
 | `limit` | number | `100` | Maximum number of trace records to keep. |
+| `classes` | array of strings | — | Keep only the events of these classes (empty: all of them). |
+| `nodes` | array of numbers | — | Keep only the events of these blocks of the document (their `moduleid`; empty: all of them). |
+| `xact` | number | — | Keep only the events of this transaction. |
+| `from` | number | — | Keep only the events from this simulated time on. |
+| `to` | number | — | Keep only the events until this simulated time. |
+| `summary` | boolean | `false` | Answer with the summary of the run instead of the events. |
 
 Returns the `genmsi.trace/1` document, the same document `genmsi trace --json`
-prints. The trace has no filters (decision of the coordinator in Phase 2); the
-document says `truncated: true` when the bound may have cut it.
+prints. The document says `truncated: true` when the bound may have cut it.
+
+**The filters are applied when the event is recorded**, so the limit counts
+the events that **pass** the filter: an agent that asks for the events of one
+class gets those events, not the first ones of the run. The document carries
+the filter it used, so the agent knows what it is not seeing.
+
+`until` is the horizon of the **run**; `from` and `to` are the window of the
+**filter**: they cut the events of a run that goes on.
+
+**The summary** (`summary: true`) answers the `genmsi.trace_summary/1`
+document instead: what each block did — how many times a transaction entered
+it, the first and the last time — and not the events. It is the summary of
+the **whole run**, not of the events that were kept, and it is not cut by the
+limit. A block nobody entered is in it, with zero entries.
 
 ### `explain_model`
 
@@ -189,6 +208,15 @@ Returns the `genmsi.explain/1` document:
 | `program` | object | The engine's description of the compiled program: `title`, `start_counter`, `blocks[]` (`node`, `class`, `label`, `operands`, `ports`), `storages`, `functions`, `variables`, `random_variables`, `tables`, `qtables` and `diagnostics`. |
 | `model` | object | The model as the document writes it: `path`, `title`, `blocks[]` (`id`, `class`, `kind`, `name`, `caption`, `label`, `container`, `layout`, `properties[]` (`name`, `value`, `ty`, `subtype`, `hint`, `unique`, `visible`), `inputs[]` and `outputs[]` (`ioid`, `name`, `caption`, `label`)) and `edges[]` (`from_module`, `from_ioid`, `from_port`, `to_module`, `to_ioid`, `to_port`, `label`, `container`). It is the `genmsi.model/1` document the desktop app reads. |
 | `glossary` | object | What each GPSS statement of the model does, keyed by class. Only the classes the model uses appear. |
+| `map` | array | The **map between the compiled statements and the blocks of the document**: one row per statement, with `statement` (its index in the program), `node` (the `moduleid` of the block it came from), `class`, `caption` (the name the agent gave the block) and `line` and `column` (where the block is in the `.gmdl`). |
+
+**The map is what makes the trace legible.** The trace numbers the
+*statements* the model compiles to, and the report numbers them the other
+way round; the `node` of an event and the `map` of this document are the
+bridge to the block of the document and to its place in the file: "what block
+is statement 218" is one lookup, not a piece of reverse engineering. A
+module that compiles to several statements (the `Clock` is a generator and a
+terminate) has one row per statement, and the `node` repeats.
 
 The `program` is the compiled GPSS: its `operands` are positional, in the
 order the original's listing uses. The `model` is the document itself: every
@@ -392,98 +420,6 @@ again once the model is saved. `apply_edit` and `save_model` **refuse** that
 write on their own (see `model_locked` below): the refusal is mechanical, not
 a rule the agent has to remember.
 
-### `open_model`
-
-The tool takes no arguments.
-
-It returns the `genmsi.openmodel/1` document:
-
-| Field | Type | Meaning |
-|---|---|---|
-| `schema` | string | `genmsi.openmodel/1` |
-| `path` | string or null | The **absolute path** of the file the app has open; null when there is none. |
-| `pid` | number or null | The pid of the process that has the model open; null when there is none. |
-
-**The answer is never a failure.** When the app is not running, or it is
-running with no model open, the answer is the same document with `path` and
-`pid` null: the question has an answer either way, and the agent reads it as
-"nobody has a model open" and writes wherever it wants.
-
-**Why the agent asks for it.** The desktop app watches the file it has open:
-when the file changes, the app reloads the model and runs it again, and the
-reader sees the change without touching anything. An agent that writes the
-model to the path the app has open is inside that cycle: it does not have to
-guess where the app writes, and it does not have to ask the reader which file
-is open.
-
-The file the app publishes lives in the **data directory of the app**, in
-`open-model.json`:
-
-| Platform | The directory |
-|---|---|
-| Linux | `$XDG_DATA_HOME/org.gensmi.desktop` (or `$HOME/.local/share/org.gensmi.desktop`) |
-| macOS | `$HOME/Library/Application Support/org.gensmi.desktop` |
-| Windows | `%APPDATA%\org.gensmi.desktop` |
-
-The app writes it when it opens a model and removes it when it creates a new
-one or closes; the pid of the document says whether the app that wrote it is
-still running, so a file left behind by an app that is gone is read as "no
-model open".
-
-**The directory is the one the platform names, and a relative one does not
-count.** On Linux the server takes `$XDG_DATA_HOME` only when it is an
-**absolute** path, and falls back to `$HOME/.local/share` otherwise: a
-relative `XDG_DATA_HOME` is not a directory of its own, it is the real one.
-An agent (or a test) that wants its own directory has to name it with its
-whole path.
-
-## The proposal: the agent offers a model, the person decides
-
-Writing the file the app has open is the fast road, and it is the right one
-when the reader has nothing pending. It is closed when the reader **has**
-something pending: the brake refuses the write (`model_locked`), because the
-reader's work is not on the disk and writing over it would leave their work
-invisible. The road that stays open is the **proposal**.
-
-A proposal is a model the agent leaves for the person **without touching the
-disk**:
-
-1. the agent asks for it: `apply_edit` (or `save_model`) with
-   `target: "proposal"` and, usually, a `summary` of what it did;
-2. the result is written in the **staging directory of the app**, beside a
-   `genmsi.proposal/1` document that says what the proposal is, what it
-   proposes to change and what the agent did. The answer to the call carries
-   the identity of the proposal (`proposal.id`) and the path of the staged
-   model (`proposal.model`) — the `genmsi.edit/1` document has both;
-3. the app picks the oldest pending proposal up, loads the model **in
-   memory** and puts it on the canvas: the session is **dirty** (the model
-   differs from the disk) and the adoption is **one step of the history**, so
-   the reader can undo it. The file on the disk still holds the old model;
-4. the reader decides. *Aceptar* is the app's normal save; *Descartar* undoes
-   the adoption and leaves a note;
-5. the verdict travels in `genmsi.live/1`: `app_state` carries `proposal`
-   with its `state` (`pending`, `accepted` or `rejected`) and the `note` the
-   reader wrote.
-
-The rules:
-
-- **a proposal never touches the disk**: that is the whole point of it;
-- **the proposal is about the model the agent worked on** — the file it
-  named, or the model the app has open when it named none — and the app
-  adopts a proposal **only** when that is the model it has open. A proposal
-  about another file waits;
-- **the reader's work comes first**: the app does not adopt a proposal while
-  the reader has changes that are not saved. The proposal waits, and the
-  reader is told so. It is the rule of the brake, seen from the other side;
-- **the brake is not bypassed**: a proposal is a way to *show* a model, not a
-  way around the brake. Adopting one leaves the session dirty, so a
-  `model_locked` afterwards is exactly what it was.
-
-The staging directory lives in the **data directory of the app**, beside the
-file that says which model is open (`<data>/staging/`): on Linux,
-`$XDG_DATA_HOME/org.gensmi.desktop/staging` (or
-`$HOME/.local/share/org.gensmi.desktop/staging`).
-
 ## Errors
 
 A model that does not work is a **tool error**: the call succeeds as a call
@@ -590,9 +526,11 @@ It publishes two documents of its own, `genmsi.classlist/1` and
 (`genmsi.catalogue/1`) keeps its own shape, so the application does not
 download the templates it does not use.
 
-The `open_model` tool has no CLI counterpart either, for the same reason: the
-file that says which model the app has open belongs to the app, not to the
-engine. It publishes one document of its own, `genmsi.openmodel/1`.
+The `app_state` tool has no CLI counterpart either, for the same reason: the
+file that says what the app is showing belongs to the app, not to the engine.
+It publishes one document of its own, `genmsi.live/1` — and it is the **only**
+one: the model the app has open travels in it, next to the `dirty` flag and
+the last run, so the two facts cannot come from two files and disagree.
 
 ## The verb: `apply_edit`
 

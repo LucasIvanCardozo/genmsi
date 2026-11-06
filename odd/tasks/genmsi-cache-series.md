@@ -52,7 +52,9 @@ unidad de trabajo, sobre la rama de la feature.
 La sección de gráficos se pinta al ritmo que el lector elige, en un selector
 "Refresco" en la barra de la pestaña *Gráficos*: `cada frame`, `cada 100 ms`,
 `cada 250 ms`, `cada 500 ms`, `cada 1 s`, `cada 2 s`, `cada 5 s`. El valor por
-defecto es `cada frame` (el comportamiento de siempre).
+defecto es **`cada 500 ms`** (el lector lo pidió así): la sección se pinta dos
+veces por segundo, que es lo que una máquina lenta necesita y lo que un
+lector no distingue del cuadro a cuadro.
 
 El selector cambia **el ritmo de la pintura**, nunca el de la simulación: la
 reproducción corre igual, y la sección muestra el instante de la última
@@ -243,5 +245,30 @@ el orden de la cadena de entrega:
 | `e6b239a` | este documento | — |
 
 La entrega es una cadena de PRs sobre la rama de la feature
-(`chain_strategy=feature-branch-chain`), uno por unidad de trabajo. Ni el
-push ni la apertura de los PRs están decididos: eso es del usuario.
+(`chain_strategy=feature-branch-chain`), uno por unidad de trabajo, con un
+PRtracker en borrador que no se mergea:
+
+| PR | unidad | rama | +/- |
+|---|---|---|---|
+| #1 | el tracker (borrador, sin merge) | `feature/charts-performance` | +2176 -113 |
+| #2 | el ritmo del pintado y la imagen del canvas | `-01-pace` | +438 -41 |
+| #3 | el caché de las series y el índice que lo lleva | `-02-cache` | +783 -0 |
+| #7 | los gráficos leen el caché | `-03-read` | +84 -48 |
+| #4 | el script que mide el costo de un pintado | `-03-wiring` | +596 -0 |
+| #5 | el documento de la feature | `-04-docs` | +247 -0 |
+| #6 | los dos scrolls y la versión 0.5.1 | `-05-layout` | +28 -24 |
+| #8 | el ritmo por defecto: 500 ms | `-06-default` | +30 -4 |
+
+El único PR que pasa las 400 líneas es el del caché: el código y las
+pruebas que lo pignan son una sola unidad, y separarlos dejaría el caché
+sin probar. El resto entra en el presupuesto.
+
+El push y la apertura de los PRs los decidió el usuario: la rama y la
+cadena.
+
+L16 (2026-11-06, usuario, textual): "bien! solo una minima cosa mas, el
+refresco quieor que sea de 500ms por defecto, solo eso!" — el ritmo por
+defecto de la sección pasa de `cada frame` a `cada 500 ms`: dos pinturas
+por segundo, que es lo que una máquina lenta necesita y lo que un lector
+no distingue del cuadro a cuadro. El selector sigue ofreciendo `cada
+frame`. Commit `9e9dd87`, PR #8 (la última unidad de la cadena).

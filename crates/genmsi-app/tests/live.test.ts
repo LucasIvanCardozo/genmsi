@@ -210,3 +210,39 @@ test("the picture carries the clock, the figures and the population of the same 
   useLive.getState().setClock(9);
   assert.equal(useLive.getState().known, false, "the clock moved on its own");
 });
+
+test("a picture the reader asked for moves the counter of the pictures they asked for", () => {
+  useLive.getState().reset();
+  const before = useLive.getState().urgentTick;
+  // The animation publishes sixty times a second and the charts sample
+  // them: those pictures do not move the counter.
+  useLive.getState().publish({ clock: 1, counts: new Map(), balls: new Map() });
+  assert.equal(
+    useLive.getState().urgentTick,
+    before,
+    "the picture of the animation is not one the reader asked for",
+  );
+  // The slider of the header, and the end of the run: this picture is the
+  // one the reader asked for, and the charts show it at once.
+  useLive.getState().publish({
+    clock: 2,
+    counts: new Map(),
+    balls: new Map(),
+    urgent: true,
+  });
+  assert.equal(
+    useLive.getState().urgentTick,
+    before + 1,
+    "the picture the reader asked for moves the counter",
+  );
+});
+
+test("a reset does not take the counter back", () => {
+  const before = useLive.getState().urgentTick;
+  useLive.getState().reset();
+  assert.equal(
+    useLive.getState().urgentTick,
+    before,
+    "a picture that is not one the reader asked for is still not one",
+  );
+});

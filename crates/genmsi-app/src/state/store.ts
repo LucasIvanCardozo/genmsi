@@ -139,6 +139,14 @@ export interface AppState {
   playing: boolean;
   /** How fast the replay runs. */
   speed: number;
+  /**
+   * How often the charts redraw, in milliseconds.
+   *
+   * Zero is every frame: the section follows the replay as it happens.
+   * A bigger number is how often the section is painted, and nothing else:
+   * the replay runs at the same speed either way.
+   */
+  chartRefreshMs: number;
   /** The blocks the user selected in the graph. */
   selectedBlockIds: number[];
   /**
@@ -282,6 +290,8 @@ export interface AppState {
   setPlaying: (playing: boolean) => void;
   /** Set how fast the replay runs. */
   setSpeed: (speed: number) => void;
+  /** Set how often the charts redraw, in milliseconds; zero is every frame. */
+  setChartRefreshMs: (ms: number) => void;
   /** Select the blocks of the graph. */
   select: (ids: number[], doors?: DoorIdentity[]) => void;
   /**
@@ -515,6 +525,7 @@ export const useApp = create<AppState>((set, get) => ({
   playhead: 0,
   playing: false,
   speed: 1,
+  chartRefreshMs: 0,
   selectedBlockIds: [],
   selectedDoors: [],
   activeContainerId: 0,
@@ -1224,6 +1235,8 @@ export const useApp = create<AppState>((set, get) => ({
   setPlaying: (playing: boolean) => set({ playing }),
 
   setSpeed: (speed: number) => set({ speed }),
+
+  setChartRefreshMs: (chartRefreshMs: number) => set({ chartRefreshMs }),
 
   select: (ids: number[], doors: DoorIdentity[] = []) => {
     // The same selection does not change the state: the graph reports it

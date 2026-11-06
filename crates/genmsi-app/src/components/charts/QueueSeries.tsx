@@ -8,7 +8,6 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { decimals, number } from "../../format.ts";
-import { seriesFrom } from "../../monitor/series.ts";
 import type { ReplayIndex } from "../../monitor/replay.ts";
 import type { QueueNumbers } from "./entities.ts";
 import { colorOf } from "./palette.ts";
@@ -38,8 +37,11 @@ export default function QueueSeries({
     setSelected(monitor.queues.slice(0, DEFAULT_SERIES));
   }, [monitor]);
 
+  // The rows come from the cache of the index: the chart is repainted
+  // sixty times per second, and rebuilding the series from the start of the
+  // run on every repaint is what made the painting expensive.
   const data = useMemo(
-    () => seriesFrom(selected, monitor.queuePoints, clock),
+    () => monitor.series.rows(monitor.queuePoints, selected, clock),
     [monitor, selected, clock],
   );
 

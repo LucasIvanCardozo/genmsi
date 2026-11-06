@@ -11,10 +11,20 @@
  */
 import { useMemo } from "react";
 import { number } from "../../format.ts";
-import { segmentsOf } from "../../monitor/series.ts";
 import type { ReplayIndex } from "../../monitor/replay.ts";
+import type { SeriesPoint } from "../../monitor/series.ts";
 import type { FacilityNumbers } from "./entities.ts";
 import { colorOf } from "./palette.ts";
+
+/**
+ * The points of a facility that has none.
+ *
+ * The cache keys its answer by the identity of the list of points, so the
+ * list of a facility without points has to be the same one every time: a
+ * fresh empty list would make the cache build the answer of that facility
+ * again on every repaint.
+ */
+const NO_POINTS: readonly SeriesPoint[] = [];
 
 export default function FacilityTimeline({
   monitor,
@@ -28,13 +38,18 @@ export default function FacilityTimeline({
   /** The instant the reader is at. */
   clock: number;
 }) {
+  // The intervals come from the cache of the index: the chart is repainted
+  // sixty times per second, and rebuilding the intervals of every facility
+  // from the start of the run on every repaint is what made the painting
+  // expensive. The list of points is the one the index holds: the cache
+  // keys its answer by its identity.
   const rows = useMemo(
     () =>
       facilities.map((facility, index) => ({
         facility,
         color: colorOf(index),
-        segments: segmentsOf(
-          monitor.facilityPoints.get(facility.name) ?? [],
+        segments: monitor.series.segments(
+          monitor.facilityPoints.get(facility.name) ?? NO_POINTS,
           clock,
         ),
       })),

@@ -54,6 +54,9 @@ interface Reached {
  * section is painted: the replay keeps running at the same speed and the
  * section shows the instant of the last sample, so a slow machine paints
  * less without the run going slower.
+ *
+ * The default is 500 ms -- twice a second -- and the reader can still ask
+ * for every frame.
  */
 const REFRESH_OPTIONS = [
   { ms: 0, label: "cada frame" },

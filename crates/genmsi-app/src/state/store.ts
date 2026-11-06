@@ -145,6 +145,10 @@ export interface AppState {
    * Zero is every frame: the section follows the replay as it happens.
    * A bigger number is how often the section is painted, and nothing else:
    * the replay runs at the same speed either way.
+   *
+   * The default is 500 ms: the section paints twice a second, which is
+   * enough for a reader and much cheaper for the machine than sixty
+   * paintings a second. The reader can still ask for every frame.
    */
   chartRefreshMs: number;
   /** The blocks the user selected in the graph. */
@@ -525,7 +529,7 @@ export const useApp = create<AppState>((set, get) => ({
   playhead: 0,
   playing: false,
   speed: 1,
-  chartRefreshMs: 0,
+  chartRefreshMs: 500,
   selectedBlockIds: [],
   selectedDoors: [],
   activeContainerId: 0,

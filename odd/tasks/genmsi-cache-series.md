@@ -257,6 +257,7 @@ PRtracker en borrador que no se mergea:
 | #4 | el script que mide el costo de un pintado | `-03-wiring` | +596 -0 |
 | #5 | el documento de la feature | `-04-docs` | +247 -0 |
 | #6 | los dos scrolls y la versión 0.5.1 | `-05-layout` | +28 -24 |
+| #8 | el ritmo por defecto: 500 ms | `-06-default` | +30 -4 |
 
 El único PR que pasa las 400 líneas es el del caché: el código y las
 pruebas que lo pignan son una sola unidad, y separarlos dejaría el caché
@@ -264,3 +265,10 @@ sin probar. El resto entra en el presupuesto.
 
 El push y la apertura de los PRs los decidió el usuario: la rama y la
 cadena.
+
+L16 (2026-11-06, usuario, textual): "bien! solo una minima cosa mas, el
+refresco quieor que sea de 500ms por defecto, solo eso!" — el ritmo por
+defecto de la sección pasa de `cada frame` a `cada 500 ms`: dos pinturas
+por segundo, que es lo que una máquina lenta necesita y lo que un lector
+no distingue del cuadro a cuadro. El selector sigue ofreciendo `cada
+frame`. Commit `9e9dd87`, PR #8 (la última unidad de la cadena).

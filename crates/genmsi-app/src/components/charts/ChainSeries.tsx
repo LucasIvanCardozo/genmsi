@@ -6,7 +6,6 @@
  */
 import { useMemo, useState } from "react";
 import { decimals, number } from "../../format.ts";
-import { seriesFrom } from "../../monitor/series.ts";
 import type { ReplayIndex } from "../../monitor/replay.ts";
 import type { ChainNumbers } from "./entities.ts";
 import StatCard from "./StatCard.tsx";
@@ -28,8 +27,11 @@ export default function ChainSeries({
   const name = selected ?? chains[0]?.name ?? null;
   const chain = chains.find((candidate) => candidate.name === name) ?? null;
 
+  // The rows come from the cache of the index, so that repainting the
+  // chart costs what changed since the last repaint.
   const data = useMemo(
-    () => (name === null ? [] : seriesFrom([name], monitor.chainPoints, clock)),
+    () =>
+      name === null ? [] : monitor.series.rows(monitor.chainPoints, [name], clock),
     [monitor, name, clock],
   );
 

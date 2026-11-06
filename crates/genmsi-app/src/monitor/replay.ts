@@ -34,6 +34,7 @@
 import { applyChange, closeFigures, emptyFigures, type FigureChange, type Figures } from "./stats.ts";
 import { FLIGHT_SECONDS, firstMoveAfter } from "./balls.ts";
 import type { SeriesPoint } from "./series.ts";
+import { SeriesCache } from "./seriesCache.ts";
 import type { ModelEdge } from "../types";
 
 /** One event of the trace, as the replay reads it. */
@@ -297,6 +298,15 @@ export interface ReplayIndex {
   waits: Map<string, WaitSample[]>;
   /** The instants the transactions of the run were created. */
   generateTimes: number[];
+  /**
+   * The cache of the series the charts draw.
+   *
+   * The cache lives here because its lifetime is the lifetime of the run:
+   * a new run is a new index and a new cache, and its rows are built
+   * again. Nothing has to be invalidated, and the cache never outlives the
+   * run it belongs to.
+   */
+  series: SeriesCache;
   /** Whether the trace may have been cut by its record limit. */
   truncated: boolean;
   /** How many records the trace kept. */
@@ -817,6 +827,8 @@ export function buildIndex(
     chainPoints,
     waits,
     generateTimes,
+    // The cache of the series: it is born with the index and dies with it.
+    series: new SeriesCache(),
     truncated: trace.truncated,
     records: trace.records,
     limit: trace.limit,

@@ -24,11 +24,12 @@
  * record, the balls change when a transaction is on its way, and the figures
  * change when the run moves an entity.
  */
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { create } from "zustand";
 import { sameFigure, type BlockFigure } from "./figures.ts";
 import type { ReplayState } from "./replay.ts";
-import { instantOf, type Figures, type Instant } from "./stats.ts";
+import { Sampler } from "./sampling.ts";
+import { instantOf, type Figures, type Instant, type LiveSnapshot } from "./stats.ts";
 
 /** What a block shows of the run. */
 export interface LiveCounts {
@@ -78,6 +79,15 @@ export interface LivePicture {
    * the population of the card is of the instant the clock marks.
    */
   population?: number | null;
+  /**
+   * Whether this picture is one the reader asked for.
+   *
+   * The animation publishes sixty times a second and the charts sample
+   * them. A picture the reader asked for — the slider of the header, the
+   * end of the run — is not sampled: nobody waits a quarter of a second
+   * for the picture they asked for.
+   */
+  urgent?: boolean;
 }
 
 export interface LiveState extends LivePicture {
@@ -101,6 +111,14 @@ export interface LiveState extends LivePicture {
    * is not there yet.
    */
   known: boolean;
+  /**
+   * How many pictures the reader asked for.
+   *
+   * The charts sample the picture of the live layer; this counter is what
+   * tells them that the picture they are holding is one the reader asked
+   * for, and that it has to be shown at once.
+   */
+  urgentTick: number;
   /** Publish what the picture shows right now. */
   publish: (picture: LivePicture) => void;
   /**
@@ -137,6 +155,7 @@ export const useLive = create<LiveState>((set) => ({
   retries: {},
   population: null,
   known: false,
+  urgentTick: 0,
   publish: (picture) =>
     set((state) => {
       // The clock always moves, so the picture is never the same.
@@ -153,11 +172,23 @@ export const useLive = create<LiveState>((set) => ({
       const known =
         picture.figures !== undefined && picture.figures !== null &&
         picture.population !== undefined;
-      return { clock: picture.clock, counts, balls, figures, blockFigures, retries, population, known };
+      return {
+        clock: picture.clock,
+        counts,
+        balls,
+        figures,
+        blockFigures,
+        retries,
+        population,
+        known,
+        // The counter only moves when the picture is one the reader asked
+        // for: the charts sample the rest.
+        urgentTick: picture.urgent ? state.urgentTick + 1 : state.urgentTick,
+      };
     }),
   setClock: (clock) => set({ clock, known: false }),
   reset: () =>
-    set({
+    set((state) => ({
       ...EMPTY,
       counts: new Map(),
       balls: new Map(),
@@ -166,7 +197,10 @@ export const useLive = create<LiveState>((set) => ({
       retries: {},
       population: null,
       known: false,
-    }),
+      // The counter does not go back: a picture that is not the one the
+      // reader asked for is still not one.
+      urgentTick: state.urgentTick,
+    })),
 }));
 
 /**
@@ -256,26 +290,25 @@ export function useFigures(): Figures | null {
 }
 
 /**
- * The instant the charts are at.
+ * The instant the charts are at, from a snapshot of the live layer.
  *
- * The clock and the figures come from the live layer, which publishes them
- * together: they are of the same instant, and the charts divide the figures
- * of that instant by the clock of that instant.
+ * The clock and the figures come from the same snapshot, so they are of
+ * the same instant, and the charts divide the figures of that instant by
+ * the clock of that instant.
  *
+ * @param snapshot the clock and the figures of one instant
  * @param start the time the run started
  * @param end the time the run ended
  * @param playhead the state of the replay at the playhead, the fallback
  *        for a live layer that carries no figures of the instant
  */
-export function useInstant(
+export function useInstantOf(
+  snapshot: LiveSnapshot,
   start: number,
   end: number,
   playhead: ReplayState | null,
 ): Instant {
-  const clock = useLive((state) => state.clock);
-  const figures = useLive((state) => state.figures);
-  const population = useLive((state) => state.population);
-  const known = useLive((state) => state.known);
+  const { clock, figures, population, known } = snapshot;
   return useMemo(
     () =>
       instantOf(
@@ -287,6 +320,78 @@ export function useInstant(
     [clock, figures, population, known, playhead, start, end],
   );
 }
+
+/**
+ * The live picture, sampled at the rate the reader chose.
+ *
+ * The replay publishes sixty times a second; the charts do not have to
+ * redraw sixty times a second. This hook gives them the picture of the
+ * live layer at the rate the reader asked for: the newest picture wins,
+ * and the one that waits is never lost.
+ *
+ * A picture the reader asked for is shown at once: the sampler is for the
+ * animation, not for the reader.
+ *
+ * @param refreshMs how often the charts redraw, in milliseconds; zero is
+ *        every frame.
+ */
+export function useSampledLive(refreshMs: number): LiveState {
+  const [live, setLive] = useState<LiveState>(() => useLive.getState());
+  // The sampler is the machinery of the sampling: it is not state, and a
+  // new rate is a new sampler.
+  const sampler = useRef<Sampler<LiveState>>(
+    new Sampler<LiveState>(refreshMs, now),
+  );
+  // How many pictures the reader asked for the last time the charts were
+  // shown: when the number moves, the picture is shown at once.
+  const urgent = useRef(useLive.getState().urgentTick);
+
+  useEffect(() => {
+    sampler.current = new Sampler<LiveState>(refreshMs, now);
+    urgent.current = useLive.getState().urgentTick;
+    // The rate changed, not the picture: what is on screen is what the
+    // live layer holds right now.
+    setLive(useLive.getState());
+  }, [refreshMs]);
+
+  useEffect(() => {
+    const unsub = useLive.subscribe((state) => {
+      if (state.urgentTick !== urgent.current) {
+        // The reader asked for this picture: it does not wait.
+        urgent.current = state.urgentTick;
+        sampler.current.take();
+        setLive(state);
+        return;
+      }
+      const due = sampler.current.offer(state);
+      if (due !== null) {
+        setLive(due);
+      }
+    });
+    if (refreshMs <= 0) {
+      return unsub;
+    }
+    // The timer is what makes the time of the waiting picture come.
+    const timer = setInterval(() => {
+      if (!sampler.current.due()) {
+        return;
+      }
+      const value = sampler.current.take();
+      if (value !== null) {
+        setLive(value);
+      }
+    }, refreshMs);
+    return () => {
+      unsub();
+      clearInterval(timer);
+    };
+  }, [refreshMs]);
+
+  return live;
+}
+
+/** The clock the sampler measures its rate with. */
+const now = (): number => performance.now();
 
 /**
  * The figure a block shows, or `undefined` when the block has none.

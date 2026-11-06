@@ -17,16 +17,13 @@
  * and comparing them says nothing.
  */
 import { decimals } from "../../format.ts";
-import type { Figures } from "../../monitor/stats.ts";
-import type { ReportDocument } from "../../types";
 import BarList, { type BarItem } from "./BarList.tsx";
 import {
-  facilitiesOf,
-  queuesOf,
   resourcePressuresOf,
-  storagesOf,
-  type Elapsed,
+  type FacilityNumbers,
+  type QueueNumbers,
   type ResourcePressure,
+  type StorageNumbers,
 } from "./entities.ts";
 
 /** How many resources a panel shows. */
@@ -89,22 +86,21 @@ function itemsOf(pressures: ResourcePressure[]): BarItem[] {
 }
 
 export default function ResourceRanking({
-  report,
-  live,
-  elapsed,
+  facilities,
+  queues,
+  storages,
 }: {
-  /** The report of the run. */
-  report: ReportDocument;
-  /** The figures of the entities at the instant the reader is at. */
-  live: Figures | null;
-  /** The time the numbers were measured over. */
-  elapsed: Elapsed;
+  /** The facilities of the run, with the numbers of the instant. */
+  facilities: FacilityNumbers[];
+  /** The queues of the run, with the numbers of the instant. */
+  queues: QueueNumbers[];
+  /** The storages of the run, with the numbers of the instant. */
+  storages: StorageNumbers[];
 }) {
-  const pressures = resourcePressuresOf(
-    facilitiesOf(report, live, elapsed),
-    queuesOf(report, live, elapsed),
-    storagesOf(report, live, elapsed),
-  );
+  // The numbers of the entities come from the section: they are computed
+  // once there and the card reads them. Computing them again here made a
+  // second set of them, with a different identity, on every repaint.
+  const pressures = resourcePressuresOf(facilities, queues, storages);
 
   const facilityItems = itemsOf(pressures.facilities);
   const queueItems = itemsOf(pressures.queues);

@@ -12,7 +12,7 @@
  * Two rules govern the numbers of the panel:
  *
  * - **the clock and the figures are of the same instant**. The instant
- *   comes from the live layer (`useInstant`), and when it is not known no
+ *   comes from the live layer (`useInstantOf`), and when it is not known no
  *   figure of it is shown: the panel says "Sin datos.";
  * - **what the replay has not reached yet is not a zero**. A switch or a
  *   savevalue the report knows and the replay has not touched says

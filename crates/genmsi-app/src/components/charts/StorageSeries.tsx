@@ -7,7 +7,6 @@
  */
 import { useMemo, useState } from "react";
 import { number } from "../../format.ts";
-import { seriesFrom } from "../../monitor/series.ts";
 import type { ReplayIndex } from "../../monitor/replay.ts";
 import type { StorageNumbers } from "./entities.ts";
 import StatCard from "./StatCard.tsx";
@@ -29,8 +28,11 @@ export default function StorageSeries({
   const name = selected ?? storages[0]?.name ?? null;
   const storage = storages.find((candidate) => candidate.name === name) ?? null;
 
+  // The rows come from the cache of the index, so that repainting the
+  // chart costs what changed since the last repaint.
   const data = useMemo(
-    () => (name === null ? [] : seriesFrom([name], monitor.storagePoints, clock)),
+    () =>
+      name === null ? [] : monitor.series.rows(monitor.storagePoints, [name], clock),
     [monitor, name, clock],
   );
 

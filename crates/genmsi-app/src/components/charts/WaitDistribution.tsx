@@ -28,7 +28,7 @@ import {
   YAxis,
 } from "recharts";
 import { decimals, number } from "../../format.ts";
-import { cumulative, histogram, waitWidth } from "../../monitor/series.ts";
+import { waitWidth } from "../../monitor/series.ts";
 import type { ReplayIndex } from "../../monitor/replay.ts";
 import { FIGURE_STATES } from "./states.ts";
 
@@ -68,31 +68,46 @@ export default function WaitDistribution({
     [all],
   );
 
-  const samples = useMemo(
-    () =>
-      all
-        .filter((sample) => sample.time <= clock)
-        .map((sample) => sample.wait),
-    [all, clock],
+  // The figure comes from the cache of the index: the chart is repainted
+  // sixty times per second, and filtering the waits of the queue and
+  // building its histogram on every repaint is what made the painting
+  // expensive. The cache answers with the same figure for the same clock,
+  // so a chart that did not change is not repainted.
+  const figure = useMemo(
+    () => (queue === null ? null : monitor.series.waits(all, width, clock)),
+    [monitor, all, width, clock, queue],
   );
 
   const chart = useMemo(() => {
-    if (samples.length === 0) {
+    if (figure === null) {
       return null;
     }
-    const longest = longestOf(samples);
-    const bins = histogram(samples, width);
-    const shares = cumulative(bins);
-    const mean = samples.reduce((sum, wait) => sum + wait, 0) / samples.length;
-    const barSize = Math.max(4, Math.round(620 / Math.max(bins.length, 1)) - 8);
-    const rows = bins.map((bin, index) => ({
+    const barSize = Math.max(
+      4,
+      Math.round(620 / Math.max(figure.bins.length, 1)) - 8,
+    );
+    const rows = figure.bins.map((bin, index) => ({
       x: bin.low + width / 2,
       label: `${number(bin.low)} - ${number(bin.high)}`,
       frequency: bin.count,
-      accumulated: shares[index],
+      accumulated: figure.shares[index],
     }));
-    return { rows, mean, width, longest, empty: longest === 0, barSize };
-  }, [samples, width]);
+    // How many transactions left the queue: the bins hold every one of
+    // them, so the histogram says how many there were.
+    const departures = figure.bins.reduce(
+      (sum, bin) => sum + bin.count,
+      0,
+    );
+    return {
+      rows,
+      mean: figure.mean,
+      width,
+      longest: figure.longest,
+      empty: figure.longest === 0,
+      barSize,
+      departures,
+    };
+  }, [figure, width]);
 
   if (names.length === 0) {
     return (
@@ -131,7 +146,7 @@ export default function WaitDistribution({
             <li className="flex items-baseline justify-between gap-3">
               <span className="text-slate-500">salidas</span>
               <b className={`font-mono ${FIGURE_STATES.instant.textClass}`}>
-                {number(samples.length)}
+                {number(chart.departures)}
               </b>
             </li>
             <li className="flex items-baseline justify-between gap-3">

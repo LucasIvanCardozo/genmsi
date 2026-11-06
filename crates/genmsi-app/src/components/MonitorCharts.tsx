@@ -172,7 +172,11 @@ export default function MonitorCharts({
             badge="derived"
             footnote={`Utilización * = tiempo ocupado ÷ ${until} · contenido medio * = área ÷ ${until} · utilización media * = área ÷ ${until} ÷ capacidad. Las familias no se comparan entre sí: cada una tiene su escala.`}
           >
-            <ResourceRanking report={report} live={closed} elapsed={elapsed} />
+            <ResourceRanking
+              facilities={facilities}
+              queues={queues}
+              storages={storages}
+            />
           </ChartCard>
 
           <div className="grid gap-3 lg:grid-cols-2">

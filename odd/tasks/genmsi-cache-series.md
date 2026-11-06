@@ -112,7 +112,7 @@ Los contratos de honestidad de la sección, que el caché no puede tocar:
 |---|---|---|---|---|
 | T0 | S1, S2 | El ritmo del pintado y la imagen del canvas: el sampler, el selector "Refresco", la vía urgente y el panel que dice el ritmo | inline | `b8345df` |
 | T1 | S3 | El caché puro `SeriesCache` (`rows`, `segments`, `waits`) y sus tests de equivalencia con las implementaciones de referencia | subagente | `18822ce` |
-| T2 | S3 | El script de medición del costo del pintado, antes y después, con los datos del motor | subagente | — |
+| T2 | S3 | El script de medición del costo del pintado, antes y después, con los datos del motor | subagente | `9666000` |
 | T3 | S3 | El índice de la reproducción lleva el caché | inline | `18822ce` |
 | T4 | S3 | Las tres series (colas, almacenes, cadenas) leen el caché | subagente | `9d2f796` |
 | T5 | S3 | Los segmentos de las facilities y la distribución de las esperas leen el caché | subagente | `9d2f796` |
@@ -227,3 +227,21 @@ trazando un path con un punto por cambio real—, que nadie midió todavía y
 que la decimación rompería (el contrato de la tarjeta: "cada escalón es un
 cambio real, no una muestra"). Para esa mitad, el selector "Refresco" que
 ya existe es la palanca.
+
+L15 (2026-11-06, cierre): la suite entera **424/424** — los 407 tests que
+no levantan un servidor (23 s) y los tres que sí lo levantan, de a uno
+(8 + 4 + 5) —, `tsc --noEmit` limpio y `npm run build` OK. La prueba
+visual en la app real quedó registrada en L13. Los commits de la rama, en
+el orden de la cadena de entrega:
+
+| commit | unidad | PR |
+|---|---|---|
+| `b8345df` | el ritmo del pintado y la imagen del canvas | 1 |
+| `18822ce` | el caché de las series y el índice que lo lleva | 2 |
+| `9d2f796` | los gráficos leen el caché | 3 |
+| `9666000` | el script que mide el costo de un pintado | 4 |
+| `e6b239a` | este documento | — |
+
+La entrega es una cadena de PRs sobre la rama de la feature
+(`chain_strategy=feature-branch-chain`), uno por unidad de trabajo. Ni el
+push ni la apertura de los PRs están decididos: eso es del usuario.

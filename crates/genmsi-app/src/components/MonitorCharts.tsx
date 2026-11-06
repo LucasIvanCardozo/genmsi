@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useInstant, useLive } from "../monitor/live";
+import { useInstantOf, useSampledLive } from "../monitor/live";
 import { countAt } from "../monitor/series.ts";
 import type { ReplayIndex, ReplayState } from "../monitor/replay";
 import type { ModelBody, ReportDocument } from "../types";
@@ -55,6 +55,7 @@ export default function MonitorCharts({
   monitor,
   state,
   model,
+  refreshMs,
 }: {
   /** The report of the run. */
   report: ReportDocument;
@@ -64,12 +65,21 @@ export default function MonitorCharts({
   state: ReplayState | null;
   /** The model of the run, for the names of the blocks. */
   model: ModelBody | null;
+  /**
+   * How often the section redraws, in milliseconds.
+   *
+   * Zero is every frame. The number is the pace of the *painting*, not of
+   * the replay: the run goes on at the same speed, and the section shows
+   * the instant of the last sample.
+   */
+  refreshMs: number;
 }) {
-  // The instant the numbers are of: the clock and the figures come from
-  // the live layer, which publishes them together, so they are of the same
-  // instant. The clock of the replay is the clock the reader is at, not
-  // the run as it will be.
-  const instant = useInstant(report.start_time, report.end_time, state);
+  // The live picture, sampled at the rate the reader chose: the section
+  // redraws as often as the reader asked for, not sixty times a second.
+  // The picture is sampled whole, so the clock and the figures of the
+  // section are always of the same instant.
+  const live = useSampledLive(refreshMs);
+  const instant = useInstantOf(live, report.start_time, report.end_time, state);
   const clock = instant.clock;
   // The time the numbers were measured over: the clock for the numbers of
   // the instant, the length of the run for the published ones. Each set of
@@ -102,8 +112,8 @@ export default function MonitorCharts({
   // The counts of every block and the retries it could not be entered: they
   // come from the live layer too, so the ranking of the blocks is of the
   // instant the clock marks.
-  const counts = useLive((live) => live.counts);
-  const retries = useLive((live) => live.retries);
+  const counts = live.counts;
+  const retries = live.retries;
   const blocks = useMemo(
     () => blockRows(report, model, counts, retries),
     [report, model, counts, retries],
@@ -136,6 +146,7 @@ export default function MonitorCharts({
             report={report}
             instant={instant}
             generated={generated}
+            refreshMs={refreshMs}
           />
         </aside>
 

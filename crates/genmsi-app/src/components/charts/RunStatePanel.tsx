@@ -59,6 +59,7 @@ export default function RunStatePanel({
   report,
   instant,
   generated,
+  refreshMs,
 }: {
   /** The report of the run. */
   report: ReportDocument;
@@ -66,6 +67,13 @@ export default function RunStatePanel({
   instant: Instant;
   /** How many transactions were created up to the clock. */
   generated: number;
+  /**
+   * How often the section redraws, in milliseconds.
+   *
+   * Zero is every frame. A bigger number is the pace of the painting, and
+   * the panel says so: the clock it shows is the clock of the last sample.
+   */
+  refreshMs: number;
 }) {
   const state = useMemo(
     () => runStateOf({ report, instant, generated }),
@@ -121,6 +129,17 @@ export default function RunStatePanel({
             }
           />
         </ul>
+
+        {/* The pace of the painting, when it is not every frame. The panel
+            says it because the clock it shows is the clock of the last
+            sample, and a section that does not say that shows a picture
+            of an instant that is not the one the reader is at. */}
+        {refreshMs > 0 && (
+          <p className="mt-1.5 text-[10.5px] leading-snug text-slate-500">
+            La sección se refresca cada {refreshMs} ms: el reloj de este
+            panel va hasta el instante de la última muestra.
+          </p>
+        )}
 
         {/* The waiting of the end: a published number, and the box is the
             alarm of a run that ended blocked. The alarm is of the error

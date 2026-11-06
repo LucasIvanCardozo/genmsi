@@ -5,7 +5,7 @@ import { useApp } from "../state/store";
 import { FLIGHT_SECONDS, MIN_WALL_FLIGHT, travellersAt, type Move } from "../monitor/balls";
 import { graphOf, legsOf, routesOf } from "../graph/graph";
 import { countsOf, countsWithContainers, crossingsEvents, crossingsUntil } from "../monitor/counts";
-import { figureBlockOf, figuresOf } from "../monitor/figures";
+import { figureBlockOf, figuresOf, type BlockFigure } from "../monitor/figures";
 import { useLive, type LiveBall, type LiveCounts } from "../monitor/live";
 import { populationOf, type Figures } from "../monitor/stats.ts";
 import { proposalBand } from "../state/proposal";
@@ -47,6 +47,25 @@ interface Reached {
 }
 
 /**
+ * The paces the section of the charts can be painted at.
+ *
+ * Zero is every frame: the section follows the replay as it happens, which
+ * is what a fast machine wants. The other numbers are how often the
+ * section is painted: the replay keeps running at the same speed and the
+ * section shows the instant of the last sample, so a slow machine paints
+ * less without the run going slower.
+ */
+const REFRESH_OPTIONS = [
+  { ms: 0, label: "cada frame" },
+  { ms: 100, label: "cada 100 ms" },
+  { ms: 250, label: "cada 250 ms" },
+  { ms: 500, label: "cada 500 ms" },
+  { ms: 1000, label: "cada 1 s" },
+  { ms: 2000, label: "cada 2 s" },
+  { ms: 5000, label: "cada 5 s" },
+] as const;
+
+/**
  * The window of the simulation: the model, its run and its report.
  *
  * The body is the picture: the graph of the model is the reproduction's
@@ -82,6 +101,8 @@ export default function MonitorView({
     playhead,
     playing,
     speed,
+    chartRefreshMs,
+    setChartRefreshMs,
     selectedBlockIds,
     activeContainerId,
     setActiveContainerId,
@@ -298,6 +319,16 @@ export default function MonitorView({
   frameRef.current = playhead;
   stateRef.current = state;
 
+  // The panel that is on screen.
+  //
+  // The picture of the canvas —the balls on the links and the figure of
+  // every block— is only read by the canvas, and the canvas is only on
+  // screen in the panel of the reproduction. In the other panels that work
+  // is work thrown away: it is computed sixty times a second and nobody
+  // looks at it. The ref carries the panel where the animation reads it.
+  const panelRef = useRef(panel);
+  panelRef.current = panel;
+
   // The picture of this instant: the clock, the counts of the blocks, the
   // balls that are on their way and the figures of the entities.
   //
@@ -309,19 +340,25 @@ export default function MonitorView({
     retries: Record<number, number>,
     population: number,
     counts: Map<number, LiveCounts>,
+    urgent = false,
   ) => {
     const current = live.current;
+    // Whether the canvas is on screen: its picture is only computed when it
+    // is. The replay runs the same either way.
+    const canvas = panelRef.current === "reproduccion";
     const balls = new Map<string, LiveBall[]>();
-    for (const traveller of travellersAt(
-      current.moves,
-      current.times,
-      clock,
-      FLIGHT_SECONDS,
-      // The floor of the flight is in the clock of the reader: at a hundred
-      // times the speed, a ball that crossed a block with no waiting time
-      // still flies long enough to be seen.
-      speed * MIN_WALL_FLIGHT,
-    )) {
+    for (const traveller of canvas
+      ? travellersAt(
+          current.moves,
+          current.times,
+          clock,
+          FLIGHT_SECONDS,
+          // The floor of the flight is in the clock of the reader: at a hundred
+          // times the speed, a ball that crossed a block with no waiting time
+          // still flies long enough to be seen.
+          speed * MIN_WALL_FLIGHT,
+        )
+      : []) {
       // The links the entity travels over: a move that crosses the border
       // of a container travels over several of them, and the entity crosses
       // them one after the other.
@@ -353,12 +390,18 @@ export default function MonitorView({
     // on, and the pair of always for the block that operates on none. It is
     // read with the clock of this instant, because the occupancy of a
     // resource is the time it was held over the time the run has reached.
-    const blockFigures = figuresOf(current.blocks, {
-      figures,
-      report: current.report,
-      clock,
-      counts,
-    });
+    //
+    // Like the balls, it is only computed when the canvas is on screen:
+    // the figure of every block is a pass over every block of the model,
+    // sixty times a second.
+    const blockFigures = canvas
+      ? figuresOf(current.blocks, {
+          figures,
+          report: current.report,
+          clock,
+          counts,
+        })
+      : new Map<number, BlockFigure>();
     useLive.getState().publish({
       clock,
       counts,
@@ -367,6 +410,7 @@ export default function MonitorView({
       retries,
       population,
       blockFigures,
+      urgent,
     });
   };
 
@@ -486,6 +530,24 @@ export default function MonitorView({
     }
   }, [monitor]);
 
+  // The canvas comes back: it needs the picture of the instant, and its
+  // picture is not computed while it is off screen. The animation publishes
+  // it on every frame, but the replay may be paused, and then there is no
+  // animation to publish it: this effect does it.
+  useEffect(() => {
+    if (panel !== "reproduccion") {
+      return;
+    }
+    const current = useLive.getState();
+    publish(
+      current.clock,
+      current.figures ?? null,
+      current.retries,
+      current.population ?? 0,
+      current.counts,
+    );
+  }, [panel]);
+
   // The picture follows the state of the replay.
   //
   // The slider of the header moves the run while the reproduction is
@@ -517,6 +579,9 @@ export default function MonitorView({
         picture.retries,
         picture.population,
         picture.counts,
+        // The reader moved the run by hand: this picture is the one they
+        // asked for, and the charts show it at once.
+        true,
       );
     }
   }, [state, playing, counts]);
@@ -565,6 +630,26 @@ export default function MonitorView({
             {candidate.label}
           </button>
         ))}
+        {panel === "graficos" && (
+          <label className="ml-auto flex items-center gap-1.5 self-center pr-3 text-[11px] text-slate-500">
+            <span>Refresco</span>
+            <select
+              data-monitor-refresh="graficos"
+              value={chartRefreshMs}
+              onChange={(event) =>
+                setChartRefreshMs(Number(event.target.value))
+              }
+              className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] text-slate-700 outline-none focus:border-indigo-400"
+              title="Cada cuánto se redibujan los gráficos. La reproducción no cambia: sólo la pintura."
+            >
+              {REFRESH_OPTIONS.map((option) => (
+                <option key={option.ms} value={option.ms}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
 
       {panel === "reproduccion" && (
@@ -689,7 +774,13 @@ export default function MonitorView({
             Ejecuta la simulación para ver sus gráficos.
           </p>
         ) : (
-          <MonitorCharts report={report} monitor={monitor} state={state} model={model} />
+          <MonitorCharts
+            report={report}
+            monitor={monitor}
+            state={state}
+            model={model}
+            refreshMs={chartRefreshMs}
+          />
         ))}
       {panel === "reporte" &&
         (report === null ? (

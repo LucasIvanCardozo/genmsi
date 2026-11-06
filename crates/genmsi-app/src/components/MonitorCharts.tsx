@@ -136,12 +136,16 @@ export default function MonitorCharts({
       : "tiempo hasta el reloj";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto">
-      <div className="grid items-start gap-3 lg:grid-cols-[minmax(0,1fr)_372px]">
+    // The section has two parts and, when they stand side by side, each one
+    // scrolls on its own: the panel of the state on the right and the cards
+    // on the left. The section itself does not scroll. In a narrow window
+    // the two stack and the section scrolls as it always did.
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto lg:overflow-hidden">
+      <div className="grid items-start gap-3 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_372px] lg:items-stretch">
         {/* The panel comes first in the order of the document: in a narrow
             window it stacks above the cards, and in a wide one the order
-            puts it on the right, where it does not scroll away. */}
-        <aside className="order-1 lg:order-2 lg:sticky lg:top-3">
+            puts it on the right, where it scrolls on its own. */}
+        <aside className="order-1 lg:order-2 lg:min-h-0 lg:overflow-y-auto">
           <RunStatePanel
             report={report}
             instant={instant}
@@ -150,7 +154,7 @@ export default function MonitorCharts({
           />
         </aside>
 
-        <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-1">
+        <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-1 lg:min-h-0 lg:overflow-y-auto">
           <ChartCard
             title="La corrida en números"
             subtitle="Lo que el reloj ya no tiene que repetir: el reloj, el fin y la identidad de la corrida están en el panel lateral."

@@ -47,18 +47,21 @@ jobs:
             args: "--target aarch64-unknown-linux-gnu"
             targets: "aarch64-unknown-linux-gnu"
           # macOS: one `.dmg` for the two Macs (Intel and Apple Silicon).
-          - platform: macos-latest
+          # The image is named, not `latest`: the label moved to macOS 26
+          # without notice, and an installer that changes its base under the
+          # feet of the people who download it is not a release.
+          - platform: macos-15
             name: macos
             args: "--target universal-apple-darwin"
             targets: "x86_64-apple-darwin aarch64-apple-darwin"
           # Windows x64: the `-setup.exe` and the `.msi`.
-          - platform: windows-latest
+          - platform: windows-2025
             name: windows
             args: ""
             targets: ""
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -96,7 +99,7 @@ jobs:
       # crate, and it does not compile with a stable rustc).
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.3.14
 
       - name: The dependencies of the frontend
         working-directory: crates/genmsi-app
@@ -146,7 +149,7 @@ jobs:
       # local source.
       - name: The binary of Linux
         if: matrix.name == 'linux-x86_64'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: genmsi-linux-x86_64
           path: crates/genmsi-app/src-tauri/target/release/genmsi-app-desktop
@@ -179,7 +182,7 @@ jobs:
   # It is built inside a container of Arch, because `makepkg` is of Arch.
   pacman:
     name: El paquete de pacman (CachyOS)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     container: archlinux:base-devel
     steps:
       # The dependencies come BEFORE the checkout: the image of Arch does
@@ -199,9 +202,9 @@ jobs:
             unzip
           # Bun: its own release (the crate of crates.io is another
           # program), installed for everybody and not for one user.
-          BUN_INSTALL=/usr/local bash -c "curl -fsSL https://bun.sh/install | bash"
+          BUN_INSTALL=/usr/local bash -c "curl -fsSL https://bun.sh/install | bash -s \"bun-v1.3.14\""
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: The package
         run: |
@@ -210,7 +213,7 @@ jobs:
           chown -R builder "$GITHUB_WORKSPACE"
           su builder -c "cd '$GITHUB_WORKSPACE' && PATH=/usr/local/bin:\$PATH packaging/arch/build-package.sh"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: genmsi-pacman
           # The .SRCINFO starts with a dot, and the glob of the action
@@ -235,10 +238,10 @@ jobs:
     needs: [release]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: The binary of Linux
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: genmsi-linux-x86_64
           path: crates/genmsi-app/src-tauri/target/release
@@ -271,7 +274,7 @@ jobs:
           version="$(grep -m1 '^version = ' crates/genmsi-app/src-tauri/Cargo.toml | cut -d'"' -f2)"
           flatpak build-bundle repo "GenMSI_$version.flatpak" org.gensmi.desktop
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: genmsi-flatpak
           path: |
@@ -282,9 +285,9 @@ jobs:
   publicar-pacman:
     name: El paquete de pacman, en el release
     needs: [release, pacman]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: genmsi-pacman
           path: paquete
@@ -306,9 +309,9 @@ jobs:
   publicar-flatpak:
     name: El Flatpak, en el release
     needs: [release, flatpak]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: genmsi-flatpak
           path: flatpak
@@ -325,7 +328,7 @@ jobs:
   notas:
     name: El cuerpo del release y las sumas
     needs: [release, publicar-pacman, publicar-flatpak]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Los archivos del release
         env:

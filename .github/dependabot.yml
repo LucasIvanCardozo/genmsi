@@ -1,0 +1,31 @@
+# The dependencies of the workflows.
+#
+# The actions declare the runtime they need (the Node version they run on),
+# and GitHub withdraws the runtimes it stops supporting. An action that
+# declares an old runtime is forced to run on a newer one anyway, and the
+# repository hears about it in the log of every run: the warnings that said
+# that `actions/checkout@v4` targets Node.js 20 arrived that way.
+#
+# Dependabot opens the pull request that brings an action to its new major,
+# and the checks of the repository say whether the bump holds.
+
+version: 2
+
+updates:
+  # The actions of the workflows.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "ci"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+  # The dependencies of the frontend are NOT here: the app locks them with
+  # `bun.lock`, and Dependabot reads `package-lock.json`, `yarn.lock` and
+  # `pnpm-lock.yaml`, not Bun's. An entry for the `npm` ecosystem here would
+  # fail every week looking for a lockfile that does not exist. The frontend
+  # is updated with `bun update`, by hand.

@@ -8,6 +8,43 @@ description: Read this when an agent has to build, read or change a GenMSI model
 This file is the procedure and the vocabulary for building a GenMSI model with the GenMSI MCP server.
 It is the only sanctioned place to learn the format: the catalogue holds the facts of a class, the tools hold the interface, and this file holds the rest — read it instead of the engine's Rust source.
 
+GenMSI is a discrete-event simulator: a model is a graph of blocks that you
+draw, that compiles and that runs. This file is the procedure and the
+vocabulary for building one of those models with the GenMSI MCP server. It is
+written for the agent that has to write or change a model.
+
+- [The workflow](#the-workflow) — the nine steps of a model, from the
+  catalogue call to the save.
+- [The verb](#the-verb) — `apply_edit`, the commands of a batch and what each
+  of them guarantees.
+- [Reading a run](#reading-a-run) — the events and the summary of a run, and
+  the map that crosses them.
+- [The person reading](#the-person-reading) — the desktop application, the
+  unsaved changes and the proposal that waits for a verdict.
+- [The document](#the-document) — the XML of a `.gmdl` file and the rules of
+  the format.
+  - [The properties](#the-properties) — the properties of a block, their
+    `type` and `subType`, and the value a missing property is read as.
+  - [How two blocks are connected](#how-two-blocks-are-connected) — the
+    `<link>` element, the ports of a class and the rules of the flow.
+  - [A worked example](#a-worked-example) — a five-block model, written out,
+    and the numbers it produces.
+- [Entities](#entities) — the entities that are declared and the ones that
+  come into being by use.
+- [Expressions](#expressions) — the language of the properties that carry an
+  expression.
+- [Runtime semantics worth knowing](#runtime-semantics-worth-knowing) — the
+  rules of a run that change the result of a model.
+- [Probe before you rely on it](#probe-before-you-rely-on-it) — the five steps
+  of a probe of a class whose behaviour you have not seen.
+- [Traps](#traps) — the mistakes that cost a run, and the error each of them
+  produces.
+- [If the MCP does not tell you something](#if-the-mcp-does-not-tell-you-something) —
+  what to do when the tools have no answer to give.
+
+**How to read it.** If all you have to do is build a model, read *The workflow*
+and *The verb*; the rest is detail.
+
 ## The workflow
 
 1. **One catalogue call.** `catalogue({ classes: ["Generate", "Queue", "FacilityUse", "Terminate", "Clock"] })` — every class the model needs, in **one call**, not one call per class. The answer carries, for each class: the title and the description, the input ports (`ioid`, `name`), the output ports (`ioid`, `name`), the properties (`name`, `hint`, `ty`, `subtype`, and the `options` of a listed property), the entity kinds the class `declares` and the ones it `uses`, the XML template of a minimal valid block of that class, and the **contract** of the class: what it does to the flow of the transaction, what it blocks, the rules of taking and releasing, and the traps.

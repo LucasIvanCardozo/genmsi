@@ -1,9 +1,10 @@
-//! Compatibility harness against the original tool's report.
+//! Compatibility harness against the reference application's report.
 //!
 //! The baselines under `fixtures/outputs/*.report.txt` are single sample runs of
-//! the Delphi original (decision D6: semantic equivalence within statistical
-//! tolerance — not bit-exactness). This module parses those reports and compares
-//! them with replications of the Rust engine.
+//! the reference application (the GenMSI desktop program for Windows, decision
+//! D6: semantic equivalence within statistical tolerance — not bit-exactness).
+//! This module parses those reports and compares them with replications of the
+//! Rust engine.
 //!
 //! Comparison rule (documented in `docs/oracle-comparison.md`): a metric matches
 //! when its relative deviation from the baseline is below the metric's tolerance
@@ -94,7 +95,7 @@ pub struct BaselineReport {
     pub storages: Vec<BaselineStorage>,
 }
 
-/// Parse a report produced by the original `genmsi.exe`.
+/// Parse a report produced by the reference application (`genmsi.exe`).
 pub fn parse_baseline_report(text: &str) -> Result<BaselineReport, String> {
     let mut report = BaselineReport::default();
     let mut lines = text.lines().peekable();
@@ -528,10 +529,27 @@ pub fn compare_metrics(
     comparisons
 }
 
+/// The anchor a heading gets in a Markdown document: its text in lowercase,
+/// without punctuation, with every space as a hyphen.
+///
+/// `Parcial 6-11-23__Veron - Parcial` becomes
+/// `parcial-6-11-23__veron---parcial`.
+pub fn heading_anchor(text: &str) -> String {
+    let mut anchor = String::with_capacity(text.len());
+    for ch in text.chars() {
+        if ch.is_whitespace() {
+            anchor.push('-');
+        } else if ch.is_alphanumeric() || ch == '-' || ch == '_' {
+            anchor.extend(ch.to_lowercase());
+        }
+    }
+    anchor
+}
+
 /// Markdown table of all comparisons.
 pub fn render_markdown(comparisons: &[ModelComparison], note: &str) -> String {
     let mut out = String::new();
-    out.push_str("# Oracle comparison against the original GenMSI\n\n");
+    out.push_str("# Oracle comparison against the reference application\n\n");
     out.push_str(note);
     out.push_str("\n\n## Summary\n\n");
     out.push_str("| Model | Horizon | Runs | Matched | Ratio | Status |\n");
@@ -644,5 +662,17 @@ STORAGE           CAP. REMAIN. MIN.  MAX. ENTRIES AVL. AVE.C.  UTIL. RETRY DELAY
     #[test]
     fn rejects_text_that_is_not_a_report() {
         assert!(parse_baseline_report("Error en linea 9 -> Bloque inválido").is_err());
+    }
+
+    #[test]
+    fn computes_the_anchor_of_a_heading() {
+        assert_eq!(
+            heading_anchor("Parcial 6-11-23__Veron - Parcial"),
+            "parcial-6-11-23__veron---parcial"
+        );
+        assert_eq!(
+            heading_anchor("TP6__Clase 6_2_UltimoCliente"),
+            "tp6__clase-6_2_ultimocliente"
+        );
     }
 }

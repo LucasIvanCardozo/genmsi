@@ -85,7 +85,7 @@ fn fast_models_match_the_baseline() {
 fn comparison_document_covers_every_model() {
     let doc = std::fs::read_to_string(root().join("docs/oracle-comparison.md"))
         .expect("docs/oracle-comparison.md exists");
-    assert!(doc.contains("# Oracle comparison against the original GenMSI"));
+    assert!(doc.contains("# Oracle comparison against the reference application"));
     for model in models() {
         let stem = model.file_stem().unwrap().to_string_lossy().to_string();
         assert!(doc.contains(&stem), "document does not mention {stem}");

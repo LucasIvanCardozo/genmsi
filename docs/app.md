@@ -6,9 +6,9 @@ The desktop application of GenMSI: a thin client over the engine
 This document describes the **third vertical slice** (Phase 4c): the app
 opens a `.gmdl`, shows its graph, **edits it** — creating, deleting,
 connecting and moving blocks, editing their properties, undoing, copying
-and pasting — saves the model back to a `.gmdl` that the original editor
-still opens, and **replays a finished run** in a monitor of its own, with the
-clock, the state of the entities and the charts of the run.
+and pasting — saves the model back to a `.gmdl`, with the structure the
+format declares, and **replays a finished run** in a monitor of its own,
+with the clock, the state of the entities and the charts of the run.
 
 ## The shape of the app
 
@@ -241,9 +241,8 @@ generated from the Rust ones (`src/types/generated/EditCommand.ts`):
 
 The labels are the connection points: a link is a pair of ports that share
 one label, and the block's own label is the label of its first labelled
-input. The original editor reused ids and labels when it copied a block,
-and that is where its structural bugs came from; the paste here gives the
-copies fresh ids and a fresh label per remapped link.
+input. A copy never reuses an id or a label: the paste gives the copies
+fresh ids and a fresh label per remapped link.
 
 ### The documents come from the engine
 
@@ -279,8 +278,7 @@ The script turns on the optional `ts` feature of `genmsi-core` and of
 
 ## The interface
 
-The design is the app's own (the phase's decision `S2`): clarity over
-similarity with the original.
+The design is the app's own (the phase's decision `S2`): clarity first.
 
 - **Header**: the identity of the work and the **console of the run**. The
   identity comes first — the mark, the name of the app, the name of the
@@ -292,9 +290,10 @@ similarity with the original.
   before a run, disabled, and the reader never has to start a run to find
   them.
 - **Toolbar**: the commands, in one dense row, split by what they do and
-  named. *Archivo* — `Nuevo`, `Abrir…`, `Recientes`, `Guardar`,
-  `Guardar como…`; *Edición* — `Deshacer`, `Rehacer`, `Borrar`; *Vista* —
-  `Encuadrar`, `Reacomodar`; and at the other end the three numbers the next
+  named. *Archivo* — `Nuevo`, `Abrir…`, the recents (`Los modelos abiertos
+  últimamente`), `Guardar`, `Guardar como…`; *Edición* — `Deshacer`,
+  `Rehacer`, `Borrar`; *Vista* — `Encuadrar`, the re-layout (`Reordenar el
+  grafo en capas`); and at the other end the three numbers the next
   run takes: the seed, with the lock that says whether it repeats, the
   horizon and the `START`. The commands that an icon explains keep only the
   icon; the ones that a word explains keep the word.
@@ -347,8 +346,8 @@ similarity with the original.
   save a model. What needs the eye says so with a halo: it pulses three
   times, because the reader may be looking at the graph and not at the foot
   of the window.
-- **Numbers**: the original's comma decimals, so a report read in the app
-  and a report read in the CLI say the same thing.
+- **Numbers**: the comma decimals of the CLI's report, so a report read in
+  the app and a report read in the CLI say the same thing.
 - **Text**: Spanish, neutral. The code, the file names and the documents
   stay in English.
 
@@ -467,7 +466,8 @@ replay, the published ones by the length of the run.
 
 ### The re-layout is explicit
 
-`Reacomodar` recomposes the whole canvas with **dagre**, the Sugiyama
+The button of the re-layout (`Reordenar el grafo en capas`) recomposes the
+whole canvas with **dagre**, the Sugiyama
 pipeline, **from top to bottom**: the input of a block is at its top and its
 output at its bottom, so the flow the reader follows goes down, and the links
 are short and straight. The flow is counted over the whole model (a link that
@@ -507,7 +507,7 @@ zoom out to be seen.
 | `crates/genmsi-app/src/monitor/series.ts` | The series, the intervals and the histograms the charts draw. |
 | `crates/genmsi-app/src/state/store.ts` | The app's state (Zustand). |
 | `crates/genmsi-app/src/types/generated/` | The types generated from the Rust schema. |
-| `crates/genmsi-app/src/format.ts` | The numbers of the app, with the original's comma decimals. |
+| `crates/genmsi-app/src/format.ts` | The numbers of the app, with the comma decimals of the CLI's report. |
 | `crates/genmsi-app/vite/devBridge.ts` | The Vite middleware that serves the engine's documents. |
 | `crates/genmsi-app/engine/` | `genmsi-app-engine`: the facade both backends share. |
 | `crates/genmsi-app/src-tauri/` | The desktop shell (outside the workspace: its dependency tree is heavy). |
@@ -534,8 +534,9 @@ crates/genmsi-app/scripts/check-tauri-shell.sh
 
 ```bash
 cd crates/genmsi-app
-bun test        # the dev bridge's bytes against the engine's, the property
-                # editors and the replay of the trace
+node --test tests/*.test.ts   # the dev bridge's bytes against the engine's,
+                              # the property editors and the replay of the
+                              # trace (the `test` script of `package.json`)
 bunx tsc --noEmit
 ```
 

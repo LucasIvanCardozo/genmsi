@@ -219,7 +219,35 @@ adaptation notice (the original opens the model anyway, but the notice has to
 be accepted with its "Aceptar" button before the simulator can be driven), and
 a second session running the original under the same Wine prefix (the
 `wineserver -k` that ends a run kills the other session's simulation too).
-`GENMSI_WINEPREFIX` points the harness at a prefix of its own.
+`GENMSI_WINEPREFIX` points the harness at a prefix of its own: it is the
+variable the harness reads (`run_oracle.sh` ignores the plain `WINEPREFIX`
+that `run-benches.sh` exports).
+
+## `compare-gpss.sh` — one listing against the listing of the original
+
+```
+bash scripts/wine-oracle/compare-gpss.sh <our gpss> <the original's gpss>
+```
+
+It compares the listing our engine compiles for a model with the listing the
+original wrote for the same model: block by block, matched by the label of
+the block, and connection by connection, with the definitions compared as
+sets. It exits 0 when the two agree, 1 when they differ and 2 when a file is
+missing.
+
+## `compare-benches.sh` — every bench against the answer of the original
+
+```
+bash scripts/wine-oracle/compare-benches.sh <benches dir> <results dir>
+```
+
+It asks our engine for the listing of every bench of the directory and
+compares it with the one the original wrote (the results that
+`run-benches.sh` leaves). It builds the release binary
+(`cargo build --release -p genmsi-cli`), prints the classes that agree and
+the ones that differ, and then compares the numbers of the reports with the
+example `compare-benches` of the core. It exits 0 when every bench that has
+an answer agrees, 1 when one does not and 2 when a directory is missing.
 
 ## `first_arrival_evidence.py` — when the first transaction of a generator arrives
 
@@ -272,13 +300,57 @@ A bench shows what one class does. A **probe** is an experiment: a model built
 so that the question cannot be answered by reading the text, run in the
 original and in our engine, and the numbers of the two reports compared.
 
+The runner of the `TransferProbOrder` probe is:
+
 ```
 bash scripts/wine-oracle/probes/run-probe.sh
 ```
 
-Each probe directory holds the models, what the original produced
-(`oracle/`) and what our engine produced (`ours/`), plus a note with the
-question, the numbers and the verdict.
+It is wired to that probe: with no argument it runs the three models
+`TransferProbOrder85`, `TransferProbOrder15` and `TransferProbOrder`, and
+what it prints is the entry count of `A_AdvanceLargo` and of
+`A_AdvanceCorto` of each run. The other probes have their own command:
+
+- the models of the root of `probes/` — the harness itself runs them:
+
+  ```
+  bash scripts/wine-oracle/run_oracle.sh scripts/wine-oracle/probes/<model>.gmdl <outdir>
+  ```
+
+  They are `MultifurcacionPParam.gmdl`, `TestFalso.gmdl`, `QueueContent.gmdl`,
+  `AdvanceDelay.gmdl`, `AssignValor.gmdl`, `LogicSet.gmdl`, `LogicReset.gmdl`
+  and `AlterMiembro.gmdl`, the ones of the notes `SondasLote2.md` and
+  `SondasLote3.md`. The answers of the original are in `oracle/` and ours in
+  `ours/`.
+- `gates/` — `python3 scripts/wine-oracle/probes/gates/make-gate-probes.py`
+  builds the models and the harness runs them. It measures what each of the
+  six operators of the `GATE` does over a storage in one state. It holds the
+  models and the answers of the original in `oracle/`.
+- `almacen/` — the harness runs them, with the model in
+  `scripts/wine-oracle/probes/almacen/`:
+
+  ```
+  bash scripts/wine-oracle/run_oracle.sh <model>.gmdl <outdir>
+  ```
+
+  They measure the storages, the queues and the facilities. It holds the
+  models and the answers of the original in `oracle/`.
+- `reporte/` — `python3 scripts/wine-oracle/probes/reporte/make-reporte-probes.py`
+  builds the models and
+  `bash scripts/wine-oracle/probes/reporte/run-probe-reporte.sh <model.gmdl> <outdir>`
+  runs them. It measures the group and table sections of the report. It holds
+  the models and the note `SondasReporte.md`.
+- `select/` — `python3 scripts/wine-oracle/probes/select/make-select-probes.py`
+  builds the models and
+  `bash scripts/wine-oracle/probes/select/run-probe.sh <model.gmdl> <outdir>`
+  runs them (the same harness with screenshots, for the models that do not
+  finish). It measures the listing of the `SELECT` family and the `EXAMINE`.
+  It holds the models and the note
+  [`probes/select/EvidenciaSelect.md`](probes/select/EvidenciaSelect.md).
+
+Only the root of `probes/` keeps the answers of our engine (`ours/`); the
+directories of a probe keep the answers of the original (`oracle/`), and two
+of them have a note of their own (`reporte/` and `select/`).
 
 ### `TransferProbOrder` — which order does the original's engine follow for a `Transfer`?
 

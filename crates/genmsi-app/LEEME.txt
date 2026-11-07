@@ -1,7 +1,10 @@
-GenMSI 0.5.1 — simulador GPSS
-================================
+GenMSI 0.5.1 — simulador de eventos discretos
+=============================================
 
 Esta carpeta lleva la aplicación para Linux (x86_64), sin instalar.
+
+GenMSI es un simulador de eventos discretos: dibujás un modelo de colas y
+lo corrés.
 
 CÓMO SE USA
 -----------
@@ -13,25 +16,33 @@ CÓMO SE USA
 
        ./genmsi-app-desktop
 
-La ventana se titula "GenMSI". Desde la barra de herramientas se abre un
-modelo («Abrir…»), se guarda («Guardar» y «Guardar como…») y se corre la
-simulación («Simular» para el informe, «Ejecutar» para verla reproducida).
+La ventana se titula "GenMSI". Los controles están repartidos por zonas:
+
+  - La barra del modelo (a la izquierda de la barra de herramientas) lleva
+    «Abrir…» y la lista de los modelos abiertos últimamente.
+  - La barra de herramientas lleva «Guardar», «Guardar como…», deshacer y
+    rehacer, borrar lo seleccionado, encuadrar el grafo, reordenarlo en capas
+    y los tres números de la corrida: «Semilla», «Hasta» y «START».
+  - La consola de la corrida lleva «Simular» (el informe), «Ejecutar» (la
+    reproducción) y «Cancelar» mientras el motor trabaja.
 
 La simulación corre una sola vez: la reproducción y el informe salen de esa
 misma corrida, así que los números que ves son los de esa corrida ✓. Se
 puede interrumpir con «Cancelar», y el informe dice que la corrida se
 cortó.
 
+Fijá la «Semilla» (la casilla «Fijar») si querés que la corrida se repita
+igual: con la semilla suelta, cada corrida sortea la suya y los números
+cambian.
+
 QUÉ NECESITA
 ------------
-Un escritorio Linux con GTK 3 y WebKitGTK 4.1 (los tiene cualquier
-distribución de escritorio: Debian, Ubuntu, Fedora, openSUSE, Arch, CachyOS...).
+Un escritorio Linux con GTK 3 y WebKitGTK 4.1: son las dos librerías del
+shell de escritorio, y el paquete de Arch las pide así
+(`packaging/arch/PKGBUILD`: `depends=('gtk3' 'webkit2gtk-4.1')`). En Debian y
+Ubuntu:
 
-Para instalarlo como un programa del sistema, mejor el paquete:
-  - Debian, Ubuntu y derivados:  GenMSI_0.5.1_amd64.deb   (sudo dpkg -i)
-  - Fedora, openSUSE y derivados:  GenMSI-0.5.1-1.x86_64.rpm
-  - CachyOS, Arch y derivados:  genmsi-0.5.1-1-x86_64.pkg.tar.zst
-    (sudo pacman -U)
+    sudo apt install libwebkit2gtk-4.1-dev
 
 QUÉ SE PUBLICA
 --------------
@@ -45,8 +56,12 @@ Estos son los formatos de cada versión, todos con el mismo número:
   - GenMSI_0.5.1_x64-setup.exe         Windows (x64)
   - GenMSI_0.5.1_x64_en-US.msi         Windows (x64)
   - GenMSI_0.5.1.flatpak               Flatpak
-  - GenMSI-0.5.1-linux-x86_64.tar.gz   la versión portátil, sin instalar
+  - GenMSI_0.5.1_linux-x86_64.tar.gz   la versión portátil, sin instalar
   - SHA256SUMS                         la suma de cada instalador
+
+Este archivo es el de la versión portátil de Linux (la de arriba, la que se
+abre sin instalar nada). El resto de los instaladores están en la página de
+la release.
 
 QUÉ HAY DENTRO
 --------------
@@ -56,5 +71,6 @@ QUÉ HAY DENTRO
   LEEME.txt            este archivo
 
 Los modelos que abras son tuyos: la aplicación no borra ni toca nada fuera de
-la carpeta de datos del usuario, donde guarda la lista de los últimos modelos
-abiertos.
+la carpeta de datos del usuario, que en Linux es
+`$XDG_DATA_HOME/org.gensmi.desktop` (o `~/.local/share/org.gensmi.desktop`),
+y donde guarda la lista de los últimos modelos abiertos.

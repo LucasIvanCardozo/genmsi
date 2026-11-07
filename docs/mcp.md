@@ -1,16 +1,56 @@
 # genmsi MCP server
 
-`genmsi-mcp` is the MCP server of the GenMSI engine (ROADMAP Phase 3): it serves
-the engine to an AI agent over stdio with the eight tools of decision D7 —
-`simulate`, `lint`, `get_trace` and `explain_model`, plus `save_model`, which
-writes a model the agent built, `apply_edit`, which builds and changes one
-block by block, `catalogue`, which tells the agent which block classes exist
-and what the XML of a block of each one looks like, and `app_state`, which
-tells the agent what the desktop app is showing right now (the model it has
-open among it). The
+`genmsi-mcp` is the MCP server of the GenMSI engine: it serves the engine to an
+AI agent over stdio with the eight tools the server offers — `simulate`, `lint`,
+`get_trace` and `explain_model`, plus `save_model`, which writes a model the
+agent built, `apply_edit`, which builds and changes one block by block,
+`catalogue`, which tells the agent which block classes exist and what the XML
+of a block of each one looks like, and `app_state`, which tells the agent what
+the desktop app is showing right now (the model it has open among it). The
 binary is a thin layer over `genmsi-core` and `genmsi-format`; it carries no
 simulation logic (decision D2), and the documents it returns are the ones the
 CLI publishes (decision D13).
+
+The contract of the server, in one place: the eight tools it offers, the
+document each one returns, the classes of error a call can fail with, and how
+a client is configured to reach it. It is there so that an agent and a script
+read the same thing — the documents are the CLI's, byte for byte. Read it when
+you write an agent, when you integrate the server into a product, and when a
+call fails and the failure has to be understood.
+
+- [The agent's guide](#the-agents-guide) — where the procedure of writing a
+  model lives, and where the installer puts it.
+- [The tools](#the-tools) — the eight tools the server offers and the document
+  each one returns:
+  - [`catalogue`](#catalogue) — which block classes exist and what a block of
+    one of them looks like.
+  - [`lint`](#lint) — loads, validates and compiles a model and says what it
+    found.
+  - [`simulate`](#simulate) — runs the model once and returns its GPSS report.
+  - [`get_trace`](#get_trace) — runs the model with the trace on and returns
+    the records, with the filters applied.
+  - [`explain_model`](#explain_model) — describes the model, its blocks and the
+    map to the compiled statements.
+  - [`save_model`](#save_model) — writes a model the agent built, after
+    checking that it compiles.
+  - [`apply_edit`](#apply_edit) — adds, edits and connects the blocks with a
+    batch of the engine's own commands.
+  - [`app_state`](#app_state) — what the desktop app is showing right now.
+- [Errors](#errors) — the classes a call can fail with, and the fields each
+  one carries.
+- [Parity with the CLI](#parity-with-the-cli) — why the documents and the
+  refusals are the CLI's.
+- [Decisions](#decisions) — the questions the phase asked and the answers that
+  were recorded.
+- [The verb: `apply_edit`](#the-verb-apply_edit) — why the tool exists and
+  what its document carries.
+- [The entry point](#the-entry-point) — the binary and the subcommand that
+  speak the same protocol.
+- [Configuring the server in a client](#configuring-the-server-in-a-client) —
+  the file and the key each client reads.
+- [Two things that bite](#two-things-that-bite) — the working directory of the
+  server, and the guide that is a file and not the protocol.
+- [See also](#see-also) — the documents this one leans on.
 
 ## The agent's guide
 
@@ -34,7 +74,7 @@ Standard output belongs to the protocol: the server writes nothing else there.
 A failure that stops the server goes to standard error and the process exits
 with `1`.
 
-## The eight tools
+## The tools
 
 | Tool | What it does | Returns |
 |---|---|---|
@@ -47,7 +87,8 @@ with `1`.
 | `apply_edit` | Adds, edits and connects the blocks of a model: a batch of the engine's own editing commands. | `genmsi.edit/1` |
 | `app_state` | Says what the desktop app is showing right now: the model it has open, whether the reader has unsaved changes on it, what it found and the last run it made. | `genmsi.live/1` |
 
-Every tool but `catalogue` takes the model in one of two ways:
+Every tool that works on a model, except `catalogue` and `app_state`, takes it
+in one of two ways:
 
 - `path`: the path of a `.gmdl` file on disk.
 - `model`: the `.gmdl` document as text, for a model an agent is building and
@@ -90,6 +131,7 @@ With `class` it returns the `genmsi.class/1` document of that class:
 | `declares` | array | The entities the class **declares**: the storages, functions, tables, variables and logic switches a model has to define before it uses them. Each entry carries the `property` that names the entity and its `kind`. |
 | `uses` | array | The entities the class **uses**: the facilities, queues and labels a model creates by using them. Each entry carries the `property` that names the entity and its `kind`. |
 | `template` | string | The XML of a minimal, valid block of this class. |
+| `semantics` | object or null | The **contract** of the class: `flow` (what the class does to the flow of the transaction), `blocking` (what it blocks, and what it does not), `resources` (the rules of taking and releasing) and `gotchas` (the traps). Null when the class has no contract. |
 
 The `description` is empty for a class the glossary does not cover: the
 document never invents one.
@@ -154,7 +196,7 @@ described in [`docs/cli.md`](cli.md#genmsilint1).
 | `model` | string or null | — | The `.gmdl` document as text. |
 | `seed` | number | drawn at random | Seed of every random stream; the run says which it used, and the same seed reproduces the same run. |
 | `until` | number or null | — | Stop once the simulated clock passes this time. |
-| `start` | number | `1` | How many terminations the run waits for, like the original's `Start` field. The run ends when the counter reaches zero or below. The model does not declare it. A value below one is refused. |
+| `start` | number | `1` | How many terminations the run waits for: the start count of the run (`start`), a parameter of the run and not of the model. The run ends when the counter reaches zero or below. A value below one is refused. |
 
 Returns the `genmsi.report/1` document, the same document
 `genmsi simulate --json` prints.
@@ -167,7 +209,7 @@ Returns the `genmsi.report/1` document, the same document
 | `model` | string or null | — | The `.gmdl` document as text. |
 | `seed` | number | drawn at random | Seed of every random stream; the run says which it used. |
 | `until` | number or null | — | Stop once the simulated clock passes this time. |
-| `start` | number | `1` | How many terminations the run waits for, like the original's `Start` field. The run ends when the counter reaches zero or below. The model does not declare it. A value below one is refused. |
+| `start` | number | `1` | How many terminations the run waits for: the start count of the run (`start`), a parameter of the run and not of the model. The run ends when the counter reaches zero or below. A value below one is refused. |
 | `limit` | number | `100` | Maximum number of trace records to keep. |
 | `classes` | array of strings | — | Keep only the events of these classes (empty: all of them). |
 | `nodes` | array of numbers | — | Keep only the events of these blocks of the document (their `moduleid`; empty: all of them). |
@@ -219,7 +261,7 @@ module that compiles to several statements (the `Clock` is a generator and a
 terminate) has one row per statement, and the `node` repeats.
 
 The `program` is the compiled GPSS: its `operands` are positional, in the
-order the original's listing uses. The `model` is the document itself: every
+order the listing uses. The `model` is the document itself: every
 property carries its name and its value, and every edge names the two ends of
 a connection. An agent reads a model — and writes the next one — from the
 `model`, not from the positions of an operand string.
@@ -456,8 +498,8 @@ The fields that do not apply are absent — never `null`, never `0`. **The line
 and the column point at the opening tag of the offending element of the
 `.gmdl` file**, which is where an agent has to look; the reference models are
 one very long line, so the column is the one that tells two blocks apart. The
-line and the column are not the line of the GPSS program the original tool
-generated.
+line and the column are not the line of the GPSS program the engine compiled
+from the model.
 
 A failure the parser finds while reading the document points at the element it
 was reading: the opening tag of the `<module>` when the failure is inside one

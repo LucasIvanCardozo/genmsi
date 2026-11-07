@@ -171,7 +171,7 @@ record:
 ```
 
 The columns are simulation time, transaction, report line, block class, event
-(`generate`, `enter`, `leave`, `wait`, `terminate`) and detail. `--limit` bounds
+(`generate`, `enter`, `leave`, `wait`, `backup`, `terminate`) and detail. `--limit` bounds
 how many records the engine keeps; when the bound was reached the output ends with
 the note shown above, so a truncated trace is never mistaken for a complete one.
 There are no filters by transaction, block or time range.
@@ -337,6 +337,7 @@ appear exactly as the user wrote them on the command line.
 | `label` | string or null | GPSS label, when the block has one |
 | `operands` | string | Operands rendered the way the report shows them |
 | `entries`, `current`, `retries` | number | `ENTRY`, `CURRENT` and `RETRY` counters |
+| `counts_block` | boolean | Whether this row counts the transactions that entered its block. A block of the model can be several statements of the listing (a facility use is a queue, a seize, a depart, an advance and a release): the row that says `true` carries the entries of the block, so a client asks that row for the figure instead of adding the rows of the block up. |
 
 `entities` holds one object per entity kind, each keyed by entity name:
 
@@ -366,13 +367,15 @@ from it, so a consumer that wants `AVE.CONT.` divides `area` by
 | `limit` | number | Record limit the run used |
 | `records` | number | Records kept |
 | `truncated` | boolean | True when `records` reached `limit` |
+| `filter` | object | The filter the run applied, when the event was recorded: `classes` (array of string, the classes whose events are kept), `nodes` (array of number, the `moduleid` of the blocks of the document), `xact` (number or null, the transaction), `from` and `to` (number or null, the window of time). An empty filter keeps every event. |
 | `events` | array | Trace records, in simulation order |
 
 `events[]`: `time` (number), `xact` (number, the transaction id), `block` (number,
-0-based statement index: the human output prints `block + 1`), `class` (string),
-`label` (string or null), `event` (`generate`, `enter`, `leave`, `wait`,
-`terminate`, `table`, `logic`, `value`, `unlink`), `detail` (string, possibly
-empty).
+0-based statement index: the human output prints `block + 1`), `node` (number,
+the `moduleid` of the block of the document the statement came from), `class`
+(string), `label` (string or null), `event` (`generate`, `enter`, `leave`, `wait`,
+`backup`, `terminate`, `table`, `logic`, `value`, `unlink`), `detail` (string,
+possibly empty).
 
 The detail says what the event is about, and the events that carry a name and
 a value separate the two by the **last** space (a name may hold spaces, a

@@ -106,8 +106,53 @@ Los subagentes leen este documento entero, hasta `## Log`, y dicen qué `S#` cub
 ### L6 — T4: la publicación (2026-11-07)
 
 - La historia reescrita se publicó primero en la rama `rewrite/limpieza-atribucion`
-  (`23d01dc`), que no pisa nada: el guard de seguridad del harness bloquea el push con
-  `--force`, y publicar en una rama nueva es la parte que no destruye.
+  (`23d01dc`, la historia reescrita antes de los commits de esta feature), que no pisa
+  nada: el guard de seguridad del harness bloquea el push con `--force`, y publicar en
+  una rama nueva es la parte que no destruye.
 - `main` sigue en `6b3bbf4` hasta que se mueva. El bundle `.git/pre-clean-2026-11-07.bundle`
   es el camino de vuelta: `git clone .git/pre-clean-2026-11-07.bundle vuelta` deja la
   historia vieja intacta.
+
+### L7 — T6: la config de Dependabot del lado de GitHub (2026-11-07)
+
+- `DELETE /repos/LucasIvanCardozo/genmsi/dependabot/config` y su `GET` devuelven 404
+  con este token: no hay config almacenada que el token pueda ver. La config que
+  valía era la del archivo, y GitHub la lee del default branch: sin
+  `.github/dependabot.yml` en `main`, Dependabot deja de proponer updates, aunque la UI
+  muestre la entrada vieja (esa se borra en Settings → Dependabot, si todavía aparece).
+
+### L8 — T5, T7 y T8: la prevención (2026-11-07)
+
+- `f4ad609`: sin `.github/dependabot.yml`. Dependabot no encuentra configuración que
+  leer y deja de abrir PRs.
+- `9ca4ccc`: `AGENTS.md` y `CLAUDE.md` con la regla (el proyecto es de Lucas Cardozo,
+  ningún commit lleva pie de atribución, un commit por unidad de trabajo, Conventional
+  Commits en español) y el job `atribucion` de `checks.yml`, que falla si un commit del
+  historia lleva `Co-Authored-By` o `Signed-off-by`, o si el autor no es el dueño.
+- El job se probó contra las dos historias: con la vieja falla (25 pies de atribución y
+  el autor del bot) y con la nueva pasa. Mira el autor y no el committer, porque hay
+  merges hechos por la UI de GitHub cuyo committer es GitHub.
+
+### L9 — T9: los SHAs de los documentos (2026-11-07)
+
+- Ocho documentos citeban commits por su hash abreviado: `odd/tasks/docs-refresh.md`,
+  `genmsi-app-estado-vivo.md`, `genmsi-bucle-propuesta.md`, `genmsi-cache-series.md`,
+  `genmsi-manos-del-agente.md`, `genmsi-mcp-verbo.md`, `readme-genmsi.md` y
+  `odd/readme-genmsi/tasks`. Parcheados con el hash nuevo de la misma longitud.
+  Quedan 0 referencias viejas.
+
+### L10 — T10: la configuración de git del dueño (2026-11-07)
+
+- Lo que ya está: `user.name` y `user.email` globales, y `user.useconfigonly=true`, que
+  hace que git **no adivine** la identidad si falta la configuración. Y el hook global
+  `/home/lucas/.githooks/commit-msg`, que borra los `co-authored-by:` que no son del
+  dueño (lo instalaste el 6-nov, después de los commits ofendidos: por eso no los frenó).
+- Lo que falta: `user.useconfigonly` **no** impide que una herramienta o un bot se haga
+  pasar por vos (cualquiera que use esa configuración commitea con tu nombre), y el hook
+  no contempla `Signed-off-by:` ni a un bot que commitee con tu identidad.
+- Lo que sí cierra la puerta es la branch protection de GitHub, que `main` no tiene
+  (`GET /branches/main/protection` → 404). Es lo que impide que un PR de un bot o un
+  token compromisesido aterrice en `main`. En Settings → Branches: "Require status
+  checks to pass" (el job `atribucion` que se acaba de agregar) y "Restrict who can push"
+  (solo Lucas).
+

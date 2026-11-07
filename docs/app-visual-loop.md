@@ -14,11 +14,10 @@ change is finished.
 
 The UI of this app is reviewed with a browser, not by reading the code: the
 frontend runs under Vite, `agent-browser` opens it, the loop clicks, takes a
-screenshot in `/tmp` and looks at it before the slice is closed.
+screenshot in `/tmp` and looks at it before the change is called done.
 
-The loop is part of the definition of done of every slice. The screenshots
-are **not** committed: the repository does not carry images (the phase's
-decision `S4`).
+The loop is part of the definition of done of every change. The screenshots
+are **not** committed: the repository does not carry images.
 
 The whole loop is one runnable script,
 `crates/genmsi-app/scripts/check-visual-loop.sh`; it runs these steps in
@@ -34,7 +33,7 @@ one by one, and a change to the loop changes the script first.
   Vite and the wait until it answers.
 - [2. Open it and look at it](#2-open-it-and-look-at-it) — the browser
   session, the viewport and the first look at the app.
-- [3. Drive the slice](#3-drive-the-slice) — the flow of the loop: the
+- [3. Drive the change](#3-drive-the-change) — the flow of the loop: the
   helpers of the browser, the model, the editing steps (create a node,
   connect it, drag it, undo, redo, re-layout, save and reopen), a model the
   engine refuses, and the monitor with its charts and its report.
@@ -42,7 +41,7 @@ one by one, and a change to the loop changes the script first.
   screenshot, and what to do when the picture is not what it should be.
 - [5. Close the loop](#5-close-the-loop) — the browser and the server
   closed, and the log where a failed request shows up.
-- [The checklist of a slice](#the-checklist-of-a-slice) — the five steps
+- [The checklist of a change](#the-checklist-of-a-change) — the five steps
   that close a change: build, loop, tests, types and shutdown.
 - [The desktop shell](#the-desktop-shell) — the shell's own smoke check,
   and the flags its webview needs under `Xvfb`.
@@ -93,7 +92,7 @@ agent-browser wait --text "GenMSI"
 agent-browser snapshot -i              # the interactive elements, with their refs
 ```
 
-## 3. Drive the slice
+## 3. Drive the change
 
 The script (`crates/genmsi-app/scripts/check-visual-loop.sh`) does these
 steps; they are spelled out here. The working directory of the steps below
@@ -361,7 +360,7 @@ with the image reader of the session). The things to look at:
 
 When something is wrong: fix it, reload (`agent-browser open` again or
 `agent-browser reload`), and take the screenshot again. The loop ends when
-the picture is what the slice asks for.
+the picture is what the change asked for.
 
 ## 5. Close the loop
 
@@ -373,13 +372,13 @@ kill "$(cat /tmp/genmsi-vite.pid)"
 The server's log stays in `/tmp/genmsi-vite.log`; it is where a failed request
 shows up.
 
-## The checklist of a slice
+## The checklist of a change
 
 1. The engine is built and the dependencies are installed (see *What it
    takes*).
 2. `crates/genmsi-app/scripts/check-visual-loop.sh`, or the manual steps
    above: start the dev server, wait for it, open it, take the screenshots of
-   the flow the slice adds, look at them, fix what they show.
+   the flow the change adds, look at them, fix what they show.
 3. `node --test tests/*.test.ts` (the dev bridge's bytes against
    `genmsi simulate --json`, and the pure logic of the editor; that is the
    `test` script of `package.json`).

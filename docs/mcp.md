@@ -220,6 +220,8 @@ Returns the `genmsi.report/1` document, the same document
 
 Returns the `genmsi.trace/1` document, the same document `genmsi trace --json`
 prints. The document says `truncated: true` when the bound may have cut it.
+The events the trace records are the ones the CLI lists in
+[`trace`](cli.md#trace).
 
 **The filters are applied when the event is recorded**, so the limit counts
 the events that **pass** the filter: an agent that asks for the events of one
@@ -301,17 +303,19 @@ file is renamed over it, so a reader that watches the model (the desktop
 application does) never sees half of one.
 
 **A model the reader is editing is not written**: when the desktop app has
-unsaved changes on it, the tool writes nothing and answers `model_locked`
-(see `app_state`).
+unsaved changes on it, the tool writes nothing and answers
+[`model_locked`](#errors) (ask `app_state` before writing).
 
 The tool writes the **whole document**, not a patch: read the model with
 `explain_model`, change the text and hand the complete document back.
 
 **A model without canvas geometry is composed before it is written.** The
 geometry is the engine's business (D18), and a model the editor cannot draw
-is of no use to the reader: the engine places the blocks in layers and the
-file carries the geometry. A model that already carries its geometry keeps
-the disposition its author left.
+is of no use to the reader: the engine composes the canvas and the file
+carries the geometry. How the canvas is composed is described in
+[format-and-engine.md](format-and-engine.md#the-composition-of-the-canvas).
+A model that already carries its geometry keeps the disposition its author
+left.
 
 The composition is **not a finding**: the lint document of a model that
 compiles is `ok`, with no findings, whether the engine composed the model or
@@ -383,11 +387,7 @@ position. The file the agent named keeps the model it had.
 
 **A model the reader is editing is not written.** When the desktop app has
 **unsaved changes** on the model the call named, the tool writes **nothing**
-and answers `model_locked`: the app does not reload a model that changes under
-it while the reader has changes that are not saved, so the work would stay
-invisible on the canvas and the reader's save would overwrite it. Ask
-`app_state` before writing, tell the reader, and send the same batch again
-once the model is saved.
+and answers [`model_locked`](#errors).
 
 **Where the blocks go.** `layout: "auto"` (the default) puts every block an
 `addBlock` adds in the free spot of its container, the same place the desktop
@@ -396,9 +396,11 @@ and the `y` of the command. A `paste` keeps the place of its source plus the
 offset of the command, in both modes.
 
 **The places of the commands survive the composition.** When the model the
-batch edits carries no geometry, the engine composes its canvas —and it does
-it **before** the batch, so the blocks the batch places keep the place they
-were given.
+batch edits carries no geometry, the engine composes its canvas (how it is
+composed is described in
+[format-and-engine.md](format-and-engine.md#the-composition-of-the-canvas))
+—and it does it **before** the batch, so the blocks the batch places keep
+the place they were given.
 
 **The ids are predictable.** The blocks a batch creates take the next free
 ids, in the order of the commands: a model that starts from the skeleton
@@ -454,14 +456,10 @@ the same document with `path` and `pid` null: the question has an answer
 either way. A document left behind by an app that is gone says nothing: the
 pid says whether the process is alive.
 
-**Why the agent asks for it.** The app does not reload a model that changes
-under it while the reader has changes that are not saved —the reader's work is
-not thrown away by a change somebody else made— so the work of an agent that
-wrote anyway would stay invisible on the canvas, and the reader's save would
-overwrite it. The agent asks first, tells the reader, and sends the same edit
-again once the model is saved. `apply_edit` and `save_model` **refuse** that
-write on their own (see `model_locked` below): the refusal is mechanical, not
-a rule the agent has to remember.
+**Why the agent asks for it.** `apply_edit` and `save_model` **refuse** that
+write on their own (see [`model_locked`](#errors)): the refusal is mechanical,
+not a rule the agent has to remember. The agent asks first, tells the reader,
+and sends the same edit again once the model is saved.
 
 ## Errors
 
@@ -523,7 +521,7 @@ The classes:
 | `invalid_command` | A command of the batch could not be applied. The batch is atomic, so no command is applied: the failure names the command that failed (its index in `command` and its `op` in `op`), the block it was about with the class and the name the agent gave it (`node`, `class`, `name`) and the property it was setting (`property`), and the model stays as it was. |
 | `class_not_found` | The class named in `catalogue` is not one of the classes the catalogue lists. The `class` field carries the name that was asked for. |
 | `model_not_found` | The file named by `path` does not exist. (`apply_edit` is the exception: it creates the model, see above.) |
-| `model_locked` | The desktop app has **unsaved changes** on the model the call named, so nothing was written. The `path` field carries the model. The reader has to save it (or discard it) and the agent sends the same edit again: the batch is replayable, because the commands are the source of truth and not the text. The agent can also leave a **proposal** instead (`target: "proposal"`), which does not touch the disk. |
+| `model_locked` | The desktop app has **unsaved changes** on the model the call named, so nothing was written. The app does not reload a model that changes under it while the reader has changes that are not saved —the reader's work is not thrown away by a change somebody else made— so the work of an agent that wrote anyway would stay invisible on the canvas, and the reader's save would overwrite it. The `path` field carries the model. The reader has to save it (or discard it) and the agent sends the same edit again: the batch is replayable, because the commands are the source of truth and not the text. The agent can also leave a **proposal** instead (`target: "proposal"`), which does not touch the disk. |
 | `model_unreadable` | Reserved for a file the tool cannot read outside the model load path; a model the server loads goes through the same `parse_file` call the CLI uses, so its read failures are `invalid_model` (a missing file is still `model_not_found`). |
 | `model_unwritable` | The file could not be written: the permissions, the disk, or the path. A model that does not compile is never written at all, so this class means the write itself failed. |
 | `invalid_xml` | The document is not well-formed XML. The line and the column are known, the block is not. |
@@ -542,11 +540,11 @@ The MCP server is the same engine behind the same API (decision D7), so:
   `genmsi simulate --json` and `genmsi trace --json` print exactly what the
   matching tool returns for the same model, the same seed and the same
   horizon.
-- The accept/refuse split of the reference models is the CLI's split: twenty
-  models run and five are refused, each with the same message class
-  (`docs/cli.md` publishes the table).
-- The five refused models fail as tool errors with the same text the CLI
-  prints on stderr, plus the position of the block to fix.
+- The accept/refuse split of the reference models is the CLI's split: the
+  [reference models](cli.md#reference-models) table publishes the twenty that
+  run and the five that are refused, each with the same message class.
+- The refused models fail as tool errors with the same text the CLI prints on
+  stderr, plus the position of the block to fix.
 
 ## Decisions
 
@@ -687,10 +685,9 @@ cp -r skill/genmsi-modeling ~/.agents/skills/    # or: scripts/install-linux.sh 
 
 A write is refused for one more reason: while the desktop app has
 **unsaved changes** on the model the call names, `save_model` and
-`apply_edit` refuse with `model_locked` and write nothing: the app does not
-reload a model that changes under it while the reader has changes that are
-not saved. Ask `app_state` before you write, tell the reader, and send the
-same call again once the model is saved.
+`apply_edit` refuse with [`model_locked`](#errors) and write nothing. Ask
+`app_state` before you write, tell the reader, and send the same call again
+once the model is saved.
 
 ## See also
 

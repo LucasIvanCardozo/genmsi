@@ -299,12 +299,18 @@ the uniform (D=0.1167, p=0.3666).
 
 ## 6. Validation inferred from the five error outputs
 
-| Baseline | Message of the reference application | Engine rule |
+The five models the engine refuses, and the class of error each one fails
+with, are published in the CLI's
+[reference models](cli.md#reference-models). What this section records is the
+rule the engine applies to each class of error, and the message of the
+reference application the rule was inferred from.
+
+| Class of error | Message of the reference application | Engine rule |
 |---|---|---|
-| `Parcial 8-11-21__ParcialMikelModelos` | `Error en linea 9 -> Bloque inválido` | entity-definition names may not contain whitespace or `:` (the only offender in 25 models is `tiempo demora`) |
-| `Problema 2__puenteLevadizo`, `TP6__Clase 6_0_TestGate` | `No hay bloques TERMINATE con parámetro A` | `validate_runnable`: a `Clock` or `TERMINATE` with positive `A` is required |
-| `TP9__tp9` | `El parámetro B no debe ser nulo` | `UNLINK` requires a label on its `SalidaAlt` output |
-| `TP9__hack` | `Se intentó obtener la linea del fuente de un bloque inexistente` | an internal crash of the reference application; **not replicated** — the model has no termination path and the engine reports that modelling error |
+| `invalid block` | `Error en linea 9 -> Bloque inválido` | entity-definition names may not contain whitespace or `:` (the only offender in 25 models is `tiempo demora`) |
+| no `TERMINATE` with operand A and no `CLOCK` | `No hay bloques TERMINATE con parámetro A` | `validate_runnable`: a `Clock` or `TERMINATE` with positive `A` is required |
+| `UNLINK` without a label | `El parámetro B no debe ser nulo` | `UNLINK` requires a label on its `SalidaAlt` output |
+| internal crash of the reference application (`TP9__hack`) | `Se intentó obtener la linea del fuente de un bloque inexistente` | an internal crash of the reference application; **not replicated** — the model has no termination path and the engine reports that modelling error |
 
 All errors carry a `Location` with file, 1-based source line and `moduleid`.
 
@@ -318,8 +324,9 @@ All errors carry a `Location` with file, 1-based source line and `moduleid`.
 - `replicate` runs `N` replications with seeds derived by `mix_u64(base_seed, i)`
   and reports mean, standard deviation and the 95% Student-t interval per metric
   (`t_critical` uses the exact table up to 30 degrees of freedom).
-- When the trace is enabled, every entry, leave, wait, backup and termination
-  is recorded with time, transaction, block, label and detail. The `backup`
+- When the trace is enabled, every event of the run is recorded with time,
+  transaction, block, label and detail. The events the trace records are the
+  ones the CLI lists in [`trace`](cli.md#trace). The `backup`
   event says that the transaction backs up to the block it is counted in: it
   is recorded in the block that waits (a gate that does not open, a facility
   that is busy, a storage that is full, a match without a partner) and its

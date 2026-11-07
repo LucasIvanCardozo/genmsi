@@ -220,9 +220,10 @@ positions:
 
 The geometry is the engine's business (D18): a model that carries none is a
 model the desktop editor cannot draw, and the command composes it so that the
-reader can see it. A model that already carries its geometry is **left
-exactly as its author left it** (`status: unchanged`), and nothing is written
-either way: the write is explicit.
+reader can see it. How the canvas is composed is described in
+[format-and-engine.md](format-and-engine.md#the-composition-of-the-canvas).
+A model that already carries its geometry comes back with `status: unchanged`,
+and nothing is written either way: the write is explicit.
 
 ```
 $ genmsi layout mi-modelo.gmdl --write

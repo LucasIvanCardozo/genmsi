@@ -64,7 +64,7 @@ in them — is in [`app-visual-loop.md`](app-visual-loop.md).
   browser and in the desktop shell.
 - [Checking it](#checking-it) — the tests of the app and the checks of the
   workspace.
-- [What this slice does not do](#what-this-slice-does-not-do) — the limits
+- [What the app does not do yet](#what-the-app-does-not-do-yet) — the limits
   of the app as it is today: the monitor replays a finished run, and the
   live monitor of a run in progress is not part of it.
 
@@ -205,9 +205,9 @@ one the engine's core computes for the platform:
 
 Knowing **which file** is open is not enough: an agent that writes on it
 while the reader has changes that are not saved produces work that never
-reaches the canvas (the app does not reload a model that changes under it
-while the reader is editing) and that the reader's save overwrites. So the
-app publishes what it is showing, in a file of its own data directory:
+reaches the canvas and that the reader's save overwrites (the brake is
+described in [`mcp.md`](mcp.md#errors)). So the app publishes what it is
+showing, in a file of its own data directory:
 `live.json`, beside `recent-models.json`. The file
 carries the `genmsi.live/1` document:
 
@@ -229,8 +229,9 @@ file is removed, like every other publication of the app.
 
 The MCP server reads that file and publishes it as the `app_state` tool, and
 it **refuses** to write on a model the app has open with unsaved changes
-(`model_locked`): the refusal is mechanical, in the tool, because a rule that
-depends on the agent remembering to ask is a rule some agent skips.
+([`model_locked`](mcp.md#errors)): the refusal is mechanical, in the tool,
+because a rule that depends on the agent remembering to ask is a rule some
+agent skips.
 
 ### The app adopts the proposal of an agent
 
@@ -238,9 +239,9 @@ Writing the file the app has open is the fast road, and it is the right one
 when the reader has nothing pending. It is closed when the reader **has**
 something pending: the app does not reload a model that changes under it
 while the reader is editing, and the verb refuses the write
-(`model_locked`). The road that stays open is the **proposal**: an agent
-leaves a model in the staging directory of the app, without touching the
-disk, and the app puts it on the canvas.
+([`model_locked`](mcp.md#errors)). The road that stays open is the
+**proposal**: an agent leaves a model in the staging directory of the app,
+without touching the disk, and the app puts it on the canvas.
 
 A proposal is a model the agent wrote in `<data>/staging/` beside a
 `genmsi.proposal/1` document that says what it is, what it proposes to
@@ -270,7 +271,8 @@ Two rules keep the promise of the loop:
 
 - **the reader's work comes first**: the app does not adopt a proposal while
   the reader has changes that are not saved. The proposal waits, and the
-  reader is told so. It is the rule of the brake, seen from the other side;
+  reader is told so. It is the rule of the brake, seen from the other side
+  ([`model_locked`](mcp.md#errors));
 - **the proposal is about the model the agent worked on**, and the app
   adopts it only when that is the model it has open. A proposal about
   another file waits — and it does not hold the queue in front of the
@@ -336,7 +338,7 @@ The script turns on the optional `ts` feature of `genmsi-core` and of
 
 ## The interface
 
-The design is the app's own (the phase's decision `S2`): clarity first.
+The design is the app's own: clarity first.
 
 - **Header**: the identity of the work and the **console of the run**. The
   identity comes first — the mark, the name of the app, the name of the
@@ -451,8 +453,8 @@ run had at every instant:
 | The transactions inside every block | The entries and the departures the trace records. |
 
 **No metric the engine computes is derived.** The average content and the
-utilization are *not* rebuilt: the report document does not carry them (the
-phase 4b review removed the column that implied otherwise), so the app does
+utilization are *not* rebuilt: the report document does not carry them (a
+review of the monitor removed the column that implied otherwise), so the app does
 not show them. What the monitor shows is the *state*, which is what a monitor
 shows.
 
@@ -525,12 +527,8 @@ replay, the published ones by the length of the run.
 ### The re-layout is explicit
 
 The button of the re-layout (`Reordenar el grafo en capas`) recomposes the
-whole canvas with **dagre**, the Sugiyama
-pipeline, **from top to bottom**: the input of a block is at its top and its
-output at its bottom, so the flow the reader follows goes down, and the links
-are short and straight. The flow is counted over the whole model (a link that
-crosses the border of a container says where the flow goes), and the
-containers are the frames around the blocks they hold.
+whole canvas. How the canvas is composed is described in
+[format-and-engine.md](format-and-engine.md#the-composition-of-the-canvas).
 
 The layout is computed by the **engine** (`genmsi_format::layout`, D18), it is
 deterministic (the same model always produces the same positions) and it
@@ -538,10 +536,8 @@ travels as **one** command, so the whole re-layout is one undo entry. It is
 never run on open: the picture the author of the file left stays until the
 user asks for a new one.
 
-The engine's composition also places the blocks that carry no geometry of
-their own (with the default size), and the containers grow to hold what they
-own. The frontend has no copy of the algorithm: the button asks the engine,
-so the app and the MCP place a model the same way.
+The frontend has no copy of the algorithm: the button asks the engine, so the
+app and the MCP place a model the same way.
 
 A container is the **frame** around what it holds: it is drawn behind its
 content and it is not a thing the reader drags (the blocks inside it are).
@@ -605,11 +601,11 @@ cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-## What this slice does not do
+## What the app does not do yet
 
-The **live monitor is not here yet**: this phase replays a *finished* run.
+The **live monitor is not here yet**: this build replays a *finished* run.
 The stepping engine (a model that runs and waits, `new`/`step`/snapshot) is
-Phase 4d, a separate unit whose exit gate is the oracle 20/20.
+planned as a separate unit, whose exit gate is the oracle 20/20.
 
-The engine does not change in this phase: the trace the monitor replays is
+The engine does not change here: the trace the monitor replays is
 the `genmsi.trace/1` document the CLI already published.

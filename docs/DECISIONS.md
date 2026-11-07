@@ -137,6 +137,7 @@ publish seven documents: `genmsi.lint/1`, `genmsi.report/1`,
 Rationale: the smallest surface that covers a modelling session (D11) while
 giving scripts a contract they can
 depend on; the schema field lets each document grow without breaking consumers.
+The complete contract is published in [`docs/cli.md`](cli.md).
 
 ## D14 — MCP tool surface: the CLI's documents, a model by path or by document
 
@@ -297,6 +298,8 @@ Rationale: the session the user ran asked for a simpler model and wrote it
 with two Python scripts, because the MCP had no way to build a model and the
 file it wrote had no geometry to draw. The engine composing the canvas is
 what makes an agent's model a model the reader can see.
+
+The algorithm itself is described in [format-and-engine.md](format-and-engine.md#the-composition-of-the-canvas).
 
 ## D19 — One zone of truth: the engine publishes, the app invents nothing
 

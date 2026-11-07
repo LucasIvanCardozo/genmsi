@@ -38,7 +38,8 @@ cargo build --release
 ```
 
 That prints the GPSS report of the model — the same tables the original Delphi
-workshop prints, and exactly the output below. To install the app, the CLI and the MCP server instead:
+workshop prints, and exactly the output below. To install the app, the CLI and
+the MCP server instead:
 
 ```sh
 ./scripts/install-linux.sh --with-mcp
@@ -55,8 +56,8 @@ lint(path)                # does it compile? what did the engine find?
 simulate(path, seed)      # the report
 ```
 
-> A cold agent — no documentation in the prompt, no XML written by hand — built a
-> 35-block model in **12 MCP calls**
+> A cold agent — no documentation in the prompt, no XML written by hand — built
+> a 35-block model in **12 MCP calls**
 > ([`odd/tasks/medida3/notas.md`](odd/tasks/medida3/notas.md)).
 
 **And the engine answering.** The same command with the seed pinned, so the

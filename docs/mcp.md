@@ -425,6 +425,7 @@ Returns the `genmsi.edit/1` document:
 | `diagnostics` | array | The findings, as in `genmsi.lint/1`. |
 | `created` | array | The ids of the blocks the batch created. |
 | `source` | string | The model as text, when there was no file to write it to. The field is absent when the model was written. |
+| `proposal` | object | The proposal the edit left for the person, when the edit went to the staging area of the app instead of to the file: `id` (the identity of the proposal), `model` (the absolute path of the model the proposal carries) and `document` (the absolute path of the document that describes the proposal, which is where the verdict lives). The field is absent when the model went to the file. |
 
 A model given as text (`model`) has no file to write to: the text of the
 result travels back in `source`, and that text is the only place the edit

@@ -1,16 +1,56 @@
 # genmsi MCP server
 
-`genmsi-mcp` is the MCP server of the GenMSI engine (ROADMAP Phase 3): it serves
-the engine to an AI agent over stdio with the eight tools of decision D7 —
-`simulate`, `lint`, `get_trace` and `explain_model`, plus `save_model`, which
-writes a model the agent built, `apply_edit`, which builds and changes one
-block by block, `catalogue`, which tells the agent which block classes exist
-and what the XML of a block of each one looks like, and `app_state`, which
-tells the agent what the desktop app is showing right now (the model it has
-open among it). The
+`genmsi-mcp` is the MCP server of the GenMSI engine: it serves the engine to an
+AI agent over stdio with the eight tools the server offers — `simulate`, `lint`,
+`get_trace` and `explain_model`, plus `save_model`, which writes a model the
+agent built, `apply_edit`, which builds and changes one block by block,
+`catalogue`, which tells the agent which block classes exist and what the XML
+of a block of each one looks like, and `app_state`, which tells the agent what
+the desktop app is showing right now (the model it has open among it). The
 binary is a thin layer over `genmsi-core` and `genmsi-format`; it carries no
 simulation logic (decision D2), and the documents it returns are the ones the
 CLI publishes (decision D13).
+
+The contract of the server, in one place: the eight tools it offers, the
+document each one returns, the classes of error a call can fail with, and how
+a client is configured to reach it. It is there so that an agent and a script
+read the same thing — the documents are the CLI's, byte for byte. Read it when
+you write an agent, when you integrate the server into a product, and when a
+call fails and the failure has to be understood.
+
+- [The agent's guide](#the-agents-guide) — where the procedure of writing a
+  model lives, and where the installer puts it.
+- [The tools](#the-tools) — the eight tools the server offers and the document
+  each one returns:
+  - [`catalogue`](#catalogue) — which block classes exist and what a block of
+    one of them looks like.
+  - [`lint`](#lint) — loads, validates and compiles a model and says what it
+    found.
+  - [`simulate`](#simulate) — runs the model once and returns its GPSS report.
+  - [`get_trace`](#get_trace) — runs the model with the trace on and returns
+    the records, with the filters applied.
+  - [`explain_model`](#explain_model) — describes the model, its blocks and the
+    map to the compiled statements.
+  - [`save_model`](#save_model) — writes a model the agent built, after
+    checking that it compiles.
+  - [`apply_edit`](#apply_edit) — adds, edits and connects the blocks with a
+    batch of the engine's own commands.
+  - [`app_state`](#app_state) — what the desktop app is showing right now.
+- [Errors](#errors) — the classes a call can fail with, and the fields each
+  one carries.
+- [Parity with the CLI](#parity-with-the-cli) — why the documents and the
+  refusals are the CLI's.
+- [Decisions](#decisions) — the questions the phase asked and the answers that
+  were recorded.
+- [The verb: `apply_edit`](#the-verb-apply_edit) — why the tool exists and
+  what its document carries.
+- [The entry point](#the-entry-point) — the binary and the subcommand that
+  speak the same protocol.
+- [Configuring the server in a client](#configuring-the-server-in-a-client) —
+  the file and the key each client reads.
+- [Two things that bite](#two-things-that-bite) — the working directory of the
+  server, and the guide that is a file and not the protocol.
+- [See also](#see-also) — the documents this one leans on.
 
 ## The agent's guide
 
@@ -34,7 +74,7 @@ Standard output belongs to the protocol: the server writes nothing else there.
 A failure that stops the server goes to standard error and the process exits
 with `1`.
 
-## The eight tools
+## The tools
 
 | Tool | What it does | Returns |
 |---|---|---|
@@ -47,7 +87,8 @@ with `1`.
 | `apply_edit` | Adds, edits and connects the blocks of a model: a batch of the engine's own editing commands. | `genmsi.edit/1` |
 | `app_state` | Says what the desktop app is showing right now: the model it has open, whether the reader has unsaved changes on it, what it found and the last run it made. | `genmsi.live/1` |
 
-Every tool but `catalogue` takes the model in one of two ways:
+Every tool that works on a model, except `catalogue` and `app_state`, takes it
+in one of two ways:
 
 - `path`: the path of a `.gmdl` file on disk.
 - `model`: the `.gmdl` document as text, for a model an agent is building and
@@ -90,6 +131,7 @@ With `class` it returns the `genmsi.class/1` document of that class:
 | `declares` | array | The entities the class **declares**: the storages, functions, tables, variables and logic switches a model has to define before it uses them. Each entry carries the `property` that names the entity and its `kind`. |
 | `uses` | array | The entities the class **uses**: the facilities, queues and labels a model creates by using them. Each entry carries the `property` that names the entity and its `kind`. |
 | `template` | string | The XML of a minimal, valid block of this class. |
+| `semantics` | object or null | The **contract** of the class: `flow` (what the class does to the flow of the transaction), `blocking` (what it blocks, and what it does not), `resources` (the rules of taking and releasing) and `gotchas` (the traps). Null when the class has no contract. |
 
 The `description` is empty for a class the glossary does not cover: the
 document never invents one.
@@ -154,7 +196,7 @@ described in [`docs/cli.md`](cli.md#genmsilint1).
 | `model` | string or null | — | The `.gmdl` document as text. |
 | `seed` | number | drawn at random | Seed of every random stream; the run says which it used, and the same seed reproduces the same run. |
 | `until` | number or null | — | Stop once the simulated clock passes this time. |
-| `start` | number | `1` | How many terminations the run waits for, like the original's `Start` field. The run ends when the counter reaches zero or below. The model does not declare it. A value below one is refused. |
+| `start` | number | `1` | How many terminations the run waits for: the start count of the run (`start`), a parameter of the run and not of the model. The run ends when the counter reaches zero or below. A value below one is refused. |
 
 Returns the `genmsi.report/1` document, the same document
 `genmsi simulate --json` prints.
@@ -167,7 +209,7 @@ Returns the `genmsi.report/1` document, the same document
 | `model` | string or null | — | The `.gmdl` document as text. |
 | `seed` | number | drawn at random | Seed of every random stream; the run says which it used. |
 | `until` | number or null | — | Stop once the simulated clock passes this time. |
-| `start` | number | `1` | How many terminations the run waits for, like the original's `Start` field. The run ends when the counter reaches zero or below. The model does not declare it. A value below one is refused. |
+| `start` | number | `1` | How many terminations the run waits for: the start count of the run (`start`), a parameter of the run and not of the model. The run ends when the counter reaches zero or below. A value below one is refused. |
 | `limit` | number | `100` | Maximum number of trace records to keep. |
 | `classes` | array of strings | — | Keep only the events of these classes (empty: all of them). |
 | `nodes` | array of numbers | — | Keep only the events of these blocks of the document (their `moduleid`; empty: all of them). |
@@ -178,6 +220,8 @@ Returns the `genmsi.report/1` document, the same document
 
 Returns the `genmsi.trace/1` document, the same document `genmsi trace --json`
 prints. The document says `truncated: true` when the bound may have cut it.
+The events the trace records are the ones the CLI lists in
+[`trace`](cli.md#trace).
 
 **The filters are applied when the event is recorded**, so the limit counts
 the events that **pass** the filter: an agent that asks for the events of one
@@ -219,7 +263,7 @@ module that compiles to several statements (the `Clock` is a generator and a
 terminate) has one row per statement, and the `node` repeats.
 
 The `program` is the compiled GPSS: its `operands` are positional, in the
-order the original's listing uses. The `model` is the document itself: every
+order the listing uses. The `model` is the document itself: every
 property carries its name and its value, and every edge names the two ends of
 a connection. An agent reads a model — and writes the next one — from the
 `model`, not from the positions of an operand string.
@@ -259,17 +303,19 @@ file is renamed over it, so a reader that watches the model (the desktop
 application does) never sees half of one.
 
 **A model the reader is editing is not written**: when the desktop app has
-unsaved changes on it, the tool writes nothing and answers `model_locked`
-(see `app_state`).
+unsaved changes on it, the tool writes nothing and answers
+[`model_locked`](#errors) (ask `app_state` before writing).
 
 The tool writes the **whole document**, not a patch: read the model with
 `explain_model`, change the text and hand the complete document back.
 
 **A model without canvas geometry is composed before it is written.** The
 geometry is the engine's business (D18), and a model the editor cannot draw
-is of no use to the reader: the engine places the blocks in layers and the
-file carries the geometry. A model that already carries its geometry keeps
-the disposition its author left.
+is of no use to the reader: the engine composes the canvas and the file
+carries the geometry. How the canvas is composed is described in
+[format-and-engine.md](format-and-engine.md#the-composition-of-the-canvas).
+A model that already carries its geometry keeps the disposition its author
+left.
 
 The composition is **not a finding**: the lint document of a model that
 compiles is `ok`, with no findings, whether the engine composed the model or
@@ -341,11 +387,7 @@ position. The file the agent named keeps the model it had.
 
 **A model the reader is editing is not written.** When the desktop app has
 **unsaved changes** on the model the call named, the tool writes **nothing**
-and answers `model_locked`: the app does not reload a model that changes under
-it while the reader has changes that are not saved, so the work would stay
-invisible on the canvas and the reader's save would overwrite it. Ask
-`app_state` before writing, tell the reader, and send the same batch again
-once the model is saved.
+and answers [`model_locked`](#errors).
 
 **Where the blocks go.** `layout: "auto"` (the default) puts every block an
 `addBlock` adds in the free spot of its container, the same place the desktop
@@ -354,9 +396,11 @@ and the `y` of the command. A `paste` keeps the place of its source plus the
 offset of the command, in both modes.
 
 **The places of the commands survive the composition.** When the model the
-batch edits carries no geometry, the engine composes its canvas —and it does
-it **before** the batch, so the blocks the batch places keep the place they
-were given.
+batch edits carries no geometry, the engine composes its canvas (how it is
+composed is described in
+[format-and-engine.md](format-and-engine.md#the-composition-of-the-canvas))
+—and it does it **before** the batch, so the blocks the batch places keep
+the place they were given.
 
 **The ids are predictable.** The blocks a batch creates take the next free
 ids, in the order of the commands: a model that starts from the skeleton
@@ -383,6 +427,7 @@ Returns the `genmsi.edit/1` document:
 | `diagnostics` | array | The findings, as in `genmsi.lint/1`. |
 | `created` | array | The ids of the blocks the batch created. |
 | `source` | string | The model as text, when there was no file to write it to. The field is absent when the model was written. |
+| `proposal` | object | The proposal the edit left for the person, when the edit went to the staging area of the app instead of to the file: `id` (the identity of the proposal), `model` (the absolute path of the model the proposal carries) and `document` (the absolute path of the document that describes the proposal, which is where the verdict lives). The field is absent when the model went to the file. |
 
 A model given as text (`model`) has no file to write to: the text of the
 result travels back in `source`, and that text is the only place the edit
@@ -411,14 +456,10 @@ the same document with `path` and `pid` null: the question has an answer
 either way. A document left behind by an app that is gone says nothing: the
 pid says whether the process is alive.
 
-**Why the agent asks for it.** The app does not reload a model that changes
-under it while the reader has changes that are not saved —the reader's work is
-not thrown away by a change somebody else made— so the work of an agent that
-wrote anyway would stay invisible on the canvas, and the reader's save would
-overwrite it. The agent asks first, tells the reader, and sends the same edit
-again once the model is saved. `apply_edit` and `save_model` **refuse** that
-write on their own (see `model_locked` below): the refusal is mechanical, not
-a rule the agent has to remember.
+**Why the agent asks for it.** `apply_edit` and `save_model` **refuse** that
+write on their own (see [`model_locked`](#errors)): the refusal is mechanical,
+not a rule the agent has to remember. The agent asks first, tells the reader,
+and sends the same edit again once the model is saved.
 
 ## Errors
 
@@ -456,8 +497,8 @@ The fields that do not apply are absent — never `null`, never `0`. **The line
 and the column point at the opening tag of the offending element of the
 `.gmdl` file**, which is where an agent has to look; the reference models are
 one very long line, so the column is the one that tells two blocks apart. The
-line and the column are not the line of the GPSS program the original tool
-generated.
+line and the column are not the line of the GPSS program the engine compiled
+from the model.
 
 A failure the parser finds while reading the document points at the element it
 was reading: the opening tag of the `<module>` when the failure is inside one
@@ -480,7 +521,7 @@ The classes:
 | `invalid_command` | A command of the batch could not be applied. The batch is atomic, so no command is applied: the failure names the command that failed (its index in `command` and its `op` in `op`), the block it was about with the class and the name the agent gave it (`node`, `class`, `name`) and the property it was setting (`property`), and the model stays as it was. |
 | `class_not_found` | The class named in `catalogue` is not one of the classes the catalogue lists. The `class` field carries the name that was asked for. |
 | `model_not_found` | The file named by `path` does not exist. (`apply_edit` is the exception: it creates the model, see above.) |
-| `model_locked` | The desktop app has **unsaved changes** on the model the call named, so nothing was written. The `path` field carries the model. The reader has to save it (or discard it) and the agent sends the same edit again: the batch is replayable, because the commands are the source of truth and not the text. The agent can also leave a **proposal** instead (`target: "proposal"`), which does not touch the disk. |
+| `model_locked` | The desktop app has **unsaved changes** on the model the call named, so nothing was written. The app does not reload a model that changes under it while the reader has changes that are not saved —the reader's work is not thrown away by a change somebody else made— so the work of an agent that wrote anyway would stay invisible on the canvas, and the reader's save would overwrite it. The `path` field carries the model. The reader has to save it (or discard it) and the agent sends the same edit again: the batch is replayable, because the commands are the source of truth and not the text. The agent can also leave a **proposal** instead (`target: "proposal"`), which does not touch the disk. |
 | `model_unreadable` | Reserved for a file the tool cannot read outside the model load path; a model the server loads goes through the same `parse_file` call the CLI uses, so its read failures are `invalid_model` (a missing file is still `model_not_found`). |
 | `model_unwritable` | The file could not be written: the permissions, the disk, or the path. A model that does not compile is never written at all, so this class means the write itself failed. |
 | `invalid_xml` | The document is not well-formed XML. The line and the column are known, the block is not. |
@@ -499,11 +540,11 @@ The MCP server is the same engine behind the same API (decision D7), so:
   `genmsi simulate --json` and `genmsi trace --json` print exactly what the
   matching tool returns for the same model, the same seed and the same
   horizon.
-- The accept/refuse split of the reference models is the CLI's split: twenty
-  models run and five are refused, each with the same message class
-  (`docs/cli.md` publishes the table).
-- The five refused models fail as tool errors with the same text the CLI
-  prints on stderr, plus the position of the block to fix.
+- The accept/refuse split of the reference models is the CLI's split: the
+  [reference models](cli.md#reference-models) table publishes the twenty that
+  run and the five that are refused, each with the same message class.
+- The refused models fail as tool errors with the same text the CLI prints on
+  stderr, plus the position of the block to fix.
 
 ## Decisions
 
@@ -555,6 +596,98 @@ to.
 The server runs as its own binary, `genmsi-mcp`, and as the subcommand
 `genmsi mcp` (decision D15): both speak the same protocol over the same
 stdio, and the CLI's subcommand is the one the installer registers.
+
+## Configuring the server in a client
+
+The server is the same everywhere: it is the same binary, the same engine and
+the same protocol. What changes is the file each client reads and the key it
+uses.
+
+The installer registers the server with Pi and puts the agent's guide in
+place:
+
+```sh
+./scripts/install-linux.sh --with-mcp
+```
+
+**Pi** — the command writes the file wherever that Pi reads it
+(`~/.pi/agent/mcp.json`, and `.pi/mcp.json` in a trusted project):
+
+```sh
+pi mcp add genmsi -- ~/.local/bin/genmsi mcp
+```
+
+**Claude Desktop** — `~/.config/Claude/claude_desktop_config.json`, key
+`mcpServers`:
+
+```json
+{
+  "mcpServers": {
+    "genmsi": {
+      "command": "/home/you/.local/bin/genmsi",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**Cursor** — `~/.cursor/mcp.json`, key `mcpServers`:
+
+```json
+{
+  "mcpServers": {
+    "genmsi": {
+      "command": "/home/you/.local/bin/genmsi",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**VS Code (Copilot)** — `.vscode/mcp.json`, and the key is `servers`:
+
+```json
+{
+  "servers": {
+    "genmsi": {
+      "type": "stdio",
+      "command": "/home/you/.local/bin/genmsi",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**Windsurf** — `~/.codeium/windsurf/mcp_config.json`, key `mcpServers`.
+**Zed** — `~/.config/zed/settings.json`, key `context_servers`.
+
+## Two things that bite
+
+**The working directory.** The server inherits the directory the client
+launches it in, and a relative `path` is resolved against it: the same call
+works in one client and fails in another. Pin it when the client can
+(`pi mcp add genmsi --cwd /path/to/Genmsi -- …`), and use **absolute paths**
+in the calls — `app_state` already returns one: the `path` of the
+`genmsi.live/1` document is the absolute path of the model the app has open.
+
+**The guide is a file, not the protocol.** The catalogue, the tool
+descriptions and the published schema travel in the protocol, so an agent can
+build a model with the MCP alone. The *procedure* (how a model is written,
+which entities it has to declare, what the expression language is) lives in
+the guide, and it is installed with the product:
+[`skill/genmsi-modeling/SKILL.md`](../skill/genmsi-modeling/SKILL.md).
+`skill/` is a **skills root**: copying its contents into `~/.agents/skills/`
+is the whole installation.
+
+```sh
+cp -r skill/genmsi-modeling ~/.agents/skills/    # or: scripts/install-linux.sh --with-mcp
+```
+
+A write is refused for one more reason: while the desktop app has
+**unsaved changes** on the model the call names, `save_model` and
+`apply_edit` refuse with [`model_locked`](#errors) and write nothing. Ask
+`app_state` before you write, tell the reader, and send the same call again
+once the model is saved.
 
 ## See also
 

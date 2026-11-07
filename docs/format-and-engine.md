@@ -1,11 +1,66 @@
 # `.gmdl` format and simulation semantics
 
-Design notes for Phase 1 (`genmsi-format` + `genmsi-core`). They record the
-semantics the engine implements and the evidence behind each rule. Decisions
-D1–D12 of `docs/DECISIONS.md` are not re-opened here; this file is the working
-reference for how the subset behaves.
+The format of a model (`.gmdl`) and the semantics the engine implements,
+with the evidence behind each rule. The decisions that shaped it live in
+[`DECISIONS.md`](DECISIONS.md); this file is the working reference for how the
+engine behaves.
 
-## 1. The file format as the original writes it
+The **reference application** is the Windows program the harness of
+`scripts/wine-oracle/` runs under Wine; every comparison in this file is made
+against it.
+
+This is the reference of the `.gmdl` format and of the semantics the engine
+implements: what every block means, how an expression is evaluated and what a
+run produces. It is here so that whoever writes a model knows what is going to
+happen, and so that whoever reads the code knows which rules it obeys. It is
+read by the authors of models, by the readers of the engine's source, and by
+anyone who asks why the engine behaves the way it does.
+
+- [1. The file format](#1-the-file-format) — the XML of a `.gmdl` document:
+  the modules, the properties, the percent-encoding and the canvas the engine
+  composes.
+  - [Round-trip guarantee](#round-trip-guarantee) — the proof that a rewrite is
+    byte-for-byte identical and that the geometry of the model survives it.
+  - [The composition of the canvas](#the-composition-of-the-canvas) — how the
+    engine lays the blocks out (dagre, network simplex, Brandes–Köpf) and when
+    it does it.
+- [2. Container topology](#2-container-topology) — how the containers own their
+  links, what the entry and exit ports mean and how the flow is resolved
+  inside them.
+- [3. Block expansion](#3-block-expansion) — the GPSS statements every class
+  compiles to, and the modules that compile to none.
+- [4. Expression language](#4-expression-language) — the grammar of the
+  properties that carry an expression, and the forms that look alike but are
+  not.
+- [5. Runtime semantics (with the evidence that pinned them)](#5-runtime-semantics-with-the-evidence-that-pinned-them) —
+  what each statement does at run time, with the comparison against the
+  reference application that pinned it.
+  - [Settled: the first interval with a dispersion is drawn](#settled-the-first-interval-with-a-dispersion-is-drawn) —
+    the deviation that became a rule, and the measurement that settled it.
+- [6. Validation inferred from the five error outputs](#6-validation-inferred-from-the-five-error-outputs) —
+  the five refusals of the reference application and the rule the engine
+  applies to each one.
+- [7. Reports, exports and replications](#7-reports-exports-and-replications) —
+  the GPSS report, the JSON and CSV exports, the replications with their
+  interval, and the trace.
+  - [Deviations from the report of the reference application](#deviations-from-the-report-of-the-reference-application) —
+    the places where our report differs on purpose, and why none of them
+    changes the simulation.
+- [8. Oracle comparison](#8-oracle-comparison) — how the numbers of a run are
+  compared with the baseline of the reference application, and the rule that
+  decides that they match.
+- [9. The GPSS as a second oracle](#9-the-gpss-as-a-second-oracle) — the GPSS
+  text of both programs and the tools that compare them statement by
+  statement.
+  - [What the phase measured](#what-the-phase-measured) — the numbers the phase
+    reached, and the benches that cannot be compared.
+  - [What the oracle found that no one was looking for](#what-the-oracle-found-that-no-one-was-looking-for) —
+    the three defects the comparison uncovered.
+  - [9.1 What the reference application writes](#91-what-the-reference-application-writes) —
+    the naming, the spelling and the operands of the statements of the
+    reference application.
+
+## 1. The file format
 
 A `.gmdl` file is a single line of compact XML:
 
@@ -46,13 +101,18 @@ The geometry is the engine's business (D18). `genmsi_format::layout` composes
 a model that does not carry it, with **dagre** (the Rust port of dagre.js),
 the Sugiyama pipeline:
 
-- The **flow** of the model is cut into layers: the depth of a block is the
-  length of the longest path that reaches it, and the links that close a
-  cycle are taken out first (the flow of a model with a cycle is still a flow,
-  and the block the cycle comes back to is its start). The links that cross
-  the border of a container are spliced: the flow that enters a container goes
-  to the block its entry port names, and the flow that leaves it comes from
-  the block its exit port names (`layout::flow`).
+- The **flow** of the model is cut into layers by the **network simplex**
+  (`Ranker::NetworkSimplex`), which cuts the rows so that the links cross as
+  few layers as possible. When the simplex fails on a compound graph —the
+  cycles of the container borders— the composition falls back to the **tight
+  tree**, which cuts the same rows by the depth of the flow but crosses more
+  links; the composition must never panic, and both answers are the same every
+  time, so it stays deterministic. The links that close a cycle are taken out
+  first (the flow of a model with a cycle is still a flow, and the block the
+  cycle comes back to is its start). The links that cross the border of a
+  container are spliced: the flow that enters a container goes to the block its
+  entry port names, and the flow that leaves it comes from the block its exit
+  port names (`layout::flow`).
 - The layers are **ordered** to cross the fewest links (the barycentre of the
   neighbours and the transpose; no luck in it).
 - The blocks are **placed** (Brandes–Köpf): the direction is **top to bottom**
@@ -95,9 +155,9 @@ block is reached; cycles are rejected.
 
 ## 3. Block expansion
 
-The original generates GPSS statements from the semantic modules. The compiler
-does the same, so report rows and block statistics line up with the original's
-block table:
+The compiler generates GPSS statements from the semantic modules, so the report
+rows and the block statistics line up with the block table of the reference
+application:
 
 | Module | Emitted statements |
 |---|---|
@@ -116,16 +176,17 @@ Definitions (`Function`, `Variable`, `VariableA`, `Table`, `QTable`,
 (D4). Supported forms:
 
 - numbers, `+ - * /`, modulo `@`, parentheses, unary minus;
-- `#` is the **multiplication**, not a division: the original's expression
-  editor (`FormOIExpresion`, read out of the executable) has no `*` key — it
-  offers `/`, `%`, `#` and `@` — and its models read that way ("15#paraLlevar"
-  is a surcharge per delivery, and "160+(P:Tipo-1)#30" is a price);
+- `#` is the **multiplication**, not a division: the format has no `*` key — the
+  expression editor of the reference application (`FormOIExpresion`, read out
+  of the executable) offers `/`, `%`, `#` and `@` — and the models read that way
+  ("15#paraLlevar" is a surcharge per delivery, and "160+(P:Tipo-1)#30" is a
+  price);
 - typed references with `:` or `$`: `P:` parameter, `X:` savevalue, `V:`
   variable, `FN:`/`F:` function, `Q:` queue content, `S:` storage units in use,
   `R:` facility free flag, `CH:` user-chain size, `LS:`/`L:` logic switch,
   `N:` transactions that passed a label, `W:` transactions waiting there;
 - indirect names: `*Caja` (the entity named by the value of parameter `Caja`);
-  a bare name is also a parameter read (the original emits `*cantP` for `cantP`);
+  a bare name is also a parameter read (the compiler emits `*cantP` for `cantP`);
 - system symbols `AC1` (model clock), `C1` (absolute clock), `TC1` (remaining
   termination count), `RN<k>` (uniform draw from stream `k`);
 - `70%` is the editor's per-mille form and evaluates to `700`.
@@ -143,16 +204,17 @@ text in entity-name positions.
   `A` and `B` — `A` alone, or the draw of `A±B` when there is a dispersion.
   It never arrives at time 0 by definition. `D` limits the total; an empty `A`
   is a zero interarrival, so with it the first transaction does land at time 0
-  (the original does the same: the models use it with `D` to create one
-  transaction at time 0). Verified against the 18 models that carry a `GENERATE`
-  without dispersion, without offset and without limit: `GENERATE 3600` over a
+  (the models use it with `D` to create one transaction at time 0). Verified
+  against the 18 models that carry a `GENERATE` without dispersion, without
+  offset and without limit: `GENERATE 3600` over a
   horizon of 3600 gives 2 entries (the arrival at 3600 plus the one still
   pending in the FEC), `GENERATE 900` over 3600 gives 5 and `GENERATE 1800`
   over 1800 gives 2; with the first arrival at time 0 those same models would
   give 3, 6 and 3. The table of the eighteen, the counting model of the
-  original that makes the comparison exact and the two rules it rests on are
-  in `odd/tasks/notas-primera-llegada.md`; the table is reproduced from the
-  original's reports by `scripts/wine-oracle/first_arrival_evidence.py`, and
+  reference application that makes the comparison exact and the two rules it
+  rests on are in `odd/tasks/notas-primera-llegada.md`; the table is reproduced
+  from the reports of the reference application by
+  `scripts/wine-oracle/first_arrival_evidence.py`, and
   `scripts/wine-oracle/compare_generate.py` puts our own counts next to it.
 - **ADVANCE A,B / GENERATE with B**: a numeric `B` is a symmetric spread
   (`uniform(A-B, A+B)`); a **function** `B` multiplies the mean
@@ -164,9 +226,10 @@ text in entity-name positions.
   `FunctionExpon` is `-ln(1-u)` on its `Seed` stream; `FunctionDist` maps
   percentages to indices 1..N; `VariableA` is a uniform integer in
   `[Minimo, Maximo]` on its `Seed` stream.
-- **SPLIT A creates A copies**; the original continues to its own output and the
-  copies go to the `Copias` output. The models prove it: `SPLIT P$n` is paired
-  with `ASSEMBLE 1+P$n` (the copies plus the original) in TP4/TP5.
+- **SPLIT A creates A copies**; the transaction that arrives continues to its
+  own output and the copies go to the `Copias` output. The models prove it:
+  `SPLIT P$n` is paired with `ASSEMBLE 1+P$n` (the copies plus the transaction
+  that arrived) in TP4/TP5.
 - **ASSEMBLE** gathers `Cantidad` transactions of the same assembly set, keeps
   one and destroys the rest; **GATHER** releases all of them.
 - **TRANSFER**: literals ending in `%` are fractions (`85%` → 0.85); numeric
@@ -174,15 +237,16 @@ text in entity-name positions.
   The first output is the probability branch.
 - **SELECT / SELECTF**: `SELECT MIN|MAX` picks the entity number in `[minimo,
   maximo]` with the smallest/largest metric (queue content, storage occupancy);
-  `SELECTF` (`op="Libre"`, GPSS `NU`) picks the first entity that is actually
-  free. Facilities and queues are auto-created by number, as GPSS does. The
-  class of the entity is the `ClaseSNA` property, and the original's list of
-  classes has 38 of them (`Q` queue, `S` storage, `R` storage left, `F`
-  facility, `LS` logic switch...): the statement carries the class as its
-  last operand (`SELECT MIN param,1,10,,F`).
+  `SELECTF` (`op="Libre"`, the `NU` operator) picks the first entity that is
+  actually free. Facilities and queues are auto-created by number. The class of
+  the entity is the `ClaseSNA` property, and the catalogue of the format has
+  38 of them (`Q` queue, `S` storage, `R` storage left, `F` facility, `LS` logic
+  switch...): the statement carries the class as its last operand
+  (`SELECT MIN param,1,10,,F`).
 - **GATE**: pass goes to `Salida1`; a failure goes to `Salida2` when it is
   connected, otherwise the transaction waits in the block and every state change
-  retries the waiters (the original reports these as RETRY counts).
+  retries the waiters (the reference application reports these as RETRY
+  counts).
 - **PREEMPT/RETURN**: a preempted owner that was delayed in an `ADVANCE` has its
   remaining time stored in the `Remanente` parameter; `RETURN` releases the
   facility and resumes the owner with its remaining time. Interrupt modes are
@@ -192,31 +256,32 @@ text in entity-name positions.
   `SalidaAlt` target while the active transaction continues at `Salida1`.
 - **Groups**: `JOIN` adds the transaction (transaction group) or a number
   (`JoinNumber`); `EXAMINE` tests numeric membership; `REMOVE`, `SCAN` and
-  `ALTER` operate on transaction groups as in GPSS.
+  `ALTER` operate on transaction groups.
 - **Termination**: the run ends when the start counter reaches zero. A model is
   runnable only if it has a `Clock` or a `TERMINATE` with a positive `A`
   operand — exactly the oracle's refusal rule.
 - **`Clock` and the `START`**: the `Clock` spends one unit of the `START` every
   `Frecuencia` time units ("Descuenta 1 unidad del START de la simulación cada
   un cierto tiempo indicado"), so a run with `Frecuencia` 3600 ends at time
-  3600 and the report says so in `END_TIME`. The original compiles the `Clock`
-  into `GENERATE Frecuencia` + `TERMINATE 1`, and the engine does the same.
+  3600 and the report says so in `END_TIME`. The engine compiles the `Clock`
+  into `GENERATE Frecuencia` + `TERMINATE 1`.
 - **Storages (`ENTER`/`LEAVE`)**: a storage exists only when a `StorageDef`
   declares it, and the declaration gives its capacity in units (`Tamaño`,
   "Capacidad del Storage"). The `Cantidad` of an `ENTER`/`LEAVE` is the units
   one transaction takes and gives back ("Cantidad de ingresos"), so a storage
   of `Tamaño` 1 with a `Cantidad` of 1 holds one transaction at a time and the
-  others wait (the original reports `MAX` 1 and the refusals in the storage's
-  own `RETRY`). A storage the model does not declare has no capacity: the
-  original stops the run with "Referencia a una entidad storage inexistente",
-  and the compiler refuses the model before it runs.
+  others wait (the reference application reports `MAX` 1 and the refusals in the
+  storage's own `RETRY`). A storage the model does not declare has no capacity:
+  the reference application stops the run with "Referencia a una entidad
+  storage inexistente", and the compiler refuses the model before it runs.
 
 ### Settled: the first interval with a dispersion is drawn
 
 With a dispersion (`B` not empty and not zero), the first interarrival is
-**drawn** from `A` and `B`, like every other interarrival. The original's
-manual says the first increment is "calculated from the operands A and B";
-with `A` alone that is the exact `A`, and with a dispersion it is a draw.
+**drawn** from `A` and `B`, like every other interarrival. The manual of the
+reference application says the first increment is "calculated from the operands
+A and B"; with `A` alone that is the exact `A`, and with a dispersion it is a
+draw.
 
 This used to be a known deviation — the engine scheduled the first arrival at
 exactly `A` and started drawing from the second interval on — and it is
@@ -227,19 +292,25 @@ has (with a spread the first arrival is drawn and not the mean; without a
 spread there is nothing to draw and the first arrival is the mean, exactly;
 with an offset the offset is the increment of the first transaction and
 nothing is drawn). The measurement that settled it is in
-`odd/tasks/notas-primera-llegada.md`: sixty first arrivals of the original
-read with a `MARK` give a mean of 57.133 against the 60 the model asks for,
-and the Kolmogorov-Smirnov test against `U(30,90)` does not reject the
-uniform (D=0.1167, p=0.3666).
+`odd/tasks/notas-primera-llegada.md`: sixty first arrivals of the reference
+application read with a `MARK` give a mean of 57.133 against the 60 the model
+asks for, and the Kolmogorov-Smirnov test against `U(30,90)` does not reject
+the uniform (D=0.1167, p=0.3666).
 
 ## 6. Validation inferred from the five error outputs
 
-| Baseline | Original message | Engine rule |
+The five models the engine refuses, and the class of error each one fails
+with, are published in the CLI's
+[reference models](cli.md#reference-models). What this section records is the
+rule the engine applies to each class of error, and the message of the
+reference application the rule was inferred from.
+
+| Class of error | Message of the reference application | Engine rule |
 |---|---|---|
-| `Parcial 8-11-21__ParcialMikelModelos` | `Error en linea 9 -> Bloque inválido` | entity-definition names may not contain whitespace or `:` (the only offender in 25 models is `tiempo demora`) |
-| `Problema 2__puenteLevadizo`, `TP6__Clase 6_0_TestGate` | `No hay bloques TERMINATE con parámetro A` | `validate_runnable`: a `Clock` or `TERMINATE` with positive `A` is required |
-| `TP9__tp9` | `El parámetro B no debe ser nulo` | `UNLINK` requires a label on its `SalidaAlt` output |
-| `TP9__hack` | `Se intentó obtener la linea del fuente de un bloque inexistente` | an internal crash of the original; **not replicated** — the model has no termination path and the engine reports that modelling error |
+| `invalid block` | `Error en linea 9 -> Bloque inválido` | entity-definition names may not contain whitespace or `:` (the only offender in 25 models is `tiempo demora`) |
+| no `TERMINATE` with operand A and no `CLOCK` | `No hay bloques TERMINATE con parámetro A` | `validate_runnable`: a `Clock` or `TERMINATE` with positive `A` is required |
+| `UNLINK` without a label | `El parámetro B no debe ser nulo` | `UNLINK` requires a label on its `SalidaAlt` output |
+| internal crash of the reference application (`TP9__hack`) | `Se intentó obtener la linea del fuente de un bloque inexistente` | an internal crash of the reference application; **not replicated** — the model has no termination path and the engine reports that modelling error |
 
 All errors carry a `Location` with file, 1-based source line and `moduleid`.
 
@@ -247,14 +318,15 @@ All errors carry a `Location` with file, 1-based source line and `moduleid`.
 
 - `genmsi_core::render` prints the GPSS report (header counts, block table with
   `ENTRY/CURRENT/RETRY`, facilities, queues, storages, user chains, tables,
-  savevalues, diagnostics) with the original's comma decimals.
+  savevalues, diagnostics) with the comma decimals of the format.
 - `to_json` returns a typed `serde` document (run, blocks, entities);
   `to_csv` returns `section,entity,metric,value` rows.
 - `replicate` runs `N` replications with seeds derived by `mix_u64(base_seed, i)`
   and reports mean, standard deviation and the 95% Student-t interval per metric
   (`t_critical` uses the exact table up to 30 degrees of freedom).
-- When the trace is enabled, every entry, leave, wait, backup and termination
-  is recorded with time, transaction, block, label and detail. The `backup`
+- When the trace is enabled, every event of the run is recorded with time,
+  transaction, block, label and detail. The events the trace records are the
+  ones the CLI lists in [`trace`](cli.md#trace). The `backup`
   event says that the transaction backs up to the block it is counted in: it
   is recorded in the block that waits (a gate that does not open, a facility
   that is busy, a storage that is full, a match without a partner) and its
@@ -264,18 +336,18 @@ All errors carry a `Location` with file, 1-based source line and `moduleid`.
   samples of a table, the state of a logic switch, the value of a savevalue
   and the members that leave a chain.
 
-### Deviations from the original's report
+### Deviations from the report of the reference application
 
 These are deliberate and do not change the simulation:
 
-- one report row per module (the original expands compound blocks into several
-  rows); statistics are identical for the labelled first statement;
+- one report row per module (the reference application expands compound blocks
+  into several rows); statistics are identical for the labelled first statement;
 - blocked transactions are counted as current in the block they came from, the
-  way the original counts them (`A_Queue  QUEUE  qAfuera  13 13` with the gate
-  shut, and the trace says the same with its `backup` event); the exception
-  is the `MATCH`, whose waiting transaction the original counts in the match
-  as well (`A_Match  TRANSFER  ,PIENSA  43 3 0` and `PIENSA  MATCH  ESPERA
-  40 3 0`), and we count it only in the transfer;
+  way the reference application counts them (`A_Queue  QUEUE  qAfuera  13 13`
+  with the gate shut, and the trace says the same with its `backup` event); the
+  exception is the `MATCH`, whose waiting transaction the reference application
+  counts in the match as well (`A_Match  TRANSFER  ,PIENSA  43 3 0` and
+  `PIENSA  MATCH  ESPERA 40 3 0`), and we count it only in the transfer;
 - queue content and facility utilization are integrals over the run, so they do
   not depend on where a blocked transaction is displayed;
 - `TABULATE` records one observation per execution (`Peso` is accepted but not
@@ -283,20 +355,20 @@ These are deliberate and do not change the simulation:
 
 ## 8. Oracle comparison
 
-`genmsi_core::oracle` parses the original's report; the release example
-`crates/genmsi-core/examples/oracle.rs` runs every model to the baseline's
-`END_TIME` with replications and writes `docs/oracle-comparison.md`. A metric
-matches when its relative error is within 20% (counts) or 35% (times and
-occupancies), or when the baseline value falls inside the 95% interval of our
-replication mean. Baselines are single samples, so the rule is generous by
+`genmsi_core::oracle` parses the report of the reference application; the
+release example `crates/genmsi-core/examples/oracle.rs` runs every model to the
+baseline's `END_TIME` with replications and writes `docs/oracle-comparison.md`.
+A metric matches when its relative error is within 20% (counts) or 35% (times
+and occupancies), or when the baseline value falls inside the 95% interval of
+our replication mean. Baselines are single samples, so the rule is generous by
 design (D6).
 
 ## 9. The GPSS as a second oracle
 
-The numbers say whether a model behaves like the original; they do not say
-whether it behaves like the original *for the right reasons*. The original
-publishes its own answer to that question: it compiles a model into GPSS and
-shows it in its **Código GPSS** tab.
+The numbers say whether a model behaves like the reference application; they do
+not say whether it behaves like it *for the right reasons*. The reference
+application publishes its own answer to that question: it compiles a model
+into GPSS and shows it in its **Código GPSS** tab.
 
 `genmsi gpss <model>` writes the same text: one statement per line, the
 block's name, the verb and the operands, the definitions first, and the blocks
@@ -304,8 +376,9 @@ in the order a transaction walks them. The order matters — a transaction goes
 to the next block by itself, so only the connections that break the walk are
 written as a `TRANSFER` with no name.
 
-`scripts/wine-oracle/compare-gpss.sh` compares our text with the original's
-for the same model. It compares two things apart from each other:
+`scripts/wine-oracle/compare-gpss.sh` compares our text with the text of the
+reference application for the same model. It compares two things apart from
+each other:
 
 - **what each block does**: the verb and the operands of every statement,
   matched by the block's name;
@@ -315,36 +388,38 @@ The two are compared apart because the order of the blocks is a matter of the
 walk and not of the model: the same connection is a fall-through in one program
 and a `TRANSFER` in the other, and that is not a difference of behaviour.
 
-The tools in `scripts/wine-oracle/` read the original without running it:
+The tools in `scripts/wine-oracle/` read the reference application without
+running it:
 
 | Tool | What it does |
 |---|---|
-| `dfm.py` | Writes the original's 55 forms as text, so its interface can be read instead of photographed |
-| `make-benches.py` | Writes a model per class of the original's class library, with the ports and the defaults that library declares |
-| `run-benches.sh` | Runs every bench against the original and keeps its GPSS and its report |
-| `compare-gpss.sh` | Compares our GPSS with the original's, block by block and connection by connection |
-| `first_arrival_evidence.py` | Reads the original's own baseline reports and shows when the first transaction of a generator arrives |
-| `compare_generate.py` | The same evidence with our engine's counts next to the original's |
+| `dfm.py` | Writes the 55 forms of the reference application as text, so its interface can be read instead of photographed |
+| `make-benches.py` | Writes a model per class of the class library of the reference application, with the ports and the defaults that library declares |
+| `run-benches.sh` | Runs every bench against the reference application and keeps its GPSS and its report |
+| `compare-gpss.sh` | Compares our GPSS with the one of the reference application, block by block and connection by connection |
+| `first_arrival_evidence.py` | Reads the baseline reports of the reference application and shows when the first transaction of a generator arrives |
+| `compare_generate.py` | The same evidence with our engine's counts next to the ones of the reference application |
 
-A bench is the unit of verification: the original's GPSS for it says how a
-class compiles, and the original's report for it says what the class does.
+A bench is the unit of verification: the GPSS of the reference application for
+it says how a class compiles, and its report for it says what the class does.
 Together they are the specification of that class, and the model under test is
 one class with nothing else in it.
 
 ### What the phase measured
 
-Against the original's own answer, class by class:
+Against the answer of the reference application, class by class:
 
 | | Before the phase | Now |
 |---|---|---|
-| The GPSS of the bench is the original's | 17 of 62 | **62 of 62** |
-| The numbers of the bench are the original's | — | **50 of 55** |
+| The GPSS of the bench is the one of the reference application | 17 of 62 | **62 of 62** |
+| The numbers of the bench are the ones of the reference application | — | **50 of 55** |
 
-The four benches the original refuses to run are not a failure of the tool: it
-shows a dialog ("the modules were adapted") and never shows its own window, so
-there is no answer to compare with. The five that cannot be compared by the
-numbers are the benches whose original report has no header to read — a bench
-with a single `Depart` measures nothing.
+The four benches the reference application refuses to run are not a failure of
+the tool: it shows a dialog ("the modules were adapted") and never shows its
+own window, so there is no answer to compare with. The five that cannot be
+compared by the numbers are the benches whose report of the reference
+application has no header to read — a bench with a single `Depart` measures
+nothing.
 
 One command asks both questions:
 
@@ -358,28 +433,29 @@ bash scripts/wine-oracle/compare-benches.sh scripts/wine-oracle/benches /tmp/ben
 
 - The `ALTER` read `CompParam` and `CompValue` as the pair to **assign**, and
   altered the parameter it was supposed to **compare**, without comparing
-  anything. The macro of the original says it in its own words, and the block
-  has a second output called "No alteró" for the transactions that do not
-  match.
+  anything. The macro of the reference application says it in its own words, and
+  the block has a second output called "No alteró" for the transactions that do
+  not match.
 - The `#` of an expression is the **multiplication**, not an integer division:
-  the original's expression editor has no `*` key (it offers `/`, `%`, `#` and
-  `@`), and its models read that way.
+  the format has no `*` key (the expression editor of the reference application
+  offers `/`, `%`, `#` and `@`), and the models read that way.
 - A transfer's destinations are written in the **reverse** of the port order,
-  and the original's own property hint says the opposite ("probabilidad de
-  continuar por la Salida1"). The text is reversed; the engine is not — a
-  probe in `scripts/wine-oracle/probes/` settles it with the numbers.
+  and the property hint of the reference application says the opposite
+  ("probabilidad de continuar por la Salida1"). The text is reversed; the
+  engine is not — a probe in `scripts/wine-oracle/probes/` settles it with the
+  numbers.
 
-### 9.1 What the original writes
+### 9.1 What the reference application writes
 
-The text of the original is not what the model says, and reading it is a
-matter of rules. These are the ones the benches show.
+The text of the reference application is not what the model says, and reading it
+is a matter of rules. These are the ones the benches show.
 
-**The name of a statement.** The original does not take the name of a
-statement from the model: it gives every block the name of its class
+**The name of a statement.** The reference application does not take the name of
+a statement from the model: it gives every block the name of its class
 (`A_Advance`, `A_Queue`), and when two blocks of the same class would take
 that name it numbers the second one (`A_Terminate`, `A_Terminate1`). The
-classes whose statements come from a macro of the original write a name of
-their own:
+classes whose statements come from a macro of the reference application write a
+name of their own:
 
 | Class | The name it writes |
 |---|---|
@@ -393,9 +469,9 @@ A block that has no input port — a generator, the clock — has no name at all
 
 **The spelling of an expression.** A typed reference is written with a `$`
 where the model writes a `:` (`P:Param` becomes `P$Param`). The operands of
-a `TEST`, a `SELECT` or a `GATE` carry the operator of the original's own
-vocabulary (`E`, `NE`, `L`, `LE`, `G`, `GE`; `MIN`, `MAX`, `NU`; `LS`, `LR`;
-`SF`, `SNF`, `SE`, `SNE`, `SV`, `SNV`; `NU`, `U`).
+a `TEST`, a `SELECT` or a `GATE` carry the operator of the vocabulary of the
+reference application (`E`, `NE`, `L`, `LE`, `G`, `GE`; `MIN`, `MAX`, `NU`;
+`LS`, `LR`; `SF`, `SNF`, `SE`, `SNE`, `SV`, `SNV`; `NU`, `U`).
 
 **The operands of a class.** Each class writes the operands its own macro
 writes, in the order of that macro: `ALTER E <grupo>,<cantidad>,<parámetro

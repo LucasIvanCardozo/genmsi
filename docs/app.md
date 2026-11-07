@@ -3,12 +3,70 @@
 The desktop application of GenMSI: a thin client over the engine
 (`genmsi-core`), the same way the CLI and the MCP server are.
 
-This document describes the **third vertical slice** (Phase 4c): the app
-opens a `.gmdl`, shows its graph, **edits it** — creating, deleting,
+The app opens a `.gmdl`, shows its graph, **edits it** — creating, deleting,
 connecting and moving blocks, editing their properties, undoing, copying
-and pasting — saves the model back to a `.gmdl` that the original editor
-still opens, and **replays a finished run** in a monitor of its own, with the
-clock, the state of the entities and the charts of the run.
+and pasting — saves the model back to a `.gmdl`, with the structure the
+format declares, and **replays a finished run** in a monitor of its own,
+with the clock, the state of the entities and the charts of the run.
+
+This document says how the logic is divided (the frontend, the facade and
+the engine), what a **document** is (the versioned JSON the engine publishes
+and the app renders), what an **editing session** is (the model in memory,
+with its undo stack and its save), and how the interface looks.
+
+It is read by two kinds of reader: whoever maintains the app, who needs to
+know what can be touched and what cannot — the app never writes the XML of
+a model, every mutation is a command of the format — and whoever integrates
+the app with the rest of GenMSI, who needs to know what can be asked of it:
+the operations of the adapter, the documents it publishes and the proposals
+it accepts.
+
+**Start here**
+
+The app in a browser, against the real engine (the script builds the engine
+first):
+
+```bash
+scripts/dev-app.sh
+```
+
+The desktop application, installed for the current user:
+
+```bash
+scripts/install-linux.sh
+```
+
+The visual work loop — the screenshots of the interface and what to look at
+in them — is in [`app-visual-loop.md`](app-visual-loop.md).
+
+- [The shape of the app](#the-shape-of-the-app) — how the work is divided
+  between the frontend, the facade and the engine, and what the app owns:
+  [one adapter and its two backends](#one-adapter-two-backends), [the
+  session that owns the model](#the-session-owns-the-model), [the watcher
+  of the file on disk](#the-app-watches-the-model-it-has-open), [the live
+  document](#the-app-publishes-one-document-about-itself) and [what the app
+  shows](#the-app-publishes-what-it-is-showing), [the proposal of an
+  agent](#the-app-adopts-the-proposal-of-an-agent), [the editing
+  commands](#the-commands), [the documents of the
+  engine](#the-documents-come-from-the-engine) and [the generated
+  types](#the-types-are-generated).
+- [The interface](#the-interface) — the window as the reader sees it: the
+  header, the toolbar, the three panels, the lateral panel, the shape of
+  every block and the status line; then [the property
+  editors](#the-property-editors-come-from-the-declared-type), [the
+  monitor](#the-monitor-replays-the-run), [the
+  charts](#the-charts-read-the-documents) and [the
+  re-layout](#the-re-layout-is-explicit).
+- [The files](#the-files) — what every directory of the app holds: the
+  adapter, the components, the editor, the monitor, the shapes, the state,
+  the generated types and the desktop shell.
+- [Running it](#running-it) — the commands that raise the app, in the
+  browser and in the desktop shell.
+- [Checking it](#checking-it) — the tests of the app and the checks of the
+  workspace.
+- [What the app does not do yet](#what-the-app-does-not-do-yet) — the limits
+  of the app as it is today: the monitor replays a finished run, and the
+  live monitor of a run in progress is not part of it.
 
 ## The shape of the app
 
@@ -147,9 +205,9 @@ one the engine's core computes for the platform:
 
 Knowing **which file** is open is not enough: an agent that writes on it
 while the reader has changes that are not saved produces work that never
-reaches the canvas (the app does not reload a model that changes under it
-while the reader is editing) and that the reader's save overwrites. So the
-app publishes what it is showing, in a file of its own data directory:
+reaches the canvas and that the reader's save overwrites (the brake is
+described in [`mcp.md`](mcp.md#errors)). So the app publishes what it is
+showing, in a file of its own data directory:
 `live.json`, beside `recent-models.json`. The file
 carries the `genmsi.live/1` document:
 
@@ -171,8 +229,9 @@ file is removed, like every other publication of the app.
 
 The MCP server reads that file and publishes it as the `app_state` tool, and
 it **refuses** to write on a model the app has open with unsaved changes
-(`model_locked`): the refusal is mechanical, in the tool, because a rule that
-depends on the agent remembering to ask is a rule some agent skips.
+([`model_locked`](mcp.md#errors)): the refusal is mechanical, in the tool,
+because a rule that depends on the agent remembering to ask is a rule some
+agent skips.
 
 ### The app adopts the proposal of an agent
 
@@ -180,9 +239,9 @@ Writing the file the app has open is the fast road, and it is the right one
 when the reader has nothing pending. It is closed when the reader **has**
 something pending: the app does not reload a model that changes under it
 while the reader is editing, and the verb refuses the write
-(`model_locked`). The road that stays open is the **proposal**: an agent
-leaves a model in the staging directory of the app, without touching the
-disk, and the app puts it on the canvas.
+([`model_locked`](mcp.md#errors)). The road that stays open is the
+**proposal**: an agent leaves a model in the staging directory of the app,
+without touching the disk, and the app puts it on the canvas.
 
 A proposal is a model the agent wrote in `<data>/staging/` beside a
 `genmsi.proposal/1` document that says what it is, what it proposes to
@@ -212,7 +271,8 @@ Two rules keep the promise of the loop:
 
 - **the reader's work comes first**: the app does not adopt a proposal while
   the reader has changes that are not saved. The proposal waits, and the
-  reader is told so. It is the rule of the brake, seen from the other side;
+  reader is told so. It is the rule of the brake, seen from the other side
+  ([`model_locked`](mcp.md#errors));
 - **the proposal is about the model the agent worked on**, and the app
   adopts it only when that is the model it has open. A proposal about
   another file waits — and it does not hold the queue in front of the
@@ -241,9 +301,8 @@ generated from the Rust ones (`src/types/generated/EditCommand.ts`):
 
 The labels are the connection points: a link is a pair of ports that share
 one label, and the block's own label is the label of its first labelled
-input. The original editor reused ids and labels when it copied a block,
-and that is where its structural bugs came from; the paste here gives the
-copies fresh ids and a fresh label per remapped link.
+input. A copy never reuses an id or a label: the paste gives the copies
+fresh ids and a fresh label per remapped link.
 
 ### The documents come from the engine
 
@@ -279,8 +338,7 @@ The script turns on the optional `ts` feature of `genmsi-core` and of
 
 ## The interface
 
-The design is the app's own (the phase's decision `S2`): clarity over
-similarity with the original.
+The design is the app's own: clarity first.
 
 - **Header**: the identity of the work and the **console of the run**. The
   identity comes first — the mark, the name of the app, the name of the
@@ -292,9 +350,10 @@ similarity with the original.
   before a run, disabled, and the reader never has to start a run to find
   them.
 - **Toolbar**: the commands, in one dense row, split by what they do and
-  named. *Archivo* — `Nuevo`, `Abrir…`, `Recientes`, `Guardar`,
-  `Guardar como…`; *Edición* — `Deshacer`, `Rehacer`, `Borrar`; *Vista* —
-  `Encuadrar`, `Reacomodar`; and at the other end the three numbers the next
+  named. *Archivo* — `Nuevo`, `Abrir…`, the recents (`Los modelos abiertos
+  últimamente`), `Guardar`, `Guardar como…`; *Edición* — `Deshacer`,
+  `Rehacer`, `Borrar`; *Vista* — `Encuadrar`, the re-layout (`Reordenar el
+  grafo en capas`); and at the other end the three numbers the next
   run takes: the seed, with the lock that says whether it repeats, the
   horizon and the `START`. The commands that an icon explains keep only the
   icon; the ones that a word explains keep the word.
@@ -347,8 +406,8 @@ similarity with the original.
   save a model. What needs the eye says so with a halo: it pulses three
   times, because the reader may be looking at the graph and not at the foot
   of the window.
-- **Numbers**: the original's comma decimals, so a report read in the app
-  and a report read in the CLI say the same thing.
+- **Numbers**: the comma decimals of the CLI's report, so a report read in
+  the app and a report read in the CLI say the same thing.
 - **Text**: Spanish, neutral. The code, the file names and the documents
   stay in English.
 
@@ -394,8 +453,8 @@ run had at every instant:
 | The transactions inside every block | The entries and the departures the trace records. |
 
 **No metric the engine computes is derived.** The average content and the
-utilization are *not* rebuilt: the report document does not carry them (the
-phase 4b review removed the column that implied otherwise), so the app does
+utilization are *not* rebuilt: the report document does not carry them (a
+review of the monitor removed the column that implied otherwise), so the app does
 not show them. What the monitor shows is the *state*, which is what a monitor
 shows.
 
@@ -467,12 +526,9 @@ replay, the published ones by the length of the run.
 
 ### The re-layout is explicit
 
-`Reacomodar` recomposes the whole canvas with **dagre**, the Sugiyama
-pipeline, **from top to bottom**: the input of a block is at its top and its
-output at its bottom, so the flow the reader follows goes down, and the links
-are short and straight. The flow is counted over the whole model (a link that
-crosses the border of a container says where the flow goes), and the
-containers are the frames around the blocks they hold.
+The button of the re-layout (`Reordenar el grafo en capas`) recomposes the
+whole canvas. How the canvas is composed is described in
+[format-and-engine.md](format-and-engine.md#the-composition-of-the-canvas).
 
 The layout is computed by the **engine** (`genmsi_format::layout`, D18), it is
 deterministic (the same model always produces the same positions) and it
@@ -480,10 +536,8 @@ travels as **one** command, so the whole re-layout is one undo entry. It is
 never run on open: the picture the author of the file left stays until the
 user asks for a new one.
 
-The engine's composition also places the blocks that carry no geometry of
-their own (with the default size), and the containers grow to hold what they
-own. The frontend has no copy of the algorithm: the button asks the engine,
-so the app and the MCP place a model the same way.
+The frontend has no copy of the algorithm: the button asks the engine, so the
+app and the MCP place a model the same way.
 
 A container is the **frame** around what it holds: it is drawn behind its
 content and it is not a thing the reader drags (the blocks inside it are).
@@ -507,7 +561,7 @@ zoom out to be seen.
 | `crates/genmsi-app/src/monitor/series.ts` | The series, the intervals and the histograms the charts draw. |
 | `crates/genmsi-app/src/state/store.ts` | The app's state (Zustand). |
 | `crates/genmsi-app/src/types/generated/` | The types generated from the Rust schema. |
-| `crates/genmsi-app/src/format.ts` | The numbers of the app, with the original's comma decimals. |
+| `crates/genmsi-app/src/format.ts` | The numbers of the app, with the comma decimals of the CLI's report. |
 | `crates/genmsi-app/vite/devBridge.ts` | The Vite middleware that serves the engine's documents. |
 | `crates/genmsi-app/engine/` | `genmsi-app-engine`: the facade both backends share. |
 | `crates/genmsi-app/src-tauri/` | The desktop shell (outside the workspace: its dependency tree is heavy). |
@@ -534,8 +588,9 @@ crates/genmsi-app/scripts/check-tauri-shell.sh
 
 ```bash
 cd crates/genmsi-app
-bun test        # the dev bridge's bytes against the engine's, the property
-                # editors and the replay of the trace
+node --test tests/*.test.ts   # the dev bridge's bytes against the engine's,
+                              # the property editors and the replay of the
+                              # trace (the `test` script of `package.json`)
 bunx tsc --noEmit
 ```
 
@@ -546,11 +601,11 @@ cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-## What this slice does not do
+## What the app does not do yet
 
-The **live monitor is not here yet**: this phase replays a *finished* run.
+The **live monitor is not here yet**: this build replays a *finished* run.
 The stepping engine (a model that runs and waits, `new`/`step`/snapshot) is
-Phase 4d, a separate unit whose exit gate is the oracle 20/20.
+planned as a separate unit, whose exit gate is the oracle 20/20.
 
-The engine does not change in this phase: the trace the monitor replays is
+The engine does not change here: the trace the monitor replays is
 the `genmsi.trace/1` document the CLI already published.

@@ -8,6 +8,43 @@ description: Read this when an agent has to build, read or change a GenMSI model
 This file is the procedure and the vocabulary for building a GenMSI model with the GenMSI MCP server.
 It is the only sanctioned place to learn the format: the catalogue holds the facts of a class, the tools hold the interface, and this file holds the rest — read it instead of the engine's Rust source.
 
+GenMSI is a discrete-event simulator: a model is a graph of blocks that you
+draw, that compiles and that runs. This file is the procedure and the
+vocabulary for building one of those models with the GenMSI MCP server. It is
+written for the agent that has to write or change a model.
+
+- [The workflow](#the-workflow) — the nine steps of a model, from the
+  catalogue call to the save.
+- [The verb](#the-verb) — `apply_edit`, the commands of a batch and what each
+  of them guarantees.
+- [Reading a run](#reading-a-run) — the events and the summary of a run, and
+  the map that crosses them.
+- [The person reading](#the-person-reading) — the desktop application, the
+  unsaved changes and the proposal that waits for a verdict.
+- [The document](#the-document) — the XML of a `.gmdl` file and the rules of
+  the format.
+  - [The properties](#the-properties) — the properties of a block, their
+    `type` and `subType`, and the value a missing property is read as.
+  - [How two blocks are connected](#how-two-blocks-are-connected) — the
+    `<link>` element, the ports of a class and the rules of the flow.
+  - [A worked example](#a-worked-example) — a five-block model, written out,
+    and the numbers it produces.
+- [Entities](#entities) — the entities that are declared and the ones that
+  come into being by use.
+- [Expressions](#expressions) — the language of the properties that carry an
+  expression.
+- [Runtime semantics worth knowing](#runtime-semantics-worth-knowing) — the
+  rules of a run that change the result of a model.
+- [Probe before you rely on it](#probe-before-you-rely-on-it) — the five steps
+  of a probe of a class whose behaviour you have not seen.
+- [Traps](#traps) — the mistakes that cost a run, and the error each of them
+  produces.
+- [If the MCP does not tell you something](#if-the-mcp-does-not-tell-you-something) —
+  what to do when the tools have no answer to give.
+
+**How to read it.** If all you have to do is build a model, read *The workflow*
+and *The verb*; the rest is detail.
+
 ## The workflow
 
 1. **One catalogue call.** `catalogue({ classes: ["Generate", "Queue", "FacilityUse", "Terminate", "Clock"] })` — every class the model needs, in **one call**, not one call per class. The answer carries, for each class: the title and the description, the input ports (`ioid`, `name`), the output ports (`ioid`, `name`), the properties (`name`, `hint`, `ty`, `subtype`, and the `options` of a listed property), the entity kinds the class `declares` and the ones it `uses`, the XML template of a minimal valid block of that class, and the **contract** of the class: what it does to the flow of the transaction, what it blocks, the rules of taking and releasing, and the traps.
@@ -17,7 +54,7 @@ It is the only sanctioned place to learn the format: the catalogue holds the fac
 3. **Build the model with `apply_edit`.** One call, one batch of the engine's editing commands: an `addBlock` per block, a `connect` per link, a `setProperty` per operand. The engine gives every new block a place on the canvas, checks that the model compiles and writes it. The batch is **atomic**: if a command fails, no command is applied and the error names the command that failed, the block it was about (with its class and **the name you gave it**) and the property it was setting. See *The verb* below. You do not have to name a file: when you name neither a `path` nor a `model`, the batch works on **the model the app has open**.
 4. **`lint({ path })`** — the model as it is now on disk. It loads, validates and compiles the model and reports what it found. A model that does not compile is a tool error, not an empty report. The lint also names the **property a block carries that its class does not declare** (`Tamano` for `Tamaño`, with the name it probably meant): a typo is silent in the engine **when the model was written by hand**, so the lint is where it shows up — as a finding of a model that compiles, because a missing *operand* is a refusal and never reaches the findings. **Through the editing path it is not silent**: `setProperty` with a property the class does not declare fails, and the failure names the property and the block.
 5. **`explain_model({ path })`** — the model as the document writes it: every block with its class, its properties **by name** and its ports, and the `edges` that wire the blocks. It is the cheapest way to see that the model is the model you meant. (It compiles the model first, so read it after `lint`.) It also carries the **map** between the compiled statements and the blocks of the document: one row per statement, with the block, the name you gave it and where it is in the `.gmdl`.
-6. **`simulate({ path, seed })`** — the GPSS report. Read its `blocks` (the statements the model compiles to, with their counts) and its `entities` (the queues, facilities and storages it used).
+6. **`simulate({ path, seed })`** — the report of the run. Read its `blocks` (the statements the model compiles to, with their counts) and its `entities` (the queues, facilities and storages it used).
    - **Always pass the `seed` explicitly.** The default is drawn at random, so two calls with the same arguments are two different runs. The seed you pass is the seed you can repeat.
 7. **`get_trace({ path, seed, ... })`** — the events of a run, and the **summary** of it. The filters (by class, by block, by transaction, by window of time) are applied when the event is recorded, so the `limit` counts the events that pass them: ask for the events of one class and you get those, not the first ones of the run. With `summary: true` the answer is the summary of the run — what each block did, how many times a transaction entered it and when the first and the last one entered it. See *Reading a run* below.
 8. **`app_state()`** — what the reader is seeing right now (see *The person reading* below): the model the app has open, whether that file has changes that are not saved, and the **proposal** on the table, if you left one.
@@ -81,11 +118,30 @@ The order matters: `lint` before `simulate` (a model that does not compile is a 
   their canvas and decides — see *The person reading* below. A `summary` of
   what you did travels with the proposal.
 
+`apply_edit` and `save_model` are two ways to write, and they do not overlap:
+`apply_edit` changes a model **block by block**, `save_model` writes a
+document **you wrote**. Prefer `apply_edit`: it carries the class names, the
+ports and the properties of the engine, it checks what it writes, and it never
+leaves a half-built model behind.
+
+- **The model is checked before it is written.** One that does not compile is
+  **not** written, and the failure is the compiler's, with the block and its
+  position. The file keeps the model it had.
+- The answer is the `genmsi.edit/1` document: the lint of the model it edited
+  (the same fields as `genmsi.lint/1`), the commands applied, whether the
+  model was written, and the blocks the batch created. With `model` (no
+  file) the text of the result comes back in `source`.
+
 ## Reading a run
 
 A run has two faces: the **events** (what happened, one by one) and the
 **summary** (what each block did). The trace is the first and the summary is
 the second, and most of the questions an agent asks are about the second.
+
+**The events.** The events the trace records are the ones the command line
+lists in `docs/cli.md`, under `trace`. (The guide travels outside the
+repository when it is installed, so it names the document instead of linking
+it.)
 
 **The filters.** `get_trace` takes `classes` (the classes of the blocks),
 `nodes` (the blocks of the document, by their `moduleid`), `xact` (a
@@ -141,15 +197,6 @@ it found in the model, the last run it made (the report and the seed it ran
 with), and **the proposal on the table**. Without the application running it
 answers with `path: null`.
 
-The tools do not need a path: when you ask for a model and name neither a
-file nor a document, they work on **the model the app has open** — the one
-the reader is looking at. That is what you mean, unless you say otherwise.
-With no app running, or with no model open, the tools that take a model
-answer `no_open_model` and tell you to name a file: there is no destination
-to guess. (`app_state` never fails: it answers with its document and
-`path: null` when there is no app — a `null` path is what "nobody has a
-model open" looks like.)
-
 **Look before you write.** If the model you are about to change is the one
 the application has open, ask `app_state()` first:
 
@@ -193,19 +240,6 @@ proposal and the person decides.
 
 And if the reader asks you what you did, `app_state()` also tells you whether
 your change actually landed on their canvas.
-- **The model is checked before it is written.** One that does not compile is
-  **not** written, and the failure is the compiler's, with the block and its
-  position. The file keeps the model it had.
-- The answer is the `genmsi.edit/1` document: the lint of the model it edited
-  (the same fields as `genmsi.lint/1`), the commands applied, whether the
-  model was written, and the blocks the batch created. With `model` (no
-  file) the text of the result comes back in `source`.
-
-`apply_edit` and `save_model` are two ways to write, and they do not overlap:
-`apply_edit` changes a model **block by block**, `save_model` writes a
-document **you wrote**. Prefer `apply_edit`: it carries the class names, the
-ports and the properties of the engine, it checks what it writes, and it never
-leaves a half-built model behind.
 
 ## The document
 
@@ -214,7 +248,7 @@ A `.gmdl` file is one XML document: a root, the (empty) custom classes, and the 
 | Element | What it is |
 |---|---|
 | `<gmodel versioncode="1.00.2008.03.23">` | the file |
-| `<gclasses/>` | the custom macros of the original editor; the engine does not interpret them — do not use them |
+| `<gclasses/>` | the custom macros; the engine does not interpret them — do not use them |
 | the root `<module moduleid="0" moduleclass="main" owner="0" kind="C">` | the model; it owns the `<links>` that wire the blocks and has no ports |
 | a block `<module moduleid="N" moduleclass="Class" owner="0" kind="A">` | one block of that class; `N` is unique in the model; `owner="0"` says the model root holds it |
 | `<props>` | the properties of the class, one `<property>` each |
@@ -264,7 +298,7 @@ Five blocks: a clock, a generator, a queue, a facility and a terminate. The queu
 </modules></gmodel>
 ```
 
-With `seed: 42` this model: one transaction arrives, joins `Cola`, takes `Servidor`, waits 9 units and terminates. The report says `end_time` 79 and the queue `Cola` has 2 entries.
+With `simulate({ path, seed: 42 })` this model: one transaction arrives, joins `Cola`, takes `Servidor`, waits 9 units and terminates. The report says `end_time` 79 and the queue `Cola` has 2 entries.
 
 ## Entities
 
@@ -314,7 +348,7 @@ The value of a property that carries an expression is written in the language of
 |---|---|
 | `12`, `12.5` | a number |
 | `a+b`, `a-b`, `a*b`, `a/b` | arithmetic |
-| `a#b` | **multiplication** — `#` is not division: the original's editor has no `*` key, it offers `/`, `%`, `#` and `@` |
+| `a#b` | **multiplication** — `#` is not division: the notation offers `/`, `%`, `#` and `@`, and no `*` |
 | `a@b` | modulo |
 | `( )` | grouping; `-a` is the negation |
 | `70%` | the editor's per-mille form: it evaluates to **700** |
@@ -356,14 +390,14 @@ Do not mix the two percentage forms: in an expression `70%` is 700, but in `Tran
 - **A `Clock` has no output port**, so it cannot send a transaction anywhere: it is the horizon of the run, not an event. An event at a given time is a `Generate` with an `OffSet`, or a `Logic` that a `GateL` waits for.
 - **A `Terminate` with `Unidades=0` removes the transaction and never ends the run**; with a number it takes that many units from the counter of the run for every transaction that arrives (the run ends when the counter reaches zero).
 - **A `Table` tabulates an expression.** Its `Atributo` is evaluated at the `Tabulate` block, not when the table is declared: `Atributo="AC1-P:HoraLlegada"` records the time each transaction waited.
-- **A generator does not arrive at time 0**: the first transaction arrives one interval later — unless `OffSet` shifts it, and then the first arrival is *at* the offset (`OffSet=120` arrives at time 120, not at 130). **An `OffSet` of zero arrives at time 0**; an `OffSet` that is empty leaves the first arrival drawn from the mean. A numeric `Modificador` is a symmetric spread, `uniform(Media-Modificador, Media+Modificador)`; `Modificador=0` means exactly `Media`; a **function** as the modifier multiplies the mean (`Media * f(u)`), the idiom for an exponential service. **With a spread, the first interval is drawn too**, like the ones that follow: the original does that and so does the engine (`crates/genmsi-core/tests/primera_llegada.rs` pins the three cases).
+- **A generator does not arrive at time 0**: the first transaction arrives one interval later — unless `OffSet` shifts it, and then the first arrival is *at* the offset (`OffSet=120` arrives at time 120, not at 130). **An `OffSet` of zero arrives at time 0**; an `OffSet` that is empty leaves the first arrival drawn from the mean. A numeric `Modificador` is a symmetric spread, `uniform(Media-Modificador, Media+Modificador)`; `Modificador=0` means exactly `Media`; a **function** as the modifier multiplies the mean (`Media * f(u)`), the idiom for an exponential service. **With a spread, the first interval is drawn too**, like the ones that follow (`crates/genmsi-core/tests/primera_llegada.rs` pins the three cases).
 - **`FacilityUse` is five statements**: queue, seize, depart, advance, release. The transaction waits in the `Queue` while the facility is busy.
 - **`Queue` joins, it does not dequeue**: the transaction enters the queue and goes on its way; it stays in the queue until a `Depart` takes it out. A queue whose model has no `Depart` never empties, and the report says so (`content` grows, `zero_entries` stays at zero).
 - **`Match` is a rendezvous**: the transaction waits at the block (the trace shows a `backup` event) for the transaction that carries the conjugate label; the pair then continues together — **both** of them, so **both** keep whatever they had taken. A rendezvous is not a handover of one item to the other.
 - **`Transfer` splits**: the first output takes the share `Prob`, the second takes the rest.
 - **A storage needs its capacity**: `StorageDef` declares it. `Enter` takes units and keeps them until a `Leave` gives them back; a transaction that does not fit **waits at the `Enter`**, and a `Leave` never waits. `StorageUse` is the pair in one block: it joins the queue, takes the units, leaves the queue, waits the `Media` and gives the units back. The unit is **held, not consumed**, so a storage of capacity N admits N transactions at a time and the next one waits.
 - **The gate blocks** (`GateF`, `GateL`, `GateS`, `GateM`): the pass goes to `Salida1`; when `Salida2` is not connected, the transaction waits in the block and every change of the state retries the waiters.
-- **`Split` creates copies**: the original continues to its own output and the copies go to `Salida2`.
+- **`Split` creates copies**: the transaction goes on to `Salida1` and `Split.Cantidad` copies of it go to `Salida2`.
 
 
 ## Probe before you rely on it

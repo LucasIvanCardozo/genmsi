@@ -1,19 +1,15 @@
-# GenMSI
-
-<p align="center">
-  <b>A discrete-event simulation workshop for Linux: draw a model, run it, and watch the numbers.</b>
-</p>
-
-<p align="center">
-  <sub>The engine, the format and the tools are in Rust; the desktop application is Tauri 2 + React.</sub>
-</p>
-
-<p align="center">
-  <img alt="CI" src="https://github.com/LucasIvanCardozo/genmsi/actions/workflows/checks.yml/badge.svg">
-  <img alt="MIT" src="https://img.shields.io/badge/license-MIT-059669">
-  <img alt="v0.5.1" src="https://img.shields.io/badge/version-0.5.1-6366f1">
-  <img alt="Linux" src="https://img.shields.io/badge/platform-Linux-0d9488">
-</p>
+<div align="center">
+  <img src="crates/genmsi-app/src-tauri/icons/128x128.png" width="96" alt="GenMSI">
+  <h1>GenMSI</h1>
+  <p><b>A discrete-event simulation workshop: draw a model, run it, and watch the numbers.</b></p>
+  <p><sub>The engine, the format and the tools are in Rust; the desktop application is Tauri 2 + React.</sub></p>
+  <p>
+    <img alt="CI" src="https://github.com/LucasIvanCardozo/genmsi/actions/workflows/checks.yml/badge.svg">
+    <img alt="MIT" src="https://img.shields.io/badge/license-MIT-059669">
+    <img alt="v0.5.1" src="https://img.shields.io/badge/version-0.5.1-6366f1">
+    <img alt="linux · macos · windows" src="https://img.shields.io/badge/platform-linux%20%C2%B7%20macos%20%C2%B7%20windows-0d9488">
+  </p>
+</div>
 
 ## What it is
 
@@ -52,28 +48,32 @@ graph LR
   class F fuente
 ```
 
-## Run it
+## Install it
 
-Linux, Rust stable, and Bun for the frontend.
+The application is installed with the installers of the
+[releases](https://github.com/LucasIvanCardozo/genmsi/releases): every release
+carries the packages of the systems, all of the same version.
+
+| System | What the release carries |
+|---|---|
+| Linux | `.deb` and `.rpm` (x86_64 and arm64), the Flatpak, and a `.tar.gz` portable |
+| Arch and CachyOS | `.pkg.tar.zst` |
+| macOS | `.dmg` (Intel and Apple Silicon) |
+| Windows | `-setup.exe` and `.msi` (x64) |
+
+The sources of the packages are in [`packaging/`](packaging).
+
+From the source, the application runs in the browser against the real engine
+(it needs Rust stable and Bun):
 
 ```sh
 git clone https://github.com/LucasIvanCardozo/genmsi.git
 cd genmsi
-scripts/dev-app.sh          # the application in the browser, against the real engine
+scripts/dev-app.sh
 ```
 
-To install it as a desktop application:
-
-```sh
-./scripts/install-linux.sh
-```
-
-And the engine on its own:
-
-```sh
-cargo build --release
-./target/release/genmsi --help
-```
+And the engine on its own, with `cargo build --release`:
+`./target/release/genmsi --help`.
 
 ## The MCP server (beta)
 

@@ -9,6 +9,57 @@ The **reference application** is the Windows program the harness of
 `scripts/wine-oracle/` runs under Wine; every comparison in this file is made
 against it.
 
+This is the reference of the `.gmdl` format and of the semantics the engine
+implements: what every block means, how an expression is evaluated and what a
+run produces. It is here so that whoever writes a model knows what is going to
+happen, and so that whoever reads the code knows which rules it obeys. It is
+read by the authors of models, by the readers of the engine's source, and by
+anyone who asks why the engine behaves the way it does.
+
+- [1. The file format](#1-the-file-format) — the XML of a `.gmdl` document:
+  the modules, the properties, the percent-encoding and the canvas the engine
+  composes.
+  - [Round-trip guarantee](#round-trip-guarantee) — the proof that a rewrite is
+    byte-for-byte identical and that the geometry of the model survives it.
+  - [The composition of the canvas](#the-composition-of-the-canvas) — how the
+    engine lays the blocks out (dagre, network simplex, Brandes–Köpf) and when
+    it does it.
+- [2. Container topology](#2-container-topology) — how the containers own their
+  links, what the entry and exit ports mean and how the flow is resolved
+  inside them.
+- [3. Block expansion](#3-block-expansion) — the GPSS statements every class
+  compiles to, and the modules that compile to none.
+- [4. Expression language](#4-expression-language) — the grammar of the
+  properties that carry an expression, and the forms that look alike but are
+  not.
+- [5. Runtime semantics (with the evidence that pinned them)](#5-runtime-semantics-with-the-evidence-that-pinned-them) —
+  what each statement does at run time, with the comparison against the
+  reference application that pinned it.
+  - [Settled: the first interval with a dispersion is drawn](#settled-the-first-interval-with-a-dispersion-is-drawn) —
+    the deviation that became a rule, and the measurement that settled it.
+- [6. Validation inferred from the five error outputs](#6-validation-inferred-from-the-five-error-outputs) —
+  the five refusals of the reference application and the rule the engine
+  applies to each one.
+- [7. Reports, exports and replications](#7-reports-exports-and-replications) —
+  the GPSS report, the JSON and CSV exports, the replications with their
+  interval, and the trace.
+  - [Deviations from the report of the reference application](#deviations-from-the-report-of-the-reference-application) —
+    the places where our report differs on purpose, and why none of them
+    changes the simulation.
+- [8. Oracle comparison](#8-oracle-comparison) — how the numbers of a run are
+  compared with the baseline of the reference application, and the rule that
+  decides that they match.
+- [9. The GPSS as a second oracle](#9-the-gpss-as-a-second-oracle) — the GPSS
+  text of both programs and the tools that compare them statement by
+  statement.
+  - [What the phase measured](#what-the-phase-measured) — the numbers the phase
+    reached, and the benches that cannot be compared.
+  - [What the oracle found that no one was looking for](#what-the-oracle-found-that-no-one-was-looking-for) —
+    the three defects the comparison uncovered.
+  - [9.1 What the reference application writes](#91-what-the-reference-application-writes) —
+    the naming, the spelling and the operands of the statements of the
+    reference application.
+
 ## 1. The file format
 
 A `.gmdl` file is a single line of compact XML:

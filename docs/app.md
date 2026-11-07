@@ -3,12 +3,70 @@
 The desktop application of GenMSI: a thin client over the engine
 (`genmsi-core`), the same way the CLI and the MCP server are.
 
-This document describes the **third vertical slice** (Phase 4c): the app
-opens a `.gmdl`, shows its graph, **edits it** — creating, deleting,
+The app opens a `.gmdl`, shows its graph, **edits it** — creating, deleting,
 connecting and moving blocks, editing their properties, undoing, copying
 and pasting — saves the model back to a `.gmdl`, with the structure the
 format declares, and **replays a finished run** in a monitor of its own,
 with the clock, the state of the entities and the charts of the run.
+
+This document says how the logic is divided (the frontend, the facade and
+the engine), what a **document** is (the versioned JSON the engine publishes
+and the app renders), what an **editing session** is (the model in memory,
+with its undo stack and its save), and how the interface looks.
+
+It is read by two kinds of reader: whoever maintains the app, who needs to
+know what can be touched and what cannot — the app never writes the XML of
+a model, every mutation is a command of the format — and whoever integrates
+the app with the rest of GenMSI, who needs to know what can be asked of it:
+the operations of the adapter, the documents it publishes and the proposals
+it accepts.
+
+**Start here**
+
+The app in a browser, against the real engine (the script builds the engine
+first):
+
+```bash
+scripts/dev-app.sh
+```
+
+The desktop application, installed for the current user:
+
+```bash
+scripts/install-linux.sh
+```
+
+The visual work loop — the screenshots of the interface and what to look at
+in them — is in [`app-visual-loop.md`](app-visual-loop.md).
+
+- [The shape of the app](#the-shape-of-the-app) — how the work is divided
+  between the frontend, the facade and the engine, and what the app owns:
+  [one adapter and its two backends](#one-adapter-two-backends), [the
+  session that owns the model](#the-session-owns-the-model), [the watcher
+  of the file on disk](#the-app-watches-the-model-it-has-open), [the live
+  document](#the-app-publishes-one-document-about-itself) and [what the app
+  shows](#the-app-publishes-what-it-is-showing), [the proposal of an
+  agent](#the-app-adopts-the-proposal-of-an-agent), [the editing
+  commands](#the-commands), [the documents of the
+  engine](#the-documents-come-from-the-engine) and [the generated
+  types](#the-types-are-generated).
+- [The interface](#the-interface) — the window as the reader sees it: the
+  header, the toolbar, the three panels, the lateral panel, the shape of
+  every block and the status line; then [the property
+  editors](#the-property-editors-come-from-the-declared-type), [the
+  monitor](#the-monitor-replays-the-run), [the
+  charts](#the-charts-read-the-documents) and [the
+  re-layout](#the-re-layout-is-explicit).
+- [The files](#the-files) — what every directory of the app holds: the
+  adapter, the components, the editor, the monitor, the shapes, the state,
+  the generated types and the desktop shell.
+- [Running it](#running-it) — the commands that raise the app, in the
+  browser and in the desktop shell.
+- [Checking it](#checking-it) — the tests of the app and the checks of the
+  workspace.
+- [What this slice does not do](#what-this-slice-does-not-do) — the limits
+  of the app as it is today: the monitor replays a finished run, and the
+  live monitor of a run in progress is not part of it.
 
 ## The shape of the app
 

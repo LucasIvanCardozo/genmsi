@@ -1,5 +1,17 @@
 # The visual loop of genmsi-app
 
+The procedure to look at the work of the app and to correct it: one script
+raises the app (`crates/genmsi-app/scripts/check-visual-loop.sh`), another
+drives it (`agent-browser`), and a screenshot says whether the picture is
+right.
+
+It is there so that a visual change can be **seen** before it is called
+done: the loop takes the screenshots of the flow and looks at them.
+
+It is read by whoever works on the interface: a panel, a shape or a message
+that changes goes through the loop, and its pictures are looked at before the
+change is finished.
+
 The UI of this app is reviewed with a browser, not by reading the code: the
 frontend runs under Vite, `agent-browser` opens it, the loop clicks, takes a
 screenshot in `/tmp` and looks at it before the slice is closed.
@@ -11,8 +23,29 @@ decision `S4`).
 The whole loop is one runnable script,
 `crates/genmsi-app/scripts/check-visual-loop.sh`; it runs these steps in
 order, takes the screenshots and exits non-zero if any step fails. The
-manual steps below are the same commands, spelled out one by one — when the
-script changes, this document changes with it.
+script is the source of truth: the steps below are its commands, spelled out
+one by one, and a change to the loop changes the script first.
+
+- [What it takes](#what-it-takes) — what the loop needs before it starts:
+  the engine built, the frontend's dependencies installed, the binaries the
+  dev bridge spawns, and the copy of the model the loop edits.
+- [1. Start the dev server in the
+  background](#1-start-the-dev-server-in-the-background) — the server under
+  Vite and the wait until it answers.
+- [2. Open it and look at it](#2-open-it-and-look-at-it) — the browser
+  session, the viewport and the first look at the app.
+- [3. Drive the slice](#3-drive-the-slice) — the flow of the loop: the
+  helpers of the browser, the model, the editing steps (create a node,
+  connect it, drag it, undo, redo, re-layout, save and reopen), a model the
+  engine refuses, and the monitor with its charts and its report.
+- [4. Look, fix, repeat](#4-look-fix-repeat) — what to look at in each
+  screenshot, and what to do when the picture is not what it should be.
+- [5. Close the loop](#5-close-the-loop) — the browser and the server
+  closed, and the log where a failed request shows up.
+- [The checklist of a slice](#the-checklist-of-a-slice) — the five steps
+  that close a change: build, loop, tests, types and shutdown.
+- [The desktop shell](#the-desktop-shell) — the shell's own smoke check,
+  and the flags its webview needs under `Xvfb`.
 
 ## What it takes
 

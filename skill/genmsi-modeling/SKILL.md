@@ -138,6 +138,11 @@ A run has two faces: the **events** (what happened, one by one) and the
 **summary** (what each block did). The trace is the first and the summary is
 the second, and most of the questions an agent asks are about the second.
 
+**The events.** The events the trace records are the ones the command line
+lists in `docs/cli.md`, under `trace`. (The guide travels outside the
+repository when it is installed, so it names the document instead of linking
+it.)
+
 **The filters.** `get_trace` takes `classes` (the classes of the blocks),
 `nodes` (the blocks of the document, by their `moduleid`), `xact` (a
 transaction), and `from` and `to` (a window of simulated time). They are

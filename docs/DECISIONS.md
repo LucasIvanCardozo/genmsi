@@ -4,6 +4,35 @@ Every architecture decision made for genmsi lives here. Phase sessions read
 this file and do not re-litigate settled decisions; a decision change requires
 a new entry (or an explicit supersede) in this file.
 
+This is the index: what each decision is, and whether it still stands as it
+was written. The entries are self-contained; read the one you need.
+
+| # | Decision | State |
+|---|---|---|
+| D1 | Language: Rust | vigente |
+| D2 | Structure: Cargo workspace with layered crates | modificada por D15 (la excepción de la regla de capas) |
+| D3 | Model format: DOM parsing (roxmltree), not streaming | modificada (la medición es de un archivo local, no versionado) |
+| D4 | Expression language: pest grammar | vigente |
+| D5 | RNG: rand + rand_chacha, seeded per run | vigente |
+| D6 | Fidelity goal: semantic equivalence with statistical tolerance | vigente |
+| D7 | Agent integration: MCP first-class via rmcp | ampliada por D14, D15, D21 y D23 |
+| D8 | GUI: Tauri 2 + React 19 + React Flow | modificada (el stack que se usa hoy) |
+| D9 | Oracle: Wine verifies, published GPSS semantics lead | vigente |
+| D10 | Verification: proptest for invariants, insta for snapshots | vigente |
+| D11 | Simplicity guard | vigente |
+| D12 | Phase sessions protocol | vigente |
+| D13 | CLI output contract: one deterministic document per subcommand | modificada (`mcp` es la excepción, y hay dos documentos más) |
+| D14 | MCP tool surface: the CLI's documents, a model by path or by document | vigente |
+| D15 | One entry point for the MCP server: `genmsi mcp`, `genmsi-mcp` kept | vigente |
+| D16 | The lint document says what the format found, in `genmsi.lint/1` | vigente |
+| D17 | The agent's knowledge: facts in the catalogue, structure in the explain document, procedure in the guide | vigente |
+| D18 | The engine composes the canvas | modificada (el algoritmo de composición es el network simplex) |
+| D19 | One zone of truth: the engine publishes, the app invents nothing | vigente |
+| D20 | The design of the interface is approved by the user, and only by the user | vigente |
+| D21 | The MCP's verb: one batch, one vocabulary, atomic, and it writes | vigente |
+| D22 | The live state of the app: the app publishes it, the agent reads it, and the verb refuses to overwrite what is being read | vigente |
+| D23 | The proposal: the agent offers a model, the person decides | modificada (ocho herramientas, no nueve) |
+
 ## D1 — Language: Rust
 
 One engine feeds CLI, MCP server and GUI without duplicated logic; a static
@@ -18,9 +47,15 @@ Layer rule: only `genmsi-format` and `genmsi-core` may be dependencies of more
 than one crate. CLI, MCP and GUI are thin layers with no simulation logic.
 Each crate compiles and is tested independently.
 
+The rule has one exception (D15): `genmsi-cli` depends on `genmsi-mcp`, so the
+same binary can serve the protocol. The desktop app enters the workspace as
+`crates/genmsi-app/engine` —a thin facade over `genmsi-core`— while the Tauri
+shell stays out of it, because its dependency tree is heavy.
+
 ## D3 — Model format: DOM parsing (roxmltree), not streaming
 
-The largest input is `gClasses.xml` at 722 KB; it fits in memory trivially.
+The largest input measured was the class library at 722 KB (a local copy of
+the reference set, not versioned); it fits in memory trivially.
 Streaming (quick-xml) adds complexity with no benefit at this size. Revisit
 only if multi-hundred-MB inputs ever appear.
 
@@ -34,13 +69,14 @@ Parse errors come with line/column, which agents and humans need.
 
 Same seed → bit-for-bit reproducible run. Basis for replications, confidence
 intervals, and the semantic oracle regression tests. Compatibility with the
-original is statistical, not bit-exact.
+reference application is statistical, not bit-exact.
 
 ## D6 — Fidelity goal: semantic equivalence with statistical tolerance
 
-`.gmdl` models from the original must open and run with results equivalent
-within statistical tolerance. Replicating Delphi/GPSS internal RNG and
-floating-point quirks is out of scope.
+`.gmdl` models must open and run with results equivalent, within statistical
+tolerance, to the ones the reference application produces. Replicating the
+internal random generator of that program, and its floating-point quirks, is
+out of scope.
 
 ## D7 — Agent integration: MCP first-class via rmcp
 
@@ -48,17 +84,17 @@ floating-point quirks is out of scope.
 `get_trace`, `explain_model`. The tool surface is a thin adapter over the same
 API the CLI uses.
 
-## D8 — GUI: Tauri 2 + React 19 + React Flow (Phase 4)
+## D8 — GUI: Tauri 2 + React 19 + React Flow
 
 The node editor needs a best-in-class graph component; native GUI toolkits
-(egui, Slint) would require hand-building it. Frontend: React Flow, Zustand,
-Tailwind + shadcn/ui, Recharts (single charting library). Shared types are
-generated from the Rust schema (ts-rs or typify). GUI work starts only after
-the engine and format are frozen by tests.
+(egui, Slint) would require hand-building it. Frontend: React Flow, Zustand, Tailwind (with
+the project's own components, no component library), Recharts (single charting
+library). Shared types are generated from the Rust schema (ts-rs). The GUI was
+built after the engine and the format were frozen by tests.
 
 ## D9 — Oracle: Wine verifies, published GPSS semantics lead
 
-The original `genmsi.exe` runs under Wine to *verify* equivalence. Semantic
+The reference application runs under Wine to *verify* equivalence. Semantic
 ground truth comes from published GPSS documentation (GPSS/H, GPSS World);
 black-box Wine deduction is the slow path, used only to resolve discrepancies.
 The engine implements first the block subset actually used by the project's
@@ -72,8 +108,8 @@ traces so regressions show up in the diff.
 
 ## D11 — Simplicity guard
 
-Goal is minimum parity with the original, with better code quality — not a
-maximally professional system. Every tool addition must justify itself against
+Goal is equivalent behaviour with better code quality — not a maximally
+professional system. Every tool addition must justify itself against
 that goal.
 
 ## D12 — Phase sessions protocol
@@ -87,16 +123,21 @@ Product questions go to the user through the coordinator.
 
 Every `genmsi` subcommand writes exactly one deterministic document to stdout and
 nothing to stderr unless it fails, which is what makes the output snapshot-testable
-and usable from CI (ROADMAP Phase 2). `--json` wraps the body in a versioned
+and usable from CI. `--json` wraps the body in a versioned
 envelope, `{"schema": "genmsi.<document>/<major>", ...}`; within one major version a
 change is additive only (new fields may appear; existing names, types and meanings
 stay), and a breaking change bumps the number. Exit codes: `0` success, `1` the
-model does not load, validate or run (including the five models the original
-refuses), `2` usage error, `3` `lint` found compiler diagnostics on a runnable
-model. `trace` has no filters beyond `--limit`, and `run-all <dir>` exists as the
-CI convenience that sweeps one directory. Rationale: the smallest surface that
-covers the original's workflow (D11) while giving scripts a contract they can
+model does not load, validate or run (including the five reference models the
+engine refuses), `2` usage error, `3` `lint` found compiler diagnostics on a runnable
+model. `genmsi mcp` is the one exception to the rule: it speaks a protocol,
+not a document. `trace` has no filters beyond `--limit`, and `run-all <dir>`
+exists as the CI convenience that sweeps one directory. The seven subcommands
+publish seven documents: `genmsi.lint/1`, `genmsi.report/1`,
+`genmsi.trace/1`, `genmsi.gpss/1`, `genmsi.layout/1` and `genmsi.run-all/1`.
+Rationale: the smallest surface that covers a modelling session (D11) while
+giving scripts a contract they can
 depend on; the schema field lets each document grow without breaking consumers.
+The complete contract is published in [`docs/cli.md`](cli.md).
 
 ## D14 — MCP tool surface: the CLI's documents, a model by path or by document
 
@@ -120,7 +161,7 @@ line and the column possible, the semantic model records the source position of
 every block (`genmsi-format`: `Block::source`); the field is additive, the
 writer never reads it, and the engine keeps producing byte-identical `.gmdl`
 files. The position points at the opening tag of the `<module>` element in the
-`.gmdl` source, not at the line of the GPSS program the original generated.
+`.gmdl` source, not at the line of the GPSS program the engine compiled.
 
 This phase delivers the server as its own binary, `genmsi-mcp`, speaking MCP
 over stdio. D7's wording (`genmsi mcp` runs the server) needs the CLI path,
@@ -214,7 +255,8 @@ simulation), and it leaves a model that is already composed exactly as its
 author placed it: a model whose blocks all carry their geometry is left
 alone, and one that does not is composed entirely (the composition is one
 picture, not a patch). It only happens when something asks for it (the app's
-`Reacomodar`, the MCP before it writes a model, the CLI's `genmsi layout`).
+`Reordenar el grafo en capas`, the MCP before it writes a model, the CLI's
+`genmsi layout`).
 
 There is one algorithm, not two. The frontend had its own copy of the
 re-layout, and a copy is a second answer to the same question: the app
@@ -235,11 +277,15 @@ top and its output at its bottom, so the flow a reader follows goes down. The
 flow is counted over the whole model, with the borders of the containers
 spliced, so a link that crosses a container says where the flow goes.
 
-The layers are cut with the **tight tree**, not with the network simplex: the
-simplex minimises the length of the links and, to do it, pushes the sources
-down, so the parallel branches of a flow stop starting together and the reader
-no longer sees the fork. The tight tree leaves every block as early in the
-flow as it can be.
+The layers are cut with the **network simplex**, which minimises the number of
+links that cross a layer. The alternative was the **tight tree**, which cuts
+the same rows (they are the depth of the flow) but crosses 76 more links over
+the corpus; the tree leaves every block as early in the flow as it can be,
+which was the reason to prefer it, but it costs more crossings. The tree is
+kept as the fallback: the simplex panics on some compound graphs (the cycles
+of the container borders), and the composition must never panic, so the answer
+comes from the tree when the simplex fails. Both answers are the same every
+time, so the composition stays deterministic.
 
 The measure lives in the engine (`genmsi_format::measure`) and the corpus
 test compares the composition against a committed baseline: a change to the
@@ -252,6 +298,8 @@ Rationale: the session the user ran asked for a simpler model and wrote it
 with two Python scripts, because the MCP had no way to build a model and the
 file it wrote had no geometry to draw. The engine composing the canvas is
 what makes an agent's model a model the reader can see.
+
+The algorithm itself is described in [format-and-engine.md](format-and-engine.md#the-composition-of-the-canvas).
 
 ## D19 — One zone of truth: the engine publishes, the app invents nothing
 
@@ -285,8 +333,8 @@ belongs to the run and not to the model: the model document is built from the
 file, without compiling, so that a model that does not compile still has its
 graph.
 
-Rationale: the figure of a block does not exist in the original's report (the
-original writes one row per statement, not one per block), so the engine has
+Rationale: the figure of a block is not part of the report (the report has one
+row per statement, not one per block), so the engine has
 to publish it if anybody wants it. The user saw the consequence of the app
 making it up: a facility use that served 59 transactions showed 295.
 
@@ -467,7 +515,9 @@ The rules that stay:
   that does not name a file works on what the person is looking at, instead
   of guessing a destination. With no app and no file, the tool says so
   (`no_open_model`) instead of failing vaguely;
-- **no new tool**: the surface of the MCP stays at nine tools. What was added
+- **no new tool**: the surface of the MCP stays at eight tools (`catalogue`,
+  `apply_edit`, `lint`, `simulate`, `get_trace`, `explain_model`,
+  `save_model`, `app_state`). What was added
   are optional fields, which is what D13 allows inside a major version.
 
 What this does not change: the engine keeps owning the formats (D19), the

@@ -1,7 +1,8 @@
-# Evidencia: cómo el original compila el `SELECT` y el `EXAMINE`
+# Evidencia: cómo se compila el `SELECT` y el `EXAMINE`
 
-Las sondas de este directorio le preguntan al original (`genmsi.exe`, bajo
-Wine) tres cosas que el motor no sabía:
+Las sondas de este directorio le preguntan al **simulador de referencia**
+(`genmsi.exe`, el programa de Windows que corre bajo Wine y contra el que se
+compara el motor) tres cosas que el motor no sabía:
 
 1. qué escribe el listado del programa cuando el `SELECT` escoge una entidad
    de cada una de las 38 clases de la lista `entitySNAclass`;
@@ -9,13 +10,13 @@ Wine) tres cosas que el motor no sabía:
    almacén (los operadores de `op_Logic_Stor`);
 3. qué escribe el `EXAMINE` cuando su salida de fallo está conectada.
 
-Los modelos y las respuestas del original son artefactos generados: no se
+Los modelos y las respuestas del simulador son artefactos generados: no se
 commitean (como los bancos). Lo que se commitea es el generador, el arnés y
 esta tabla, que es la evidencia.
 
 ## Cómo se hicieron
 
-Los modelos se generan con el catálogo del propio original
+Los modelos se generan con el catálogo del propio simulador
 (`Genmsi_20230711.backup/gClasses.xml`), que es lo que evita el diálogo de
 "adaptación" que cuelga el arnés:
 
@@ -38,7 +39,7 @@ capturas de pantalla, para los modelos que no terminan.)
 El verbo es el que dice la propiedad `op` del módulo (`Minimo` → `MIN`) y la
 clase es el último operando. Las 38:
 
-| Clase | Lo que escribe el original | Modelo |
+| Clase | Lo que escribe el simulador | Modelo |
 |---|---|---|
 | `BV` | `SELECT MIN param,1,10,,BV` | `select_BV` |
 | `CA` | `SELECT MIN param,1,10,,CA` | `select_CA` |
@@ -83,7 +84,7 @@ clase es el último operando. Las 38:
 
 Los seis operadores de `op_Logic_Stor`. La columna de la izquierda es la
 propiedad `op` del módulo `SelectS`; las dos del medio son el listado del
-original con la salida de fallo (`Salida2`, "No selec") **sin** conectar y
+simulador con la salida de fallo (`Salida2`, "No selec") **sin** conectar y
 **con** conectar:
 
 | `op` | Sin salida de fallo | Con la salida conectada |
@@ -101,10 +102,10 @@ Los modelos son `sels_<op>.gmdl` (con la salida conectada) y
 ## El destino de la salida de fallo de las otras clases de la familia
 
 Las sondas `select_<clase>_dest.gmdl` (una por clase de la familia, con la
-salida de fallo conectada) miden lo que el original escribe en el listado
+salida de fallo conectada) miden lo que escribe el simulador en el listado
 cuando tiene un destino que escribir. Las tres:
 
-| Clase | Lo que escribe el original |
+| Clase | Lo que escribe el simulador |
 |---|---|
 | `SelectF` | `SELECT NU param,1,10,,,A_Terminate1` |
 | `SelectL` | `SELECT LS param,1,10,,,A_Terminate1` |
@@ -119,7 +120,7 @@ sentencia es `SELECT MIN param,1,10,,Q` y no lleva destino.
 ## El `EXAMINE` sin destino
 
 La sonda `examine_sin_destino.gmdl` (el `Examine` con la salida de fallo sin
-conectar) no deja listing: el original se niega a abrir el modelo y dice
+conectar) no deja listing: el simulador se niega a abrir el modelo y dice
 
 ```
 Error en linea     1 -> Faltan parámetros
@@ -151,42 +152,46 @@ unidad dentro, o lleno.
 | `par_snv_lleno` | `NoDisponible` | lleno | 0 | 120 |
 
 La regla que queda: el `SV` elige el almacén y el `SNV` no elige ninguno.
-Es la que dice el manual del simulador (`VISUALSIS.HLP`): "El storage tiene
-que estar disponible para que sea seleccionado" y "El storage no tiene que
-estar disponible para que sea seleccionado". El estado de "disponible" es
-una bandera del almacén que sólo cambian las sentencias `SAVAIL` y
-`SUNAVAIL` (la biblioteca de clases del original no tiene ninguna de las
-dos), así que un almacén de un modelo del editor siempre está disponible.
+Es la que dice el manual del simulador
+(`Genmsi_20230711.backup/VISUALSIS.HLP`): "El storage tiene que estar
+disponible para que sea seleccionado" y "El storage no tiene que estar
+disponible para que sea seleccionado". El estado de "disponible" es una
+bandera del almacén que sólo cambian las sentencias `SAVAIL` y `SUNAVAIL`
+(la biblioteca de clases del simulador no tiene ninguna de las dos), así
+que un almacén de un modelo del editor siempre está disponible.
 
 ## El `EXAMINE`
 
-Con la salida de fallo conectada a un terminador, el original escribe:
+Con la salida de fallo conectada a un terminador, el simulador escribe:
 
 ```
 A_Examine       EXAMINE         UnGrupo,,A_Terminate1
 ```
 
 y sin ella no compila el modelo ("Error en linea 1 -> Faltan parámetros").
-Es lo mismo que dice el manual del simulador (`VISUALSIS.HLP`): "Número de
-bloque. Destino alternativo para la transacción activa si no es encontrado
-ningún miembro. Requerido".
+Es lo mismo que dice el manual del simulador
+(`Genmsi_20230711.backup/VISUALSIS.HLP`): "Número de bloque. Destino
+alternativo para la transacción activa si no es encontrado ningún miembro.
+Requerido".
 
 ## Lo que dice nuestro motor
 
-Con los 34 modelos de estas sondas de los que el original dejó el listado,
-nuestro listado coincide con el suyo, sentencia por sentencia
-(`scripts/wine-oracle/compare-gpss.sh`): **34 de 34**.
+En la corrida de estas sondas, el listado que produjo el motor coincide
+sentencia por sentencia con el que dejó el simulador en los 34 modelos de
+los que quedó el listado. La comparación es la de
+`scripts/wine-oracle/compare-gpss.sh`, que recibe un par de archivos (el
+listado del motor y el del simulador) y dice si coinciden o no: **34 de 34**
+es el conteo de esa corrida, no una cifra que ningún test fije. Los modelos
+de las sondas son artefactos generados que no se commitean, así que
+reproducirla exige el entorno de Wine y el simulador.
 
-Lo que **no** coincide, y queda anotado en `odd/tasks/notas-gpss-forma.md`
-("Lo que queda fuera"):
+Las dos diferencias que quedaban anotadas en `odd/tasks/notas-gpss-forma.md`
+("Lo que queda fuera") están resueltas, y el test que las fija es
+`crates/genmsi-core/tests/destinos.rs`:
 
-- el `SELECTS` con la salida de fallo conectada: el original escribe el
-  destino como último operando (`SE param,1,10,,,A_Terminate1`) y el nuestro
-  no;
-- los operadores `SV` y `SNV` de la lista `op_Logic_Stor`: el original los
-  escribe y el catálogo del editor no los ofrece.
+- el `SELECTS` con la salida de fallo conectada: el listado escribe el
+  destino como último operando (`SE param,1,10,,,A_Terminate1`);
+- los operadores `SV` y `SNV` de la lista `op_Logic_Stor`: el catálogo del
+  editor ofrece los seis operadores de la lista.
 
-Las dos cosas están arregladas en `odd/tasks/notas-destinos.md` (rama
-`feature/destinos-y-operadores`): el listado escribe el destino de la salida
-de fallo de las cuatro clases de la familia y los seis operadores de
-`op_Logic_Stor` están en el catálogo del editor.
+El detalle de cada una está en `odd/tasks/notas-destinos.md`.

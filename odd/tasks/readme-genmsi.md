@@ -113,11 +113,11 @@ el de mayor retorno es uno: **la captura de la app**.
 
 | ID | Qué hace | Specs | Ruta | Commit |
 |---|---|---|---|---|
-| T1 | Los ocho artboards del README (tema claro y oscuro) en `design/readme-genmsi/`, con el `design.json` | S2, S3, S4, S5, S9 | padre (canvas) | `docs(design)` |
-| T2 | El README nuevo, con las nueve secciones | S1, S3, S4, S5, S6, S8, S9 | padre | `docs(readme)` |
-| T3 | `docs/mcp.md`: las configuraciones de los seis clientes y los dos avisos | S7 | padre | `docs(mcp)` |
-| T4 | El estado del proyecto y la licencia: versión, fases, MIT, el original | S4, S8 | padre | `docs(readme)` |
-| T5 | Verificación: enlaces, cifras contra el repo, el reporte contra una corrida real, el markdown renderizado | S8 | padre | `docs(readme)` |
+| T1 | Los ocho artboards del README (tema claro y oscuro) en `design/readme-genmsi/`, con el `design.json` | S2, S3, S4, S5, S9 | padre (canvas) | local — `design/` está en `.gitignore` (el lienzo no es producto) |
+| T2 | El README nuevo, con las nueve secciones | S1, S3, S4, S5, S6, S8, S9 | padre | `38bb5a6` |
+| T3 | `docs/mcp.md`: las configuraciones de los seis clientes y los dos avisos | S7 | worker (`gentle-ai-worker`) | `f6b5fb8` |
+| T4 | El estado del proyecto y la licencia: versión, fases, MIT, el original | S4, S8 | padre | `38bb5a6` |
+| T5 | Verificación: enlaces, cifras contra el repo, el reporte contra una corrida real, el markdown renderizado | S8 | padre | `38bb5a6` (sin cambios: verificado) |
 
 ## Log
 
@@ -130,3 +130,6 @@ el de mayor retorno es uno: **la captura de la app**.
 - L7 — Diseño: `design/readme-genmsi/`, con ocho artboards (01-hero, 02-que-es, 03-demo, 04-por-que-los-numeros, 05-arquitectura, 06-mcp, 07-docs-estado, 08-readme-completo) y el generador `design/readme-genmsi/render.mjs`, que los renderiza **desde `README.md`** con los tokens de `design/system.md`: la maqueta y el markdown no pueden divergir. Cada artboard lleva su conmutador de tema (claro/oscuro) y sus notas de diseño. El artboard elegido es el **08** (el README completo), que es el que se implementa; los otros son sus secciones.
 - L8 — La corrida del reporte va con **semilla fija** (`--seed 42`): sin ella el reporte cambia entre corridas, porque el modelo es estocástico, y el README mostraría cifras que el lector no puede reproducir. Con la semilla, la salida del README es exactamente la que el lector obtiene.
 - L9 — Correcciones de hecho sobre el README anterior, encontradas al verificar: la herramienta `open_model` no existe (es `app_state`); las seis configuraciones de clientes y los dos avisos vivían en el README y no en `docs/mcp.md` (que es adonde van, T3); el README decía «The five configurations» y son seis.
+- L10 — Verificación (T5): los 17 enlaces del README resuelven; las ocho herramientas del README son exactamente las ocho del código (`crates/genmsi-mcp/src/server.rs`); las veinte filas del oráculo coinciden **por nombre** con `docs/oracle-comparison.md` y las barras se calcularon desde ese documento; las 66 clases de bloque, contadas en `crates/genmsi-format/src/catalogue.rs`; el reporte del README es idéntico byte a byte a la corrida con `--seed 42`.
+- L11 — Entrega: dos commits de unidad de trabajo en la rama (`38bb5a6` el README, `23d6d9a` la feature). El corte de la unidad quedó en **624 líneas authored** (README + el documento de la feature y su espejo), así que la unidad siguiente —`docs/mcp.md`— se mantiene chica y sola. El diseño no entra al repo: `design/` está en `.gitignore` ("el lienzo del diseño no es parte del producto").
+- L12 — Handoff: el artboard elegido es el **08** (`design/readme-genmsi/08-readme-completo.html`), que es la página entera; los otros siete son sus secciones. La implementación es el README en markdown, y el generador (`render.mjs`) renderiza los artboards desde ese mismo markdown: la maqueta y el documento salen de la misma fuente, así que no pueden divergir. El handoff no compromete nada por sí solo; el README está en `38bb5a6`.

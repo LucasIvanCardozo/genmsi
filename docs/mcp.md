@@ -556,6 +556,99 @@ The server runs as its own binary, `genmsi-mcp`, and as the subcommand
 `genmsi mcp` (decision D15): both speak the same protocol over the same
 stdio, and the CLI's subcommand is the one the installer registers.
 
+## Configuring the server in a client
+
+The server is the same everywhere: it is the same binary, the same engine and
+the same protocol. What changes is the file each client reads and the key it
+uses.
+
+The installer registers the server with Pi and puts the agent's guide in
+place:
+
+```sh
+./scripts/install-linux.sh --with-mcp
+```
+
+**Pi** — the command writes the file wherever that Pi reads it
+(`~/.pi/agent/mcp.json`, and `.pi/mcp.json` in a trusted project):
+
+```sh
+pi mcp add genmsi -- ~/.local/bin/genmsi mcp
+```
+
+**Claude Desktop** — `~/.config/Claude/claude_desktop_config.json`, key
+`mcpServers`:
+
+```json
+{
+  "mcpServers": {
+    "genmsi": {
+      "command": "/home/you/.local/bin/genmsi",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**Cursor** — `~/.cursor/mcp.json`, key `mcpServers`:
+
+```json
+{
+  "mcpServers": {
+    "genmsi": {
+      "command": "/home/you/.local/bin/genmsi",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**VS Code (Copilot)** — `.vscode/mcp.json`, and the key is `servers`:
+
+```json
+{
+  "servers": {
+    "genmsi": {
+      "type": "stdio",
+      "command": "/home/you/.local/bin/genmsi",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**Windsurf** — `~/.codeium/windsurf/mcp_config.json`, key `mcpServers`.
+**Zed** — `~/.config/zed/settings.json`, key `context_servers`.
+
+## Two things that bite
+
+**The working directory.** The server inherits the directory the client
+launches it in, and a relative `path` is resolved against it: the same call
+works in one client and fails in another. Pin it when the client can
+(`pi mcp add genmsi --cwd /path/to/Genmsi -- …`), and use **absolute paths**
+in the calls — `app_state` already returns one: the `path` of the
+`genmsi.live/1` document is the absolute path of the model the app has open.
+
+**The guide is a file, not the protocol.** The catalogue, the tool
+descriptions and the published schema travel in the protocol, so an agent can
+build a model with the MCP alone. The *procedure* (how a model is written,
+which entities it has to declare, what the expression language is) lives in
+the guide, and it is installed with the product:
+[`skill/genmsi-modeling/SKILL.md`](../skill/genmsi-modeling/SKILL.md).
+`skill/` is a **skills root**: copying its contents into `~/.agents/skills/`
+is the whole installation.
+
+```sh
+cp -r skill/genmsi-modeling ~/.agents/skills/    # or: scripts/install-linux.sh --with-mcp
+```
+
+A write is refused for one more reason: while the desktop app has
+**unsaved changes** on the model the call names, `save_model` and
+`apply_edit` refuse with `model_locked` and write nothing: the app does not
+reload a model that changes under it while the reader has changes that are
+not saved. Ask `app_state` before you write, tell the reader, and send the
+same call again once the model is saved.
+
 ## See also
 
 - [`docs/cli.md`](cli.md): the documents the tools return, in full.

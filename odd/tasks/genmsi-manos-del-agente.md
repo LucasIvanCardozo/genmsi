@@ -320,7 +320,7 @@ el código, usó los filtros, el resumen y el mapa. Lo que encontró:
   hablar con la app real de la máquina: documentado en `docs/mcp.md`.
 
 L16 (2026-11-02, T7, la verificación diferencial, contra el commit base
-`f6a17ca`): el MCP de la base y el de la rama, compilados los dos y
+`b11d219`): el MCP de la base y el de la rama, compilados los dos y
 comparados con las mismas llamadas. **Las mismas respuestas** en `lint` con
 un archivo, `simulate` con un archivo, `lint` y `simulate` con un
 documento, y `lint` con las dos cosas. Y **diferencias sólo donde las

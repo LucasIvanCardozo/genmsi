@@ -113,12 +113,12 @@ leer el repositorio y sin escribir XML a mano.
 
 | ID | Task | Specs | Route | Commit |
 |---|---|---|---|---|
-| T1 | `genmsi-format`: `EditCommand`, `PlacedId` y `Placement` derivan `JsonSchema` detrás de la feature `schemars` | S3a | inline | `f534b7a` |
-| T2 | `genmsi-mcp`: la herramienta `apply_edit` (entrada, colocación `auto`/`explicit`, rollback atómico, check-before-write) y el documento `genmsi.edit/1` | S2, S3, S4, S6, S7 | inline | `f534b7a` (el documento), `228cdaf` (la herramienta) |
-| T3 | `genmsi-mcp`: la clase de error `invalid_command` con el índice y el `op` del comando que falló | S3b, S5 | inline | `228cdaf` |
-| T4 | tests: unitarios (rollback, colocación, no-escribe, inline) y de protocolo (el agente construye un modelo de punta a punta) | S2, S3 | subagente (worker) | `5344fa5` |
-| T5 | `docs/mcp.md`: la herramienta, el documento, la clase de error, la regla de colocación; se saca la sección "Not in this phase" (ya vencida por D15) | S2, S5 | inline | `7ad9493` |
-| T6 | `docs/DECISIONS.md`: D21 (el verbo del MCP: un lote, una gramática, atómico, escribe) | S3 | inline | `7ad9493` |
+| T1 | `genmsi-format`: `EditCommand`, `PlacedId` y `Placement` derivan `JsonSchema` detrás de la feature `schemars` | S3a | inline | `11449c6` |
+| T2 | `genmsi-mcp`: la herramienta `apply_edit` (entrada, colocación `auto`/`explicit`, rollback atómico, check-before-write) y el documento `genmsi.edit/1` | S2, S3, S4, S6, S7 | inline | `11449c6` (el documento), `5652716` (la herramienta) |
+| T3 | `genmsi-mcp`: la clase de error `invalid_command` con el índice y el `op` del comando que falló | S3b, S5 | inline | `5652716` |
+| T4 | tests: unitarios (rollback, colocación, no-escribe, inline) y de protocolo (el agente construye un modelo de punta a punta) | S2, S3 | subagente (worker) | `5dd8f28` |
+| T5 | `docs/mcp.md`: la herramienta, el documento, la clase de error, la regla de colocación; se saca la sección "Not in this phase" (ya vencida por D15) | S2, S5 | inline | `bd7c3d4` |
+| T6 | `docs/DECISIONS.md`: D21 (el verbo del MCP: un lote, una gramática, atómico, escribe) | S3 | inline | `bd7c3d4` |
 | T7 | close: `cargo test --workspace` verde, `clippy --workspace --all-targets -D warnings` limpio | — | inline | el árbol |
 | T8 | medición: agente en frío por MCP, con el criterio de salida de S8 | S8 | subagente (worker) | — |
 
@@ -199,13 +199,13 @@ limpio.
 L12 (2026-10-31, defecto preexisting, no de esta feature): el clippy del
 workspace no estaba limpio en `main`: `crates/genmsi-core/examples/repro_app_model.rs`
 (un `mut` de sobra) y `crates/genmsi-core/examples/repro_bypass.rs` (un import
-sin usar), ambos del commit `563db27`. Arreglados aparte (`ea99a3a`), porque
+sin usar), ambos del commit `563db27`. Arreglados aparte (`2ebd571`), porque
 bloqueaban la puerta de verificación.
 
 L13 (2026-10-31, corte de la entrega): la feature se entrega en **cinco
 commits** sobre `feature/mcp-apply-edit` (base `main`), cada uno revisable:
-`ea99a3a` (los dos lints preexistentes), `f534b7a` (el esquema y el
-documento), `228cdaf` (la herramienta), `5344fa5` (los tests), `7ad9493` (la
+`2ebd571` (los dos lints preexistentes), `11449c6` (el esquema y el
+documento), `5652716` (la herramienta), `5dd8f28` (los tests), `bd7c3d4` (la
 documentación). El corte de la entrega está en el commit de la
 documentación; la medición (T8) cierra la feature.
 
@@ -244,7 +244,7 @@ sobre las magnitudes.
 L18 (2026-10-31, lo que encontró la medición): seis cosas. **D1** era un
 defecto del verbo —no había forma sancionada de crear un modelo nuevo: una
 ruta que no existe daba `model_not_found` y `save_model` rechaza el
-esqueleto vacío— y está **arreglada** (`5473298`): una ruta que no está en
+esqueleto vacío— y está **arreglada** (`8db7085`): una ruta que no está en
 el disco es un modelo que el lote crea, partiendo del esqueleto. **D2** y
 **D3** eran la guía: no decía la forma de cada comando (`setCaption` usa
 `caption`, no `value`) ni la regla de los ids (los bloques de un lote toman
@@ -267,7 +267,7 @@ sin estado inconsistente después de un fallo. Encontró **un defecto real**:
 con geometría incompleta, la composición del motor (que corría después del
 lote) reescribía las posiciones y `layout: "explicit"` no se cumplía —un
 bloque colocado en (321, 654) terminaba en (321, 810)—. **Arreglado**
-(`9de9060`): el lienzo se compone antes del lote y las coordenadas del
+(`d634f7e`): el lienzo se compone antes del lote y las coordenadas del
 comando son la última palabra, con un test que es un RED real.
 
 El verificador señaló además cinco desacuerdos entre la documentación y el

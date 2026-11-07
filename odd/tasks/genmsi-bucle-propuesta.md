@@ -243,7 +243,7 @@ comando Tauri (`session`) con un protocolo de ops (`engine/src/protocol.rs`);
 y `Session::reload` cambia la ruta del modelo, así que adoptar una
 propuesta necesita un método nuevo que **no** la cambie.
 
-L13 (2026-11-02, T1 — el núcleo, commit `39c0293`): el documento
+L13 (2026-11-02, T1 — el núcleo, commit `d675057`): el documento
 `genmsi.proposal/1` y el directorio de destino viven en
 `crates/genmsi-core/src/proposal.rs`; `LiveBody` gana `proposal`;
 `EditSession::adopted(model, checkpoint)` hace que un modelo que llega de
@@ -261,7 +261,7 @@ L15 (2026-11-02, decisión del orquestador, la ley del freno): la propuesta
 `model_locked` posterior sigue mirando lo que mira: un modelo con cambios
 sin guardar no se escribe, esté o no haya una propuesta en la mesa.
 
-L16 (2026-11-02, T2 — el MCP, commit `ffc3f23`): el `path` por defecto, la
+L16 (2026-11-02, T2 — el MCP, commit `afb8833`): el `path` por defecto, la
 clase `no_open_model` (el conjunto de clases pasa de 14 a 15), el `target` de
 las dos herramientas que escriben y el campo `proposal` de `genmsi.edit/1`.
 Nueve tests nuevos en `crates/genmsi-mcp/tests/proposal.rs`, con el servidor
@@ -290,7 +290,7 @@ tiene abierto, y `no_open_model` cuando no hay app— lo cubren los tests de
 las nueve herramientas quedó intacto.
 
 L19 (2026-11-02, decisión del orquestador, corte de slice): la feature
-entrega **cuatro commits** —el núcleo (`39c0293`), el MCP (`ffc3f23`), la app
+entrega **cuatro commits** —el núcleo (`d675057`), el MCP (`afb8833`), la app
 (T3+T4) y la documentación (T5)— y ninguno pasa de ~1000 líneas. El total
 del rama (1839 al cierre de T2) supera el corte de ~400, así que la revisión
 se toma **por commit**, nunca sobre el rama acumulado: cada commit es una
@@ -324,7 +324,7 @@ llegaba. El documento vivo publica ahora la propuesta que **espera**
 `pending`, y después `accepted` o `rejected` con la nota.
 
 L23 (2026-11-02, verificación diferencial, T6): el MCP del commit base
-(`f6a17ca`) y el de la rama, compilados los dos y comparados con las
+(`b11d219`) y el de la rama, compilados los dos y comparados con las
 mismas llamadas sobre el mismo modelo: `lint`, `simulate`, `get_trace` y
 `explain_model` con un `path`; `lint` y `simulate` con un documento; `lint`
 con las dos cosas; `apply_edit` y `save_model`; y el catálogo. **La única

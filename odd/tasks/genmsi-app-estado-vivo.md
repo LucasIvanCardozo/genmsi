@@ -165,26 +165,26 @@ cambió el archivo") **queda fuera** de la feature: es innecesaria, porque el
 humano se entera por el agente.
 
 L9 (2026-10-31, T1 — el núcleo): el documento `genmsi.live/1` vive en
-`genmsi-core/src/live.rs` (commit `b6cf40f`): el modelo abierto, el `dirty`,
+`genmsi-core/src/live.rs` (commit `93de9df`): el modelo abierto, el `dirty`,
 los diagnósticos, el modelo en memoria (sólo cuando difiere del disco) y la
 última corrida. El error del directorio de datos pasó a `AppDataError`: ya no
 es sólo el del modelo abierto. Cinco tests.
 
 L10 (2026-10-31, T3 y T4 — el MCP, worker): la herramienta `app_state` y el
-freno `model_locked` (commit `633eb60`). El freno va **antes** de parsear,
+freno `model_locked` (commit `b85242c`). El freno va **antes** de parsear,
 compilar o escribir, y sólo aplica a la fuente de archivo (un modelo en
 texto no tiene archivo que la app pueda tener abierto). El worker pidió una
 decisión sobre el pin de herramientas de `tests/tools.rs` (ocho → nueve): la
 tomé yo, porque el pin existe para eso.
 
-L11 (2026-10-31, T5 y T6 — la guía y la documentación, commit `21a035d` y
-`d4ef724`): el procedimiento en la guía (mirar antes de escribir, avisar,
+L11 (2026-10-31, T5 y T6 — la guía y la documentación, commit `977b5ef` y
+`182f988`): el procedimiento en la guía (mirar antes de escribir, avisar,
 reenviar el lote), D22 con el porqué, y `docs/mcp.md` y `docs/app.md` con la
 herramienta, el documento y el freno.
 
 L12 (2026-10-31, T2 — la app, worker): la app publica `live.json` con el
 escritor atómico del núcleo, **sólo cuando el estado cambia** (compara el
-texto con el último publicado), y lo borra al cerrar (commit `908b406`). La
+texto con el último publicado), y lo borra al cerrar (commit `ff1c187`). La
 sesión guarda la última corrida y arma el cuerpo del documento.
 
 L13 (2026-10-31, cierre): `cargo test --workspace` → **637 tests verdes**;

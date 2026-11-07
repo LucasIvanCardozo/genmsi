@@ -18,7 +18,7 @@ complementarias.
 - Entrega: `chain_strategy=feature-branch-chain` — un PR por unidad de trabajo
 - Tests: `node --test tests/*.test.ts` desde `crates/genmsi-app`
 - Pronóstico: ~1800 líneas authored en total; el corte de la primera unidad
-  ya pasó las 400 (`b8345df`)
+  ya pasó las 400 (`2a48233`)
 
 ## Specs
 
@@ -112,18 +112,18 @@ Los contratos de honestidad de la sección, que el caché no puede tocar:
 
 | ID | Specs | Tarea | Ruta | Commit |
 |---|---|---|---|---|
-| T0 | S1, S2 | El ritmo del pintado y la imagen del canvas: el sampler, el selector "Refresco", la vía urgente y el panel que dice el ritmo | inline | `b8345df` |
-| T1 | S3 | El caché puro `SeriesCache` (`rows`, `segments`, `waits`) y sus tests de equivalencia con las implementaciones de referencia | subagente | `18822ce` |
-| T2 | S3 | El script de medición del costo del pintado, antes y después, con los datos del motor | subagente | `9666000` |
-| T3 | S3 | El índice de la reproducción lleva el caché | inline | `18822ce` |
-| T4 | S3 | Las tres series (colas, almacenes, cadenas) leen el caché | subagente | `9d2f796` |
-| T5 | S3 | Los segmentos de las facilities y la distribución de las esperas leen el caché | subagente | `9d2f796` |
-| T6 | S3 | `ResourceRanking` recibe lo que `MonitorCharts` ya calculó | inline | `9d2f796` |
+| T0 | S1, S2 | El ritmo del pintado y la imagen del canvas: el sampler, el selector "Refresco", la vía urgente y el panel que dice el ritmo | inline | `2a48233` |
+| T1 | S3 | El caché puro `SeriesCache` (`rows`, `segments`, `waits`) y sus tests de equivalencia con las implementaciones de referencia | subagente | `27c7fa9` |
+| T2 | S3 | El script de medición del costo del pintado, antes y después, con los datos del motor | subagente | `694e022` |
+| T3 | S3 | El índice de la reproducción lleva el caché | inline | `27c7fa9` |
+| T4 | S3 | Las tres series (colas, almacenes, cadenas) leen el caché | subagente | `e419673` |
+| T5 | S3 | Los segmentos de las facilities y la distribución de las esperas leen el caché | subagente | `e419673` |
+| T6 | S3 | `ResourceRanking` recibe lo que `MonitorCharts` ya calculó | inline | `e419673` |
 | T7 | S3 | El cierre: suite completa, medición antes/después y verificación visual | inline | — |
 
 ### El corte de la entrega
 
-La unidad base (`b8345df`, 479 líneas) ya pasó las ~400: a partir de ahí cada
+La unidad base (`2a48233`, 479 líneas) ya pasó las ~400: a partir de ahí cada
 unidad de trabajo es un PR encadenado sobre la rama de la feature, y el
 documento va registrando el corte de cada uno.
 
@@ -150,7 +150,7 @@ el usuario aprobó deja `seriesFrom` como implementación de referencia y
 pide que el test nuevo **pine la equivalencia** con ella.
 
 L6 (2026-11-06, T0, inline): el ritmo del pintado y la imagen del canvas
-quedaron en `b8345df` (479 líneas). Verificado en la app real con
+quedaron en `2a48233` (479 líneas). Verificado en la app real con
 `agent-browser`: con "cada frame" el reloj visible de la sección se movía 21
 veces en 2 s; con "cada 500 ms", 4 veces en 2 s; el seek de una reproducción
 pausada se ve igual de rápido con un ritmo de 2 s que con "cada frame"
@@ -174,7 +174,7 @@ desordenados, relojes barajados = scrub, varios anchos de bin) con `fuzz ok`.
 El padre revisó el módulo: la fila final se arma con los valores del último
 cambio, el prefijo sale de `slice`, y `segments`/`waits` reconstruyen hacia
 atrás sin aliasear los arrays que ya pertenecían a otro estado.
-Commit `18822ce` (con T3: el índice lleva el caché).
+Commit `27c7fa9` (con T3: el índice lleva el caché).
 
 L9 (2026-11-06, T2, subagente, la corrección): el script de medición
 (`scripts/measure-chart-cost.ts`) medió el costo **real** de un pintado y
@@ -238,11 +238,11 @@ el orden de la cadena de entrega:
 
 | commit | unidad | PR |
 |---|---|---|
-| `b8345df` | el ritmo del pintado y la imagen del canvas | 1 |
-| `18822ce` | el caché de las series y el índice que lo lleva | 2 |
-| `9d2f796` | los gráficos leen el caché | 3 |
-| `9666000` | el script que mide el costo de un pintado | 4 |
-| `e6b239a` | este documento | — |
+| `2a48233` | el ritmo del pintado y la imagen del canvas | 1 |
+| `27c7fa9` | el caché de las series y el índice que lo lleva | 2 |
+| `e419673` | los gráficos leen el caché | 3 |
+| `694e022` | el script que mide el costo de un pintado | 4 |
+| `03f4113` | este documento | — |
 
 La entrega es una cadena de PRs sobre la rama de la feature
 (`chain_strategy=feature-branch-chain`), uno por unidad de trabajo, con un
@@ -271,4 +271,4 @@ refresco quieor que sea de 500ms por defecto, solo eso!" — el ritmo por
 defecto de la sección pasa de `cada frame` a `cada 500 ms`: dos pinturas
 por segundo, que es lo que una máquina lenta necesita y lo que un lector
 no distingue del cuadro a cuadro. El selector sigue ofreciendo `cada
-frame`. Commit `9e9dd87`, PR #8 (la última unidad de la cadena).
+frame`. Commit `3aae27c`, PR #8 (la última unidad de la cadena).

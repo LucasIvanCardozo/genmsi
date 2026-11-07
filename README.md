@@ -92,7 +92,6 @@ The details are in [`docs/mcp.md`](docs/mcp.md).
 - [`docs/cli.md`](docs/cli.md) — the command line.
 - [`docs/mcp.md`](docs/mcp.md) — the MCP server.
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — the decision log.
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — where the work stands.
 
 ## Status
 

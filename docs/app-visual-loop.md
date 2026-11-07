@@ -8,11 +8,11 @@ The loop is part of the definition of done of every slice. The screenshots
 are **not** committed: the repository does not carry images (the phase's
 decision `S4`).
 
-The whole loop is one runnable script, `crates/genmsi-app/scripts/
-check-visual-loop.sh`; it runs these steps in order, takes the screenshots
-and exits non-zero if any step fails. The manual steps below are the same
-commands, spelled out one by one — when the script changes, this document
-changes with it.
+The whole loop is one runnable script,
+`crates/genmsi-app/scripts/check-visual-loop.sh`; it runs these steps in
+order, takes the screenshots and exits non-zero if any step fails. The
+manual steps below are the same commands, spelled out one by one — when the
+script changes, this document changes with it.
 
 ## What it takes
 
@@ -21,7 +21,7 @@ changes with it.
 cargo build -p genmsi-cli -p genmsi-app-engine
 
 # The frontend's dependencies.
-cd crates/genmsi-app && bun install
+(cd crates/genmsi-app && bun install)
 ```
 
 The dev bridge spawns `target/debug/genmsi` and `target/debug/genmsi-app-engine`.
@@ -35,8 +35,9 @@ writes only in that directory.
 ## 1. Start the dev server in the background
 
 ```bash
-cd crates/genmsi-app
-bun run dev > /tmp/genmsi-vite.log 2>&1 &
+# The dev server runs in the app's directory; the steps of section 3 run
+# from the root of the repository.
+(cd crates/genmsi-app && bun run dev) > /tmp/genmsi-vite.log 2>&1 &
 echo $! > /tmp/genmsi-vite.pid
 ```
 
@@ -52,7 +53,7 @@ instead of moving the address.
 ## 2. Open it and look at it
 
 ```bash
-export AGENT_BROWSER_SESSION="genmsi-$(agent-browser session id --scope worktree --prefix fase4b)"
+export AGENT_BROWSER_SESSION="genmsi-visual-loop-$$"
 agent-browser open http://127.0.0.1:5173/
 agent-browser set viewport 1440 1000   # the graph of a reference model is a tall column
 agent-browser wait --text "GenMSI"
@@ -61,9 +62,24 @@ agent-browser snapshot -i              # the interactive elements, with their re
 
 ## 3. Drive the slice
 
-The script (`scripts/check-visual-loop.sh`) does these steps; they are
-spelled out here. Three helpers come first, because they are what the app's
-own interface allows in a browser.
+The script (`crates/genmsi-app/scripts/check-visual-loop.sh`) does these
+steps; they are spelled out here. The working directory of the steps below
+is the root of the repository, and the paths of the models are relative to
+it:
+
+```bash
+# The root of the repository: the paths of the models below are relative
+# to it.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# Where the screenshots go.
+SHOTS="${GENMSI_SHOTS:-/tmp/genmsi-app}"
+mkdir -p "$SHOTS"
+```
+
+Three helpers come first, because they are what the app's own interface
+allows in a browser.
 
 ```bash
 # Open a model in the browser.
@@ -80,7 +96,10 @@ open_model() {
   agent-browser eval "localStorage.setItem('genmsi.recent-models', JSON.stringify(['$path']))" >/dev/null
   agent-browser reload >/dev/null
   agent-browser wait --text "GenMSI"
-  agent-browser find role button click --name "Recientes"
+  # The recents live behind an icon button, not one with a name: it is the
+  # "models opened lately" button of the header, and it stays disabled while
+  # the list is empty, so the recents have to be written before the reload.
+  agent-browser eval "(() => { const b = Array.from(document.querySelectorAll('button')).find((x) => (x.getAttribute('aria-label') || '').includes('modelos abiertos')); if (!b) return 'no recent button'; if (b.disabled) return 'the recent button is disabled'; b.click(); return 'menu open'; })()" >/dev/null
   agent-browser eval "(() => { const button = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes('$file')); if (!button) return 'the model is not in the recents'; button.click(); return 'opened'; })()" >/dev/null
   # The header carries the name of the model that is open.
   agent-browser wait --text "$stem"
@@ -102,23 +121,24 @@ node_position() {
 
 ```bash
 # The reviewed model: the graph, framed with the model's own geometry.
-open_model "fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl"
+open_model "$REPO_ROOT/fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl"
 agent-browser wait --text "Puerta Banco"
-agent-browser screenshot /tmp/genmsi-app/01-grafo.png
+agent-browser screenshot "$SHOTS/01-grafo.png"
 
 # Select a block of the graph by its node id (a click by text lands on the
 # element that covers the node) and read its properties.
 agent-browser click '.react-flow__node[data-id="6"]'
-agent-browser screenshot /tmp/genmsi-app/02-propiedades.png
+agent-browser screenshot "$SHOTS/02-propiedades.png"
 
 # Run the model and read the report.
 agent-browser find role button click --name "Simular"
 agent-browser click '[data-monitor-panel="reporte"]'
 agent-browser wait --text "Bloques"
 agent-browser click '[data-monitor-aside="bloques"]'
-agent-browser screenshot /tmp/genmsi-app/03-catalogo.png
+agent-browser wait --text "Decisi"
+agent-browser screenshot "$SHOTS/03-catalogo.png"
 
-agent-browser screenshot /tmp/genmsi-app/04-reporte.png
+agent-browser screenshot "$SHOTS/04-reporte.png"
 # The editing below happens on the graph, so the window goes back to it.
 agent-browser click '[data-monitor-panel="reproduccion"]'
 agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > 0"
@@ -128,9 +148,26 @@ agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length >
 
 ```bash
 # The copy the loop edits.
-cp fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl crates/genmsi-app/.devmodels/visual.gmdl
-open_model "crates/genmsi-app/.devmodels/visual.gmdl"
+EDITED="$REPO_ROOT/crates/genmsi-app/.devmodels/visual.gmdl"
+mkdir -p "$(dirname "$EDITED")"
+cp "$REPO_ROOT/fixtures/models/TP6__Clase 6_1_PuertaBanco.gmdl" "$EDITED"
+open_model "$EDITED"
 agent-browser wait --text "Puerta Banco"
+
+# The ids the new blocks get: the session assigns the next free id, which
+# is the largest id of the model plus one. The engine computes it, so the
+# steps below carry no fixed id.
+ENGINE="${GENMSI_APP_BIN:-$REPO_ROOT/target/debug/genmsi-app-engine}"
+BASE_ID=$("$ENGINE" model "$EDITED" |
+  python3 -c 'import json,sys; print(max(b["id"] for b in json.load(sys.stdin)["blocks"]) + 1)')
+# The blocks the picture shows: the ones the model places on the canvas.
+NODE_COUNT=$("$ENGINE" model "$EDITED" |
+  python3 -c 'import json,sys; print(len([b for b in json.load(sys.stdin)["blocks"] if b["layout"]]))')
+# The links the model has: the new one is one more.
+EDGE_COUNT=$("$ENGINE" model "$EDITED" |
+  python3 -c 'import json,sys; print(len(json.load(sys.stdin)["edges"]))')
+GENERATE_ID=$BASE_ID
+TERMINATE_ID=$((BASE_ID + 1))
 
 # A new node, created from the catalogue. The classes live in the lateral
 # panel, in the tab "Bloques".
@@ -140,76 +177,76 @@ agent-browser wait --text "Generar"
 # can be clicked.
 agent-browser scrollintoview '[data-block-class="Generate"]'
 agent-browser click '[data-block-class="Generate"]'
-agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > 18"
-agent-browser screenshot /tmp/genmsi-app/05-nodo-nuevo.png
+agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > $NODE_COUNT"
+agent-browser screenshot "$SHOTS/05-nodo-nuevo.png"
 
 # A second node, and the connection between the two: the new Generate feeds
 # the new Terminate, so the link does not replace any other one. React Flow
 # listens to the pointer events, so the connection is a real mouse drag.
 agent-browser scrollintoview '[data-block-class="Terminate"]'
 agent-browser click '[data-block-class="Terminate"]'
-agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > 19"
+agent-browser wait --fn "document.querySelectorAll('.react-flow__node').length > $((NODE_COUNT + 1))"
 agent-browser find role button click --name "Encuadrar"
 agent-browser wait 300
 
 # The drag needs the coordinates of the two handles, read from the picture:
 # the blocks move with the model, so fixed coordinates would not land.
-from_centre=$(centre_of ".react-flow__node[data-id=\"39\"] .react-flow__handle-bottom")
-to_centre=$(centre_of ".react-flow__node[data-id=\"40\"] .react-flow__handle-top")
+from_centre=$(centre_of ".react-flow__node[data-id=\"$GENERATE_ID\"] .react-flow__handle-bottom")
+to_centre=$(centre_of ".react-flow__node[data-id=\"$TERMINATE_ID\"] .react-flow__handle-top")
 agent-browser mouse move "${from_centre%,*}" "${from_centre#*,}"
 agent-browser mouse down left
 agent-browser mouse move "${to_centre%,*}" "${to_centre#*,}" --duration 400 --steps 12
 agent-browser mouse up left
-agent-browser wait --fn "document.querySelectorAll('.react-flow__edge').length > 9"
-agent-browser screenshot /tmp/genmsi-app/06-conectado.png
+agent-browser wait --fn "document.querySelectorAll('.react-flow__edge').length > $EDGE_COUNT"
+agent-browser screenshot "$SHOTS/06-conectado.png"
 
 # The node is dragged: one drag is one undo entry.
-POSITION_BEFORE=$(node_position 39)
-x=$(centre_of '.react-flow__node[data-id="39"]')
+POSITION_BEFORE=$(node_position "$GENERATE_ID")
+x=$(centre_of ".react-flow__node[data-id=\"$GENERATE_ID\"]")
 agent-browser mouse move "${x%,*}" "${x#*,}"
 agent-browser mouse down left
 agent-browser mouse move $(( ${x%,*} - 120 )) $(( ${x#*,} - 60 )) --duration 400 --steps 12
 agent-browser mouse up left
-agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"39\"]').style.transform !== '$POSITION_BEFORE'"
-agent-browser screenshot /tmp/genmsi-app/07-arrastrado.png
+agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"$GENERATE_ID\"]').style.transform !== '$POSITION_BEFORE'"
+agent-browser screenshot "$SHOTS/07-arrastrado.png"
 
 # Undo takes the drag back.
 agent-browser press "Control+z"
-agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"39\"]').style.transform === '$POSITION_BEFORE'"
-agent-browser screenshot /tmp/genmsi-app/08-deshacer.png
+agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"$GENERATE_ID\"]').style.transform === '$POSITION_BEFORE'"
+agent-browser screenshot "$SHOTS/08-deshacer.png"
 
 # And redo puts it back.
 agent-browser press "Control+Shift+z"
-agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"39\"]').style.transform !== '$POSITION_BEFORE'"
-agent-browser screenshot /tmp/genmsi-app/09-rehacer.png
+agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"$GENERATE_ID\"]').style.transform !== '$POSITION_BEFORE'"
+agent-browser screenshot "$SHOTS/09-rehacer.png"
 
 # The re-layout: the button asks the engine to compose the model, and the
 # blocks move to the layers of the flow. The composition is the engine's,
 # the same one the MCP applies before it writes a model.
-POSITION_BEFORE=$(node_position 39)
+POSITION_BEFORE=$(node_position "$GENERATE_ID")
 agent-browser find role button click --name "Reordenar el grafo en capas"
-agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"39\"]').style.transform !== '$POSITION_BEFORE'"
-agent-browser screenshot /tmp/genmsi-app/10-reacomodado.png
+agent-browser wait --fn "document.querySelector('.react-flow__node[data-id=\"$GENERATE_ID\"]').style.transform !== '$POSITION_BEFORE'"
+agent-browser screenshot "$SHOTS/10-reacomodado.png"
 
 # The model is saved, and the app says so.
 agent-browser find role button click --name "Guardar"
 agent-browser wait --text "Se guardó"
-agent-browser screenshot /tmp/genmsi-app/11-guardado.png
+agent-browser screenshot "$SHOTS/11-guardado.png"
 
 # The file is reopened: the change is in the file, not only in the session.
 agent-browser open http://127.0.0.1:5173/
 agent-browser wait --text "GenMSI"
-open_model "crates/genmsi-app/.devmodels/visual.gmdl"
+open_model "$EDITED"
 agent-browser wait --text "Puerta Banco"
-agent-browser screenshot /tmp/genmsi-app/12-reabierto.png
+agent-browser screenshot "$SHOTS/12-reabierto.png"
 ```
 
 ### A model the engine refuses
 
 ```bash
-open_model "fixtures/models/TP9__tp9.gmdl"
+open_model "$REPO_ROOT/fixtures/models/TP9__tp9.gmdl"
 agent-browser wait --text "El modelo no compila"
-agent-browser screenshot /tmp/genmsi-app/13-error.png
+agent-browser screenshot "$SHOTS/13-error.png"
 ```
 
 `agent-browser wait --text ...` is the wait to use after an action: the app
@@ -226,7 +263,7 @@ model with the run on it.
 ```bash
 # The model of the monitor: it has queues, facilities and tables, so the
 # charts have something to draw.
-open_model "fixtures/models/TP4__supermercado.gmdl"
+open_model "$REPO_ROOT/fixtures/models/TP4__supermercado.gmdl"
 agent-browser wait --text "supermercado"
 
 # The run it needs.
@@ -234,7 +271,7 @@ agent-browser wait --text "Ejecutar"
 agent-browser find role button click --name "Ejecutar"
 # The clock of the run advances: the monitor is playing the trace.
 agent-browser wait --fn "!document.body.innerText.includes('0:00:00')"
-agent-browser screenshot /tmp/genmsi-app/14-monitor.png
+agent-browser screenshot "$SHOTS/14-monitor.png"
 
 # The replay is paused and put at the middle of the run, so the picture is
 # the same on every run. React reads the value of the input from its own
@@ -242,18 +279,26 @@ agent-browser screenshot /tmp/genmsi-app/14-monitor.png
 # is dispatched: the component sees the change.
 agent-browser find role button click --name "Pausar la reproducción"
 agent-browser eval "(() => { const input = document.querySelector('[aria-label=\"Posición de la reproducción\"]'); const max = Number(input.max); const value = String(Math.floor(max / 2)); const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set; setter.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); return value; })()"
-agent-browser screenshot /tmp/genmsi-app/15-monitor-reproduccion.png
+agent-browser screenshot "$SHOTS/15-monitor-reproduccion.png"
 
 # The charts of the run: the time series of the entities and the histogram
 # of the tables.
 agent-browser click '[data-monitor-panel="graficos"]'
 agent-browser wait --text "Histograma"
-agent-browser screenshot /tmp/genmsi-app/16-monitor-graficos.png
+agent-browser screenshot "$SHOTS/16-monitor-graficos.png"
 
 # The report of the run, with the numbers of the instant the replay is at.
 agent-browser click '[data-monitor-panel="reporte"]'
 agent-browser wait --text "Colas"
-agent-browser screenshot /tmp/genmsi-app/17-monitor-reporte.png
+agent-browser screenshot "$SHOTS/17-monitor-reporte.png"
+
+# The bench of the shapes: the 66 classes of the catalogue, unconnected, so
+# that every silhouette is seen with the same eye. The model does not
+# compile (a model with no links is not a model), and the app says so in
+# the status line while it draws every block.
+open_model "$REPO_ROOT/crates/genmsi-app/fixtures/catalogo-clases.gmdl"
+agent-browser wait --text "catalogo-clases"
+agent-browser screenshot "$SHOTS/18-banco-clases.png"
 ```
 
 ## 4. Look, fix, repeat
@@ -266,13 +311,13 @@ with the image reader of the session). The things to look at:
 - the selected block shows its properties, decoded, with one editor per
   declared type;
 - the new node is on the picture, connected to the other one, and the
-  labels of the link are the original editor's (`A_<Class>`);
+  labels of the link follow the format's `A_<Class>` convention;
 - the undo takes the drag back and the redo puts it back;
 - the re-layout puts the blocks in layers: that picture is the engine's
   composition, the same one the MCP applies before it writes a model;
 - the diagnostics say what the model compiles to, after every change;
-- the report's tables carry the engine's numbers, with the original's comma
-  decimals;
+- the report's tables carry the engine's numbers, with the comma decimals
+  of the CLI's report;
 - the monitor's clock moves with the replay, the blocks that hold
   transactions are marked, and the panel shows the content of the queues and
   the owner of the facilities at that instant;
@@ -297,8 +342,8 @@ shows up.
 
 ## The checklist of a slice
 
-1. `cargo build -p genmsi-cli -p genmsi-app-engine` (the engine did not move,
-   but the build must be there).
+1. The engine is built and the dependencies are installed (see *What it
+   takes*).
 2. `crates/genmsi-app/scripts/check-visual-loop.sh`, or the manual steps
    above: start the dev server, wait for it, open it, take the screenshots of
    the flow the slice adds, look at them, fix what they show.

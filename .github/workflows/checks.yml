@@ -94,3 +94,36 @@ jobs:
       - name: The tests of the shell
         working-directory: crates/genmsi-app/src-tauri
         run: cargo test
+
+  # The commits: who signs them and what they say.
+  #
+  # The rule of the project: no commit carries an attribution footer (no
+  # `Co-Authored-By`, no `Signed-off-by`), and the only author is the owner of
+  # the repository. It is written down in `AGENTS.md`; this job is what makes
+  # it true, because a rule that is not checked is a wish.
+  atribucion:
+    name: La atribución de los commits
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The whole history: the rule is about every commit, not about the
+          # last one.
+          fetch-depth: 0
+
+      - name: Ningún commit lleva pie de atribución
+        run: |
+          if git log --format=%B | grep -inE '^[[:space:]]*(co-authored-by|signed-off-by):'; then
+            echo "::error::un commit lleva pie de atribución (Co-Authored-By o Signed-off-by)"
+            exit 1
+          fi
+
+      - name: Solo el dueño firma los commits
+        run: |
+          otros="$(git log --format='%an <%ae>' | sort -u \
+            | grep -vFx 'Lucas Cardozo <lucasivancardozo27@gmail.com>' || true)"
+          if [ -n "$otros" ]; then
+            echo "::error::commits que no son del dueño del repositorio:"
+            echo "$otros"
+            exit 1
+          fi
